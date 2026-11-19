@@ -303,7 +303,7 @@ function unboundSpec(row) {
 async function countWhere(io, spec, column, start, end, extra) {
   const parts = [`${column}.gte.${start}`, `${column}.lt.${end}`];
   if (extra) parts.push(extra);
-  const res = await io.count(spec.table, { ...(spec.filters || {}), and: `(${parts.join(',')})` });
+  const res = await io.count(spec.table, { ...(spec.filters || {}), select: column, and: `(${parts.join(',')})` });
   if (!res || res.ok !== true || typeof res.count !== 'number' || !Number.isFinite(res.count)) {
     return unknown(READ_FAILED, column);
   }
@@ -660,7 +660,7 @@ export async function measureCustomerFindability(io, window, readCustomer, probe
 
 export async function loadCustomerReader() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || '';
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+  const key = process.env.SCORECARD_READONLY_JWT || '';
   if (!url || !key) return null;
   const mod = await import('../src/lib/strategic-intel/sourced-pain-points.ts');
   const { createClient } = await import('@supabase/supabase-js');
@@ -894,7 +894,7 @@ export function renderMarkdown(report) {
 export function createPostgrestReader(base, key) {
   return {
     async count(table, filters) {
-      const path = `/rest/v1/${table}?${q({ ...filters, select: '*' })}`;
+      const path = `/rest/v1/${table}?${q(filters)}`;
       const res = await restGet(base, key, path, { count: true });
       if (!res.ok) return { ok: false, error: res.error, rows: [], count: null };
       if (typeof res.count !== 'number') return { ok: false, error: 'count header missing', rows: [], count: null };
@@ -912,7 +912,7 @@ export function createPostgrestReader(base, key) {
 function loadCredentials() {
   if (existsSync('.env.local')) applyEnvFile(readFileSync('.env.local', 'utf8'));
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || '';
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+  const key = process.env.SCORECARD_READONLY_JWT || '';
   return { url: url.replace(/\/$/, ''), key };
 }
 

@@ -2,8 +2,9 @@
 # Schedule fires only after this file is on the default branch.
 # workflow_dispatch can run it from a branch.
 #
-# The database credential is an existing Actions secret, passed only as
-# environment on the build step. The step does not print it.
+# The database credential is the read-only scorecard JWT, passed only as
+# environment on the build step. The step does not print it. The service-role
+# key is not used.
 #
 # A reader that can list runs and read job logs (and cannot download artifacts)
 # takes the scorecard from the build step log, between the lines
@@ -47,9 +48,10 @@ jobs:
       - name: Build scorecard
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SCORECARD_READONLY_JWT: ${{ secrets.SCORECARD_READONLY_JWT }}
         run: |
           set +x
+          node scripts/scorecard-readonly-check.mjs
           ./node_modules/.bin/tsx scripts/daily-acquisition-scorecard.mjs --out-dir "$RUNNER_TEMP/scorecard"
 
       - name: Publish job summary

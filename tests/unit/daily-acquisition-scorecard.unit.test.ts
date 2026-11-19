@@ -498,6 +498,9 @@ describe('the script and the workflow stay read-only', () => {
     expect(src).not.toMatch(/method:\s*'POST'/);
     expect(src).not.toMatch(/method:\s*'PATCH'/);
     expect(src).not.toMatch(/method:\s*'DELETE'/);
+    expect(src).not.toContain("select: '*'");
+    expect(src).not.toContain('SUPABASE_SERVICE_ROLE_KEY');
+    expect(src).toContain('SCORECARD_READONLY_JWT');
     expect(src).toContain('getAgencySourcedIntelligence');
     expect(src).toContain('restGet');
     expect(src).toContain("fact(null, 'unknown'");
@@ -517,12 +520,13 @@ describe('the script and the workflow stay read-only', () => {
     expect(workflow).toContain('actions/upload-artifact');
     expect(workflow).toContain('set +x');
     expect(workflow).toContain(SCORECARD_BEGIN);
-    expect(workflow).not.toMatch(/echo\s+.*SUPABASE_SERVICE_ROLE_KEY/);
+    expect(workflow).not.toContain('SUPABASE_SERVICE_ROLE_KEY');
     expect(workflow).not.toMatch(/echo\s+.*secrets\./);
+    expect(workflow).toContain('scorecard-readonly-check.mjs');
     const build = workflow.split('- name: Build scorecard')[1].split('- name:')[0];
     expect(build).toContain('secrets.NEXT_PUBLIC_SUPABASE_URL');
-    expect(build).toContain('secrets.SUPABASE_SERVICE_ROLE_KEY');
-    expect(workflow.replace(build, '')).not.toContain('SUPABASE_SERVICE_ROLE_KEY');
+    expect(build).toContain('secrets.SCORECARD_READONLY_JWT');
+    expect(workflow.replace(build, '')).not.toContain('SCORECARD_READONLY_JWT');
     expect(workflow.replace(build, '')).not.toContain('NEXT_PUBLIC_SUPABASE_URL');
   });
 
@@ -530,6 +534,7 @@ describe('the script and the workflow stay read-only', () => {
     const dir = mkdtempSync(join(tmpdir(), 'scorecard-'));
     const script = join(process.cwd(), 'scripts/daily-acquisition-scorecard.mjs');
     const planted = 'eyJhbGciOiJIUzI1NiJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIn0.sigvalue';
+    const plantedService = 'service-role-planted-value';
     let code = 0;
     let stdout = '';
     try {
@@ -538,7 +543,8 @@ describe('the script and the workflow stay read-only', () => {
         encoding: 'utf8',
         env: {
           PATH: process.env.PATH,
-          SUPABASE_SERVICE_ROLE_KEY: planted,
+          SUPABASE_SERVICE_ROLE_KEY: plantedService,
+          SCORECARD_READONLY_JWT: planted,
         },
       });
     } catch (err) {
@@ -560,6 +566,37 @@ describe('the script and the workflow stay read-only', () => {
     expectNoSecrets(md);
     expectNoSecrets(JSON.stringify(report));
     expect(stdout).not.toContain(planted);
+    expect(stdout).not.toContain(plantedService);
     expect(md).not.toContain(planted);
+    expect(md).not.toContain(plantedService);
+  });
+});
+
+describe('the read-only credential', () => {
+  it('the migration grants select only and keeps rollback out of the applied SQL', () => {
+    const sql = readFileSync(join(process.cwd(), 'supabase/migrations/20261119_scorecard_reader.sql'), 'utf8');
+    const applied = sql.split('-- ROLLBACK —')[0];
+    expect(applied).toContain('CREATE ROLE scorecard_reader NOLOGIN NOINHERIT');
+    expect(applied).toContain('GRANT scorecard_reader TO authenticator');
+    expect(applied).not.toMatch(/\bDROP\b/i);
+    expect(applied).not.toMatch(/\bDELETE\b/i);
+    expect(applied).not.toMatch(/\bTRUNCATE\b/i);
+    expect(applied).not.toMatch(/\bUPDATE\b/i);
+    expect(applied).not.toMatch(/\bINSERT\b/i);
+    expect(applied).not.toMatch(/\bALTER\s+(ROLE|POLICY)\b/i);
+    expect(sql).toContain('DROP ROLE IF EXISTS scorecard_reader');
+    expect(applied).toContain('GRANT SELECT (created_at, last_modified)');
+    expect(applied).not.toMatch(/GRANT SELECT \([^)]*\bsynced_at\b/);
+    expect(applied).not.toContain('GRANT SELECT (job_name, route');
+  });
+
+  it('a permission-denied write passes and a constraint error means the key can write', async () => {
+    const { classifyWriteAttempt } = await import('../../scripts/scorecard-readonly-check.mjs');
+    expect(classifyWriteAttempt(401, '{"code":"42501","message":"permission denied for table data_source_instances"}').ok).toBe(true);
+    expect(classifyWriteAttempt(403, 'permission denied for table data_source_instances').ok).toBe(true);
+    expect(classifyWriteAttempt(400, '{"code":"23502","message":"null value in column \\"name\\""}').ok).toBe(false);
+    expect(classifyWriteAttempt(401, 'new row violates row-level security policy').ok).toBe(false);
+    expect(classifyWriteAttempt(201, '').ok).toBe(false);
+    expect(classifyWriteAttempt(401, 'Invalid API key').ok).toBe(false);
   });
 });
