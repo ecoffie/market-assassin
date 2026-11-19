@@ -8,7 +8,7 @@ Source: `GET https://ag-dashboard.acquisitiongateway.gov/api/v3.0/resources/fore
 
 DHS is not one of the 16 Gateway departments. OFPP's later phase will upload DHS forecasts to the Gateway; that phase has no date yet (DHS notice, November 2026).
 
-The official industry page is https://www.dhs.gov/advance-acquisition-planning-forecast-contract-opportunities (page text: last updated 2026-11-09; downloads of the full forecast as XLSX, CSV, and PDF). The CSV URL returns Akamai 403 from this network. A public copy of that CSV has 1,365 data rows.
+The official industry page is https://www.dhs.gov/advance-acquisition-planning-forecast-contract-opportunities (page text: last updated 2026-11-09; full forecast and "most recent forecast updates," each as XLSX, CSV, and PDF). Those downloads are the APFS extract. The CSV URL returns Akamai 403 from this network. A public copy of `APFS_forecast_allRecords.csv` parsed on 2026-11-19 is **659** data rows, the same component split as `/forecasts/all`, newest Forecast Published 2026-11-18. An earlier 1,365 figure was a line count of that multiline file, not a record count.
 
 The host in the old migration notice, `era-apfs.dhs.gov`, does not resolve. The live host is **`https://apfs-era.dhs.gov`**.
 
@@ -18,6 +18,8 @@ The host in the old migration notice, `era-apfs.dhs.gov`, does not resolve. The 
 - Sample: `F2027076057`, USCG/LOGCOM, NAICS `488310` Port and Harbor Operations, solicitation release 2026-11-18. The JSON has no POC. NAICS is taken from the source string.
 
 `sync-forecasts` now reads `/forecasts/all` when apfs-cloud is HTML, upserts on `(DHS, APFS number)`, and falls back to the CSV. A 500 and a 403 together still fail loud. They do not upsert empty.
+
+No second official forecast turned up. SAM.gov special notice `27_01_IL` (published 2026-10-29) keeps the files on that DHS.gov page through the transition, schedules subscriptions and search on apfs-era for December 2026, and says the nightly upload to GSA's Forecast of Contracting Opportunities has no date. OSDBU "Prospective Business Opportunities" still points at APFS. `Daily_Contract_Reporting.csv` is awarded-contract reporting.
 
 ## DHS is not on this source
 
