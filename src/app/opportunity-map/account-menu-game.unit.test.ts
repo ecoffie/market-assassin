@@ -55,6 +55,14 @@ describe('top bar streak + ranking chips', () => {
     expect(a?.getAttribute('href')).toBe('/app?panel=vault');
   });
 
+  it('a UEI with no federal dollars says "Not ranked yet" and why, linking to My Vault', async () => {
+    const { d } = await mount({ streak: okStreak, ranking: { success: true, status: 'not_found', uei: 'ABC123DEF456' } });
+    const a = d.getElementById('mindyRank');
+    expect(a?.textContent).toBe('Not ranked yet');
+    expect(a?.getAttribute('title')).toContain('UEI ABC123DEF456');
+    expect(a?.getAttribute('href')).toBe('/app?panel=vault');
+  });
+
   it('nothing when the data is unavailable — never a fake 0 or #1', async () => {
     const { d } = await mount({ streak: { success: true, status: 'unavailable' }, ranking: { success: true, status: 'unavailable' } });
     expect(d.getElementById('mindyStreak')).toBeNull();
