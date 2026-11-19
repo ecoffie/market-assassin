@@ -1366,11 +1366,8 @@ export default function DashboardPanel({ email, tier, onPanelChange }: Dashboard
         {/* Your ranking — lifetime federal dollars to the Vault UEI, overall + in-state (owner 2026-11-19). */}
         <YourRankingCard email={email} getAuthHeaders={getAuthHeaders} onAddUei={() => onPanelChange?.('vault')} />
         {/* Paid members can book a call with the Mindy team (owner 2026-11-19). For you is Pro/Team/trial only. */}
-        <section aria-label="Talk to the Mindy team" data-testid="book-call-card" className="rounded-xl border border-surface bg-ground px-4 py-3 mb-4 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="text-sm font-semibold text-white">Talk to the Mindy team</p>
-            <p className="text-xs text-muted">Get help with your market, a pursuit or a proposal. 30 minutes, free with your plan.</p>
-          </div>
+        <section aria-label="Talk to the team" data-testid="book-call-card" className="rounded-xl border border-surface bg-ground px-4 py-3 mb-4 flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-muted">Get help with your market, a pursuit or a proposal. A 30-minute call, free with your plan.</p>
           <a href={BOOK_CALL_URL} target="_blank" rel="noopener noreferrer" className="h-10 px-4 rounded-lg bg-[#006aff] hover:bg-[#0057d1] text-white text-sm font-semibold inline-flex items-center">
             {BOOK_CALL_LABEL}
           </a>
