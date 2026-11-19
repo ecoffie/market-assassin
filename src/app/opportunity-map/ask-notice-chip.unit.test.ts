@@ -2,7 +2,7 @@
  * The selected notice rides along with the MAIN Ask Mindy chat (Eric, 2026-11-16: no separate per-card chat).
  * Runs the REAL ASK_MINDY_JS in jsdom: the chip mirrors the listing drawer's selection, only the notice id is
  * sent as context:{kind:'opportunity',notice_id}, the conversation is not forked, the chip can be removed,
- * and "Open in full workspace" hands the session + notice to MindyChatPanel via sessionStorage.
+ * and stays on the Map (no handoff to the retired /app Ask panel).
  */
 import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -126,28 +126,15 @@ describe('selected notice attaches to the main chat', () => {
   });
 });
 
-describe('Open in full workspace', () => {
-  it('links to the Ask Mindy panel and hands over the session and attached notice (no message, no auto-send)', async () => {
+describe('Map Ask stays on the map (no /app chat handoff)', () => {
+  it('does not create an amkWs handoff link or write mindy_chat_handoff', async () => {
     const t = boot();
     t.w.__selectedOpp = OPP;
     t.open();
     await t.ask('q1');
-    const a = t.w.document.getElementById('amkWs') as HTMLAnchorElement;
-    expect(a.getAttribute('href')).toBe('/app?panel=chat');
-    a.addEventListener('click', (e) => e.preventDefault()); // jsdom: don't navigate
-    a.click();
-    const h = JSON.parse(t.w.sessionStorage.getItem('mindy_chat_handoff')!);
-    expect(h).toEqual({ v: 1, sessionId: 'sess-1', context: { kind: 'opportunity', notice_id: NID, title: OPP.title, deadline: OPP.deadline } });
-    expect(t.w.sessionStorage.getItem('mindy_chat_seed')).toBeNull();
-  });
-  it('without a notice it carries just the session', async () => {
-    const t = boot();
-    t.open();
-    await t.ask('q1');
-    const a = t.w.document.getElementById('amkWs') as HTMLAnchorElement;
-    a.addEventListener('click', (e) => e.preventDefault());
-    a.click();
-    expect(JSON.parse(t.w.sessionStorage.getItem('mindy_chat_handoff')!)).toEqual({ v: 1, sessionId: 'sess-1', context: null });
+    expect(t.w.document.getElementById('amkWs')).toBeNull();
+    expect(MAP).not.toMatch(/mindy_chat_handoff/);
+    expect(MAP).not.toMatch(/href='\/app\?panel=chat'/);
   });
 });
 

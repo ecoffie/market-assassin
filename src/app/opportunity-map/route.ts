@@ -10997,8 +10997,8 @@ const ASK_MINDY_JS = `<script>(function(){
   var foot=input&&input.parentNode&&input.parentNode.parentNode;
   var attEl=document.getElementById('amkAtt');
   if(!attEl&&foot&&input.parentNode){ attEl=document.createElement('div'); attEl.id='amkAtt'; foot.insertBefore(attEl,input.parentNode); }
-  var wsEl=document.getElementById('amkWs');
-  if(!wsEl&&foot){ wsEl=document.createElement('a'); wsEl.id='amkWs'; wsEl.className='amk-ws'; wsEl.href='/app?panel=chat'; wsEl.textContent='Open in full workspace \u2197'; foot.appendChild(wsEl); }
+  // Map Ask is the primary surface — no handoff link into the retiring /app chat panel.
+  // Reports open in the in-chat reading pane on this drawer.
   function syncAttached(){
     if(oppCtx) return;
     var s=window.__selectedOpp;
@@ -11056,16 +11056,6 @@ const ASK_MINDY_JS = `<script>(function(){
     }).catch(fail);
   }
   window.__onSelectedOpp=function(){ if(drawer.classList.contains('show')) syncAttached(); };
-  // Continue this conversation (and the attached notice) in the full Ask Mindy workspace. The panel reads
-  // mindy_chat_handoff once and does not auto-send. Inside the /app shell the frame hands this link to the
-  // parent window; standalone it navigates normally. Same-origin frames share sessionStorage.
-  if(wsEl) wsEl.addEventListener('click',function(){
-    try{ sessionStorage.setItem('mindy_chat_handoff',JSON.stringify({v:1,sessionId:oppCtx?'':(sessionId||''),
-      context:(attached&&!oppCtx)?{kind:'opportunity',notice_id:attached.id,title:attached.title,deadline:attached.deadline}:(oppCtx?{kind:'opportunity',notice_id:oppCtx.id,title:oppCtx.title,deadline:oppCtx.deadline}:null)})); }catch(e){}
-    // So the App workspace can offer "Back to Map" without dropping this conversation.
-    try{ sessionStorage.setItem('mindy_chat_from_map','1'); }catch(e){}
-    try{ if(window.__track) window.__track('tool_use','ask_mindy_open_workspace',{attached:!!(attached||oppCtx)}); }catch(e){}
-  });
   // CHARGE ONCE PER QUESTION: every card question gets a stable turn id. It is saved here as "pending" BEFORE
   // the request and cleared only when the answer has fully arrived, so a dropped connection, a refresh or a
   // reopen asks the server for THAT question again (same id): the server returns the saved answer for free
