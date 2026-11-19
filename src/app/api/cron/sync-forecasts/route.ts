@@ -44,7 +44,7 @@ import {
 } from '@/lib/forecasts/dhs-allrecords';
 import { classifyDhsBody } from '@/lib/forecasts/dhs-source';
 import { NextRequest, NextResponse } from 'next/server';
-import { forecastWriterClient, guardForecastInserts, countNewForecastRows, quarantineRefusedLoad } from '@/lib/forecasts/writer';
+import { forecastWriterClient, guardForecastInserts, countNewForecastRows, existingForecastIds, forecastRowsForDailySync, quarantineRefusedLoad } from '@/lib/forecasts/writer';
 import { sendOpsAlert } from '@/lib/ops-alert';
 import { reportCronOutcome } from '@/lib/cron-self-report';
 import {
@@ -418,23 +418,39 @@ export async function GET(request: NextRequest) {
     }
     if (normalized) console.log(`[${JOB_NAME}] normalized ${normalized} row(s) before upsert`);
 
-    // BACKFILL SAFETY (src/lib/forecasts/writer.ts): per publisher, a daily run may not CREATE a bulk of new rows
-    // while its alert floor is active. A refused publisher's rows are held back entirely (its updates wait for the
-    // backfill that must handle the bulk) and the run reports an error; other publishers still sync.
-    // The decision is made per publisher over its FULL row set before the first upsert, so a refused publisher
-    // has zero rows written (no partial prefix from earlier batches) and its whole payload is quarantined.
+    // BACKFILL SAFETY: a daily run may not CREATE a bulk of new rows while the alert floor is active.
+    // Updates to an existing (source_agency, external_id) still upsert — a Nov 16 DOE file must be
+    // able to refresh rows it already holds even when the new-identity count trips the cap.
+    // New identities over the cap are quarantined whole (no partial insert of that new set).
     const refused: string[] = [];
-    const refusedSources = new Set<string>();
+    const heldBack = new Set<string>();
     for (const src of [...new Set(deduped.map((r) => String(r.source_agency)))]) {
       const srcRows = deduped.filter((r) => String(r.source_agency) === src);
       const nr = await countNewForecastRows(supabase, src, srcRows.map((r) => String(r.external_id)));
-      const g = 'error' in nr ? { allow: false as const, reason: `${src}: new-row count failed: ${nr.error}` } : await guardForecastInserts(supabase, src, nr.newRows);
+      if ('error' in nr) {
+        for (const r of srcRows) heldBack.add(`${src}|${r.external_id}`);
+        const q = await quarantineRefusedLoad(supabase, src, nr.error, -1, srcRows);
+        refused.push(`${src}: new-row count failed: ${nr.error} — ${q.quarantined ? 'quarantined for replay' : `QUARANTINE FAILED (${q.quarantineError}); replay needs a re-fetch`}`);
+        continue;
+      }
+      const g = await guardForecastInserts(supabase, src, nr.newRows);
       if (g.allow) continue;
-      refusedSources.add(src);
-      const q = await quarantineRefusedLoad(supabase, src, g.reason, 'error' in nr ? -1 : nr.newRows, srcRows);
-      refused.push(`${g.reason} — ${q.quarantined ? 'quarantined for replay' : `QUARANTINE FAILED (${q.quarantineError}); replay needs a re-fetch`}`);
+      const heldIds = await existingForecastIds(supabase, src, srcRows.map((r) => String(r.external_id)));
+      if ('error' in heldIds) {
+        for (const r of srcRows) heldBack.add(`${src}|${r.external_id}`);
+        refused.push(`${src}: held-id read failed: ${heldIds.error}`);
+        continue;
+      }
+      const split = forecastRowsForDailySync(
+        srcRows.map((r) => ({ ...r, external_id: String(r.external_id) })),
+        heldIds.ids,
+        false,
+      );
+      for (const r of split.quarantinedNew) heldBack.add(`${src}|${r.external_id}`);
+      const q = await quarantineRefusedLoad(supabase, src, g.reason, nr.newRows, split.quarantinedNew);
+      refused.push(`${g.reason} — updates to existing keys still upsert (${split.write.length}); new rows ${q.quarantined ? 'quarantined' : `NOT quarantined (${q.quarantineError})`}`);
     }
-    const writable = deduped.filter((r) => !refusedSources.has(String(r.source_agency)));
+    const writable = deduped.filter((r) => !heldBack.has(`${r.source_agency}|${r.external_id}`));
     if (refused.length) {
       failures.push(...refused.map((r) => `insert_refused: ${r}`));
       await sendOpsAlert({ subject: 'Forecast sync — bulk of NEW rows refused (publisher floor active)', html: `<p>${refused.map((r) => `<div>${r}</div>`).join('')}</p>` }).catch(() => {});

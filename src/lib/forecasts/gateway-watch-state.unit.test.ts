@@ -8,6 +8,8 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { mapFcoRow, parseChanged } from './fco-census';
+import { gatewayExternalId, parseGatewayRow } from './gateway-forecast';
+import { planGatewayCsvReconciliation, toGatewayCsvDbRow } from './gateway-csv-reconcile';
 import { gatewayWatchState } from './gateway-watch-state';
 
 const fixture = JSON.parse(
@@ -25,6 +27,38 @@ describe('gateway watch against the live DOI row', () => {
     expect(row.naics).toBe('115310');
     expect(row.changed).toBe('2026-11-18T11:32:18-05:00');
     expect(parseChanged(fixture.listing.data[0].render.changed)).toBe(row.changed);
+  });
+
+  it('dedupes the live DOI listing as GW-L against a held csv row and does not delete absences', () => {
+    const render = fixture.listing.data[0].render;
+    const text = (v: unknown) => String(v ?? '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+    const parsed = parseGatewayRow({
+      'Listing ID': text(render.field_source_listing_id),
+      Title: text(render.title),
+      Description: text(render.body),
+      'Funding Department / Ind. Agency': text(render.field_result_id),
+      'Funding Organization': text(render.field_funding_organization),
+      'NAICS Code': text(render.field_naics_code),
+      'Estimated Contract Value': text(render.field_estimated_contract_v_max),
+    });
+    expect(parsed).not.toBeNull();
+    expect(gatewayExternalId(parsed!)).toBe('GW-L:2027-ORWA-10101');
+    const upstream = toGatewayCsvDbRow(parsed!, 'DOI');
+    expect(upstream?.source_agency).toBe('DOI');
+    expect(upstream?.naics_code).toBe('115310');
+    expect(upstream?.bureau).toBe('Bureau of Land Management');
+    const empty = planGatewayCsvReconciliation({ agency: 'DOI', upstream: [upstream], heldCsv: new Map() });
+    expect(empty.toInsert).toHaveLength(1);
+    expect(empty.toUpdate).toHaveLength(0);
+    expect(empty.absentUpstream).toEqual([]);
+    const held = planGatewayCsvReconciliation({
+      agency: 'DOI',
+      upstream: [upstream],
+      heldCsv: new Map([['GW-L:2027-ORWA-10101', { title: 'old title', naics_code: '115310' }]]),
+    });
+    expect(held.toInsert).toHaveLength(0);
+    expect(held.matchedExisting).toBe(1);
+    expect(held.toUpdate[0]?.changedFields).toContain('title');
   });
 
   it('a source that answered with a total is stale when the census is incomplete', () => {

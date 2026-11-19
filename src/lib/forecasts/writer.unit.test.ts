@@ -6,7 +6,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import { join, relative } from 'node:path';
-import { guardForecastInserts, countNewForecastRows, DAILY_SYNC_WRITERS, DAILY_SYNC_MAX_NEW_ROWS, FORECAST_WRITER_HEADER } from './writer';
+import { guardForecastInserts, countNewForecastRows, forecastRowsForDailySync, DAILY_SYNC_WRITERS, DAILY_SYNC_MAX_NEW_ROWS, FORECAST_WRITER_HEADER } from './writer';
 
 function floorDb(floor: { state: string } | null, error: { code?: string; message: string } | null = null) {
   return {
@@ -38,6 +38,23 @@ describe('guardForecastInserts — may the DAILY SYNC create these new rows?', (
   });
   it('a floor read failure refuses (never guesses toward an alert burst)', async () => {
     expect((await guardForecastInserts(floorDb(null, { message: 'connection reset' }), 'DHS', 10)).allow).toBe(false);
+  });
+});
+
+describe('forecastRowsForDailySync', () => {
+  const rows = [
+    { external_id: 'DOE-C:OLD' },
+    { external_id: 'DOE-C:NEW' },
+  ];
+  it('writes updates when new identities are over the cap, and quarantines only the new ones', () => {
+    const split = forecastRowsForDailySync(rows, new Set(['DOE-C:OLD']), false);
+    expect(split.write.map((r) => r.external_id)).toEqual(['DOE-C:OLD']);
+    expect(split.quarantinedNew.map((r) => r.external_id)).toEqual(['DOE-C:NEW']);
+  });
+  it('writes every row when the guard allows new identities', () => {
+    const split = forecastRowsForDailySync(rows, new Set(['DOE-C:OLD']), true);
+    expect(split.write).toHaveLength(2);
+    expect(split.quarantinedNew).toEqual([]);
   });
 });
 

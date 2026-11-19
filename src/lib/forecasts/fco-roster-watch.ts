@@ -93,10 +93,11 @@ export function evaluateFcoWatch(input: FcoWatchInput, now = new Date()): FcoWat
     const unreachable = census.pagesFetched === 0;
     events.push({
       type: unreachable ? 'source_unreachable' : 'enumeration_incomplete',
-      severity: 'critical',
+      // A partial read is degraded, not a dead source. Unreachable stays critical.
+      severity: unreachable ? 'critical' : 'warn',
       message: unreachable
         ? 'FCO source unreachable — no page could be read.'
-        : `FCO enumeration INCOMPLETE (${census.incompleteReason}). Roster comparison skipped: a partial census cannot prove a department is absent.`,
+        : `FCO enumeration DEGRADED (${census.incompleteReason}). Not complete. Roster comparison skipped: a partial census cannot prove a department is absent.`,
       dedupeKey: unreachable ? 'source_unreachable' : `enumeration_incomplete:${census.uniqueRows}`,
     });
     return {

@@ -43,6 +43,34 @@ describe('live 2026-11-16 CSV slice', () => {
     expect(painting.editionDate).toBe('2026-11-16');
     expect(painting.popState).toBeUndefined();
     expect(doeExternalId(painting)).toBe('DOE-C:89303025DMA000037');
+    // The row sync-forecasts upserts, and the row get_agency_forecasts returns.
+    // as_of is last_synced_at (query.ts). Identity is (source_agency, external_id).
+    const sourceUrl = 'https://www.energy.gov/documents/osbp-acquisition-forecast-public-2026-11-16csv';
+    const syncedAt = '2026-11-19T12:00:00.000Z';
+    const stored = {
+      source_agency: 'DOE',
+      source_type: 'osdbu_xlsx',
+      external_id: doeExternalId(painting),
+      title: painting.title,
+      naics_code: painting.naicsCode,
+      incumbent_name: painting.incumbentName,
+      source_url: sourceUrl,
+      last_synced_at: syncedAt,
+    };
+    const customer = {
+      agency: stored.source_agency,
+      external_id: stored.external_id,
+      title: stored.title,
+      as_of: stored.last_synced_at,
+      source_url: stored.source_url,
+    };
+    expect(customer).toMatchObject({
+      agency: 'DOE',
+      external_id: 'DOE-C:89303025DMA000037',
+      as_of: syncedAt,
+      source_url: sourceUrl,
+    });
+    expect(customer.title).toMatch(/Forrestal/);
     const netl = parsed.rows[1];
     expect(netl.programOffice).toMatch(/Fossil Energy/);
     expect(netl.popState).toBe('PENNSYLVANIA');
