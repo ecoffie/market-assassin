@@ -30,7 +30,7 @@ describe('checkInStreak', () => {
   const now = new Date('2026-11-19T15:00:00Z');
   it('pays the milestone once with a per-day key', async () => {
     const apply = vi.fn(async () => ({ applied: true, newBalance: 125 }));
-    const r = await checkInStreak('A@x.com', { now, apply: apply as never, rpc: async () => ({ current_streak: 7, longest_streak: 7, counted_today: true }) });
+    const r = await checkInStreak('A@x.com', { now, isPro: async () => true, apply: apply as never, rpc: async () => ({ current_streak: 7, longest_streak: 7, counted_today: true }) });
     expect(r).toMatchObject({ status: 'ok', streak: 7, rewardedToday: 25, next: { inDays: 7, credits: 25 } });
     expect(apply).toHaveBeenCalledWith(streakRewardKey('a@x.com', '2026-11-19'), 'a@x.com', 25, STREAK_REWARD_REASON);
     expect(streakRewardKey(' A@X.com ', '2026-11-19')).toBe('streak:a@x.com:2026-11-19');
@@ -38,8 +38,22 @@ describe('checkInStreak', () => {
 
   it('no reward on an ordinary day', async () => {
     const apply = vi.fn();
-    const r = await checkInStreak('a@x.com', { now, apply: apply as never, rpc: async () => ({ current_streak: 3, longest_streak: 9, counted_today: true }) });
+    const r = await checkInStreak('a@x.com', { now, isPro: async () => true, apply: apply as never, rpc: async () => ({ current_streak: 3, longest_streak: 9, counted_today: true }) });
     expect(r).toMatchObject({ status: 'ok', streak: 3, longest: 9, rewardedToday: 0 });
+    expect(apply).not.toHaveBeenCalled();
+  });
+
+  it('free members keep a streak but are never paid credits', async () => {
+    const apply = vi.fn();
+    const r = await checkInStreak('a@x.com', { now, isPro: async () => false, apply: apply as never, rpc: async () => ({ current_streak: 7, longest_streak: 7, counted_today: true }) });
+    expect(r).toMatchObject({ status: 'ok', streak: 7, rewardedToday: 0, creditsEligible: false });
+    expect(apply).not.toHaveBeenCalled();
+  });
+
+  it('a failed Pro check pays nothing', async () => {
+    const apply = vi.fn();
+    const r = await checkInStreak('a@x.com', { now, isPro: async () => { throw new Error('down'); }, apply: apply as never, rpc: async () => ({ current_streak: 30, longest_streak: 30, counted_today: true }) });
+    expect(r).toMatchObject({ rewardedToday: 0, creditsEligible: false });
     expect(apply).not.toHaveBeenCalled();
   });
 
@@ -50,7 +64,7 @@ describe('checkInStreak', () => {
 
   it('a failed reward write does not break the check-in', async () => {
     const apply = vi.fn(async () => { throw new Error('db down'); });
-    const r = await checkInStreak('a@x.com', { now, apply: apply as never, rpc: async () => ({ current_streak: 30, longest_streak: 30, counted_today: true }) });
+    const r = await checkInStreak('a@x.com', { now, isPro: async () => true, apply: apply as never, rpc: async () => ({ current_streak: 30, longest_streak: 30, counted_today: true }) });
     expect(r).toMatchObject({ status: 'ok', streak: 30, rewardedToday: 0 });
   });
 });

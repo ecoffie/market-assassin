@@ -1,12 +1,16 @@
 /**
  * Record today's visit, and pay the streak reward when today hits a milestone.
  *
+ * Credits are for Pro and trial members only (owner, 2026-11-19). Free members keep a streak and
+ * see what Pro would pay them, but no credits are granted (`creditsEligible: false`).
+ *
  * The reward goes through applyCreditOnce with key streak:<email>:<day>, so it is paid at most
  * once per person per day (a retry, a second tab or a second device is a no-op). Ledger reason
  * `streak_reward` is promotional (grant-reasons.ts): it never resets the ChatGPT attribution window.
  */
 import { createClient } from '@supabase/supabase-js';
 import { applyCreditOnce } from '@/lib/mcp/credits';
+import { isProEmail } from '@/lib/access/require-pro';
 import { easternDay, nextReward, rewardFor } from './rules';
 
 export const STREAK_REWARD_REASON = 'streak_reward';
@@ -16,12 +20,13 @@ export function streakRewardKey(email: string, day: string): string {
 }
 
 export type StreakResult =
-  | { status: 'ok'; streak: number; longest: number; countedToday: boolean; rewardedToday: number; next: { inDays: number; credits: number } }
+  | { status: 'ok'; streak: number; longest: number; countedToday: boolean; rewardedToday: number; creditsEligible: boolean; next: { inDays: number; credits: number } }
   | { status: 'unavailable' };
 
 interface Deps {
   rpc?: (email: string, day: string) => Promise<{ current_streak: number; longest_streak: number; counted_today: boolean } | null>;
   apply?: typeof applyCreditOnce;
+  isPro?: (email: string) => Promise<boolean>;
   now?: Date;
 }
 
@@ -52,7 +57,9 @@ export async function checkInStreak(rawEmail: string, deps: Deps = {}): Promise<
   // which is a no-op — so a reward missed by a failed write is picked up on the next visit that day.
   let rewardedToday = 0;
   const reward = rewardFor(streak);
-  if (reward > 0) {
+  // Pro / trial / staff only (resolveAccess honors an active trial). A failed check pays nothing.
+  const creditsEligible = await (deps.isPro ?? isProEmail)(email).catch(() => false);
+  if (reward > 0 && creditsEligible) {
     try {
       // applied=false means today's reward was already paid (same key): still today's reward.
       await (deps.apply ?? applyCreditOnce)(streakRewardKey(email, day), email, reward, STREAK_REWARD_REASON);
@@ -61,5 +68,5 @@ export async function checkInStreak(rawEmail: string, deps: Deps = {}): Promise<
       console.error('[streak] reward grant failed:', (e as Error).message);
     }
   }
-  return { status: 'ok', streak, longest, countedToday: !!row.counted_today, rewardedToday, next: nextReward(streak) };
+  return { status: 'ok', streak, longest, countedToday: !!row.counted_today, rewardedToday, creditsEligible, next: nextReward(streak) };
 }
