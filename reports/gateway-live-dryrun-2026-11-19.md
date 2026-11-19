@@ -4,6 +4,21 @@ Read-only. No `--apply`. No write to `agency_forecasts`. The API is not a writer
 
 Source: `GET https://ag-dashboard.acquisitiongateway.gov/api/v3.0/resources/forecast`
 
+## DHS publication (not the Gateway)
+
+DHS is not one of the 16 Gateway departments. OFPP's later phase will upload DHS forecasts to the Gateway; that phase has no date yet (DHS notice, November 2026).
+
+The official industry page is https://www.dhs.gov/advance-acquisition-planning-forecast-contract-opportunities (page text: last updated 2026-11-09; downloads of the full forecast as XLSX, CSV, and PDF). The CSV URL returns Akamai 403 from this network. A public copy of that CSV has 1,365 data rows.
+
+The host in the old migration notice, `era-apfs.dhs.gov`, does not resolve. The live host is **`https://apfs-era.dhs.gov`**.
+
+- `GET /api/apfs-public/forecasts?page=0&size=2` → HTTP 500
+- `GET /api/apfs-public/forecasts/all` → HTTP 200, **659** records on 2026-11-19, newest `forecastPublished` 2026-11-18
+- Components in that list: USCG 450, DHS HQ 56, USCIS 46, TSA 37, FEMA 24, CBP 20, ICE 16, USSS 6, FLETC 4
+- Sample: `F2027076057`, USCG/LOGCOM, NAICS `488310` Port and Harbor Operations, solicitation release 2026-11-18. The JSON has no POC. NAICS is taken from the source string.
+
+`sync-forecasts` now reads `/forecasts/all` when apfs-cloud is HTML, upserts on `(DHS, APFS number)`, and falls back to the CSV. A 500 and a 403 together still fail loud. They do not upsert empty.
+
 ## DHS is not on this source
 
 The agency filter vocabulary is 16 departments. Their filtered totals sum to the unfiltered total **13,468**. Department of Homeland Security is not in the vocabulary. `era-apfs.dhs.gov` does not resolve. `apfs-cloud.dhs.gov/api/forecast/` is the migration HTML notice. www.dhs.gov forecast and OSDBU URLs returned Akamai 403 from this network.

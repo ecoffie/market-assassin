@@ -39,7 +39,10 @@ import { canonicalDhsExternalId } from '@/lib/forecasts/dhs-identity';
 import {
   DHS_ALLRECORDS_CSV_URL,
   DHS_ALLRECORDS_SOURCE_TYPE,
+  DHS_ERA_FORECASTS_URL,
+  DHS_ERA_SOURCE_TYPE,
   dhsAllrecordsToDbRow,
+  dhsEraRecordToParsed,
   parseDhsAllrecordsBuffer,
 } from '@/lib/forecasts/dhs-allrecords';
 import { classifyDhsBody } from '@/lib/forecasts/dhs-source';
@@ -131,6 +134,31 @@ async function fetchDhsAllrecordsFile(url: string): Promise<Record<string, unkno
   }));
 }
 
+/** Live public list on apfs-era.dhs.gov. Empty or non-array is a failure. */
+async function fetchDhsEraJson(): Promise<Record<string, unknown>[]> {
+  const res = await fetch(DHS_ERA_FORECASTS_URL, {
+    headers: { Accept: 'application/json', 'User-Agent': 'GovConGiants-Mindy/1.0' },
+    cache: 'no-store',
+  });
+  if (!res.ok) throw new Error(`apfs-era forecasts/all HTTP ${res.status}`);
+  const data = await res.json() as unknown;
+  if (!Array.isArray(data)) throw new Error('apfs-era forecasts/all was not an array');
+  const now = new Date().toISOString();
+  const rows: Record<string, unknown>[] = [];
+  for (const item of data) {
+    const parsed = dhsEraRecordToParsed(item);
+    if (!parsed) continue;
+    rows.push({
+      ...dhsAllrecordsToDbRow(parsed, { sourceUrl: DHS_ERA_FORECASTS_URL }),
+      source_agency: 'DHS',
+      source_type: DHS_ERA_SOURCE_TYPE,
+      last_synced_at: now,
+    });
+  }
+  if (!rows.length) throw new Error('apfs-era forecasts/all parsed to 0 rows — refusing empty upsert');
+  return rows;
+}
+
 /**
  * Fetch + map DHS APFS.
  *
@@ -151,17 +179,21 @@ async function fetchDHS(): Promise<Record<string, unknown>[]> {
   const text = await res.text();
   const classified = classifyDhsBody(res.status, text);
   if (classified.kind !== 'json_array') {
-    // The JSON host is a migration page. The public CSV is the replacement when
-    // DHS.gov actually serves it. A 403 here is still a failure — never [].
+    // apfs-cloud is the migration notice. The live list is apfs-era
+    // /forecasts/all. The dhs.gov CSV is the same corpus when Akamai serves it.
     try {
-      return await fetchDhsAllrecordsFile(DHS_ALLRECORDS_CSV_URL);
-    } catch (csvErr) {
-      const csvMsg = csvErr instanceof Error ? csvErr.message : String(csvErr);
-      // Keep the fail-loud phrase the repair ledger anchors on. HTML 200 and a
-      // denied public file are both unreachable — never an empty upsert.
-      throw new Error(
-        `DHS APFS returned HTML (not JSON) — ${classified.detail}. Public allRecords file: ${csvMsg}`,
-      );
+      return await fetchDhsEraJson();
+    } catch (eraErr) {
+      const eraMsg = eraErr instanceof Error ? eraErr.message : String(eraErr);
+      try {
+        return await fetchDhsAllrecordsFile(DHS_ALLRECORDS_CSV_URL);
+      } catch (csvErr) {
+        const csvMsg = csvErr instanceof Error ? csvErr.message : String(csvErr);
+        // Keep the fail-loud phrase the repair ledger anchors on.
+        throw new Error(
+          `DHS APFS returned HTML (not JSON) — ${classified.detail}. apfs-era: ${eraMsg}. Public allRecords file: ${csvMsg}`,
+        );
+      }
     }
   }
   const data = classified.rows;

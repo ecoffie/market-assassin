@@ -11,7 +11,18 @@
 import * as XLSX from 'xlsx';
 import { canonicalDhsApfsNumber } from './dhs-identity';
 
-/** Full public forecast dump (preferred). */
+/**
+ * Public JSON list on the new APFS host. Measured 2026-11-19: HTTP 200, 659
+ * records, components USCG/CBP/FEMA/ICE/TSA/USCIS/DHS HQ. The paged
+ * `/forecasts` route returned HTTP 500. DHS is not on the Acquisition Gateway
+ * yet (OFPP upload is a later phase). `era-apfs.dhs.gov` does not resolve;
+ * the live host is `apfs-era.dhs.gov`.
+ */
+export const DHS_ERA_FORECASTS_URL = 'https://apfs-era.dhs.gov/api/apfs-public/forecasts/all';
+
+export const DHS_ERA_SOURCE_TYPE = 'apfs_era_json';
+
+/** Full public forecast dump (preferred when Akamai serves it). */
 export const DHS_ALLRECORDS_CSV_URL =
   'https://www.dhs.gov/xlibrary/daily-contract-opportunities-report/APFS_forecast_allRecords.csv';
 
@@ -241,6 +252,44 @@ export function parseDhsAllrecordsAoa(aoa: unknown[][]): DhsAllrecordsParseResul
   }
 
   return { rows, skipped, headerRow, missingApfs };
+}
+
+/**
+ * One object from `GET /api/apfs-public/forecasts/all`.
+ * NAICS and dollar range are parsed with the CSV helpers. Fields the JSON
+ * does not carry (POC, place of performance) stay absent — not invented.
+ */
+export function dhsEraRecordToParsed(raw: unknown): DhsAllrecordsParsedRow | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const row = raw as Record<string, unknown>;
+  const apfs = canonicalDhsApfsNumber(row.apfsNumber);
+  const title = dhsCell(row.title);
+  if (!apfs || !title) return null;
+  const naics = dhsSplitNaics(row.naics);
+  const dollarRange = dhsCell(row.dollarRange);
+  const [vmin, vmax] = dhsParseDollarRange(dollarRange);
+  return {
+    apfsNumber: apfs,
+    forecastId: row.forecastId == null ? undefined : String(row.forecastId),
+    title,
+    description: dhsCell(row.description) || undefined,
+    component: dhsCell(row.component) || undefined,
+    requirementsOffice: dhsCell(row.requirementsOffice) || undefined,
+    naicsCode: naics.code || undefined,
+    naicsDescription: naics.description || undefined,
+    contractType: dhsCell(row.contractType) || undefined,
+    contractVehicle: dhsCell(row.contractVehicle) || undefined,
+    dollarRange: dollarRange || undefined,
+    estimatedValueMin: vmin,
+    estimatedValueMax: vmax,
+    setAside: dhsCell(row.smallBusinessSetAside) || undefined,
+    sbProgram: dhsCell(row.smallBusinessProgram) || undefined,
+    contractStatus: dhsCell(row.contractStatus) || undefined,
+    solicitationRelease: dhsIsoDate(row.estimatedSolicitationRelease) || undefined,
+    raw: Object.fromEntries(
+      Object.entries(row).filter(([, v]) => v != null).map(([k, v]) => [k, String(v)]),
+    ),
+  };
 }
 
 /**
