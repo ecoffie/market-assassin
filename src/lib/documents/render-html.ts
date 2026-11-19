@@ -169,9 +169,25 @@ function blockHtml(b: Block, numberOf: (id: string) => number | null, theme: The
   }
 }
 
+/** Appended after the print stylesheet for on-screen reading (RenderHtmlOptions.screen). */
+const SCREEN_CSS = `
+body { padding: 20px 24px 40px; }
+.doc { max-width: 8.4in; }
+.cover { break-after: auto; padding-top: 0.15in; padding-bottom: 0.2in; margin-bottom: 0.2in; }
+.cover.rule { padding-top: 0.3in; }
+.toc { break-after: auto; }
+.pagebreak { break-after: auto; margin: 0; }
+.tablewrap { overflow-x: auto; }
+`;
+
 export interface RenderHtmlOptions {
   /** Include a contents page (default true when there are 4+ sections). */
   toc?: boolean;
+  /**
+   * On-screen reading (the Map's in-chat report pane) instead of print: same markup and theme, but the
+   * page gets side padding and no forced page breaks after the cover and contents.
+   */
+  screen?: boolean;
 }
 
 export function renderHtml(model: DocModel, opts: RenderHtmlOptions = {}): string {
@@ -245,5 +261,5 @@ export function renderHtml(model: DocModel, opts: RenderHtmlOptions = {}): strin
       .join('')}</ol></section>`
     : '';
 
-  return `<!doctype html><html lang="en"><head><meta http-equiv="Content-Security-Policy" content="${DOC_HTML_CSP}"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${escapeHtml(keepDash(model.title))}</title><style>${themeCss(theme)}</style></head><body><main class="doc">${cover}${toc}${body}${unverifiedSection}${sources}</main></body></html>`;
+  return `<!doctype html><html lang="en"><head><meta http-equiv="Content-Security-Policy" content="${DOC_HTML_CSP}"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${escapeHtml(keepDash(model.title))}</title><style>${themeCss(theme)}${opts.screen ? SCREEN_CSS : ''}</style></head><body><main class="doc">${cover}${toc}${body}${unverifiedSection}${sources}</main></body></html>`;
 }

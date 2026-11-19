@@ -10917,6 +10917,29 @@ const ASK_MINDY_CSS =
   + '.amk-in textarea:focus{border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.12)}'
   + '.amk-send{flex:none;width:40px;height:40px;border:0;border-radius:11px;background:#2563eb;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center}'
   + '.amk-send:disabled{opacity:.45;cursor:default}.amk-send svg{width:18px;height:18px}'
+  // ── In-chat REPORT PANE (create_document → read it here, no download). Sits beside the chat drawer on wide
+  // screens and over it on narrow ones. The report itself is the shared document engine's HTML in a
+  // script-less sandboxed iframe; export chips are secondary.
+  + '.amk-rep{position:fixed;top:0;right:min(440px,94vw);height:100dvh;width:min(880px,calc(100vw - min(440px,94vw)));background:#fff;border-right:1px solid #e3e8ef;box-shadow:-10px 0 36px rgba(16,24,40,.14);z-index:2601;display:none;flex-direction:column}'
+  + '.amk-rep.show{display:flex}'
+  + '@media(max-width:900px){.amk-rep{right:0;width:100vw;z-index:2602}}'
+  + '.amk-rep-hd{display:flex;align-items:center;gap:10px;padding:11px 14px;border-bottom:1px solid #eef1f5;flex:none}'
+  + '.amk-rep-tt{flex:1;min-width:0;display:flex;flex-direction:column}.amk-rep-t{font:800 14.5px Inter,system-ui,sans-serif;color:#111c26;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}'
+  + '.amk-rep-v{font:500 11.5px Inter,system-ui,sans-serif;color:#64748b}'
+  + '.amk-rep-back{display:none;border:1px solid #dde3ec;background:#fff;color:#1d4ed8;font:600 12px Inter,system-ui,sans-serif;border-radius:8px;padding:6px 10px;cursor:pointer}'
+  + '@media(max-width:900px){.amk-rep-back{display:inline-block}}'
+  + '.amk-rep-exp{display:flex;align-items:center;gap:6px;flex:none}.amk-rep-exp:empty{display:none}.amk-rep-exp .lb{font:500 11px Inter,system-ui,sans-serif;color:#64748b}'
+  + '.amk-rep-exp button,.amk-repcard-exp button{border:1px solid #dde3ec;background:#fff;color:#334155;font:600 11px Inter,system-ui,sans-serif;border-radius:7px;padding:3px 8px;cursor:pointer}.amk-rep-exp button:hover,.amk-repcard-exp button:hover{background:#f1f5f9}.amk-rep-exp button:disabled,.amk-repcard-exp button:disabled{opacity:.6;cursor:default}'
+  + '.amk-rep-x{border:0;background:none;color:#8595a6;cursor:pointer;font:400 24px/1 Inter,system-ui,sans-serif;padding:0 4px}'
+  + '.amk-rep-body{position:relative;flex:1;min-height:0;background:#f4f6fa}.amk-rep-f{position:absolute;inset:0;width:100%;height:100%;border:0;background:#fff}'
+  + '.amk-rep-msg{position:absolute;inset:0;display:none;align-items:center;justify-content:center;flex-direction:column;gap:10px;text-align:center;padding:24px;font:500 13.5px Inter,system-ui,sans-serif;color:#475569;background:#fff}'
+  + '.amk-rep-msg button{border:1px solid #bcd3fb;background:#eaf1fe;color:#1d4ed8;font:600 12px Inter,system-ui,sans-serif;border-radius:8px;padding:7px 12px;cursor:pointer}'
+  + '.amk-repbtn{flex:none;border:1px solid #bcd3fb;background:#eaf1fe;color:#1d4ed8;font:600 11.5px Inter,system-ui,sans-serif;border-radius:8px;padding:5px 10px;cursor:pointer;align-self:flex-start}'
+  + '.amk-repcard{margin-top:9px;border:1px solid #d3e2fc;background:#f5f9ff;border-radius:10px;padding:10px 12px;display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px}'
+  + '.amk-repcard-t{flex:1;min-width:150px;display:flex;flex-direction:column}.amk-repcard-t b{font:700 13px Inter,system-ui,sans-serif;color:#111c26;overflow-wrap:anywhere}.amk-repcard-t span{font:500 11.5px Inter,system-ui,sans-serif;color:#64748b}'
+  + '.amk-repcard-open{flex:none;border:0;background:#2563eb;color:#fff;font:700 12px Inter,system-ui,sans-serif;border-radius:8px;padding:7px 12px;cursor:pointer}'
+  + '.amk-repcard-exp{flex-basis:100%;display:flex;flex-wrap:wrap;align-items:center;gap:6px}.amk-repcard-exp .lb{font:500 11px Inter,system-ui,sans-serif;color:#64748b}'
+  + '@media(prefers-color-scheme:dark){.amk-repcard{background:#0d141d;border-color:#202b39}.amk-repcard-t b{color:#eaf1f8}}'
   + '.amk-up{text-align:center;padding:30px 20px}.amk-up h4{font:800 16px Inter;margin:0 0 6px;color:#111c26}.amk-up p{font:500 13px Inter;color:#6b7787;margin:0 0 14px}'
   + '.amk-up a{display:inline-block;background:#0a8f57;color:#fff;text-decoration:none;border-radius:10px;padding:10px 20px;font:700 13px Inter}'
   + '@media(prefers-color-scheme:dark){.amk{background:#111823}.amk-hd{border-color:#202b39}.amk-hd h3{color:#eaf1f8}.amk-msg.a{color:#eaf1f8}.amk-msg.a .bub{background:#0d141d;border-color:#202b39}.amk-msg.a .bub.md .md-h,.amk-msg.a .bub.md>p:first-child{color:#eaf1f8}.amk-msg.a .bub.md code{background:#18222f}.amk-msg.a .bub a{color:#7fb0ff}.amk-chips button{background:#0d141d;border-color:#202b39;color:#cdd8e4}.amk-foot{border-color:#202b39}.amk-in textarea{background:#0d141d;border-color:#202b39;color:#eaf1f8}.amk-empty b,.amk-up h4{color:#eaf1f8}.amk-act button{background:#122033;border-color:#1f3a5c}.amk-att{background:#122033;border-color:#1f3a5c;color:#cfe0ff}.amk-att .sp{background:#0d141d;border-color:#1f3a5c;color:#9ec2ff}.amk-ws{color:#7fb0ff}}';
@@ -11096,7 +11119,10 @@ const ASK_MINDY_JS = `<script>(function(){
   // display:'narrow_panel'. The server adds the presentation rule (answer first, short sections) to the answer
   // prompt as a SYSTEM note (src/lib/chat/display-hint.ts). It is never part of the message, so it is never
   // stored as the customer's words or read as their intent (review F3).
-  function setOpen(o){ ov.classList.toggle('show',o); drawer.classList.toggle('show',o); drawer.setAttribute('aria-hidden',o?'false':'true'); if(o){ syncAttached(); if(!body.children.length){ if(oppCtx)greetCard(); else greet(); } setTimeout(function(){ input&&input.focus(); },220); } }
+  function setOpen(o){ ov.classList.toggle('show',o); drawer.classList.toggle('show',o); drawer.setAttribute('aria-hidden',o?'false':'true'); if(o){ syncAttached(); if(!body.children.length){ if(oppCtx)greetCard(); else greet(); } setTimeout(function(){ input&&input.focus(); },220);
+    // Return later: the report left open comes back with the drawer (view mode only; card chat is about one notice).
+    if(oppCtx){ repHide(false); } else { var rs=repRead(); if(rs){ rep=Object.assign({},rep||{},rs); if(rs.open) repOpen(rs.id); } syncRepBtn(); } }
+    else { repHide(false); } }
   function greetCard(){
     var chips=[['What does it require?','Summarize what this solicitation requires: scope, deliverables, and key dates.'],
       ['Who held this before?','Who held this work before, and what did the prior contract cost?'],
@@ -11159,7 +11185,7 @@ const ASK_MINDY_JS = `<script>(function(){
   };
   var x=document.getElementById('amkX'); if(x)x.onclick=function(){ setOpen(false); };
   ov.onclick=function(){ setOpen(false); };
-  document.addEventListener('keydown',function(e){ if(e.key==='Escape'&&drawer.classList.contains('show'))setOpen(false); });
+  document.addEventListener('keydown',function(e){ if(e.key==='Escape'&&drawer.classList.contains('show')){ if(repIsOpen()){ repHide(true); return; } setOpen(false); } });
   // Auto-grow the textarea + Enter-to-send (Shift+Enter = newline).
   if(input){ input.addEventListener('input',function(){ input.style.height='auto'; input.style.height=Math.min(input.scrollHeight,120)+'px'; });
     input.addEventListener('keydown',function(e){ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); ask(input.value); } }); }
@@ -11207,6 +11233,105 @@ const ASK_MINDY_JS = `<script>(function(){
         .then(function(d){ if(d && d.uploads===true && !amkDocs) buildAttach(); },function(){});
     }catch(e){}
   }
+  // ── REPORT PANE. A document Mindy just saved (create_document) opens HERE, in the chat, as a readable page:
+  // no download needed. Reuses the Vault: GET /api/app/vault/documents/preview renders the stored DocModel with
+  // the same engine that made the PDF/Word, owner-scoped. Exports (PDF/Word/Excel/CSV) are secondary chips that
+  // use the existing download route. A revision is a NEW Vault row (the old version stays); its deliverables
+  // event simply replaces what the pane shows. The open document (and the signed source ledger that lets the
+  // next "revise it" resolve it) is kept in localStorage per account + workspace, so it is still there tomorrow.
+  var REP_KEY='mindy_map_report', rep=null, repEls=null, repSeq=0, repBtn=null;
+  var FMT_LABEL={pdf:'PDF',docx:'Word',xlsx:'Excel',csv:'CSV'}, FMT_ORDER=['pdf','docx','xlsx','csv'];
+  var UUID_RX=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  function wsKey(){ try{ return localStorage.getItem('mindy_active_workspace')||''; }catch(e){ return ''; } }
+  function repRead(){ try{ var j=JSON.parse(localStorage.getItem(REP_KEY)||'null');
+    if(j&&typeof j==='object'&&j.email&&j.email===email()&&(j.ws||'')===wsKey()&&UUID_RX.test(String(j.id||''))) return j; }catch(e){} return null; }
+  function repWrite(){ try{ if(rep) localStorage.setItem(REP_KEY,JSON.stringify(rep)); else localStorage.removeItem(REP_KEY); }catch(e){} }
+  function cleanFiles(list){ var out=[]; (Array.isArray(list)?list:[]).forEach(function(f){
+    if(!f||typeof f!=='object'||out.length>=8) return;
+    var id=String(f.document_id||''), fm=String(f.format||'').toLowerCase();
+    if(!UUID_RX.test(id)||!FMT_LABEL[fm]) return;
+    out.push({format:fm,document_id:id,file_name:String(f.file_name||'').slice(0,160),version:(typeof f.version==='number'?f.version:0)}); });
+    out.sort(function(a,b){ return FMT_ORDER.indexOf(a.format)-FMT_ORDER.indexOf(b.format); }); return out; }
+  function primaryId(files){ for(var i=0;i<files.length;i++){ if(files[i].format==='docx') return files[i].document_id; } return files.length?files[0].document_id:''; }
+  function authHdrs(){ return withWorkspace({'x-mi-auth-token':tok()||'','x-user-email':email()}); }
+  // Download one saved file: the existing Vault route mints a 60-second signed URL (attachment).
+  function exportFile(file,btn){
+    var label=btn.textContent; btn.disabled=true; btn.textContent='Preparing...';
+    fetch('/api/app/vault/documents/download?email='+encodeURIComponent(email())+'&id='+encodeURIComponent(file.document_id),{headers:authHdrs()})
+      .then(function(r){ return r.ok?r.json():null; },function(){ return null; })
+      .then(function(d){ if(d&&d.url){ try{ if(window.__track) window.__track('tool_use','map_report_export',{format:file.format}); }catch(e){} location.href=d.url; } else btn.textContent='Try again'; },function(){ btn.textContent='Try again'; })
+      .then(function(){ btn.disabled=false; if(btn.textContent==='Preparing...') btn.textContent=label; });
+  }
+  function exportRow(files,host,withLabel){
+    host.innerHTML=''; if(!files.length) return;
+    if(withLabel){ var lb=document.createElement('span'); lb.className='lb'; lb.textContent='Download'; host.appendChild(lb); }
+    files.forEach(function(f){ var b=document.createElement('button'); b.type='button'; b.setAttribute('data-fmt',f.format); b.textContent=FMT_LABEL[f.format]; b.onclick=function(){ exportFile(f,b); }; host.appendChild(b); });
+  }
+  function ensurePane(){
+    if(repEls) return repEls;
+    var el=document.createElement('aside'); el.className='amk-rep'; el.id='amkRep'; el.setAttribute('aria-hidden','true'); el.setAttribute('role','dialog'); el.setAttribute('aria-label','Report'); el.setAttribute('data-testid','amk-report-pane');
+    el.innerHTML='<div class="amk-rep-hd"><button type="button" class="amk-rep-back">Back to chat</button><div class="amk-rep-tt"><b class="amk-rep-t"></b><span class="amk-rep-v"></span></div><div class="amk-rep-exp"></div><button type="button" class="amk-rep-x" aria-label="Close report">&times;</button></div><div class="amk-rep-body"><iframe class="amk-rep-f" sandbox="" title="Report"></iframe><div class="amk-rep-msg"></div></div>';
+    document.body.appendChild(el);
+    repEls={el:el,t:el.querySelector('.amk-rep-t'),v:el.querySelector('.amk-rep-v'),exp:el.querySelector('.amk-rep-exp'),f:el.querySelector('.amk-rep-f'),msg:el.querySelector('.amk-rep-msg')};
+    el.querySelector('.amk-rep-x').onclick=function(){ repHide(true); };
+    el.querySelector('.amk-rep-back').onclick=function(){ repHide(true); };
+    return repEls;
+  }
+  function repIsOpen(){ return !!(repEls&&repEls.el.classList.contains('show')); }
+  function syncRepBtn(){
+    var hd=drawer.querySelector('.amk-hd'), xb=document.getElementById('amkX'); if(!hd) return;
+    if(rep&&!repIsOpen()&&!oppCtx){
+      if(!repBtn){ repBtn=document.createElement('button'); repBtn.type='button'; repBtn.className='amk-repbtn'; repBtn.setAttribute('data-testid','amk-report-btn'); repBtn.textContent='Report'; repBtn.title='Open your report'; repBtn.onclick=function(){ if(rep) repOpen(rep.id); }; }
+      if(!repBtn.parentNode) hd.insertBefore(repBtn,xb||null);
+    } else if(repBtn&&repBtn.parentNode){ repBtn.parentNode.removeChild(repBtn); }
+  }
+  // user=true: the reader closed it (remembered); false: the drawer closed or card mode took over (restored on reopen).
+  function repHide(user){ repSeq++; if(repEls){ repEls.el.classList.remove('show'); repEls.el.setAttribute('aria-hidden','true'); } if(user&&rep){ rep.open=false; repWrite(); } syncRepBtn(); }
+  function repMessage(text,retryId){
+    var E=ensurePane(); E.msg.innerHTML=''; E.msg.style.display='flex'; E.f.style.visibility='hidden';
+    var p=document.createElement('div'); p.textContent=text; E.msg.appendChild(p);
+    if(retryId){ var b=document.createElement('button'); b.type='button'; b.textContent='Try again'; b.onclick=function(){ repOpen(retryId); }; E.msg.appendChild(b); }
+  }
+  function repOpen(id){
+    var t=tok(), em=email(); if(!UUID_RX.test(String(id||''))||!t||!em) return;
+    var E=ensurePane(), seq=++repSeq;
+    E.el.classList.add('show'); E.el.setAttribute('aria-hidden','false');
+    if(rep){ rep.open=true; repWrite(); }
+    syncRepBtn(); repMessage('Loading your report...');
+    fetch('/api/app/vault/documents/preview?email='+encodeURIComponent(em)+'&id='+encodeURIComponent(id),{headers:authHdrs()})
+      .then(function(r){
+        if(r.status===404){ return {gone:true}; }
+        if(!r.ok) throw new Error('preview '+r.status);
+        return r.json();
+      })
+      .then(function(j){
+        if(seq!==repSeq) return; // a newer open (a revision) replaced this one
+        if(j&&j.gone){ if(rep&&rep.id===id){ rep=null; repWrite(); } repMessage('This report is no longer available. Ask Mindy to create it again.'); syncRepBtn(); return; }
+        if(!j||!j.success||typeof j.html!=='string') throw new Error('preview shape');
+        E.f.srcdoc=j.html; E.f.style.visibility='visible'; E.msg.style.display='none';
+        E.t.textContent=String(j.title||'Report'); E.v.textContent='Version '+(j.version||1)+' - saved in your Vault';
+        var files=cleanFiles(j.files); if(!files.length&&rep) files=cleanFiles(rep.files);
+        exportRow(files,E.exp,true);
+        rep=Object.assign({},rep||{},{email:em,ws:wsKey(),id:id,title:String(j.title||''),version:j.version||1,files:files,open:true}); repWrite();
+        try{ if(window.__track) window.__track('tool_use','map_report_open',{version:j.version||1}); }catch(e){}
+      })
+      .catch(function(){ if(seq===repSeq) repMessage('The report could not be loaded. Check your connection and try again.',id); });
+  }
+  // The reply that created or revised a document: a card under the answer + the pane opens on the new version.
+  function repOnDeliverables(list,aEl){
+    var files=cleanFiles(list); var id=primaryId(files); if(!id) return;
+    var prim=files.filter(function(f){ return f.document_id===id; })[0]||files[0];
+    var ver=0; files.forEach(function(f){ if(f.version>ver) ver=f.version; });
+    rep={email:email(),ws:wsKey(),id:id,title:'',version:ver||1,files:files,ledger:(rep&&rep.ledger)||null,open:true}; repWrite();
+    var w=document.createElement('div'); w.className='amk-repcard'; w.setAttribute('data-testid','amk-report-card');
+    w.innerHTML='<div class="amk-repcard-t"><b></b><span></span></div><button type="button" class="amk-repcard-open">Open report</button><div class="amk-repcard-exp"></div>';
+    w.querySelector('b').textContent=(prim.file_name||'Your report').replace(/[.](pdf|docx|xlsx|csv)$/i,'');
+    w.querySelector('span').textContent='Version '+(ver||1)+' - saved to your Vault';
+    w.querySelector('.amk-repcard-open').onclick=function(){ repOpen(id); };
+    exportRow(files,w.querySelector('.amk-repcard-exp'),true);
+    aEl.appendChild(w); body.scrollTop=body.scrollHeight;
+    repOpen(id);
+  }
   function addMsg(role, text){ var d=document.createElement('div'); d.className='amk-msg '+(role==='user'?'u':'a'); d.innerHTML=(role==='user')?esc(text):('<div class="bub"></div>'); if(role!=='user'){ var bb=d.querySelector('.bub'); if(text) paint(bb,text); else bb.textContent=''; } body.appendChild(d); body.scrollTop=body.scrollHeight; return d; }
   function upsell(){ body.innerHTML='<div class="amk-up"><h4>\\ud83d\\udd12 Ask Mindy is a Pro feature</h4><p>Get grounded, real-data answers on set-asides, agencies, opportunities, teaming and proposals \\u2014 with sources.</p><a href="/market-intelligence">Upgrade to Pro</a></div>'; }
   // opts (card chat only): turnId = reuse this question's id (retry/reopen); replay = only fetch the saved answer.
@@ -11227,7 +11352,7 @@ const ASK_MINDY_JS = `<script>(function(){
     var aEl=addMsg('assistant',''); var bub=aEl.querySelector('.bub');
     bub.innerHTML='<span class="amk-typing"><i></i><i></i><i></i></span>';
     busy=true; if(send)send.disabled=true; clearFollowups();
-    var acc='', started=false, gotDone=false, gotError=false, ledger=null;
+    var acc='', started=false, gotDone=false, gotError=false, ledger=null, turnDoc=false;
     // Prepend the grounded view context to the MESSAGE (not shown to the user) so the answer
     // is about "these"/"here" — the map\\u2019s real filters + count, never fabricated.
     // Card chat sends NO view preamble: the server supplies the opportunity from its own record.
@@ -11235,6 +11360,10 @@ const ASK_MINDY_JS = `<script>(function(){
     // without one (server contract, Agent 1, 2026-11-16: the server reconciles the two).
     var attAtSend=oppCtx?null:attached;
     var sendMsg=oppCtx?q:(ctxPreamble()+q);
+    // Back on the map after a reload with a report still open: the conversation memory is gone, but the signed
+    // source ledger saved with the report is what lets "revise it" resolve to THAT document. It rides along as
+    // the oldest assistant turn (the server verifies the signature and the owner; a forged one is ignored).
+    if(!oppCtx&&!history.length&&rep&&rep.ledger&&rep.email===em){ history.push({role:'assistant',content:'I saved your report'+(rep.title?' "'+rep.title+'"':'')+' to your Vault.',sources:rep.ledger}); }
     var payload={email:em,message:sendMsg,sessionId:sessionId||undefined,history:history.slice(-8),display:'narrow_panel'};
     if(attAtSend){ payload.context={kind:'opportunity',notice_id:attAtSend.id}; try{ if(window.__track) window.__track('tool_use','ask_mindy_with_notice',{}); }catch(e){} }
     if(oppCtx){ payload.context={kind:'opportunity',notice_id:oppCtx.id}; payload.turn_id=turnId; if(opts.replay)payload.replay_only=true;
@@ -11273,7 +11402,9 @@ const ASK_MINDY_JS = `<script>(function(){
           parts.forEach(function(p){ var line=p.split('\\n').filter(function(l){return l.indexOf('data:')===0;}).map(function(l){return l.slice(5).trim();}).join(''); if(!line)return;
             var ev; try{ ev=JSON.parse(line); }catch(e){ return; }
             if(ev.type==='session'){ sessionId=ev.sessionId||sessionId; }
-            else if(ev.type==='sources'){ ledger=(ev.ledger&&typeof ev.ledger==='object')?ev.ledger:null; }
+            else if(ev.type==='sources'){ ledger=(ev.ledger&&typeof ev.ledger==='object')?ev.ledger:null; if(turnDoc&&rep&&ledger){ rep.ledger=ledger; repWrite(); } }
+            // create_document saved a document: a card under the answer and the report opens in the pane (view mode only).
+            else if(ev.type==='deliverables'&&Array.isArray(ev.files)&&!oppCtx){ turnDoc=true; try{ repOnDeliverables(ev.files,aEl); }catch(e){} }
             else if(ev.type==='token'){ if(!started){ bub.textContent=''; started=true; } acc+=(ev.content||''); paint(bub,acc); body.scrollTop=body.scrollHeight; }
             // citations event is now always empty (RAG corpus removed 2026-08-02) \\u2014 ignored.
             else if(ev.type==='error'){ gotError=true; if(!started)bub.textContent=(ev.message||'Something went wrong.'); }
