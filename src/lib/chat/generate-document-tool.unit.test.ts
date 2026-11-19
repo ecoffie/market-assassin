@@ -132,6 +132,34 @@ describe('create_document', () => {
     expect(String(r.note)).toMatch(/left out/);
   });
 
+  it('structure repair: duplicate ids + empty table columns still save on the first call (live 2026-11-19)', async () => {
+    const s = setup();
+    const messy = model({
+      sections: [
+        { id: 'sec', heading: 'Buyers', blocks: [{ type: 'paragraph', id: 'p', text: 'NAVFAC Hawaii leads HI building construction.', claim: 'fact', cites: ['s1'] }] },
+        {
+          id: 'sec',
+          heading: 'Awards',
+          blocks: [{
+            type: 'table',
+            id: 'p',
+            claim: 'fact',
+            cites: ['s1'],
+            columns: [],
+            rows: [{ office: 'Navfacsyscom Hawaii', dollars: 1_190_000_000 }],
+          }],
+        },
+      ],
+    });
+    const r = await s.tool.execute({ doc_model: messy });
+    expect(r).toMatchObject({ ok: true, saved_to: 'vault' });
+    // Table → Word/PDF plus Excel/CSV (modelHasTables).
+    expect((r.files as R[]).map((f) => f.format).sort()).toEqual(['csv', 'docx', 'pdf', 'xlsx']);
+    const saved = s.docs().find((d) => d.mime_type === DOCX_MIME)!.doc_model;
+    expect(saved.sections.map((sec: R) => sec.id)).toEqual(['sec', 'sec-2']);
+    expect(saved.sections[1].blocks[0].columns.length).toBeGreaterThan(0);
+  });
+
   it('repeated method boilerplate is reported, never a reason to refuse', async () => {
     const s = setup();
     const boiler = 'The figures are drawn from the cited records and are reported as recorded without adjustment.';

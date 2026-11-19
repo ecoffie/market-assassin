@@ -17,7 +17,7 @@ vi.mock('@/lib/pdf/launch-browser', () => ({
 
 import { SAMPLE_REPORT } from './__fixtures__/sample-report';
 import { DOC_SCHEMA, type DocModel } from './model';
-import { validateDocModel, demoteUncitedFacts, hardenedAssumptions, DEFAULT_ASSUMPTION_ORIGIN, repeatedSentences, fixtureMarkers } from './validate';
+import { validateDocModel, demoteUncitedFacts, repairDocModelStructure, hardenedAssumptions, DEFAULT_ASSUMPTION_ORIGIN, repeatedSentences, fixtureMarkers } from './validate';
 import { keepDash, citationIndex, citeMarker, formatCell, formatColumn, formatChartValue, chartDuplicatesTable, parseInline, NOT_AVAILABLE, fileBaseName } from './format';
 import { renderHtml } from './render-html';
 import { renderDocx } from './render-docx';
@@ -588,6 +588,49 @@ describe('per-section boilerplate is a producer signal, never a cut (A4 MED-2)',
   it('the fixture report no longer repeats its method paragraph', () => {
     const texts = SAMPLE_REPORT.sections.flatMap((s) => s.blocks).map((b) => (b as { text?: string }).text ?? '');
     expect(texts.filter((x) => /drawn from the cited records/.test(x))).toEqual([]);
+  });
+});
+
+describe('repairDocModelStructure (comprehensive-report shape)', () => {
+  it('uniquifies duplicate section and block ids so validation passes', () => {
+    const m = tiny({
+      sections: [
+        { id: 'sec', heading: 'One', blocks: [{ type: 'paragraph', id: 'p', text: 'A', claim: 'fact', cites: ['s1'] }] },
+        { id: 'sec', heading: 'Two', blocks: [{ type: 'paragraph', id: 'p', text: 'B', claim: 'fact', cites: ['s1'] }] },
+      ],
+    });
+    expect(issuesOf(m).some((x) => /duplicate id/.test(x))).toBe(true);
+    const { model, changes } = repairDocModelStructure(m);
+    expect(changes.length).toBeGreaterThan(0);
+    expect(validateDocModel(model).ok).toBe(true);
+    expect(model.sections.map((s) => s.id)).toEqual(['sec', 'sec-2']);
+    expect(model.sections.flatMap((s) => s.blocks.map((b) => b.id))).toEqual(['p', 'p-2']);
+  });
+
+  it('infers table columns from row keys when columns are missing', () => {
+    const m = tiny({
+      sections: [{
+        id: 't',
+        heading: 'Awards',
+        blocks: [{
+          type: 'table',
+          id: 'tbl',
+          claim: 'fact',
+          cites: ['s1'],
+          columns: [],
+          rows: [
+            { award: 'N62478', dollars: 1_190_000_000, office: 'NAVFAC Hawaii' },
+            { award: 'W9128A', dollars: 824_530_000, office: 'USACE Honolulu' },
+          ],
+        }],
+      }],
+    });
+    expect(issuesOf(m).some((x) => /at least one column/.test(x))).toBe(true);
+    const { model, changes } = repairDocModelStructure(m);
+    expect(changes.some((c) => /inferred/.test(c))).toBe(true);
+    expect(validateDocModel(model).ok).toBe(true);
+    const tbl = model.sections[0].blocks[0] as { columns: Array<{ key: string }> };
+    expect(tbl.columns.map((c) => c.key).sort()).toEqual(['award', 'dollars', 'office']);
   });
 });
 

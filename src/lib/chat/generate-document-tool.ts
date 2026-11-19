@@ -21,7 +21,7 @@
  * Offered only when VAULT_GENERATED_FILES is on for the verified caller ('true' or 'allowlist').
  */
 import { DOC_SCHEMA, labeledUnits, type DocModel } from '@/lib/documents/model';
-import { validateDocModel, demoteUncitedFacts, hardenedAssumptions, repeatedSentences, fixtureMarkers, neverAnAssumption, citedObservationAsAssumption, BLOCK_TYPE_VALUES, CLAIM_VALUES, SOURCE_KIND_VALUES } from '@/lib/documents/validate';
+import { validateDocModel, demoteUncitedFacts, repairDocModelStructure, hardenedAssumptions, repeatedSentences, fixtureMarkers, neverAnAssumption, citedObservationAsAssumption, BLOCK_TYPE_VALUES, CLAIM_VALUES, SOURCE_KIND_VALUES } from '@/lib/documents/validate';
 import { renderDocument } from '@/lib/documents';
 import { modelHasTables } from '@/lib/documents/render-spreadsheet';
 import { saveGeneratedDocument, type GeneratedDb, type GeneratedFormat } from '@/lib/vault/generated';
@@ -262,11 +262,13 @@ export function makeGenerateDocumentTool(deps: GenerateDocumentDeps) {
     if (markers.length) return { ok: false, error: 'fixture_content', note: 'Example or test content cannot be saved as a document. Use the research from this conversation.' };
 
     // One call, one answer (Ask Mindy runs ONE tool round per turn, so a "fix and call again" retry is
-    // unreachable live — 2026-11-17 production test). When the only problems are unsupported facts, the
-    // document is repaired right away: uncited facts are saved labeled "Unverified — no source" and
-    // decision-critical ones are omitted (never refused just because a fact lacked a cite). Anything the
-    // repair cannot fix — structure, unknown values — is refused with the exact allowed values.
+    // unreachable live — 2026-11-17 production test). Repair shape first (duplicate ids / missing table
+    // columns — live 2026-11-19 comprehensive report failures), then unsupported facts: uncited facts
+    // are saved labeled "Unverified — no source" and decision-critical ones are omitted. Anything the
+    // repair cannot fix — unknown values / empty content — is refused with the exact allowed values.
     // Diagnostics (no content): what came in, what the repair changed and why, and declared sources nothing cites.
+    const structured = repairDocModelStructure(model);
+    model = structured.model;
     const unitsIn = countUnits(model);
     const omittedByReason: Record<string, number> = {};
     const preRepair = new Map<string, { claim?: string; text: string; critical?: boolean; cites?: string[] }>();
@@ -284,6 +286,7 @@ export function makeGenerateDocumentTool(deps: GenerateDocumentDeps) {
           issues: repaired.issues.slice(0, 25).map((i) => `${i.path}: ${i.message}`),
           allowed: { source_kind: [...SOURCE_KIND_VALUES], claim: [...CLAIM_VALUES], block_type: [...BLOCK_TYPE_VALUES] },
           note: 'The document could not be built and nothing was saved. Fix exactly these fields using the allowed values, then the user can ask again.',
+          ...(structured.changes.length ? { structure_repairs: structured.changes.slice(0, 20) } : {}),
         };
       }
       model = d.model; unverified = d.unverified; omitted = d.omitted; v = repaired;
@@ -300,7 +303,14 @@ export function makeGenerateDocumentTool(deps: GenerateDocumentDeps) {
     const citedIds = new Set<string>();
     for (const sec of model.sections) for (const b of sec.blocks) for (const u of labeledUnits(b)) for (const c of u.cites ?? []) citedIds.add(c);
     const uncitedSources = model.sources.filter((s) => !citedIds.has(s.id)).map((s) => ({ id: s.id, kind: s.kind, label: s.label }));
-    const diagnostics = { units_in: unitsIn, units_out: countUnits(model), unverified: unverified.length, omitted_by_reason: omittedByReason, uncited_sources: uncitedSources.map((s) => `${s.id}:${s.kind}`) };
+    const diagnostics = {
+      units_in: unitsIn,
+      units_out: countUnits(model),
+      unverified: unverified.length,
+      omitted_by_reason: omittedByReason,
+      uncited_sources: uncitedSources.map((s) => `${s.id}:${s.kind}`),
+      structure_repairs: structured.changes.length,
+    };
     console.info('[create_document] diagnostics', JSON.stringify(diagnostics));
     // Method boilerplate repeated across sections is reported, never a reason to refuse or cut.
     const repeats = repeatedSentences(model);
