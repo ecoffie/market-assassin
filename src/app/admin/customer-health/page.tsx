@@ -31,6 +31,12 @@ function money(cents: number | null): string {
   return `$${(cents / 100).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
 }
 
+function planCell(c: CustomerHealth) {
+  const monthly = c.plan !== 'lifetime' ? `${money(c.monthlyCents)}/mo` : null;
+  const life = c.lifetime ? `Lifetime${c.lifetime.paidCents !== null ? ` (${money(c.lifetime.paidCents)})` : ''}` : null;
+  return [monthly, life].filter(Boolean).join(' + ');
+}
+
 function date(iso: string | null): string {
   return iso ? new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
 }
@@ -40,7 +46,7 @@ export default function CustomerHealthPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<Payload | null>(null);
-  const [filter, setFilter] = useState<HealthStatus | 'needs_attention' | 'all'>('needs_attention');
+  const [filter, setFilter] = useState<HealthStatus | 'needs_attention' | 'all' | 'lifetime'>('needs_attention');
 
   async function load(e?: FormEvent) {
     e?.preventDefault();
@@ -61,6 +67,7 @@ export default function CustomerHealthPage() {
     if (!data) return [];
     if (filter === 'all') return data.customers;
     if (filter === 'needs_attention') return data.customers.filter((c) => c.status !== 'healthy');
+    if (filter === 'lifetime') return data.customers.filter((c) => c.lifetime);
     return data.customers.filter((c) => c.status === filter);
   }, [data, filter]);
 
@@ -92,14 +99,18 @@ export default function CustomerHealthPage() {
           </section>
 
           <p className="mt-3 text-sm">
-            <strong>Monthly revenue at risk:</strong> {money(data.summary.atRiskMonthlyCents)}
-            <span className="text-slate-500"> (customers not marked healthy)</span>
+            <strong>Monthly recurring revenue at risk:</strong> {money(data.summary.atRiskMonthlyCents)}
+            <span className="text-slate-500"> (subscribers not marked healthy)</span>
+            <span className="mx-2 text-slate-300">·</span>
+            <strong>Lifetime buyers:</strong> {data.summary.lifetimeCustomers}
+            <span className="text-slate-500"> ({data.summary.lifetimeNotHealthy} need attention)</span>
           </p>
 
           <div className="mt-4 flex flex-wrap items-center gap-2 text-sm">
             <span className="text-slate-500">Showing:</span>
             <button onClick={() => setFilter('needs_attention')} className={`rounded-full border px-3 py-1 ${filter === 'needs_attention' ? 'bg-slate-900 text-white' : 'bg-white'}`}>Needs attention</button>
             <button onClick={() => setFilter('all')} className={`rounded-full border px-3 py-1 ${filter === 'all' ? 'bg-slate-900 text-white' : 'bg-white'}`}>Everyone</button>
+            <button onClick={() => setFilter('lifetime')} className={`rounded-full border px-3 py-1 ${filter === 'lifetime' ? 'bg-slate-900 text-white' : 'bg-white'}`}>Lifetime buyers</button>
             <span className="text-slate-500">{rows.length} customer{rows.length === 1 ? '' : 's'}</span>
           </div>
 
@@ -109,7 +120,7 @@ export default function CustomerHealthPage() {
                 <th className="p-2">Customer</th>
                 <th className="p-2">Status</th>
                 <th className="p-2">Why</th>
-                <th className="p-2">$/month</th>
+                <th className="p-2">Plan</th>
                 <th className="p-2">Renews / ends</th>
                 <th className="p-2">Last active</th>
                 <th className="p-2">Customer since</th>
@@ -124,8 +135,8 @@ export default function CustomerHealthPage() {
                     </td>
                     <td className="p-2"><span className={`inline-block rounded border px-2 py-0.5 text-xs font-medium ${BADGE[c.status]}`}>{STATUS_LABEL[c.status]}</span></td>
                     <td className="p-2 text-slate-700">{c.reasons.length ? c.reasons.join(' · ') : '—'}</td>
-                    <td className="p-2">{money(c.monthlyCents)}</td>
-                    <td className="p-2">{date(c.renewsOrEndsAt)}<div className="text-xs text-slate-400">{c.subscriptionStatus.replace('_', ' ')}</div></td>
+                    <td className="p-2 whitespace-nowrap">{planCell(c)}</td>
+                    <td className="p-2">{c.plan === 'lifetime' ? <span className="text-slate-500">never (lifetime)</span> : <>{date(c.renewsOrEndsAt)}<div className="text-xs text-slate-400">{c.subscriptionStatus.replace('_', ' ')}</div></>}</td>
                     <td className="p-2">
                       {c.status === 'unknown' ? <span className="text-slate-400">unknown</span> : c.lastActivityAt ? (
                         <>{date(c.lastActivityAt)}<div className="text-xs text-slate-400">{c.daysSinceActivity === 0 ? 'today' : `${c.daysSinceActivity}d ago`}</div></>
@@ -140,7 +151,8 @@ export default function CustomerHealthPage() {
 
           <ul className="mt-6 text-xs text-slate-600 list-disc pl-5 max-w-3xl space-y-1">
             <li>Billing is the daily Stripe cache{data.stripeCacheUpdatedAt ? `, last synced ${new Date(data.stripeCacheUpdatedAt).toLocaleString()}` : ' (last sync time unknown)'}. Page built {new Date(data.generatedAt).toLocaleString()}.</li>
-            <li>Paying = Stripe status active, trialing, past due or unpaid. Gone quiet = no tracked activity for {data.quietDays}+ days.</li>
+            <li>Paying = a Stripe subscription that is active, trialing, past due or unpaid, or a lifetime Mindy purchase. Gone quiet = no tracked activity for {data.quietDays}+ days.</li>
+            <li>Lifetime buyers come from completed checkout purchases. A lifetime plan sold on a manual Stripe invoice (for example Mindy Teams Lifetime) has no purchase record, so it does not show here yet.</li>
             <li>Activity is any event in user_engagement (app, map, email clicks, MCP). Something we do not track does not count.</li>
             <li>Comp, partner, advocate and test accounts are left out ({data.excludedAccounts}).</li>
             {data.subscriptionsWithoutEmail > 0 && <li className="text-red-700">{data.subscriptionsWithoutEmail} paying subscription(s) have no email in the Stripe cache and are not shown.</li>}

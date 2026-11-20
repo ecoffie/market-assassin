@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { classifyCustomer, sortForOutreach, summarize, type CustomerFacts, type SubscriptionFact } from './health';
-import { loadCustomerHealthData } from './load';
+import { lifetimeBuyers, loadCustomerHealthData } from './load';
 
 const NOW = new Date('2026-11-19T12:00:00Z');
 const daysAgo = (d: number) => new Date(NOW.getTime() - d * 86_400_000).toISOString();
@@ -8,7 +8,7 @@ const sub = (o: Partial<SubscriptionFact> = {}): SubscriptionFact => ({
   subscriptionId: 'sub_1', status: 'active', cancelAtPeriodEnd: false, currentPeriodEnd: daysAgo(-20), monthlyCents: 14900, createdAt: daysAgo(200), ...o,
 });
 const facts = (o: Partial<CustomerFacts> = {}): CustomerFacts => ({
-  email: 'a@x.com', name: null, customerId: 'cus_1', subscriptions: [sub()], failedChargesLast30d: 0, lastFailedChargeAt: null,
+  email: 'a@x.com', name: null, customerId: 'cus_1', subscriptions: [sub()], lifetime: null, failedChargesLast30d: 0, lastFailedChargeAt: null,
   activity: { ok: true, lastActivityAt: daysAgo(2) }, ...o,
 });
 
@@ -47,6 +47,48 @@ describe('classifyCustomer', () => {
 
   it('monthly value is unknown (null) when any subscription cannot be measured', () => {
     expect(classifyCustomer(facts({ subscriptions: [sub(), sub({ monthlyCents: null })] }), NOW).monthlyCents).toBeNull();
+  });
+});
+
+describe('lifetime buyers', () => {
+  const life = { productName: 'Mindy Teams Lifetime', paidCents: 600000, purchasedAt: daysAgo(150) };
+
+  it('a lifetime-only buyer is a customer, judged on activity, with no monthly revenue', () => {
+    const quiet = classifyCustomer(facts({ subscriptions: [], lifetime: life, activity: { ok: true, lastActivityAt: daysAgo(40) } }), NOW);
+    expect(quiet.status).toBe('gone_quiet');
+    expect(quiet.plan).toBe('lifetime');
+    expect(quiet.monthlyCents).toBe(0);
+    expect(quiet.customerSince).toBe(life.purchasedAt);
+    expect(classifyCustomer(facts({ subscriptions: [], lifetime: life }), NOW).status).toBe('healthy');
+  });
+
+  it('canceling a subscription is not "canceling" when they own a lifetime plan', () => {
+    const h = classifyCustomer(facts({ subscriptions: [sub({ cancelAtPeriodEnd: true })], lifetime: life }), NOW);
+    expect(h.status).toBe('healthy');
+    expect(h.plan).toBe('both');
+  });
+
+  it('summary counts lifetime buyers and leaves them out of recurring revenue at risk', () => {
+    const s = summarize([
+      classifyCustomer(facts({ email: 'l@x.com', subscriptions: [], lifetime: life, activity: { ok: true, lastActivityAt: null } }), NOW),
+      classifyCustomer(facts({ email: 'q@x.com', activity: { ok: true, lastActivityAt: daysAgo(30) } }), NOW),
+    ]);
+    expect(s.lifetimeCustomers).toBe(1);
+    expect(s.lifetimeNotHealthy).toBe(1);
+    expect(s.atRiskMonthlyCents).toBe(14900);
+  });
+
+  it('only lifetime products count, using the app product rule (MCP and tiny charges never do)', () => {
+    const m = lifetimeBuyers([
+      { user_email: 'A@x.com', product_name: 'Mindy Lifetime', amount_cents: 99700, created_at: daysAgo(10), stripe_customer_id: 'c1' },
+      { user_email: 'a@x.com', product_name: 'Mindy Teams', amount_cents: 600000, created_at: daysAgo(5), stripe_customer_id: 'c2' },
+      { user_email: 'b@x.com', product_name: 'Mindy Ai', amount_cents: 14900, created_at: daysAgo(5), stripe_customer_id: null },
+      { user_email: 'c@x.com', product_name: 'Mindy MCP Lifetime', amount_cents: 99700, created_at: daysAgo(5), stripe_customer_id: null },
+      { user_email: 'd@x.com', product_name: 'Mindy Lifetime', amount_cents: 1490, created_at: daysAgo(5), stripe_customer_id: null },
+    ]);
+    expect([...m.keys()]).toEqual(['a@x.com']);
+    expect(m.get('a@x.com')!.fact.paidCents).toBe(600000);
+    expect([...m.get('a@x.com')!.customerIds].sort()).toEqual(['c1', 'c2']);
   });
 });
 
@@ -116,11 +158,18 @@ describe('loadCustomerHealthData', () => {
     ],
     stripe_charges: [{ customer_id: 'c2', status: 'failed', created_at: daysAgo(3) }],
     user_engagement: [{ user_email: 'one@x.com', created_at: daysAgo(1) }],
+    purchases_canonical: [
+      { user_email: 'life@x.com', product_name: 'Mindy Lifetime', amount_cents: 99700, created_at: daysAgo(60), stripe_customer_id: null, status: 'completed' },
+      { user_email: 'two@x.com', product_name: 'Mindy Lifetime', amount_cents: 99700, created_at: daysAgo(70), stripe_customer_id: 'c2', status: 'completed' },
+      { user_email: 'refund@x.com', product_name: 'Mindy Lifetime', amount_cents: 99700, created_at: daysAgo(70), stripe_customer_id: null, status: 'refunded' },
+    ],
   };
 
   it('groups by lower-cased email, skips non-paying, counts subscriptions with no email', async () => {
     const r = await loadCustomerHealthData(fakeDb(tables), NOW);
-    expect(r.customers.map((c) => c.email).sort()).toEqual(['one@x.com', 'two@x.com']);
+    expect(r.customers.map((c) => c.email).sort()).toEqual(['life@x.com', 'one@x.com', 'two@x.com']);
+    expect(r.customers.find((c) => c.email === 'life@x.com')!.subscriptions).toEqual([]);
+    expect(r.customers.find((c) => c.email === 'two@x.com')!.lifetime?.paidCents).toBe(99700);
     expect(r.subscriptionsWithoutEmail).toBe(1);
     const two = r.customers.find((c) => c.email === 'two@x.com')!;
     expect(two.failedChargesLast30d).toBe(1);

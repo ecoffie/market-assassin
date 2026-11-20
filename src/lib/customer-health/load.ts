@@ -5,6 +5,7 @@
  *   stripe_subscriptions  paying states (active, trialing, past_due, unpaid) — the daily Stripe cache
  *   stripe_customers      customer_id → email (one email can have several customer ids: grouped by email)
  *   stripe_charges        failed charges in the last 30 days
+ *   purchases_canonical   lifetime (one-time) Mindy purchases, by the product rule in briefings/product-entitlement
  *   user_engagement       each customer's latest event (index user_email, created_at DESC)
  *
  * Rules:
@@ -17,7 +18,8 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { isExcludedFromMetrics } from '@/lib/mindy/campaign-exclusions';
 import { monthlyRecurring } from '@/lib/stripe/recurring-normalize';
-import { FAILED_CHARGE_WINDOW_DAYS, type ActivityFact, type CustomerFacts, type SubscriptionFact } from './health';
+import { briefingGrantForPurchase } from '@/lib/briefings/product-entitlement';
+import { FAILED_CHARGE_WINDOW_DAYS, type ActivityFact, type CustomerFacts, type LifetimeFact, type SubscriptionFact } from './health';
 
 const PAGE = 1000;
 const MAX_ROWS = 60_000;
@@ -66,6 +68,42 @@ export interface LoadedHealthData {
   stripeCacheUpdatedAt: string | null;
 }
 
+interface PurchaseRow {
+  user_email: string | null;
+  product_name: string | null;
+  amount_cents: number | null;
+  created_at: string | null;
+  stripe_customer_id: string | null;
+}
+
+/**
+ * Lifetime buyers from purchases_canonical (one row per checkout session, duplicates removed),
+ * using the app's single product rule (briefingGrantForPurchase). Keeps each buyer's largest
+ * lifetime purchase.
+ *
+ * Known gap: a lifetime plan sold on a MANUAL Stripe invoice never writes a purchases row (only
+ * checkout does), so it is not seen here. "Mindy Teams Lifetime" is sold that way.
+ */
+export function lifetimeBuyers(rows: PurchaseRow[]): Map<string, { fact: LifetimeFact; customerIds: Set<string> }> {
+  const out = new Map<string, { fact: LifetimeFact; customerIds: Set<string> }>();
+  for (const r of rows) {
+    const email = r.user_email?.toLowerCase().trim();
+    if (!email) continue;
+    const cents = Number(r.amount_cents) || 0;
+    const grant = briefingGrantForPurchase(r.product_name, cents);
+    if (!grant.earns || grant.access !== 'lifetime') continue;
+    const prev = out.get(email);
+    const ids = prev?.customerIds || new Set<string>();
+    if (r.stripe_customer_id) ids.add(r.stripe_customer_id);
+    if (!prev || cents > (prev.fact.paidCents ?? 0)) {
+      out.set(email, { fact: { productName: r.product_name || 'Lifetime', paidCents: cents, purchasedAt: r.created_at }, customerIds: ids });
+    } else {
+      prev.customerIds = ids;
+    }
+  }
+  return out;
+}
+
 export async function loadCustomerHealthData(db: SupabaseClient, now: Date = new Date()): Promise<LoadedHealthData> {
   const subs = await readAll<SubRow>('stripe_subscriptions', (from, to) => db
     .from('stripe_subscriptions')
@@ -74,7 +112,18 @@ export async function loadCustomerHealthData(db: SupabaseClient, now: Date = new
     .order('id')
     .range(from, to));
 
-  const customerIds = [...new Set(subs.map((s) => s.customer_id).filter((x): x is string => !!x))];
+  const purchases = await readAll<PurchaseRow>('purchases_canonical', (from, to) => db
+    .from('purchases_canonical')
+    .select('user_email, product_name, amount_cents, created_at, stripe_customer_id')
+    .eq('status', 'completed')
+    .order('created_at')
+    .range(from, to));
+  const lifetime = lifetimeBuyers(purchases);
+
+  const customerIds = [...new Set([
+    ...subs.map((s) => s.customer_id),
+    ...[...lifetime.values()].flatMap((l) => [...l.customerIds]),
+  ].filter((x): x is string => !!x))];
 
   const customers: Array<{ id: string; email: string | null; name: string | null }> = [];
   for (let i = 0; i < customerIds.length; i += 200) {
@@ -95,7 +144,13 @@ export async function loadCustomerHealthData(db: SupabaseClient, now: Date = new
     .range(from, to));
 
   // Group by email.
-  const byEmail = new Map<string, { name: string | null; customerIds: Set<string>; subs: SubscriptionFact[] }>();
+  type Group = { name: string | null; customerIds: Set<string>; subs: SubscriptionFact[]; lifetime: LifetimeFact | null };
+  const byEmail = new Map<string, Group>();
+  const group = (email: string): Group => {
+    let g = byEmail.get(email);
+    if (!g) { g = { name: null, customerIds: new Set(), subs: [], lifetime: null }; byEmail.set(email, g); }
+    return g;
+  };
   let subscriptionsWithoutEmail = 0;
   const excluded = new Set<string>();
   for (const s of subs) {
@@ -103,7 +158,8 @@ export async function loadCustomerHealthData(db: SupabaseClient, now: Date = new
     const email = c?.email?.toLowerCase().trim();
     if (!email) { subscriptionsWithoutEmail++; continue; }
     if (isExcludedFromMetrics(email)) { excluded.add(email); continue; }
-    const g = byEmail.get(email) || { name: c?.name || null, customerIds: new Set<string>(), subs: [] };
+    const g = group(email);
+    g.name = g.name || c?.name || null;
     g.customerIds.add(s.customer_id!);
     g.subs.push({
       subscriptionId: s.id,
@@ -113,7 +169,15 @@ export async function loadCustomerHealthData(db: SupabaseClient, now: Date = new
       createdAt: s.created_at,
       monthlyCents: (s.plan_amount || 0) <= 0 ? 0 : monthlyRecurring(s).monthlyCents,
     });
-    byEmail.set(email, g);
+  }
+  for (const [email, l] of lifetime) {
+    if (isExcludedFromMetrics(email)) { excluded.add(email); continue; }
+    const g = group(email);
+    g.lifetime = l.fact;
+    for (const id of l.customerIds) {
+      g.customerIds.add(id);
+      g.name = g.name || customerById.get(id)?.name || null;
+    }
   }
 
   const emails = [...byEmail.keys()];
@@ -144,8 +208,9 @@ export async function loadCustomerHealthData(db: SupabaseClient, now: Date = new
     return {
       email,
       name: g.name,
-      customerId: [...g.customerIds][0],
+      customerId: [...g.customerIds][0] || null,
       subscriptions: g.subs,
+      lifetime: g.lifetime,
       failedChargesLast30d: mine.length,
       lastFailedChargeAt: mine[0]?.created_at || null,
       activity: activity[i],
