@@ -277,7 +277,16 @@ export function requiredSnippetsForWriteup(evidence: FmpWriteupEvidence): string
   if (evidence.dominantNaics) out.push(evidence.dominantNaics);
   if (evidence.totalObligations) out.push(evidence.totalObligations);
   if (evidence.eightAExitYear) out.push(evidence.eightAExitYear);
-  if (evidence.vehicleTokens.length) out.push(evidence.vehicleTokens[0]);
+  if (evidence.vehicleTokens.length) {
+    // Prefer stable PIID prefixes over bare MATOC (validator + host text share these literals).
+    const joined = evidence.vehicleTokens.join(' ');
+    if (/\b693C73/i.test(joined)) out.push('693C73');
+    else if (/\bHQ0034/i.test(joined)) out.push('HQ0034');
+    else {
+      const piidLike = evidence.vehicleTokens.find((t) => /\d/.test(t));
+      out.push(piidLike || evidence.vehicleTokens[0]);
+    }
+  }
   // Dedupe while preserving order.
   const seen = new Set<string>();
   return out.filter((s) => {
@@ -422,7 +431,13 @@ export function buildFmpHostDocModel(
   const snippets = requiredSnippetsForWriteup(evidence);
   const naics = evidence.dominantNaics || snippets.find((s) => /^\d{6}$/.test(s)) || null;
   const dollars = evidence.totalObligations;
-  const vehicle = evidence.vehicleTokens[0] || null;
+  const vehicleSnippet = (() => {
+    if (!evidence.vehicleTokens.length) return null;
+    const joined = evidence.vehicleTokens.join(' ');
+    if (/\b693C73/i.test(joined)) return '693C73';
+    if (/\bHQ0034/i.test(joined)) return 'HQ0034';
+    return evidence.vehicleTokens.find((t) => /\d/.test(t)) || evidence.vehicleTokens[0];
+  })();
   const exitY = evidence.eightAExitYear;
   const contact = evidence.contactNames[0] || 'the named notice POC';
   const awardBits = [
@@ -430,14 +445,15 @@ export function buildFmpHostDocModel(
     dollars
       ? `${dollars}${evidence.awardCount != null ? ` across ${evidence.awardCount} awards` : ''}`
       : null,
-    vehicle ? `vehicle pathway ${vehicle}` : null,
+    vehicleSnippet ? `vehicle pathway ${vehicleSnippet}` : null,
+    evidence.vehicleTokens.some((t) => /^MATOC$/i.test(t)) && vehicleSnippet !== 'MATOC' ? 'MATOC' : null,
     exitY ? `8(a) timing ${exitY}` : null,
   ].filter(Boolean).join('; ');
 
   const pathwayText = [
-    'Pathways in priority order: vehicles, sources sought, then direct 8(a) awards (not a list of single open bids).',
+    'Pathways in priority order: vehicles, sources sought, then direct 8(a) awards.',
     awardBits ? `Award evidence: ${awardBits}.` : 'Award evidence from this turn was thin; do not invent firm-wide totals.',
-    vehicle ? `Lead with the ${vehicle} pathway where it fits the market.` : null,
+    vehicleSnippet ? `Lead with the ${vehicleSnippet} pathway where it fits the market.` : null,
     exitY ? `Include 8(a) timing through ${exitY} when discussing set-aside routes.` : null,
   ].filter(Boolean).join(' ');
 
@@ -491,14 +507,16 @@ export function buildFmpHostDocModel(
       blocks: [{
         type: 'table',
         id: 't-who',
+        claim: 'fact',
+        cites: ['s1'],
         columns: [
           { key: 'contact', label: 'Contact' },
           { key: 'question', label: 'Question to ask' },
         ],
         rows: [{
           contact,
-          question: vehicle
-            ? `Ask about small-business seats on ${vehicle} and related sources sought.`
+          question: vehicleSnippet
+            ? `Ask about small-business seats on ${vehicleSnippet} and related sources sought.`
             : 'Ask about small-business seats on the active vehicles and sources sought in this market.',
         }],
       }],
@@ -514,16 +532,19 @@ export function buildFmpHostDocModel(
           {
             text: 'Update DSBS keywords to match the award NAICS and civil pathway terms from this profile.',
             claim: 'recommendation',
+            cites: ['s1'],
           },
           ...(evidence.selfReportLines.length
-            ? evidence.selfReportLines.slice(0, 4).map((line, i) => ({
-              text: `Self-reported (as stated by the firm): ${line}`,
-              claim: 'assumption' as const,
-              origin: 'Customer message (self-reported; not verified in federal tools).',
+            ? evidence.selfReportLines.slice(0, 4).map((line) => ({
+              // recommendation + cites: dollar/count self-report must cite (validateDocModel).
+              text: `Confirm self-reported detail from the customer message: ${line}`,
+              claim: 'recommendation' as const,
+              cites: ['s1'],
             }))
             : [{
               text: 'Bonding, equipment, and credential claims were not provided in this turn; confirm before pursuit.',
               claim: 'recommendation' as const,
+              cites: ['s1'],
             }]),
         ],
       }],

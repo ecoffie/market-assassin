@@ -96,7 +96,6 @@ import {
   buildFmpCreateDocumentAnswerNote,
   buildFmpCreateDocumentInjectArgs,
   buildFmpWriteupGroundingNote,
-  createDocumentArgsHaveUsableDocModel,
   FMP_DOC_TOOL_ROUND_MAX_TOKENS,
   requiredSnippetsForWriteup,
   type FmpWriteupEvidence,
@@ -1652,7 +1651,7 @@ export async function POST(request: NextRequest) {
                   })();
                   const forcedToolInjectArgs = (toolName: string): string => {
                     if (toolName === CREATE_DOCUMENT) {
-                      turnTrace.notices.push('fmp_create_document:host_doc_model_injected');
+                      turnTrace.notices.push('fmp_create_document:host_doc_model_forced');
                       return fmpCreateDocumentInjectArgs(customerFmpText);
                     }
                     if (toolName === MARKET_REPORT_TOOL && fmpState) {
@@ -1682,10 +1681,11 @@ export async function POST(request: NextRequest) {
                     const prepared = prepareChatToolArgs(String(tc.function?.name || ''), String(tc.function?.arguments ?? ''));
                     let args = prepared.args;
                     const toolNm = String(tc.function?.name || '');
-                    // Planner returned create_document without a usable doc_model → host DocModel.
-                    if (toolNm === CREATE_DOCUMENT && !createDocumentArgsHaveUsableDocModel(args)) {
+                    // FMP writeup: ALWAYS use the host DocModel. Planner bodies often have
+                    // title+sections but miss required snippets → fmp_writeup_invalid loop.
+                    if (toolNm === CREATE_DOCUMENT) {
                       args = fmpCreateDocumentInjectArgs(customerFmpText);
-                      turnTrace.notices.push('fmp_create_document:host_doc_model_replaced_empty');
+                      turnTrace.notices.push('fmp_create_document:host_doc_model_forced');
                     }
                     const identityArgs = enforceFederalMarketProfileIdentityArgs(toolNm, args, customerFmpText);
                     args = identityArgs.args;

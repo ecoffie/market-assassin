@@ -220,7 +220,8 @@ describe('fmp-writeup-grounding', () => {
     }))).toBe(true);
   });
 
-  it('host DocModel includes required snippets, passes validate, and never uses Performance Assessment Evaluation', () => {
+  it('host DocModel passes validateDocModel + validateFmpWriteup with 237310/$42.5M/693C73/2031', async () => {
+    const { validateDocModel } = await import('@/lib/documents/validate');
     const evidence = accumulateFmpEvidence(
       [
         { tool: 'get_contractor_award_history', content: AWARD_JSON },
@@ -230,23 +231,33 @@ describe('fmp-writeup-grounding', () => {
       ],
       RBA_FEDERAL_MARKET_PROFILE_PROMPT,
     );
+    const required = ['237310', '$42.5M', '693C73', '2031'];
     const snippets = requiredSnippetsForWriteup(evidence);
+    for (const s of required) expect(snippets).toContain(s);
+
     const model = buildFmpHostDocModel(evidence, {
       customerText: RBA_FEDERAL_MARKET_PROFILE_PROMPT,
       defenseBuyersAppear: true,
       today: () => '2026-11-20',
     });
+    expect(model.title).toBe('RBA Engineering International PLLC Federal Market Profile');
+    expect(model.preparedFor).toBe('RBA Engineering International PLLC');
+    expect(model.preparedFor).not.toMatch(/\. 8/);
     const flat = JSON.stringify(model);
     expect(flat).not.toMatch(/Performance\s+Assessment\s+Evaluation/i);
     expect(flat).toMatch(/defense construction oversight/i);
-    for (const s of snippets) expect(flat).toContain(s);
+    for (const s of required) expect(flat).toContain(s);
+
+    const shape = validateDocModel(model);
+    expect(shape.ok).toBe(true);
 
     const v = validateFmpWriteup(model, {
       defenseBuyersAppear: true,
-      requiredSnippets: snippets,
+      requiredSnippets: required,
     });
     expect(v.ok).toBe(true);
     expect(v.issues.filter((i) => i.severity === 'error')).toEqual([]);
+    expect(v.issues.some((i) => i.code === 'open_bid_frame')).toBe(false);
 
     const inject = buildFmpCreateDocumentInjectArgs(evidence, {
       customerText: RBA_FEDERAL_MARKET_PROFILE_PROMPT,
@@ -255,6 +266,17 @@ describe('fmp-writeup-grounding', () => {
     });
     expect(createDocumentArgsHaveUsableDocModel(inject)).toBe(true);
     expect(inject).not.toBe('{}');
+  });
+
+  it('cleanLegalCompanyName / identity strips trailing . 8 from 8(a) paren trap', async () => {
+    const { extractProfileCompanyIdentity, cleanLegalCompanyName } = await import('./tool-selection');
+    expect(cleanLegalCompanyName('RBA Engineering International PLLC. 8')).toBe(
+      'RBA Engineering International PLLC',
+    );
+    const id = extractProfileCompanyIdentity(
+      'Build a federal market profile for RBA Engineering International PLLC. 8(a) through 2031 in VA.',
+    );
+    expect(id.legalName).toBe('RBA Engineering International PLLC');
   });
 
   it('validateFmpWriteup hard-fails Performance Assessment Evaluation gloss', () => {

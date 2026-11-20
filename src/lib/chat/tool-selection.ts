@@ -226,6 +226,20 @@ export type ProfileCompanyIdentity = {
 const LEGAL_ENTITY_SUFFIX =
   /(?:PLLC|P\.L\.L\.C\.|LLC|L\.L\.C\.|Inc\.?|Incorporated|Corp\.?|Corporation|Co\.|Company|LP|L\.P\.|LLP|L\.L\.P\.)\b/i;
 
+/**
+ * Cut a legal name at the entity suffix so `8(a)` paren-capture cannot leave
+ * "RBA Engineering International PLLC. 8" (withAlias treats `8(a)` as `(…)`).
+ */
+export function cleanLegalCompanyName(raw: string): string {
+  const t = String(raw || '').replace(/\s+/g, ' ').trim();
+  if (!t) return t;
+  const m = t.match(
+    /^(.+?\b(?:PLLC|P\.L\.L\.C\.|LLC|L\.L\.C\.|Inc\.?|Incorporated|Corp\.?|Corporation|LP|L\.P\.|LLP|L\.L\.P\.))\b/i,
+  );
+  if (m) return m[1].replace(/\s+/g, ' ').trim();
+  return t.replace(/[.,;:\s]+$/g, '').trim();
+}
+
 function normCompany(s: string): string {
   return String(s || '')
     .toLowerCase()
@@ -253,27 +267,33 @@ export function extractProfileCompanyIdentity(customerText: string): ProfileComp
   let legalName: string | null = null;
   const aliases: string[] = [];
 
-  // for Legal Name PLLC (Trade Alias, City ST)
+  // Prefer the legal-suffix form first so "PLLC. 8(a)" never becomes the name.
+  const forLegal = t.match(
+    /\bfor\s+([A-Z][^.]{1,120}?(?:PLLC|P\.L\.L\.C\.|LLC|L\.L\.C\.|Inc\.?|Incorporated|Corp\.?|Corporation|LP|LLP))\b/i,
+  );
+  if (forLegal) legalName = cleanLegalCompanyName(forLegal[1]);
+
+  // for Legal Name PLLC (Trade Alias, City ST) — skip 8(a) cert parens (inside="a").
   const withAlias = t.match(
     /\bfor\s+([A-Z][^()]{1,120}?)\s*\(([^)]{1,160})\)/i,
   );
   if (withAlias) {
-    const before = withAlias[1].replace(/\s+/g, ' ').trim().replace(/,\s*$/, '');
-    if (LEGAL_ENTITY_SUFFIX.test(before) || before.length >= 8) legalName = before;
+    const before = cleanLegalCompanyName(withAlias[1].replace(/,\s*$/, ''));
+    if (!legalName && before && (LEGAL_ENTITY_SUFFIX.test(before) || before.length >= 8)) {
+      legalName = before;
+    }
     const inside = withAlias[2].trim();
-    // First comma-separated chunk is usually the trade name; later chunks are city/state.
-    const firstChunk = inside.split(',')[0]?.trim() || '';
-    if (firstChunk && normCompany(firstChunk) !== normCompany(legalName || '')) {
-      aliases.push(firstChunk);
+    // `8(a)` makes the capture group inside="a" — not a trade alias.
+    const eightAParen = /^a\b/i.test(inside) && inside.length <= 4;
+    if (!eightAParen) {
+      const firstChunk = inside.split(',')[0]?.trim() || '';
+      if (firstChunk && normCompany(firstChunk) !== normCompany(legalName || '')) {
+        aliases.push(firstChunk);
+      }
     }
   }
 
-  if (!legalName) {
-    const forLegal = t.match(
-      /\bfor\s+([A-Z][^.]{1,120}?(?:PLLC|P\.L\.L\.C\.|LLC|L\.L\.C\.|Inc\.?|Incorporated|Corp\.?|Corporation|LP|LLP))\b/i,
-    );
-    if (forLegal) legalName = forLegal[1].replace(/\s+/g, ' ').trim();
-  }
+  if (legalName) legalName = cleanLegalCompanyName(legalName);
 
   return { legalName, aliases, uei };
 }
