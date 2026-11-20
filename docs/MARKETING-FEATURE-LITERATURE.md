@@ -4,7 +4,7 @@
 
 **Why it matters.** The Claude+MCP RBA profile bar is usable from Ask/Vault downloads, not a cover page with a one-paragraph pathways section.
 
-**Proof.** Unit: enriched host ≥3500 chars + IRS/set-aside-as-person rejection + planner prefer. Live Ask 2026-11-20: Vault `df4f8679…` gained Claude section shell (The read → readiness); follow-up rejects "No Range Specified"/"Sole Source" contact leak.
+**Proof.** Unit 40/40 `fmp-writeup-grounding`. Live getmindy.ai Ask 2026-11-20 after `d418f4c95` / `dpl_…p8hkhllff`: Vault docx `37dc3e28-8ce2-49da-b10b-47a53d9f0ddb` + PDF `166673d9-87e6-4c77-8a1f-12c6414e59f9` — 6 pages / ~8.4k chars; sections The read → pathways → proven → PAE → pain → who-to-talk → readiness+DSBS; no IRS/DLA/set-aside-as-person; no tax-software/security bridge-contract pathways; NAICS 237310 + $42.5M grounded. Prior blank Ask PDF was 4 pages / ~2.5k chars.
 
 
 ### Ask Mindy Federal Market Profile write-up (host-grounded Vault DocModel) — 2026-11-20
