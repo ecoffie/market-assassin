@@ -13,6 +13,14 @@ describe('decideDodSbirExecuteOutcome — false green cannot claim success', () 
     expect(o.disclosure).toMatch(/empty/);
   });
 
+  it('api-down with an unmeasured held count is not an empty corpus', () => {
+    const o = decideDodSbirExecuteOutcome({ stopped: 'api-down', upserted: 0, heldRows: null });
+    expect(o.success).toBe(false);
+    expect(o.httpStatus).toBe(503);
+    expect(o.disclosure).toMatch(/unmeasured/);
+    expect(o.disclosure).toMatch(/not an empty corpus/);
+  });
+
   it('api-down with historical rows is still not success', () => {
     const o = decideDodSbirExecuteOutcome({ stopped: 'api-down', upserted: 0, heldRows: 42 });
     expect(o.success).toBe(false);
