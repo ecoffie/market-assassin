@@ -22,6 +22,7 @@ import type { AppTier, AppPanel } from '../UnifiedSidebar';
 import { authedFetch } from '../authHeaders';
 import { ChatAttachments } from '../chat/ChatAttachments';
 import { GeneratedDownloadChips, type GeneratedDownloadFile } from '../chat/GeneratedDownloadChips';
+import { ChatReportPreview, type ChatInlineReport } from '../chat/ChatReportPreview';
 import { useVaultCapabilities } from '../chat/useVaultCapabilities';
 import { UpgradeModal } from '../UpgradeModal';
 import { DEFAULT_STARTER_PROMPTS } from '@/lib/chat/starter-prompts';
@@ -81,6 +82,8 @@ interface ChatMessage {
   /** W2: create_document files saved this turn — in-chat download chips mint signed URLs on click. */
   deliverables?: GeneratedDownloadFile[];
   deliverablePdfNote?: string | null;
+  /** Packaged generate_market_report: the rendered report HTML, read in the chat (not persisted in History). */
+  report?: ChatInlineReport;
 }
 
 
@@ -312,6 +315,13 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
                     : m
                 ));
               }
+            } else if (evt.type === 'market_report' && typeof evt.html === 'string' && evt.html) {
+              const report: ChatInlineReport = {
+                html: evt.html,
+                title: typeof evt.title === 'string' && evt.title ? evt.title : 'Market report',
+                url: typeof evt.url === 'string' ? evt.url : null,
+              };
+              setMessages(prev => prev.map(m => m.id === assistantMsg.id ? { ...m, report } : m));
             } else if (evt.type === 'sources' && evt.ledger && typeof evt.ledger === 'object') {
               setMessages(prev => prev.map(m =>
                 m.id === assistantMsg.id ? { ...m, ledger: evt.ledger } : m
@@ -734,7 +744,7 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
               <div key={msg.id} className={msg.role === 'user' ? 'flex justify-end' : 'flex justify-start'}>
                 <div className={msg.role === 'user'
                   ? 'max-w-[80%] rounded-2xl rounded-tr-md bg-surface border border-hairline px-4 py-3'
-                  : 'max-w-[85%]'
+                  : (msg.report || msg.deliverables?.length) ? 'w-full' : 'max-w-[85%]'
                 }>
                   {msg.role === 'assistant' && (
                     <div className="flex items-center gap-2 mb-1.5">
@@ -743,6 +753,13 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
                         <span className="inline-block w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse" />
                       )}
                     </div>
+                  )}
+                  {/* The report leads: read it here, no download needed. Files are the secondary action below. */}
+                  {msg.role === 'assistant' && !msg.isStreaming && !msg.errored && email && msg.report && (
+                    <ChatReportPreview email={email} inline={msg.report} />
+                  )}
+                  {msg.role === 'assistant' && !msg.isStreaming && !msg.errored && email && !msg.report && !!msg.deliverables?.length && (
+                    <ChatReportPreview email={email} files={msg.deliverables} />
                   )}
                   <div className={`text-[14.5px] leading-relaxed ${msg.errored ? 'text-red-300' : msg.role === 'user' ? 'text-slate-100' : 'text-slate-200'}`}>
                     {msg.content

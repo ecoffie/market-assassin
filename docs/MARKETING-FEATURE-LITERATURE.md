@@ -7712,3 +7712,13 @@ the notices. Test: `federal-events-ranking.unit.test.ts`.
 **Honest scope.** Spreadsheet export uses the document's table blocks (or a Summary sheet when there are none). CSV cells are formula-injection safe. Still behind the Vault generated-files flag.
 
 **Proof.** `render-spreadsheet.ts` + `create_document` W4 path; sample deliverables in the release package.
+
+## Ask Mindy shows the report in the chat, not just a download (2026-11-20)
+
+**What.** When Ask Mindy builds a Federal Market Profile (or any saved document, or a packaged market report), the report opens right in the conversation, above the answer, with the pathways, awards and "The read" visible. Download PDF / Word buttons sit underneath as the secondary action.
+
+**Why it matters.** Customers used to get only download buttons and never saw the data in chat, so a stale file from an earlier run looked like the answer. Reading the report in place means what you see is what you download.
+
+**Honest scope.** The on-screen report is the saved document rendered by the same engine as the PDF and Word files. Older chats keep their older files; ask again to get the current report.
+
+**Proof.** `ChatReportPreview` + `/api/app/vault/documents/preview`; `chat-report-preview.unit.test.tsx`, `mindy-chat-report-preview.unit.test.tsx`, and the rich-model extraction test in `fmp-writeup-grounding.unit.test.ts`.

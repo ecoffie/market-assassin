@@ -243,7 +243,7 @@ describe('fmp-writeup-grounding', () => {
       const after = rewriteFmpAnswerDownloadLinks(before, [realPath]);
       expect(after).not.toMatch(/your-link-to-download\.com/i);
       expect(after).toContain(realPath);
-      expect(after).toMatch(/Downloads \(Vault\):/);
+      expect(after).toMatch(/Downloads:/);
       expect(after).toContain(`- ${realPath}`);
     });
 
@@ -530,6 +530,36 @@ describe('fmp-writeup-grounding', () => {
         requiredSnippets: requiredSnippetsForWriteup(evidence),
       });
       expect(v.issues.filter((i) => i.severity === 'error')).toEqual([]);
+    });
+
+    it('the rich host model reads in the chat preview AND extracts to a substantive Word/PDF body (same model, one source)', async () => {
+      const { renderHtml } = await import('@/lib/documents/render-html');
+      const { renderDocx } = await import('@/lib/documents/render-docx');
+      const { extractDocx } = await import('@/lib/documents/extract');
+      const model = buildFmpHostDocModel(evidence, hostOpts);
+
+      // What the in-chat pane shows (the preview route renders the stored model with `screen: true`).
+      const screen = renderHtml(model, { screen: true });
+      expect(screen).toContain('The read');
+      expect(screen).toContain('693C7326R0001');
+      expect(screen).toContain('Federal Highway Administration');
+      expect(screen).toContain('Helson Roman');
+
+      // What the download chip contains: the same model, extracted with the upload pipeline.
+      const { text } = await extractDocx(await renderDocx(model));
+      expect(text.length).toBeGreaterThanOrEqual(4000);
+      expect(text).toContain('The read');
+      expect(text).toContain('693C7326R0001');
+    });
+
+    it('the answer note tells the model the report is open in the chat, not "go to the Vault"', () => {
+      const note = buildFmpCreateDocumentAnswerNote({
+        evidence,
+        downloadPaths: ['/api/app/vault/documents/download?id=11111111-1111-4111-8111-111111111111'],
+        title: 'RBA Federal Market Profile',
+      });
+      expect(note).toMatch(/already open in the chat/i);
+      expect(note).toMatch(/do not tell the customer to go to the Vault/i);
     });
 
     it('parses a FIND-shaped payload (open / coming_back / coming_soon, id, due) into pathway rows', () => {

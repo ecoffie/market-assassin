@@ -1021,7 +1021,7 @@ export function buildFmpCreateDocumentAnswerNote(opts: {
   const paths = opts.downloadPaths.filter(Boolean);
   const lines: string[] = [
     'FMP ANSWER AFTER create_document (host rule):',
-    'Summarize the federal market profile from the grounding facts below. Do not answer with download links alone.',
+    'The full report is already open in the chat above your answer (the customer reads it there; no download needed). Summarize the federal market profile from the grounding facts below in plain English. Do not answer with download links alone, and do not tell the customer to go to the Vault to read it.',
     'Only cite download_path values that appear in the create_document tool JSON (listed next). Never invent URLs such as your-link-to-download.com or placeholder links.',
   ];
   if (opts.title) lines.push(`Document title: ${opts.title}.`);
@@ -1029,7 +1029,7 @@ export function buildFmpCreateDocumentAnswerNote(opts: {
     lines.push('Real download_path values from the tool result:');
     for (const p of paths) lines.push(`- ${p}`);
   } else {
-    lines.push('No download_path values were returned. Tell the user the file is in Vault / the in-chat download chips; do not invent a URL.');
+    lines.push('No download_path values were returned. Tell the user the report is open above and the download buttons are under it; do not invent a URL.');
   }
   const facts: string[] = [];
   if (opts.evidence.dominantNaics) facts.push(`NAICS ${opts.evidence.dominantNaics}`);
@@ -1077,8 +1077,8 @@ function pathByDocumentId(downloadPaths: readonly string[]): Map<string, string>
 
 function realDownloadBulletList(downloadPaths: readonly string[]): string {
   const paths = [...pathByDocumentId(downloadPaths).values()];
-  if (!paths.length) return 'Download files from the in-chat download chips (Vault).';
-  return ['Downloads (Vault):', ...paths.map((p) => `- ${p}`)].join('\n');
+  if (!paths.length) return 'Download files from the buttons under the report.';
+  return ['Downloads:', ...paths.map((p) => `- ${p}`)].join('\n');
 }
 
 /**
@@ -1146,7 +1146,7 @@ export function rewriteFmpAnswerDownloadLinks(
     if (!stillHasReal && allow.size) {
       out = `${out.replace(/\n{3,}/g, '\n\n').trimEnd()}\n\n${realDownloadBulletList([...allow])}`;
     } else if (!stillHasReal && !allow.size) {
-      out = `${out.replace(/\n{3,}/g, '\n\n').trimEnd()}\n\nUse the in-chat download chips to open the Vault files.`;
+      out = `${out.replace(/\n{3,}/g, '\n\n').trimEnd()}\n\nUse the download buttons under the report.`;
     }
   }
 
