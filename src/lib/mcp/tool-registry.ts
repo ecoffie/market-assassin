@@ -2942,7 +2942,10 @@ async function dispatchMcpTool(
   if (name === 'get_buying_offices') {
     // Raw args on purpose: the tool normalizes arrays / comma lists / state names itself and
     // reports anything it could not apply in _meta.ignored_args (P1-1 contract).
-    const result = (await getBuyingOffices(args)) as unknown as Record<string, unknown>;
+    const { readDirectoryOfficeNames } = await import('@/lib/gov-contacts/directory-office-name');
+    const result = (await getBuyingOffices(args, undefined, new Date(), {
+      lookup: readDirectoryOfficeNames,
+    })) as unknown as Record<string, unknown>;
     return { result, credits };
   }
 
