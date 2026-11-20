@@ -127,6 +127,22 @@ describe('sourced pain points — provenance contract', () => {
     }
   });
 
+  it('gives Ask Mindy and MCP the cited finding fields', () => {
+    const row = sourced({
+      recommendation: 'Do not treat this recommendation as the public finding.',
+      published_at: '2026-09-30',
+    });
+    const citation = toCitation(row);
+    expect(citation.claim).toContain('Flight Simulators');
+    expect(citation.document_number).toBe('GAO-26-107726');
+    expect(citation.published_at).toBe('2026-09-30');
+    expect(citation.source_url).toBe('https://www.gao.gov/products/gao-26-107726');
+    expect(citation.agency).toBe('Department of Transportation');
+    expect(citation.provenance).toBe('SOURCE_FACT');
+    expect(citation.recommendation).toMatch(/recommendation/);
+    expect(citation.claim).not.toContain('Do not treat this recommendation');
+  });
+
   it('keeps sourced dollar claims (SOURCE_FACT) intact', () => {
     const s = sourced({
       pain_point: 'Program cost grew to $16.1B (Source: GAO-26-107726)',
