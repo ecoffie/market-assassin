@@ -1030,12 +1030,17 @@ export async function POST(request: NextRequest) {
           // awarded contracts, not open solicitations). See src/lib/chat/tool-selection.ts.
           // F1: classified on the CUSTOMER's words (the map view preamble is not theirs). A CURRENT_FIND question
           // is not offered the open-only search_sam_opportunities when find_opportunities is offered.
-          const priorCustomerText = [...history].reverse().find((h) => h.role === 'user')?.content;
-          const toolOffer = filterToolsForTurn(executor.offeredToolDefs(), splitViewPreamble(message).rest, priorCustomerText ? splitViewPreamble(String(priorCustomerText)).rest : null);
+          // Same customer text as federalMarketProfileAsk / host contract (never bare `.rest` without
+          // `|| message` — an empty rest after a view-preamble-only strip must not drop FMP).
+          const priorCustomerRaw = [...history].reverse().find((h) => h.role === 'user')?.content;
+          const priorCustomerAsk = priorCustomerRaw
+            ? (splitViewPreamble(String(priorCustomerRaw)).rest || String(priorCustomerRaw))
+            : null;
+          const toolOffer = filterToolsForTurn(executor.offeredToolDefs(), customerAskForContract, priorCustomerAsk);
           if (toolOffer.federalMarketProfile) turnTrace.notices.push('intent:federal_market_profile');
           if (toolOffer.marketResearch) turnTrace.notices.push('intent:market_research');
           // Industry codes the CUSTOMER typed (a planner-chosen code is not passed to find_opportunities).
-          const customerTypedCodes = interpretCapabilityNaics(splitViewPreamble(message).rest).typedCodes;
+          const customerTypedCodes = interpretCapabilityNaics(customerAskForContract).typedCodes;
           const notOfferedThisTurn = new Set(toolOffer.removed);
           for (const n of toolOffer.removed) turnTrace.notices.push(`tool_not_offered:${n}:${n === SAM_ONLY_TOOL ? 'current_find_uses_three_horizons' : 'open_opportunity_question'}`);
           // Document text in the planner (a create_document turn, or a "revise that document" turn): create_document
