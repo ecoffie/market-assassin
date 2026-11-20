@@ -8,8 +8,10 @@ import {
 } from './public-agency-intel-cache';
 import {
   buildPublicPainSection,
+  classifyPublicPriority,
   getPublicAgencyBySlug,
   listPublicAgencies,
+  PUBLIC_PRIORITY_DOLLAR_NOTE,
   publicCitationHref,
   selectPublicSourced,
   type PublicSourcedClaim,
@@ -39,11 +41,15 @@ describe('public agency pain points', () => {
     });
     expect(section.snapshotFloor).toBe(true);
     expect(section.items.map((item) => item.claim)).toEqual(SNAPSHOT);
+    expect(section.cited).toEqual([]);
+    expect(section.unsourced.map((item) => item.claim)).toEqual(SNAPSHOT);
     expect(section.items.every((item) => item.href === null)).toBe(true);
-    expect(section.freshnessLabel).toMatch(/Published snapshot/);
-    expect(section.freshnessLabel).toMatch(/could not be read/);
-    expect(section.freshnessLabel).toMatch(/Mindy last checked 2026-11-18 23:40 UTC/);
-    expect(section.freshnessLabel).toMatch(/refreshes daily/);
+    expect(section.freshnessLabel).toBe('');
+    expect(section.unsourcedLabel).toMatch(/Published snapshot/);
+    expect(section.unsourcedLabel).toMatch(/could not be read/);
+    expect(section.unsourcedLabel).toMatch(/Mindy last checked 2026-11-18 23:40 UTC/);
+    expect(section.unsourcedLabel).toMatch(/refreshes daily/);
+    expect(section.unsourcedLabel).not.toMatch(/Sourced from GAO/);
     expect(section.asOf).toBeNull();
     expect(section.checkedAt).toBe('2026-11-18 23:40 UTC');
   });
@@ -55,7 +61,9 @@ describe('public agency pain points', () => {
     });
     expect(section.snapshotFloor).toBe(true);
     expect(section.items.map((item) => item.claim)).toEqual(SNAPSHOT);
-    expect(section.freshnessLabel).toMatch(/No sourced GAO or inspector general report is on file/);
+    expect(section.cited).toEqual([]);
+    expect(section.freshnessLabel).toBe('');
+    expect(section.unsourcedLabel).toMatch(/No sourced GAO or inspector general report is on file/);
   });
 
   it('keeps one line when a sourced claim repeats a snapshot line, and keeps the snapshot wording', () => {
@@ -99,7 +107,14 @@ describe('public agency pain points', () => {
     expect(novel.sourceLabel).toBe('Inspector General');
     expect(novel.publishedAt).toBe('2026-11-01');
     expect(section.asOf).toBe('2026-11-01');
+    expect(section.cited.map((item) => item.claim)).toEqual([
+      'Open recommendations on product recalls remain unresolved.',
+    ]);
+    expect(section.unsourced.map((item) => item.claim)).toEqual(SNAPSHOT);
     expect(section.freshnessLabel).toMatch(/as of 2026-11-01/);
+    expect(section.freshnessLabel).toMatch(/Sourced from GAO/);
+    expect(section.unsourcedLabel).toMatch(/not covered by the sourced report date/);
+    expect(section.unsourcedLabel).not.toMatch(/as of/);
     expect(section.freshnessLabel).toMatch(/Mindy last checked 2026-11-18 15:05 UTC/);
     expect(section.freshnessLabel).toMatch(/refreshes daily/);
   });
@@ -261,5 +276,53 @@ describe('agency pages', () => {
     expect(html).toContain('as of 2026-10-02');
     expect(html).toMatch(/Mindy last checked \d{4}-\d{2}-\d{2} \d{2}:\d{2} UTC/);
     expect(html).toContain('The intelligence refreshes daily.');
+    const sourcedAt = html.indexOf('Sourced from GAO');
+    const snapshotAt = html.indexOf('Published snapshot');
+    expect(sourcedAt).toBeGreaterThan(-1);
+    expect(snapshotAt).toBeGreaterThan(sourcedAt);
+    const uncited = 'Cloud migration and DevSecOps adoption';
+    expect(html.indexOf(uncited)).toBeGreaterThan(snapshotAt);
+    expect(html.slice(sourcedAt, snapshotAt)).not.toContain(uncited);
+  });
+
+  it('keeps VA snapshot lines and dollar priorities out of the sourced heading', async () => {
+    intel.getAgencySourcedIntelligence.mockResolvedValue({
+      sourced: [
+        sourced({
+          pain_point: 'A newly acquired sustainment gap.',
+          source_url: 'https://www.gao.gov/products/gao-26-000099',
+          document_number: 'GAO-26-000099',
+          published_at: '2026-09-30',
+        }),
+      ],
+      meta: { sourcedReadFailed: false },
+    });
+    const { default: AgencyPage } = await import('@/app/agencies/[slug]/page');
+    const element = await AgencyPage({
+      params: Promise.resolve({ slug: 'department-of-veterans-affairs' }),
+    });
+    const html = renderToStaticMarkup(element);
+    const sourcedAt = html.indexOf('Sourced from GAO and inspectors general, as of 2026-09-30');
+    const snapshotAt = html.indexOf('>Published snapshot<');
+    expect(sourcedAt).toBeGreaterThan(-1);
+    expect(snapshotAt).toBeGreaterThan(sourcedAt);
+    expect(html.slice(sourcedAt, snapshotAt)).not.toContain('Claims processing automation');
+    expect(html.slice(sourcedAt, snapshotAt)).not.toContain('Electronic health records (EHR) modernization');
+    expect(html.indexOf('Claims processing automation')).toBeGreaterThan(snapshotAt);
+    expect(html).toContain('$5.1B allocated for Electronic Health Record Modernization');
+    expect(html).toContain(PUBLIC_PRIORITY_DOLLAR_NOTE);
+    expect(html).not.toContain('Where the money is moving');
+    expect(html).toContain('Not an obligation and not spending');
+  });
+});
+
+describe('public priority dollars stay curated figures', () => {
+  it('keeps the dollar text and marks it as not an obligation', () => {
+    const line = classifyPublicPriority(
+      '$5.1B allocated for Electronic Health Record Modernization (EHRM)',
+    );
+    expect(line.text).toContain('$5.1B');
+    expect(line.unsourcedDollar).toBe(true);
+    expect(classifyPublicPriority('Claims processing automation').unsourcedDollar).toBe(false);
   });
 });

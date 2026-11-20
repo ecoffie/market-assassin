@@ -24,8 +24,10 @@ import {
 } from '@/data/agencies-seo';
 import {
   buildPublicPainSection,
+  classifyPublicPriority,
   getPublicAgencyBySlug,
   listPublicAgencies,
+  PUBLIC_PRIORITY_DOLLAR_NOTE,
   type PublicPainSection,
 } from '@/lib/seo/public-agency-pages';
 import { cachedAgencyAwards, cachedPublicAgencyIntel } from '@/lib/seo/public-agency-intel-cache';
@@ -481,6 +483,42 @@ function WhereTheyPost({ agency }: { agency: AgencySeo }) {
   );
 }
 
+function PainList({ items, startAt = 1 }: { items: PublicPainSection['cited']; startAt?: number }) {
+  return (
+    <ul className="space-y-2">
+      {items.map((item, i) => (
+        <li
+          key={`${item.kind}-${i}`}
+          className="flex items-start gap-3 bg-white border border-(--mp-hair) rounded-lg p-4"
+        >
+          <span className="flex-shrink-0 w-6 h-6 rounded-full bg-(--mp-navy-wash) border border-(--mp-line) text-(--mp-navy) text-xs font-bold flex items-center justify-center mt-0.5">
+            {startAt + i}
+          </span>
+          <div>
+            <p className="text-(--mp-body) leading-relaxed">{item.claim}</p>
+            {(item.href || item.documentNumber) && (
+              <p className="text-sm text-(--mp-muted) mt-2">
+                {item.href ? (
+                  <a href={item.href} rel="noreferrer" className="text-(--mp-navy) hover:underline">
+                    {item.sourceLabel}
+                    {item.documentNumber ? ` ${item.documentNumber}` : ''}
+                  </a>
+                ) : (
+                  <span>
+                    {item.sourceLabel}
+                    {item.documentNumber ? ` ${item.documentNumber}` : ''}
+                  </span>
+                )}
+                {item.publishedAt ? ` · published ${item.publishedAt}` : ''}
+              </p>
+            )}
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function PainPoints({ agency, section }: { agency: AgencySeo; section: PublicPainSection }) {
   if (section.items.length === 0) return null;
   return (
@@ -488,44 +526,19 @@ function PainPoints({ agency, section }: { agency: AgencySeo; section: PublicPai
       <h2 className="text-2xl font-bold text-(--mp-ink) mb-4 font-(family-name:--mp-font-serif)">
         {agency.abbreviation || agency.name} pain points
       </h2>
-      <p className="text-sm text-(--mp-muted) mb-4">{section.freshnessLabel}</p>
-      <p className="text-(--mp-body) mb-4 leading-relaxed">
-        What {agency.abbreviation || agency.name} is actively trying to fix —
-        sourced from agency strategic plans, IG reports, and FY26 budget
-        justifications. Map your capabilities to these and you&apos;re writing
-        toward an evaluator&apos;s actual problem.
-      </p>
-      <ul className="space-y-2">
-        {section.items.map((item, i) => (
-          <li
-            key={i}
-            className="flex items-start gap-3 bg-white border border-(--mp-hair) rounded-lg p-4"
-          >
-            <span className="flex-shrink-0 w-6 h-6 rounded-full bg-(--mp-navy-wash) border border-(--mp-line) text-(--mp-navy) text-xs font-bold flex items-center justify-center mt-0.5">
-              {i + 1}
-            </span>
-            <div>
-              <p className="text-(--mp-body) leading-relaxed">{item.claim}</p>
-              {(item.href || item.documentNumber) && (
-                <p className="text-sm text-(--mp-muted) mt-2">
-                  {item.href ? (
-                    <a href={item.href} rel="noreferrer" className="text-(--mp-navy) hover:underline">
-                      {item.sourceLabel}
-                      {item.documentNumber ? ` ${item.documentNumber}` : ''}
-                    </a>
-                  ) : (
-                    <span>
-                      {item.sourceLabel}
-                      {item.documentNumber ? ` ${item.documentNumber}` : ''}
-                    </span>
-                  )}
-                  {item.publishedAt ? ` · published ${item.publishedAt}` : ''}
-                </p>
-              )}
-            </div>
-          </li>
-        ))}
-      </ul>
+      {section.cited.length > 0 && (
+        <div className="mb-8">
+          <p className="text-sm text-(--mp-muted) mb-4">{section.freshnessLabel}</p>
+          <PainList items={section.cited} />
+        </div>
+      )}
+      {section.unsourced.length > 0 && (
+        <div>
+          <h3 className="text-lg font-semibold text-(--mp-ink) mb-2">Published snapshot</h3>
+          <p className="text-sm text-(--mp-muted) mb-4">{section.unsourcedLabel}</p>
+          <PainList items={section.unsourced} startAt={section.cited.length + 1} />
+        </div>
+      )}
     </div>
   );
 }
@@ -538,18 +551,25 @@ function Priorities({ agency }: { agency: AgencySeo }) {
         FY26 funding priorities
       </h2>
       <p className="text-(--mp-body) mb-4 leading-relaxed">
-        Where the money is moving inside {agency.abbreviation || agency.name}{' '}
-        in the current and upcoming fiscal years.
+        Published snapshot for {agency.abbreviation || agency.name}. A dollar
+        figure in this list is a curated note. It is not an obligation and not
+        spending.
       </p>
       <ul className="space-y-3">
-        {agency.priorities.map((p, i) => (
-          <li
-            key={i}
-            className="border-l-2 border-(--mp-line) pl-4 py-1 text-(--mp-body) leading-relaxed"
-          >
-            {p}
-          </li>
-        ))}
+        {agency.priorities.map((p, i) => {
+          const line = classifyPublicPriority(p);
+          return (
+            <li
+              key={i}
+              className="border-l-2 border-(--mp-line) pl-4 py-1 text-(--mp-body) leading-relaxed"
+            >
+              {line.text}
+              {line.unsourcedDollar && (
+                <span className="block text-sm text-(--mp-muted) mt-1">{PUBLIC_PRIORITY_DOLLAR_NOTE}</span>
+              )}
+            </li>
+          );
+        })}
       </ul>
     </div>
   );
