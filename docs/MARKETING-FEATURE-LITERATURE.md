@@ -1,3 +1,12 @@
+
+### Ask Mindy Federal Market Profile write-up (host-grounded Vault DocModel) — 2026-11-20
+
+**What shipped.** Company-first FMP phase machine ends in a host-built DocModel (`create_document`) that must pass structure + grounding (237310 / market $ / vehicle / DSBS / Navy PAE), saves Word/PDF/xlsx/csv to Vault, and rewrites invented chat download URLs to real `/api/app/vault/documents/download?id=` paths.
+
+**Why it matters.** The Claude+MCP RBA Federal Market Profile quality bar is now an Ask Mindy deliverable customers can open from Vault, not a chat-only summary that drifts.
+
+**Proof.** Prod `dpl_9T32zZRwGGcz5oBkKrVftqLtFRPM` on getmindy.ai; cold Ask session `cafa394a-0d45-4971-aed8-5e241379dee5`; Vault doc `2050d353-cd4e-4cf3-afc5-c8694a0f1e60`; grade `.claude-tmp-rba-fmp-doc-grade-FINAL.json` pass=true; notices `fmp_create_document:host_doc_model_forced` + `answer_download_links_rewritten`.
+
 # Mindy — Marketing & Content Literature (June 2026 Feature Release)
 
 > **For the content/SEO team.** Every feature below is LIVE on getmindy.ai. Each
