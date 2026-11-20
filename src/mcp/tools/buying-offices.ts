@@ -66,6 +66,8 @@ export interface BuyingOfficesInput {
 export interface BuyingOfficeRow {
   rank: number;
   office_name: string | null;
+  /** award_record: the warehouse or its name lookup supplied the name. code_only: a code with no name. not_reported: the source had neither. Never invented. */
+  name_provenance: 'award_record' | 'code_only' | 'not_reported';
   office_code: string | null;
   /** dodaac for Department of Defense awarding offices; agency_office_code otherwise; null for funding offices (the source carries no funding-office code). */
   office_code_type: 'dodaac' | 'agency_office_code' | null;
@@ -396,6 +398,7 @@ export async function getBuyingOffices(
       ? 'Ranked by AWARDING (contracting) office. top_funding_offices names the customer organization whose money it was; the two often differ (a regional contracting center buying for a local command).'
       : 'Ranked by FUNDING office (the customer). top_awarding_offices names the contracting offices that bought for it. Funding offices carry no office code in the source.',
     'Dollars are net obligations inside the window (de-obligations subtract), not lifetime award values.',
+    'This ranking does not include people, phone numbers, or email. A missing office name was not in the award record and is not filled in.',
   ];
   if (metroStatePinned && metro) notes.push(`No state was given; ${metroCore} is only in ${metro.state} in Mindy's city list, so the metro is ${metro.state} only.`);
   if (metroAmbiguousStates.length > 1) notes.push(`${metroCore} is a city name in ${metroAmbiguousStates.join(', ')}. No metro was expanded because no state was given; pass state for one metro.`);
@@ -475,9 +478,16 @@ export async function getBuyingOffices(
     const key = r.office_key === NOT_REPORTED ? null : r.office_key;
     const named = role === 'awarding' && key ? officeNames.map.get(key) : undefined;
     const fundingNamed = role === 'funding' && key ? fundingAgencies.map.get(key) : undefined;
+    const reportedName = role === 'awarding' ? (named?.name ?? null) : key;
+    const nameProvenance: BuyingOfficeRow['name_provenance'] = !key
+      ? 'not_reported'
+      : reportedName
+        ? 'award_record'
+        : 'code_only';
     const row: BuyingOfficeRow = {
       rank: i + 1,
-      office_name: role === 'awarding' ? (named?.name ?? null) : key,
+      office_name: nameProvenance === 'code_only' ? null : reportedName,
+      name_provenance: nameProvenance,
       office_code: role === 'awarding' ? key : null,
       office_code_type: role === 'awarding' && key ? (isDodOffice(named?.agency) ? 'dodaac' : 'agency_office_code') : null,
       agency: role === 'awarding' ? (named?.agency ?? null) : (fundingNamed?.agency ?? null),
