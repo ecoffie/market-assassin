@@ -69,6 +69,34 @@ describe('GET /api/sbir agency routing', () => {
     expect(body.empty_reason).toMatch(/empty result/);
   });
 
+  it.each(['NIDA', 'NEI', 'NHGRI'])('agency=%s is sent to RePORTER and returned rows are kept', async (code) => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        meta: { total: 1, offset: 0, limit: 25 },
+        results: [{
+          project_num: `${code}-1`,
+          project_title: `${code} awarded project`,
+          activity_code: 'R43',
+          agency_ic_admin: { abbreviation: code, name: code },
+        }],
+      }),
+    });
+    const res = await call(`?agency=${code}`);
+    const body = await res.json();
+    expect(fetchMock).toHaveBeenCalledOnce();
+    const init = fetchMock.mock.calls[0][1] as RequestInit;
+    expect(JSON.parse(String(init.body)).criteria.agencies).toEqual([code]);
+    expect(body).toMatchObject({
+      count: 1,
+      result_state: 'matched',
+      source: 'nih',
+      _degraded: false,
+    });
+    expect(body.opportunities[0]).toMatchObject({ id: `${code}-1`, agency: code });
+  });
+
   it('an NIH HTTP failure is unavailable, not a fresh zero', async () => {
     fetchMock.mockResolvedValue({ ok: false, status: 503, json: async () => ({}) });
     const res = await call('?agency=NCI&keyword=malaria');

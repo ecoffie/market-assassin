@@ -7,6 +7,7 @@
  * Lifted from the core of src/app/api/sbir/route.ts.
  */
 import { createClient } from '@supabase/supabase-js';
+import { planSbirAgency } from '@/lib/sbir/agency-availability';
 import { isManufacturedDarpaRow } from '@/lib/scrapers/manufactured-darpa';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -51,8 +52,11 @@ export interface SbirOpportunity {
 
 export interface SbirSearchResult {
   opportunities: SbirOpportunity[];
-  total: number;
+  /** Null when the source was not queried. A counted zero is only a real empty result. */
+  total: number | null;
   degraded: boolean;
+  result_state?: 'matched' | 'empty' | 'unavailable';
+  unavailable_reason?: string;
 }
 
 async function fetchNih(keyword: string, agency: string, phase: string, limit: number): Promise<{ rows: SbirOpportunity[]; degraded: boolean }> {
@@ -188,6 +192,17 @@ export async function searchSbir(input: SbirSearchInput): Promise<SbirSearchResu
   const source = input.source || 'nih';
   const limit = Math.min(Math.max(Number(input.limit) || 25, 1), 50);
 
+  const plan = planSbirAgency({ agency, source });
+  if (plan.kind === 'unavailable') {
+    return {
+      opportunities: [],
+      total: null,
+      degraded: true,
+      result_state: 'unavailable',
+      unavailable_reason: plan.reason,
+    };
+  }
+
   const tasks: Array<Promise<{ rows: SbirOpportunity[]; degraded: boolean }>> = [];
   if (source === 'nih' || source === 'all') tasks.push(fetchNih(keyword, agency, phase, limit));
   if (source === 'multisite' || source === 'all') tasks.push(fetchMultisite(keyword, agency, limit));
@@ -211,5 +226,13 @@ export async function searchSbir(input: SbirSearchInput): Promise<SbirSearchResu
     if (opportunities.length >= limit) break;
   }
 
-  return { opportunities, total: opportunities.length, degraded };
+  return {
+    opportunities,
+    total: degraded && opportunities.length === 0 ? null : opportunities.length,
+    degraded,
+    result_state: opportunities.length === 0 ? (degraded ? 'unavailable' : 'empty') : 'matched',
+    ...(degraded && opportunities.length === 0
+      ? { unavailable_reason: 'The queried SBIR source did not answer. The row count is unavailable, not zero.' }
+      : {}),
+  };
 }
