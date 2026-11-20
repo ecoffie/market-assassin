@@ -8,9 +8,14 @@ import {
   createDocumentArgsHaveUsableDocModel,
   FMP_DOC_TOOL_ROUND_MAX_TOKENS,
   formatObligationSnippet,
+  fmpDocModelRichness,
   fmpPlannerMaxTokensForCreateDocument,
+  flattenDocModelText,
+  looksLikePersonContactName,
   requiredSnippetsForWriteup,
+  resolveFmpCreateDocumentArgs,
   rewriteFmpAnswerDownloadLinks,
+  shouldPreferPlannerFmpDocModel,
 } from './fmp-writeup-grounding';
 import { RBA_FEDERAL_MARKET_PROFILE_PROMPT } from './__fixtures__/rba-federal-market-profile';
 import { validateFmpWriteup } from './fmp-writeup-validate';
@@ -358,5 +363,255 @@ describe('fmp-writeup-grounding', () => {
     });
     expect(bad.ok).toBe(false);
     expect(bad.issues.some((i) => i.code === 'pae_gloss_ban')).toBe(true);
+  });
+
+  describe('contact filter', () => {
+    it('rejects Internal Revenue Service and other org names; keeps real people', () => {
+      expect(looksLikePersonContactName('Internal Revenue Service')).toBe(false);
+      expect(looksLikePersonContactName('Internal Revenue')).toBe(false);
+      for (const org of [
+        'Federal Highway Administration', 'Bureau Of Reclamation', 'Defense Logistics Agency',
+        'Small Business Office', 'Treasury Department', 'Clara Barton Parkway', 'Eastern Federal Lands',
+        'Government Services', 'Naval Command',
+      ]) expect(looksLikePersonContactName(org)).toBe(false);
+      for (const person of ['Helson Roman', 'David Bogner', 'Terry Agena']) {
+        expect(looksLikePersonContactName(person)).toBe(true);
+      }
+    });
+
+    it('accumulate drops IRS but keeps Helson Roman from the same payload', () => {
+      const evidence = accumulateFmpEvidence([
+        {
+          tool: 'search_federal_contacts',
+          content: JSON.stringify({
+            contacts: [
+              { name: 'Internal Revenue Service', agency: 'Treasury' },
+              { name: 'Helson Roman', email: 'helson.roman@dot.gov', office: 'FHWA Eastern Federal Lands' },
+            ],
+          }),
+        },
+      ]);
+      expect(evidence.contactNames).toEqual(['Helson Roman']);
+      expect(evidence.contactRows?.[0]).toMatchObject({
+        person: 'Helson Roman',
+        email: 'helson.roman@dot.gov',
+        agency: 'FHWA Eastern Federal Lands',
+      });
+      expect(JSON.stringify(evidence.contactRows)).not.toMatch(/Internal Revenue/);
+    });
+  });
+
+  describe('enriched evidence + host DocModel parity', () => {
+    const AWARDS_RICH = JSON.stringify({
+      history: {
+        summary: { totalObligations: 42_500_000, awardCount: 17 },
+        topNaics: [{ naics: '237310', amount: 40_000_000, count: 14 }],
+        recentAwards: [
+          { id: 'a1', title: 'Rock Creek bridge rehabilitation', agency: 'Department of Transportation', subAgency: 'Federal Highway Administration', amount: 9_800_000, state: 'DC', setAside: '8(a) Competed' },
+          { id: 'a2', title: 'Parkway paving and drainage', agency: 'Department of the Interior', subAgency: 'National Park Service', amount: 6_200_000, state: 'VA', setAside: null },
+          { id: 'a3', title: 'Marine pier repair', agency: 'Department of Defense', subAgency: 'Army Corps of Engineers', amount: 3_100_000, state: 'MD' },
+        ],
+      },
+      _meta: { grounded: true, award_count: 17, total_obligations: 42_500_000 },
+    });
+    const OPPS_RICH = JSON.stringify({
+      items: [
+        { notice_id: 'abc123def456abc123def456abc123de', solicitation_number: '693C7326R0001', title: 'Eastern Federal Lands Inspection MATOC', department: 'Federal Highway Administration', naics_code: '237310', response_deadline: '2027-01-15T17:00:00Z', notice_type: 'Combined Synopsis/Solicitation', description: 'Construction inspection services across the eastern region.' },
+        { notice_id: 'fed654fed654fed654fed654fed654fe', solicitation_number: 'N4008026S0042', title: 'Pentagon paving and stormwater successor', department: 'Department of the Navy', naics_code: '236220', response_deadline: '2026-12-20T17:00:00Z', notice_type: 'Sources Sought' },
+        { notice_id: '0011223344556677889900aabbccddee', title: 'Clara Barton Parkway rehabilitation', department: 'National Park Service', naics_code: '237310' },
+      ],
+    });
+    const CONTACTS_RICH = JSON.stringify({
+      contacts: [
+        { name: 'Helson Roman', email: 'helson.roman@dot.gov', agency: 'FHWA Eastern Federal Lands' },
+        { name: 'David Bogner', email: 'david.bogner@whs.mil', office: 'WHS small business' },
+        { name: 'Internal Revenue Service', agency: 'Treasury' },
+      ],
+    });
+    const MARKET_RICH = JSON.stringify({
+      sections: {
+        top_agencies: [
+          { name: 'Federal Highway Administration', amount: 310_000_000 },
+          { name: 'National Park Service', amount: 160_000_000 },
+        ],
+        competition: { contractors: [{ name: 'Acme Paving', amount: 12_000_000, state: 'VA' }] },
+      },
+    });
+
+    const results = [
+      { tool: 'get_contractor_award_history', content: AWARDS_RICH },
+      { tool: 'find_opportunities', content: OPPS_RICH },
+      { tool: 'search_federal_contacts', content: CONTACTS_RICH },
+      { tool: 'generate_market_report', content: MARKET_RICH },
+      { tool: 'search_past_contracts', content: VEHICLE_JSON },
+      { tool: 'search_web', content: WEB_JSON },
+    ];
+    const evidence = accumulateFmpEvidence(results, RBA_FEDERAL_MARKET_PROFILE_PROMPT);
+    const hostOpts = { customerText: RBA_FEDERAL_MARKET_PROFILE_PROMPT, defenseBuyersAppear: true, today: () => '2026-11-20' };
+
+    it('parses award rows, pathways, contacts, buyer spend and competitors from tool JSON', () => {
+      expect(evidence.awardRows?.map((r) => r.buyer)).toEqual([
+        'Federal Highway Administration', 'National Park Service', 'Army Corps of Engineers',
+      ]);
+      expect(evidence.awardRows?.[0]).toMatchObject({ where: 'DC', competition: '8(a) Competed', obligated: '$9.8M' });
+      expect(evidence.pathways?.map((p) => p.noticeId)).toContain('693C7326R0001');
+      // vehicle first, then sources sought, then the rest
+      expect(evidence.pathways?.[0].title).toMatch(/MATOC/);
+      expect(evidence.pathways?.[1].noticeType).toMatch(/sources sought/i);
+      expect(evidence.contactRows?.map((c) => c.person)).toEqual(['Helson Roman', 'David Bogner']);
+      expect(evidence.buyerSpend?.[0]).toEqual({ agency: 'Federal Highway Administration', dollars: 310_000_000 });
+      expect(evidence.competitors?.[0].firm).toBe('Acme Paving');
+      // nothing invented: no rank or territory total in the fixture
+      expect(evidence.ranksByState).toEqual({});
+      expect(evidence.marketTerritoryDollars).toBeNull();
+    });
+
+    it('only reports ranks and territory dollars when the tool text states them', () => {
+      const ev = accumulateFmpEvidence([
+        { tool: 'generate_market_report', content: 'RBA is #4 in DC and ranked 9 in VA. FHWA + NPS territory spend $470M over three years.' },
+      ]);
+      expect(ev.ranksByState).toEqual({ DC: 4, VA: 9 });
+      expect(ev.marketTerritoryDollars).toBe('$470M');
+    });
+
+    it('host model is dense, grounded, and passes every gate', async () => {
+      const { validateDocModel } = await import('@/lib/documents/validate');
+      const model = buildFmpHostDocModel(evidence, hostOpts);
+      const rich = fmpDocModelRichness(model);
+      expect(rich.chars).toBeGreaterThanOrEqual(3500);
+      expect(rich.hasPathways).toBe(true);
+      expect(rich.whoToTalkPersonRows).toBeGreaterThanOrEqual(2);
+
+      const flat = flattenDocModelText(model);
+      expect(flat).toContain('693C7326R0001');
+      expect(flat).toContain('Helson Roman');
+      expect(flat).not.toMatch(/Internal Revenue/i);
+      expect(flat).not.toMatch(/Performance\s+Assessment\s+Evaluation/i);
+      expect(flat).not.toMatch(/\$470M/); // not in this corpus
+      expect(flat).not.toMatch(/Mid plan|upgrade to|book a/i);
+
+      const awards = model.sections.find((s) => /already proven/i.test(s.heading));
+      expect(awards?.blocks.some((b) => b.type === 'table' && b.rows.length === 3)).toBe(true);
+      expect(model.sections.some((s) => /where the money sits/i.test(s.heading))).toBe(true);
+
+      const shape = validateDocModel(model);
+      expect(shape.ok ? [] : shape.issues).toEqual([]);
+      const v = validateFmpWriteup(model, {
+        defenseBuyersAppear: true,
+        requiredSnippets: requiredSnippetsForWriteup(evidence),
+      });
+      expect(v.issues.filter((i) => i.severity === 'error')).toEqual([]);
+    });
+
+    it('with no pathway rows the pathways section is a multi-bullet frame, not one thin paragraph', () => {
+      const thin = accumulateFmpEvidence(
+        [
+          { tool: 'get_contractor_award_history', content: AWARD_JSON },
+          { tool: 'search_past_contracts', content: VEHICLE_JSON },
+        ],
+        RBA_FEDERAL_MARKET_PROFILE_PROMPT,
+      );
+      const model = buildFmpHostDocModel(thin, hostOpts);
+      const pathways = model.sections.find((s) => /pathways/i.test(s.heading))!;
+      const bullets = pathways.blocks.find((b) => b.type === 'bullets');
+      expect(bullets && bullets.type === 'bullets' ? bullets.items.length : 0).toBeGreaterThanOrEqual(4);
+      expect(flattenDocModelText(model)).toContain('693C73');
+      // no contact in evidence: placeholder is the notice POC, never an agency
+      const who = model.sections.find((s) => /who to talk to/i.test(s.heading))!;
+      expect(JSON.stringify(who)).toContain('Named notice POC on the active pathway');
+    });
+  });
+
+  describe('planner vs host DocModel', () => {
+    const evidence = accumulateFmpEvidence(
+      [
+        { tool: 'get_contractor_award_history', content: AWARD_JSON },
+        { tool: 'search_past_contracts', content: VEHICLE_JSON },
+        { tool: 'search_federal_contacts', content: CONTACT_JSON },
+        { tool: 'search_web', content: WEB_JSON },
+      ],
+      RBA_FEDERAL_MARKET_PROFILE_PROMPT,
+    );
+    const opts = { customerText: RBA_FEDERAL_MARKET_PROFILE_PROMPT, defenseBuyersAppear: true, today: () => '2026-11-20' };
+    const longText = (seed: string, long = true) => `${seed} `.repeat(long ? 70 : 1);
+
+    function plannerModel(whoRows: Array<Record<string, string>>, extra = '', long = true): DocModel {
+      const base = goodSectionsWithSnippets('$42.5M');
+      const sections = base.map((s) => {
+        if (s.id === 'sec-path') {
+          return {
+            ...s,
+            blocks: [
+              ...s.blocks,
+              ...[{ type: 'paragraph' as const, id: 'p-long', text: longText(`Inspection MATOC 693C73 small-business seats and sources sought at FHWA and WHS. ${extra}`, long), claim: 'fact' as const, cites: ['s1'] }],
+            ],
+          };
+        }
+        if (s.id === 'sec-who') {
+          return {
+            ...s,
+            blocks: [{
+              type: 'table' as const,
+              id: 't-who',
+              claim: 'fact' as const,
+              cites: ['s1'],
+              columns: [
+                { key: 'person', label: 'Person' },
+                { key: 'why', label: 'Why they matter' },
+                { key: 'question', label: 'Question to ask' },
+              ],
+              rows: whoRows,
+            }],
+          };
+        }
+        return s;
+      });
+      return { schema: DOC_SCHEMA, title: 'RBA Profile', date: '2026-11-20', sources: [{ id: 's1', label: 'Tools', kind: 'tool' }], sections };
+    }
+
+    const goodRows = [
+      { person: 'Helson Roman, FHWA EFL', why: 'Notice POC', question: 'Ask about MATOC seats.' },
+      { person: 'David Bogner, WHS', why: 'Notice POC', question: 'Ask about the Pentagon IDIQ successor.' },
+    ];
+
+    it('keeps a rich, valid planner model', () => {
+      const args = JSON.stringify({ doc_model: plannerModel(goodRows) });
+      const pick = shouldPreferPlannerFmpDocModel(args, evidence, opts);
+      expect(pick.reason).toBe('planner_rich_valid');
+      expect(pick.prefer).toBe(true);
+      const resolved = resolveFmpCreateDocumentArgs(args, evidence, opts);
+      expect(resolved.source).toBe('planner');
+      expect(resolved.notice).toBe('fmp_create_document:planner_doc_model_kept');
+    });
+
+    it('falls back to host for thin, IRS-contact, Mid CTA and empty planner output', () => {
+      const thin = JSON.stringify({ doc_model: plannerModel(goodRows, '', false) });
+      expect(shouldPreferPlannerFmpDocModel(thin, evidence, opts)).toMatchObject({ prefer: false });
+      expect(shouldPreferPlannerFmpDocModel(thin, evidence, opts).reason).toMatch(/^too_thin:/);
+
+      const irs = JSON.stringify({
+        doc_model: plannerModel([
+          { person: 'Internal Revenue Service', why: 'Agency', question: 'Ask about seats.' },
+          { person: 'Helson Roman', why: 'POC', question: 'Ask about MATOC seats.' },
+          { person: 'David Bogner', why: 'POC', question: 'Ask about IDIQ.' },
+        ]),
+      });
+      const irsPick = shouldPreferPlannerFmpDocModel(irs, evidence, opts);
+      expect(irsPick.prefer).toBe(false);
+      expect(irsPick.reason).toBe('irs_like_contact');
+
+      const oneContact = JSON.stringify({ doc_model: plannerModel([goodRows[0]]) });
+      expect(shouldPreferPlannerFmpDocModel(oneContact, evidence, opts).reason).toBe('who_to_talk_person_rows:1');
+
+      const mid = JSON.stringify({ doc_model: plannerModel(goodRows, 'Upgrade to the Mid plan for $5K-$10K.') });
+      expect(shouldPreferPlannerFmpDocModel(mid, evidence, opts).reason).toBe('mid_cta_ban');
+
+      for (const args of ['{}', '{"doc_model":{}}', 'not json']) {
+        const r = resolveFmpCreateDocumentArgs(args, evidence, opts);
+        expect(r.source).toBe('host');
+        expect(r.notice).toBe('fmp_create_document:host_doc_model_forced');
+        expect(createDocumentArgsHaveUsableDocModel(r.args)).toBe(true);
+      }
+    });
   });
 });

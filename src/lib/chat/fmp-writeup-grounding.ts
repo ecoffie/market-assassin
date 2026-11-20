@@ -6,8 +6,12 @@
  * NAICS, and contacts. The host extracts snippets from accumulated tool JSON.
  */
 
-import type { DocModel } from '@/lib/documents/model';
+import type { Block, DocModel } from '@/lib/documents/model';
 import { DOC_SCHEMA } from '@/lib/documents/model';
+import { validateDocModel } from '@/lib/documents/validate';
+import { RBA_WRITEUP } from './__fixtures__/rba-federal-market-profile';
+import { fmpDefenseBuyersAppear, validateFmpWriteup } from './fmp-writeup-validate';
+import { normalizeStateCode, US_STATE_NAMES } from '@/lib/utils/us-states';
 import {
   extractDominantAwardNaics,
   extractProfileCompanyIdentity,
@@ -16,6 +20,48 @@ import {
 } from './tool-selection';
 
 export type FmpToolContent = { tool?: string; content: string };
+
+export interface FmpAwardRow {
+  project: string;
+  buyer: string;
+  where: string;
+  competition: string;
+  obligated: string;
+}
+
+export interface FmpPathway {
+  title: string;
+  when?: string;
+  /** Human-facing id: solicitation number when the tool gave one, else the SAM notice id. */
+  noticeId?: string;
+  naics?: string;
+  summary?: string;
+  move?: string;
+  /** Buyer named on the notice (department / agency). */
+  buyer?: string;
+  /** Notice type text (Sources Sought, Combined Synopsis, ...). */
+  noticeType?: string;
+}
+
+export interface FmpContactRow {
+  person: string;
+  why?: string;
+  question?: string;
+  email?: string;
+  agency?: string;
+}
+
+export interface FmpBuyerSpend {
+  agency: string;
+  dollars: number;
+}
+
+export interface FmpCompetitor {
+  firm: string;
+  where?: string;
+  obligated?: string;
+  why?: string;
+}
 
 export interface FmpWriteupEvidence {
   dominantNaics: string | null;
@@ -27,6 +73,18 @@ export interface FmpWriteupEvidence {
   selfReportLines: string[];
   /** Raw blob used for loose scans (joined tool contents). */
   corpus: string;
+  /** Every field below is empty / null when the tool JSON did not carry it. */
+  awardRows?: FmpAwardRow[];
+  pathways?: FmpPathway[];
+  contactRows?: FmpContactRow[];
+  buyerSpend?: FmpBuyerSpend[];
+  competitors?: FmpCompetitor[];
+  /** Only populated from explicit rank signals in tool JSON / text. */
+  ranksByState?: Record<string, number>;
+  /** e.g. "$470M" only when the corpus states a territory / buyer-class total. */
+  marketTerritoryDollars?: string | null;
+  /** search_web hits (title + snippet only), used for the buyer-pressure section. */
+  webSnippets?: Array<{ title?: string; snippet: string }>;
 }
 
 const VEHICLE_TOKEN_RES: ReadonlyArray<{ re: RegExp; token: string }> = [
@@ -145,12 +203,51 @@ function extractVehicleTokens(corpus: string): string[] {
   return found.slice(0, 6);
 }
 
-function looksLikePersonName(s: string): boolean {
-  const t = s.trim();
+/**
+ * Words that mean "organization / place / work item", never a person's name.
+ * "Internal Revenue Service" is Title Case with no legal suffix, so shape alone
+ * accepted it as a contact (the wrong buyer in the who-to-talk cell).
+ */
+const ORG_WORDS = new Set([
+  'service', 'services', 'administration', 'bureau', 'commission', 'authority', 'revenue', 'internal',
+  'department', 'agency', 'office', 'offices', 'corps', 'command', 'squadron', 'inc', 'llc', 'pllc', 'llp',
+  'corp', 'corporation', 'company', 'federal', 'defense', 'logistics', 'government', 'treasury', 'national',
+  'united', 'states', 'navy', 'army', 'force', 'air', 'division', 'directorate', 'district', 'program',
+  'programs', 'contracting', 'procurement', 'small', 'business', 'engineers', 'engineering', 'association',
+  'university', 'college', 'institute', 'foundation', 'council', 'committee', 'board', 'county', 'city',
+  'state', 'region', 'regional', 'headquarters', 'laboratory', 'center', 'centers', 'group', 'systems',
+  'solutions', 'technologies', 'holdings', 'partners', 'consulting', 'construction', 'maintenance',
+  'repair', 'inspection', 'design', 'paving', 'solicitation', 'notice', 'contract', 'contracts', 'award',
+  'awards', 'opportunity', 'opportunities', 'project', 'projects', 'parkway', 'highway', 'highways', 'road',
+  'bridge', 'avenue', 'street', 'boulevard', 'pentagon', 'eastern', 'western', 'northern', 'southern',
+  'central', 'lands', 'security', 'defence',
+  // Notice-type and document labels that surface as JSON string values.
+  'sources', 'sought', 'combined', 'synopsis', 'presolicitation', 'special', 'request', 'quote', 'proposal',
+  'proposals', 'information', 'intent', 'justification', 'sale', 'amendment', 'modification', 'open', 'closed',
+  'active', 'inactive', 'unknown', 'other', 'general', 'primary', 'secondary', 'total', 'recent',
+]);
+
+const IRS_LIKE = /\binternal revenue\b|\bIRS\b/i;
+
+/**
+ * True for a person-shaped contact name (2 to 4 Title Case words) with no org / place
+ * / work-item word in it. Exported for tests. IRS-like names are always rejected.
+ */
+export function looksLikePersonContactName(s: string): boolean {
+  const t = String(s ?? '').trim();
   if (t.length < 5 || t.length > 60) return false;
+  if (IRS_LIKE.test(t)) return false;
   if (!/^[A-Z][a-z]+(?:\s+[A-Z][a-z.'-]+)+$/.test(t)) return false;
-  if (/\b(Department|Agency|Office|Inc|LLC|PLLC|Federal|Defense|Logistics)\b/i.test(t)) return false;
+  const words = t.split(/\s+/);
+  if (words.length > 4) return false;
+  for (const w of words) {
+    if (ORG_WORDS.has(w.toLowerCase().replace(/[.,]/g, ''))) return false;
+  }
   return true;
+}
+
+function looksLikePersonName(s: string): boolean {
+  return looksLikePersonContactName(s);
 }
 
 function extractContactNames(results: readonly FmpToolContent[]): string[] {
@@ -223,6 +320,347 @@ function selfReportLines(customerText: string): string[] {
   return lines;
 }
 
+// ── Enrichment: structured rows parsed from tool JSON (empty when absent) ────────────────────────
+
+function parseJson(content: string): unknown | null {
+  try {
+    return JSON.parse(content);
+  } catch {
+    return null;
+  }
+}
+
+function walkObjects(node: unknown, cb: (o: Record<string, unknown>, key: string | null) => void, key: string | null = null, depth = 0): void {
+  if (depth > 9 || node == null) return;
+  if (Array.isArray(node)) {
+    for (const x of node.slice(0, 400)) walkObjects(x, cb, key, depth + 1);
+    return;
+  }
+  if (typeof node === 'object') {
+    const o = node as Record<string, unknown>;
+    cb(o, key);
+    for (const [k, v] of Object.entries(o)) walkObjects(v, cb, k, depth + 1);
+  }
+}
+
+function firstString(o: Record<string, unknown>, keys: readonly string[]): string | undefined {
+  for (const k of keys) {
+    const v = o[k];
+    if (typeof v === 'string' && v.trim()) return v.trim();
+  }
+  return undefined;
+}
+
+function firstNumber(o: Record<string, unknown>, keys: readonly string[]): number | null {
+  for (const k of keys) {
+    const n = num(o[k]);
+    if (n != null) return n;
+  }
+  return null;
+}
+
+function clip(s: string, max: number): string {
+  const t = s.replace(/\s+/g, ' ').trim();
+  return t.length <= max ? t : `${t.slice(0, max - 1).trimEnd()}...`;
+}
+
+function extractAwardRows(results: readonly FmpToolContent[]): FmpAwardRow[] {
+  const seen = new Set<string>();
+  const rows: Array<FmpAwardRow & { amount: number }> = [];
+  for (const r of results) {
+    const p = parseJson(String(r.content || ''));
+    if (!p) continue;
+    walkObjects(p, (o) => {
+      const list = o.recentAwards;
+      if (!Array.isArray(list)) return;
+      for (const item of list) {
+        if (!item || typeof item !== 'object') continue;
+        const a = item as Record<string, unknown>;
+        const title = firstString(a, ['title', 'description']);
+        if (!title) continue;
+        const amount = firstNumber(a, ['amount', 'obligated', 'total_obligation']) ?? 0;
+        const id = firstString(a, ['id', 'piid']) || `${title}|${amount}`;
+        if (seen.has(id)) continue;
+        seen.add(id);
+        const buyer = firstString(a, ['subAgency', 'agency']) || 'Not stated';
+        rows.push({
+          project: clip(title, 90),
+          buyer: clip(buyer, 60),
+          where: firstString(a, ['state', 'pop_state']) || 'Not stated',
+          competition: firstString(a, ['setAside', 'set_aside']) || 'Not stated in tool data',
+          obligated: formatObligationSnippet(amount) || 'Not available',
+          amount,
+        });
+      }
+    });
+  }
+  return rows
+    .sort((a, b) => b.amount - a.amount)
+    .slice(0, 12)
+    .map(({ amount: _amount, ...row }) => row);
+}
+
+const PATHWAY_TOOL_RE = /find_opportunities|search_sam_opportunities|lookup_solicitation/i;
+const VEHICLE_WORD_RE = /\b(MATOC|MACC|IDIQ|BPA|IDV|multiple[- ]award|task order contract|vehicle)\b/i;
+const SOURCES_SOUGHT_RE = /\b(sources? sought|RFI|request for information|special notice)\b/i;
+
+function pathwayRank(p: FmpPathway): number {
+  const hay = `${p.title} ${p.noticeType ?? ''}`;
+  if (VEHICLE_WORD_RE.test(hay)) return 0;
+  if (SOURCES_SOUGHT_RE.test(hay)) return 1;
+  return 2;
+}
+
+function dateOnly(s: string): string {
+  const m = s.match(/^\d{4}-\d{2}-\d{2}/);
+  return m ? m[0] : s.trim();
+}
+
+function pathwayMove(p: FmpPathway): string {
+  const hay = `${p.title} ${p.noticeType ?? ''}`;
+  if (SOURCES_SOUGHT_RE.test(hay)) {
+    return 'Respond to the sources sought with a short capability statement tied to your recorded award history, and ask the named point of contact what the buyer wants to see.';
+  }
+  if (VEHICLE_WORD_RE.test(hay)) {
+    return 'Ask the named notice point of contact how small-business seats and task-order pools are being set, then position for the first task orders.';
+  }
+  return p.when
+    ? 'Confirm set-aside fit and bonding capacity now, then decide whether to bid, team or watch before the deadline.'
+    : 'Confirm set-aside fit and bonding capacity, then decide whether to bid, team or watch.';
+}
+
+function extractPathways(results: readonly FmpToolContent[]): FmpPathway[] {
+  const seen = new Set<string>();
+  const out: FmpPathway[] = [];
+  for (const r of results) {
+    if (!PATHWAY_TOOL_RE.test(String(r.tool || ''))) continue;
+    const p = parseJson(String(r.content || ''));
+    if (!p) continue;
+    walkObjects(p, (o) => {
+      const title = firstString(o, ['title', 'name']);
+      if (!title || title.length < 6) return;
+      const solicitation = firstString(o, ['solicitation_number', 'solicitationNumber', 'solicitation']);
+      const notice = firstString(o, ['notice_id', 'noticeId']);
+      if (!solicitation && !notice) return;
+      const id = solicitation || notice!;
+      const key = id.toLowerCase();
+      if (seen.has(key)) return;
+      seen.add(key);
+      const deadline = firstString(o, ['response_deadline', 'responseDeadline', 'deadline']);
+      const naicsRaw = firstString(o, ['naics_code', 'naics', 'naicsCode']);
+      const desc = firstString(o, ['description', 'summary']);
+      const buyer = firstString(o, ['department', 'agency', 'sub_tier', 'office']);
+      const noticeType = firstString(o, ['notice_type', 'noticeType', 'type']);
+      const pathway: FmpPathway = {
+        title: clip(title, 120),
+        ...(deadline ? { when: `Due ${dateOnly(deadline)}` } : {}),
+        noticeId: id,
+        ...(naicsRaw && /^\d{6}$/.test(naicsRaw) ? { naics: naicsRaw } : {}),
+        ...(desc && !/^https?:\/\//i.test(desc) ? { summary: clip(desc, 240) } : {}),
+        ...(buyer ? { buyer: clip(buyer, 80) } : {}),
+        ...(noticeType ? { noticeType: clip(noticeType, 40) } : {}),
+      };
+      pathway.move = pathwayMove(pathway);
+      out.push(pathway);
+    });
+  }
+  const indexed = out.map((p, i) => ({ p, i }));
+  indexed.sort((a, b) => {
+    const ra = pathwayRank(a.p);
+    const rb = pathwayRank(b.p);
+    if (ra !== rb) return ra - rb;
+    const da = a.p.when ?? '\uffff';
+    const db = b.p.when ?? '\uffff';
+    if (da !== db) return da < db ? -1 : 1;
+    return a.i - b.i;
+  });
+  return indexed.slice(0, 8).map((x) => x.p);
+}
+
+const CONTACT_NAME_KEYS = ['name', 'full_name', 'fullName', 'contact_name', 'poc_name', 'person'] as const;
+
+function extractStructuredContacts(results: readonly FmpToolContent[]): Map<string, FmpContactRow> {
+  const map = new Map<string, FmpContactRow>();
+  for (const r of results) {
+    const p = parseJson(String(r.content || ''));
+    if (!p) continue;
+    walkObjects(p, (o) => {
+      let name = firstString(o, CONTACT_NAME_KEYS);
+      if (!name) {
+        const f = firstString(o, ['first_name', 'firstName']);
+        const l = firstString(o, ['last_name', 'lastName']);
+        if (f && l) name = `${f} ${l}`;
+      }
+      if (!name || !looksLikePersonContactName(name)) return;
+      const k = name.toLowerCase();
+      const email = firstString(o, ['email', 'contact_email']);
+      const agency = firstString(o, ['agency', 'department', 'office', 'office_name', 'organization', 'sub_agency']);
+      const role = firstString(o, ['role', 'title', 'position']);
+      const prior = map.get(k);
+      if (prior) {
+        if (!prior.email && email) prior.email = email;
+        if (!prior.agency && agency) prior.agency = agency;
+        if (!prior.why && role) prior.why = role;
+        return;
+      }
+      map.set(k, {
+        person: name,
+        ...(email ? { email } : {}),
+        ...(agency ? { agency: clip(agency, 80) } : {}),
+        ...(role ? { why: clip(role, 80) } : {}),
+      });
+    });
+  }
+  return map;
+}
+
+/** A truncated PIID-style token expands to the full notice id when a pathway carries it. */
+function fullVehicleToken(token: string, pathways: readonly FmpPathway[]): string {
+  const hit = pathways.find((p) => p.noticeId && p.noticeId.toUpperCase().startsWith(token.toUpperCase()));
+  return hit?.noticeId ?? token;
+}
+
+function contactQuestion(vehicleTokens: readonly string[], pathways: readonly FmpPathway[], agency?: string): string {
+  const rawVeh = vehicleTokens.find((t) => /\d/.test(t)) || vehicleTokens[0];
+  const veh = rawVeh ? fullVehicleToken(rawVeh, pathways) : rawVeh;
+  if (veh) return `Ask how small-business seats on ${veh} and the related sources sought are being set${agency ? ` at ${agency}` : ''}.`;
+  const lead = pathways[0];
+  if (lead) return `Ask what the buyer wants to see in a response to "${clip(lead.title, 70)}".`;
+  return `Ask which upcoming vehicles and sources sought${agency ? ` at ${agency}` : ''} are reserved for small business.`;
+}
+
+function buildContactRows(
+  names: readonly string[],
+  structured: ReadonlyMap<string, FmpContactRow>,
+  vehicleTokens: readonly string[],
+  pathways: readonly FmpPathway[],
+): FmpContactRow[] {
+  return names
+    .filter(looksLikePersonContactName)
+    .map((name) => {
+      const s = structured.get(name.toLowerCase());
+      const agency = s?.agency;
+      return {
+        person: name,
+        ...(s?.email ? { email: s.email } : {}),
+        ...(agency ? { agency } : {}),
+        why: s?.why
+          ? `${s.why}${agency ? `, ${agency}` : ''}`
+          : `Named contact in this turn's tool results${agency ? ` (${agency})` : ''}`,
+        question: contactQuestion(vehicleTokens, pathways, agency),
+      };
+    });
+}
+
+function extractBuyerSpend(results: readonly FmpToolContent[]): FmpBuyerSpend[] {
+  const best = new Map<string, FmpBuyerSpend>();
+  for (const r of results) {
+    const p = parseJson(String(r.content || ''));
+    if (!p) continue;
+    walkObjects(p, (o) => {
+      const list = o.top_agencies;
+      if (!Array.isArray(list)) return;
+      for (const it of list) {
+        if (!it || typeof it !== 'object') continue;
+        const a = it as Record<string, unknown>;
+        const agency = firstString(a, ['name', 'agency']);
+        const dollars = firstNumber(a, ['amount', 'obligated', 'total_obligated']);
+        if (!agency || dollars == null || dollars <= 0) continue;
+        const k = agency.toLowerCase();
+        const prior = best.get(k);
+        if (!prior || dollars > prior.dollars) best.set(k, { agency: clip(agency, 60), dollars });
+      }
+    });
+  }
+  return [...best.values()].sort((a, b) => b.dollars - a.dollars).slice(0, 8);
+}
+
+function extractCompetitors(results: readonly FmpToolContent[]): FmpCompetitor[] {
+  const best = new Map<string, FmpCompetitor & { amount: number }>();
+  for (const r of results) {
+    const p = parseJson(String(r.content || ''));
+    if (!p) continue;
+    walkObjects(p, (o) => {
+      const list = o.contractors;
+      if (!Array.isArray(list)) return;
+      for (const it of list) {
+        if (!it || typeof it !== 'object') continue;
+        const c = it as Record<string, unknown>;
+        const firm = firstString(c, ['name', 'recipient_name', 'company', 'recipient']);
+        if (!firm) continue;
+        const amount = firstNumber(c, ['amount', 'total_obligated', 'obligated', 'total_obligations']) ?? 0;
+        const k = firm.toLowerCase();
+        const prior = best.get(k);
+        if (prior && prior.amount >= amount) continue;
+        const where = firstString(c, ['state', 'recipient_state', 'city']);
+        best.set(k, {
+          firm: clip(firm, 70),
+          ...(where ? { where } : {}),
+          ...(amount > 0 ? { obligated: formatObligationSnippet(amount) ?? undefined } : {}),
+          amount,
+        });
+      }
+    });
+  }
+  return [...best.values()]
+    .sort((a, b) => b.amount - a.amount)
+    .slice(0, 8)
+    .map(({ amount: _a, ...c }) => c);
+}
+
+function extractRanksByState(results: readonly FmpToolContent[], corpus: string): Record<string, number> {
+  const ranks: Record<string, number> = {};
+  const put = (stateRaw: string, rankRaw: unknown) => {
+    const st = normalizeStateCode(String(stateRaw));
+    const rk = num(rankRaw);
+    if (!st || rk == null || !Number.isInteger(rk) || rk < 1 || rk > 999) return;
+    if (!(st in ranks)) ranks[st] = rk;
+  };
+  for (const r of results) {
+    const p = parseJson(String(r.content || ''));
+    if (!p) continue;
+    walkObjects(p, (o) => {
+      const st = firstString(o, ['state', 'state_code']);
+      if (!st) return;
+      const rk = firstNumber(o, ['rank', 'state_rank', 'rank_in_state']);
+      if (rk != null) put(st, rk);
+    });
+  }
+  for (const m of corpus.matchAll(/#\s?(\d{1,3})\s+in\s+([A-Z]{2})\b/g)) put(m[2], m[1]);
+  for (const m of corpus.matchAll(/\b[Rr]ank(?:ed)?\s*(?:#|No\.?|number)?\s*(\d{1,3})\s+in\s+([A-Z]{2})\b/g)) put(m[2], m[1]);
+  for (const m of corpus.matchAll(/\b([A-Z]{2})\b[^.\n]{0,40}?\b[Rr]ank(?:ed)?\s*(?:#|No\.?|number)?\s*(\d{1,3})\b/g)) put(m[1], m[2]);
+  return ranks;
+}
+
+function extractMarketTerritoryDollars(corpus: string): string | null {
+  const m =
+    corpus.match(/(?:territory|buyer[- ]class|FHWA\s*(?:\+|and|&)\s*NPS)[^.\n$]{0,60}(\$\s?\d[\d,.]*\s?[MB])\b/i)
+    || corpus.match(/"(?:market_territory_dollars|territory_total|buyer_class_total)"\s*:\s*"(\$[^"]+)"/i);
+  return m ? m[1].replace(/\s+/g, '') : null;
+}
+
+const PRESSURE_RE = /\b(deferred maintenance|backlog|funding|reauthori[sz]ation|extension|lapse|shortfall|GAO|CRS|Legacy Restoration|appropriations?)\b/i;
+
+function extractWebSnippets(results: readonly FmpToolContent[]): Array<{ title?: string; snippet: string }> {
+  const out: Array<{ title?: string; snippet: string }> = [];
+  for (const r of results) {
+    if (!/search_web/i.test(String(r.tool || ''))) continue;
+    const p = parseJson(String(r.content || ''));
+    if (!p || typeof p !== 'object') continue;
+    const list = (p as { results?: unknown }).results;
+    if (!Array.isArray(list)) continue;
+    for (const it of list) {
+      if (!it || typeof it !== 'object') continue;
+      const h = it as Record<string, unknown>;
+      const snippet = firstString(h, ['snippet']);
+      if (!snippet || !PRESSURE_RE.test(`${snippet} ${String(h.title ?? '')}`)) continue;
+      out.push({ ...(typeof h.title === 'string' && h.title ? { title: clip(h.title, 90) } : {}), snippet: clip(snippet, 260) });
+      if (out.length >= 5) return out;
+    }
+  }
+  return out;
+}
+
 /**
  * Accumulate evidence from every FMP tool content string (all rounds).
  * `customerText` supplies self-report only (never treated as award proof).
@@ -256,15 +694,26 @@ export function accumulateFmpEvidence(
     if (awards != null && (awardCount == null || awards > awardCount)) awardCount = awards;
   }
 
+  const vehicleTokens = extractVehicleTokens(corpus);
+  const contactNames = extractContactNames(results);
+  const pathways = extractPathways(results);
   return {
     dominantNaics,
     totalObligations: bestDollars != null ? formatObligationSnippet(bestDollars) : null,
     awardCount,
-    vehicleTokens: extractVehicleTokens(corpus),
-    contactNames: extractContactNames(results),
+    vehicleTokens,
+    contactNames,
     eightAExitYear: extractEightAExit(corpus) || (/\b2031\b/.test(customerText) ? '2031' : null),
     selfReportLines: selfReportLines(customerText),
     corpus,
+    awardRows: extractAwardRows(results),
+    pathways,
+    contactRows: buildContactRows(contactNames, extractStructuredContacts(results), vehicleTokens, pathways),
+    buyerSpend: extractBuyerSpend(results),
+    competitors: extractCompetitors(results),
+    ranksByState: extractRanksByState(results, corpus),
+    marketTerritoryDollars: extractMarketTerritoryDollars(corpus),
+    webSnippets: extractWebSnippets(results),
   };
 }
 
@@ -527,10 +976,77 @@ export type BuildFmpHostDocModelOpts = {
   today?: () => string;
 };
 
+/** Civil-work terms DSBS keywords can lean on; only terms the customer or tool rows actually used are kept. */
+const CIVIL_TERMS = [
+  'heavy civil', 'bridge', 'highway', 'roadway', 'paving', 'pavement', 'stormwater', 'structural concrete',
+  'marine', 'culvert', 'retaining wall', 'earthwork', 'rehabilitation', 'design-build', 'inspection',
+] as const;
+
+function civilTermsFrom(text: string): string[] {
+  const hay = text.toLowerCase();
+  return CIVIL_TERMS.filter((t) => hay.includes(t)).slice(0, 8);
+}
+
+/** State / DC names the customer typed, in order of appearance. Never inferred from tools. */
+function geoFromCustomerText(text: string): string[] {
+  const hits: Array<{ idx: number; label: string }> = [];
+  for (const name of Object.values(US_STATE_NAMES)) {
+    if (/^district of columbia$/i.test(name)) continue;
+    const m = new RegExp(`(?<!West )\\b${name}\\b`, 'i').exec(text);
+    if (m) hits.push({ idx: m.index, label: name });
+  }
+  const dc = /\bD\.?C\.?\b|\bDistrict of Columbia\b/.exec(text);
+  if (dc) hits.push({ idx: dc.index, label: 'DC' });
+  return hits.sort((a, b) => a.idx - b.idx).map((h) => h.label).slice(0, 6);
+}
+
+const SRC = ['s1'];
+
+function para(id: string, text: string, claim: 'fact' | 'recommendation' = 'fact'): Block {
+  return { type: 'paragraph', id, text, claim, cites: SRC };
+}
+
+function listText(items: readonly string[]): string {
+  if (items.length <= 1) return items[0] ?? '';
+  return `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
+}
+
+function snippetAnchor(s: string): string {
+  if (/^\d{6}$/.test(s)) return `Primary award NAICS ${s}`;
+  if (s.startsWith('$')) return `Award obligations ${s}`;
+  if (/^20\d{2}$/.test(s)) return `8(a) timing through ${s}`;
+  return `Vehicle pathway ${s}`;
+}
+
+/** Plain text of every section / block in reading order (for char counts and snippet checks). */
+export function flattenDocModelText(model: DocModel): string {
+  const parts: string[] = [model.title, model.subtitle ?? '', model.preparedFor ?? ''];
+  for (const s of model.sections ?? []) {
+    parts.push(s.heading);
+    for (const b of s.blocks ?? []) {
+      if (b.type === 'paragraph' || b.type === 'callout') parts.push(b.text);
+      else if (b.type === 'bullets') for (const it of b.items) parts.push(it.text);
+      else if (b.type === 'table') {
+        if (b.caption) parts.push(b.caption);
+        for (const c of b.columns) parts.push(c.label);
+        for (const row of b.rows) for (const v of Object.values(row)) if (v != null) parts.push(String(v));
+      } else if (b.type === 'chart') {
+        if (b.caption) parts.push(b.caption);
+        for (const ser of b.series) {
+          parts.push(ser.name);
+          for (const pt of ser.points) parts.push(`${pt.x} ${pt.y}`);
+        }
+      }
+    }
+  }
+  return parts.filter(Boolean).join('\n');
+}
+
 /**
- * Host-built DocModel from accumulated FMP evidence. Used when the planner returns
- * create_document without a usable doc_model (or when force-injecting). Must pass
- * validateFmpWriteup including requiredSnippets and the PAE gloss ban.
+ * Host-built DocModel from accumulated FMP evidence. Claude-parity shell (the read, metrics,
+ * pathways, proven awards, money, PAE, pressure, contacts, readiness) where EVERY row and figure
+ * comes from tool JSON; a section whose evidence is absent is shorter, never invented.
+ * Must pass validateFmpWriteup including requiredSnippets and the PAE gloss ban.
  */
 export function buildFmpHostDocModel(
   evidence: FmpWriteupEvidence,
@@ -539,11 +1055,13 @@ export function buildFmpHostDocModel(
   const customerText = opts.customerText || '';
   const identity = extractProfileCompanyIdentity(customerText);
   const company = identity.legalName || 'Federal market profile';
+  const firm = identity.legalName || 'The firm';
   const defense = opts.defenseBuyersAppear !== false; // default on for FMP host rescue
   const date = (opts.today ?? (() => new Date().toISOString().slice(0, 10)))();
   const snippets = requiredSnippetsForWriteup(evidence);
   const naics = evidence.dominantNaics || snippets.find((s) => /^\d{6}$/.test(s)) || null;
   const dollars = evidence.totalObligations;
+  const exitY = evidence.eightAExitYear;
   const vehicleSnippet = (() => {
     if (!evidence.vehicleTokens.length) return null;
     const joined = evidence.vehicleTokens.join(' ');
@@ -551,122 +1069,430 @@ export function buildFmpHostDocModel(
     if (/\bHQ0034/i.test(joined)) return 'HQ0034';
     return evidence.vehicleTokens.find((t) => /\d/.test(t)) || evidence.vehicleTokens[0];
   })();
-  const exitY = evidence.eightAExitYear;
-  const contact = evidence.contactNames[0] || 'the named notice POC';
-  const awardBits = [
+  const vehicleList = evidence.vehicleTokens.length
+    ? listText(evidence.vehicleTokens.map((t) => fullVehicleToken(t, evidence.pathways ?? [])))
+    : null;
+  const awardRows = evidence.awardRows ?? [];
+  const allPathways = evidence.pathways ?? [];
+  const buyerSpend = evidence.buyerSpend ?? [];
+  const competitors = evidence.competitors ?? [];
+  const ranks = Object.entries(evidence.ranksByState ?? {});
+
+  // ── Subtitle: only what the customer text / evidence states ──
+  const geo = geoFromCustomerText(customerText);
+  const is8a = /8\s*\(\s*a\s*\)/i.test(customerText);
+  const subParts = [
     naics ? `Primary award NAICS ${naics}` : null,
-    dollars
-      ? `${dollars}${evidence.awardCount != null ? ` across ${evidence.awardCount} awards` : ''}`
-      : null,
-    vehicleSnippet ? `vehicle pathway ${vehicleSnippet}` : null,
-    evidence.vehicleTokens.some((t) => /^MATOC$/i.test(t)) && vehicleSnippet !== 'MATOC' ? 'MATOC' : null,
-    exitY ? `8(a) timing ${exitY}` : null,
-  ].filter(Boolean).join('; ');
+    is8a ? (exitY ? `8(a) firm, timing through ${exitY}` : '8(a) firm') : null,
+    geo.length ? `Market: ${geo.join(', ')}` : null,
+  ].filter(Boolean) as string[];
+  const subtitle = subParts.length ? `Report by Mindy AI. ${subParts.join('. ')}.` : undefined;
 
-  const pathwayText = [
-    'Pathways in priority order: vehicles, sources sought, then direct 8(a) awards.',
-    awardBits ? `Award evidence: ${awardBits}.` : 'Award evidence from this turn was thin; do not invent firm-wide totals.',
-    vehicleSnippet ? `Lead with the ${vehicleSnippet} pathway where it fits the market.` : null,
-    exitY ? `Include 8(a) timing through ${exitY} when discussing set-aside routes.` : null,
-  ].filter(Boolean).join(' ');
+  const sections: DocModel['sections'] = [];
 
-  const sections: DocModel['sections'] = [
-    {
-      id: 'sec-pathways',
-      heading: 'Pathways in priority order',
-      blocks: [{
-        type: 'paragraph',
-        id: 'p-pathways',
-        text: pathwayText,
-        claim: 'fact',
-        cites: ['s1'],
-      }],
-    },
-  ];
+  // ── 1. The read + headline metrics (heading skipped by the pathways-first rule) ──
+  const readBits: string[] = [];
+  if (dollars) {
+    readBits.push(
+      `${firm} shows ${dollars} in federal prime obligations`
+      + `${evidence.awardCount != null ? ` across ${evidence.awardCount} awards` : ''}`
+      + `${naics ? `, centered on NAICS ${naics}` : ''}.`,
+    );
+  } else if (naics) {
+    readBits.push(`Award history points to NAICS ${naics} as the primary lane. No firm-wide dollar total was returned this turn.`);
+  } else {
+    readBits.push('Award history was thin this turn, so no firm-wide dollar total or primary NAICS is stated.');
+  }
+  if (allPathways.length) {
+    readBits.push(`Strongest pathways right now: ${listText(allPathways.slice(0, 2).map((p) => `"${p.title}"`))}.`);
+  } else if (vehicleList) {
+    readBits.push(`Vehicle signals in the data: ${vehicleList}.`);
+  }
+  if (exitY) readBits.push(`8(a) timing runs through ${exitY}.`);
 
-  if (defense) {
+  const readBlocks: Block[] = [{
+    type: 'callout',
+    id: 'c-read',
+    tone: 'key_finding',
+    text: readBits.join(' '),
+    claim: 'fact',
+    cites: SRC,
+  }];
+  const metricRows: Array<Record<string, string>> = [];
+  if (dollars) {
+    metricRows.push({
+      metric: 'Federal prime obligations',
+      value: dollars,
+      covers: 'Recorded prime awards in the award history tool result',
+    });
+  }
+  if (evidence.awardCount != null) {
+    metricRows.push({
+      metric: 'Recorded prime awards',
+      value: String(evidence.awardCount),
+      covers: 'Award count in the same award history result',
+    });
+  }
+  for (const [state, rank] of ranks) {
+    metricRows.push({
+      metric: `Rank in ${state}`,
+      value: `#${rank}`,
+      covers: 'Rank reported by the market tools for this firm in that state',
+    });
+  }
+  if (evidence.marketTerritoryDollars) {
+    metricRows.push({
+      metric: 'Buyer-class spend in territory',
+      value: evidence.marketTerritoryDollars,
+      covers: 'Total reported in the market tool results',
+    });
+  }
+  if (exitY) {
+    metricRows.push({
+      metric: '8(a) eligibility horizon',
+      value: `Through ${exitY}`,
+      covers: 'Timing signal found in the tool results or the customer message',
+    });
+  }
+  if (metricRows.length) {
+    readBlocks.push({
+      type: 'table',
+      id: 't-metrics',
+      caption: 'Headline metrics (only figures present in this turn\'s tool results)',
+      claim: 'fact',
+      cites: SRC,
+      columns: [
+        { key: 'metric', label: 'Metric' },
+        { key: 'value', label: 'Value' },
+        { key: 'covers', label: 'What it covers' },
+      ],
+      rows: metricRows,
+    });
+  }
+  sections.push({ id: 'sec-read', heading: 'The read', blocks: readBlocks });
+
+  // ── 2. Pathways (first body section after the read) ──
+  const directBuyers = [...new Set(awardRows.map((r) => r.buyer).filter((b) => b && b !== 'Not stated'))].slice(0, 3);
+  const directPathway = directBuyers.length > 0 || buyerSpend.length > 0;
+  const noticeCap = directPathway ? 5 : 6;
+  const shown = allPathways.slice(0, noticeCap);
+  const totalPathways = shown.length + (directPathway ? 1 : 0);
+  const pathwayHeading = shown.length > 0 && totalPathways >= 6
+    ? 'Six pathways, in priority order'
+    : 'Pathways in priority order';
+  const pathwayBlocks: Block[] = [para(
+    'p-pathways-intro',
+    'Ranked by fit with the award record and by the clock: vehicles first, then sources sought, then direct 8(a) routes.',
+    'recommendation',
+  )];
+
+  if (shown.length) {
+    shown.forEach((pw, i) => {
+      const n = i + 1;
+      const idLine = pw.noticeId
+        ? `Notice ${pw.noticeId}${pw.naics ? `, NAICS ${pw.naics}` : ''}.`
+        : (pw.naics ? `NAICS ${pw.naics}.` : '');
+      const text = [
+        `**${n}. ${pw.title}.**`,
+        pw.when ? `${pw.when}.` : '',
+        pw.buyer ? `Buyer: ${pw.buyer}.` : '',
+        pw.noticeType ? `Notice type: ${pw.noticeType}.` : '',
+        pw.summary ?? '',
+        idLine,
+      ].filter(Boolean).join(' ');
+      pathwayBlocks.push(para(`p-pathway-${n}`, text));
+      if (pw.move) pathwayBlocks.push(para(`p-pathway-${n}-move`, `**Move:** ${pw.move}`, 'recommendation'));
+    });
+  } else {
+    const items: Array<{ text: string; claim: 'fact' | 'recommendation'; cites: string[] }> = [];
+    if (vehicleList) {
+      items.push({ text: `Vehicle signals in the tool data: ${vehicleList}.`, claim: 'fact', cites: SRC });
+    }
+    items.push({
+      text: `**Vehicles first.** Ask the holders of ${vehicleList ?? 'the multiple-award vehicles at your core buyers'} how small-business seats and task-order pools are being set.`,
+      claim: 'recommendation',
+      cites: SRC,
+    });
+    if (evidence.vehicleTokens.some((t) => /^MATOC$/i.test(t))) {
+      items.push({
+        text: '**MATOC.** The data names a MATOC. Treat any open on-ramp or recompete of it as your earliest entry point.',
+        claim: 'recommendation',
+        cites: SRC,
+      });
+    }
+    items.push({
+      text: '**Sources sought next.** Watch sources sought and RFIs at those buyers. A short capability statement tied to your recorded award history is the entry ticket.',
+      claim: 'recommendation',
+      cites: SRC,
+    });
+    items.push({
+      text: `**Direct 8(a) awards.** Ask each buyer in your award record for direct 8(a) offers${exitY ? `, with 8(a) timing through ${exitY}` : ''}.`,
+      claim: 'recommendation',
+      cites: SRC,
+    });
+    items.push({
+      text: '**Forecasts.** Position on agency forecasts before a notice posts and add each forecast owner to your contact list.',
+      claim: 'recommendation',
+      cites: SRC,
+    });
+    pathwayBlocks.push({ type: 'bullets', id: 'b-pathways-frame', ordered: true, items });
+  }
+  if (directPathway) {
+    const buyerNames = directBuyers.length ? directBuyers : buyerSpend.slice(0, 3).map((b) => b.agency);
+    pathwayBlocks.push(para(
+      'p-pathway-direct',
+      `**${shown.length + 1}. Direct 8(a) awards at the buyers already served.** Buyers in the award and market data include ${listText(buyerNames)}.`,
+    ));
+    pathwayBlocks.push(para(
+      'p-pathway-direct-move',
+      `**Move:** Ask each small-business office about direct 8(a) offers${exitY ? ` while 8(a) timing runs through ${exitY}` : ''}.`,
+      'recommendation',
+    ));
+  }
+  if (shown.length && vehicleList) {
+    pathwayBlocks.push(para('p-pathway-vehicles', `Vehicle signals in the tool data: ${vehicleList}.`));
+  }
+  sections.push({ id: 'sec-pathways', heading: pathwayHeading, blocks: pathwayBlocks });
+
+  // ── 3. What the firm has already proven ──
+  if (awardRows.length) {
     sections.push({
-      id: 'sec-pae',
-      heading: 'Defense construction oversight and Navy PAE',
+      id: 'sec-proven',
+      heading: 'What the firm has already proven',
       blocks: [{
-        type: 'paragraph',
-        id: 'p-pae',
-        text:
-          'Defense construction buying offices increasingly sit under defense construction oversight / Navy PAE '
-          + '(and related WHS construction oversight). Treat PAE as that oversight shift for this profile.',
+        type: 'table',
+        id: 't-awards',
+        caption: `Recorded prime awards from the award history tool, largest first (${awardRows.length} shown${evidence.awardCount != null ? ` of ${evidence.awardCount}` : ''}). Lead capture conversations with these.`,
         claim: 'fact',
-        cites: ['s1'],
+        cites: SRC,
+        columns: [
+          { key: 'project', label: 'Project' },
+          { key: 'buyer', label: 'Buyer' },
+          { key: 'where', label: 'Where' },
+          { key: 'competition', label: 'Competition' },
+          { key: 'obligated', label: 'Obligated', align: 'right' },
+        ],
+        rows: awardRows.map((r) => ({ ...r })),
       }],
     });
   }
 
-  sections.push(
-    {
-      id: 'sec-pain',
-      heading: 'What buyers are under pressure to fix',
-      blocks: [{
-        type: 'paragraph',
-        id: 'p-pain',
-        text:
-          'Buyers in this market face deferred maintenance, schedule pressure on civil infrastructure, '
-          + 'and the need for ready small-business seats on vehicles and sources sought.',
-        claim: 'fact',
-        cites: ['s1'],
-      }],
-    },
-    {
-      id: 'sec-who',
-      heading: 'Who to talk to and what to say',
+  // ── 4. Where the money sits / who else is in the market ──
+  if (buyerSpend.length) {
+    sections.push({
+      id: 'sec-money',
+      heading: 'Where the money sits',
+      blocks: [
+        para(
+          'p-money',
+          `Top buyers by obligated dollars in the market report: ${buyerSpend.slice(0, 5).map((b) => `${b.agency} ${formatObligationSnippet(b.dollars) ?? ''}`.trim()).join('; ')}.`
+          + `${evidence.marketTerritoryDollars ? ` Reported territory total: ${evidence.marketTerritoryDollars}.` : ''}`,
+        ),
+        {
+          type: 'chart',
+          id: 'c-money',
+          kind: 'bar',
+          xLabel: 'Buying agency',
+          yLabel: 'Obligations',
+          valueFormat: 'usd',
+          caption: 'Obligated dollars by buyer (highest single-report figure per buyer).',
+          claim: 'fact',
+          cites: SRC,
+          series: [{
+            name: 'Obligations',
+            points: buyerSpend.map((b) => ({ x: b.agency, y: b.dollars })),
+          }],
+        },
+      ],
+    });
+  }
+  if (competitors.length) {
+    sections.push({
+      id: 'sec-competitors',
+      heading: 'Who else is in this market',
       blocks: [{
         type: 'table',
-        id: 't-who',
+        id: 't-competitors',
+        caption: 'Peer firms from the market report tool results.',
         claim: 'fact',
-        cites: ['s1'],
+        cites: SRC,
         columns: [
-          { key: 'contact', label: 'Contact' },
-          { key: 'question', label: 'Question to ask' },
+          { key: 'firm', label: 'Firm' },
+          { key: 'where', label: 'Where it leads' },
+          { key: 'obligated', label: 'Obligated', align: 'right' },
+          { key: 'why', label: 'Why it matters' },
         ],
-        rows: [{
-          contact,
-          question: vehicleSnippet
-            ? `Ask about small-business seats on ${vehicleSnippet} and related sources sought.`
-            : 'Ask about small-business seats on the active vehicles and sources sought in this market.',
-        }],
+        rows: competitors.map((c) => ({
+          firm: c.firm,
+          where: c.where ?? 'Not stated',
+          obligated: c.obligated ?? 'Not available',
+          why: c.why ?? 'Peer in the same market report; check for vehicle seats and teaming fit.',
+        })),
       }],
+    });
+  }
+
+  // ── 5. PAE (defense) ──
+  if (defense) {
+    sections.push({
+      id: 'sec-pae',
+      heading: 'Who owns defense construction now: the PAE shift',
+      blocks: [
+        para(
+          'p-pae',
+          'Defense construction buying offices increasingly sit under defense construction oversight / Navy PAE '
+          + '(and related WHS construction oversight). Treat PAE as that oversight shift for this profile.',
+        ),
+        {
+          type: 'bullets',
+          id: 'b-pae',
+          ordered: false,
+          items: [
+            {
+              text: '**Map the buyer.** For each defense buyer in this profile, confirm whether construction now routes through Navy PAE, WHS construction oversight or another agent before you write to it.',
+              claim: 'recommendation',
+              cites: SRC,
+            },
+            {
+              text: '**Expect new points of contact.** Oversight changes can move who signs off on small-business seats. Refresh your contact list for those offices.',
+              claim: 'recommendation',
+              cites: SRC,
+            },
+            {
+              text: '**Check each service on its own.** Do not assume one construction agent covers every defense buyer.',
+              claim: 'recommendation',
+              cites: SRC,
+            },
+          ],
+        },
+      ],
+    });
+  }
+
+  // ── 6. Buyer pressure ──
+  const civilTerms = civilTermsFrom(
+    [customerText, ...allPathways.map((p) => p.title), ...awardRows.map((r) => r.project)].join(' '),
+  );
+  const web = evidence.webSnippets ?? [];
+  const painBlock: Block = web.length
+    ? {
+      type: 'bullets',
+      id: 'b-pain',
+      ordered: false,
+      items: web.slice(0, 5).map((w) => ({
+        text: `${w.title ? `**${w.title}.** ` : ''}${w.snippet}`,
+        claim: 'fact' as const,
+        cites: SRC,
+      })),
+    }
+    : {
+      type: 'bullets',
+      id: 'b-pain',
+      ordered: false,
+      items: [
+        {
+          text: `Deferred maintenance and aging infrastructure keep repair and rehabilitation work moving${civilTerms.length ? ` in ${listText(civilTerms.slice(0, 4))}` : ''}.`,
+          claim: 'assumption' as const,
+          origin: 'Standing market pressure. Web search returned no usable snippets this turn, so confirm against current GAO, CRS and agency budget documents.',
+        },
+        {
+          text: 'Schedule pressure pushes buyers toward multiple-award vehicles and faster delivery methods.',
+          claim: 'assumption' as const,
+          origin: 'Standing market pressure, not retrieved from a source this turn. Confirm with each buyer.',
+        },
+        {
+          text: 'Seats on vehicles are scarce, so buyers lean on contractors already in their award record.',
+          claim: 'assumption' as const,
+          origin: 'Standing market pressure, not retrieved from a source this turn. Confirm with each buyer.',
+        },
+      ],
+    };
+  sections.push({ id: 'sec-pain', heading: 'What buyers are under pressure to fix', blocks: [painBlock] });
+
+  // ── 7. Who to talk to ──
+  const contactRows: FmpContactRow[] = (evidence.contactRows?.length
+    ? evidence.contactRows
+    : evidence.contactNames.filter(looksLikePersonContactName).map((person) => ({ person })))
+    .filter((c) => looksLikePersonContactName(c.person))
+    .slice(0, 8);
+  const whoRows = contactRows.length
+    ? contactRows.map((c) => ({
+      person: [c.person, c.agency, c.email].filter(Boolean).join(', '),
+      why: c.why ?? `Named contact in this turn's tool results${c.agency ? ` (${c.agency})` : ''}`,
+      question: c.question ?? contactQuestion(evidence.vehicleTokens, allPathways, c.agency),
+    }))
+    : [{
+      person: 'Named notice POC on the active pathway',
+      why: 'No named person came back from the contact tools this turn; read the point of contact off the notice itself.',
+      question: contactQuestion(evidence.vehicleTokens, allPathways),
+    }];
+  sections.push({
+    id: 'sec-who',
+    heading: 'Who to talk to and what to say',
+    blocks: [{
+      type: 'table',
+      id: 't-who',
+      claim: 'fact',
+      cites: SRC,
+      columns: [
+        { key: 'person', label: 'Person' },
+        { key: 'why', label: 'Why they matter' },
+        { key: 'question', label: 'Question to ask' },
+      ],
+      rows: whoRows,
+    }],
+  });
+
+  // ── 8. Readiness + DSBS ──
+  // Drop a self-report line that merely restates shorter lines already listed.
+  const selfLines = evidence.selfReportLines.filter((line, i, all) =>
+    !all.some((other, j) => j !== i && other.length < line.length && line.includes(other)));
+  const readyItems: Array<{ text: string; claim: 'recommendation'; cites: string[] }> = [
+    {
+      text: `**DSBS keywords.** Update DSBS keywords to match the award NAICS${naics ? ` ${naics}` : ''} and ${civilTerms.length ? `these civil terms: ${civilTerms.join(', ')}` : 'the civil pathway terms in this profile'}.`,
+      claim: 'recommendation',
+      cites: SRC,
     },
     {
-      id: 'sec-ready',
-      heading: 'Readiness checklist',
-      blocks: [{
-        type: 'bullets',
-        id: 'b-ready',
-        ordered: false,
-        items: [
-          {
-            text: 'Update DSBS keywords to match the award NAICS and civil pathway terms from this profile.',
-            claim: 'recommendation',
-            cites: ['s1'],
-          },
-          ...(evidence.selfReportLines.length
-            ? evidence.selfReportLines.slice(0, 4).map((line) => ({
-              // recommendation + cites: dollar/count self-report must cite (validateDocModel).
-              text: `Confirm self-reported detail from the customer message: ${line}`,
-              claim: 'recommendation' as const,
-              cites: ['s1'],
-            }))
-            : [{
-              text: 'Bonding, equipment, and credential claims were not provided in this turn; confirm before pursuit.',
-              claim: 'recommendation' as const,
-              cites: ['s1'],
-            }]),
-        ],
-      }],
+      text: awardRows.length
+        ? `**Past performance.** Lead with the ${awardRows.length} recorded prime award${awardRows.length === 1 ? '' : 's'} in the past-performance table and match each to the buyer you are writing to.`
+        : '**Past performance.** Pull your strongest prime and subcontract references for the pathways above.',
+      claim: 'recommendation',
+      cites: SRC,
     },
-  );
+    ...(selfLines.length
+      ? selfLines.slice(0, 5).map((line) => ({
+        // recommendation + cites: dollar/count self-report must cite (validateDocModel).
+        text: `**Self-reported.** Confirm this detail from the customer message before pursuit: ${line}`,
+        claim: 'recommendation' as const,
+        cites: SRC,
+      }))
+      : [{
+        text: '**Bonding, equipment and credentials.** None were provided in this turn. Confirm them before pursuit.',
+        claim: 'recommendation' as const,
+        cites: SRC,
+      }]),
+    {
+      text: '**Registration and fit.** Confirm your SAM registration, NAICS list and set-aside status match the pathways above before a capability statement goes out.',
+      claim: 'recommendation',
+      cites: SRC,
+    },
+    {
+      text: '**Team and surge plan.** Name your design, inspection or joint-venture partner and your surge plan before the buyer asks.',
+      claim: 'recommendation',
+      cites: SRC,
+    },
+  ];
+  sections.push({
+    id: 'sec-ready',
+    heading: 'Readiness checklist: what these buyers will ask to see',
+    blocks: [{ type: 'bullets', id: 'b-ready', ordered: false, items: readyItems }],
+  });
 
-  return {
+  const model: DocModel = {
     schema: DOC_SCHEMA,
     title: `${company} Federal Market Profile`,
+    ...(subtitle ? { subtitle } : {}),
     date,
     preparedFor: company,
     sources: [{
@@ -679,6 +1505,14 @@ export function buildFmpHostDocModel(
     theme: 'mindy',
     meta: { generatedBy: 'ask_mindy_fmp_host' },
   };
+
+  // Required snippets that no section carried (e.g. a bare vehicle token) land in the pathways section.
+  const flatLower = flattenDocModelText(model).toLowerCase();
+  const missing = snippets.filter((s) => !flatLower.includes(s.toLowerCase()));
+  if (missing.length) {
+    model.sections[1].blocks.push(para('p-pathway-anchors', `Evidence anchors from this turn: ${missing.map(snippetAnchor).join('; ')}.`));
+  }
+  return model;
 }
 
 /** JSON arguments for a host-injected create_document call (never `{}`). */
@@ -687,4 +1521,159 @@ export function buildFmpCreateDocumentInjectArgs(
   opts: BuildFmpHostDocModelOpts = {},
 ): string {
   return JSON.stringify({ doc_model: buildFmpHostDocModel(evidence, opts) });
+}
+
+// ── Prefer a rich planner DocModel over the host rescue model ─────────────────────────────────────
+
+/** A planner model must carry at least this much text to beat the host model. */
+export const FMP_PLANNER_MIN_CHARS = 3500;
+/** ...and at least this many who-to-talk rows with a person-shaped name. */
+export const FMP_PLANNER_MIN_PERSON_ROWS = 2;
+
+export type ResolveFmpCreateDocumentOpts = BuildFmpHostDocModelOpts & {
+  /** Defaults to requiredSnippetsForWriteup(evidence). */
+  requiredSnippets?: string[];
+};
+
+export interface FmpDocModelRichness {
+  chars: number;
+  whoToTalkPersonRows: number;
+  hasPathways: boolean;
+}
+
+const LEADING_TITLE_RE = /^(?:Mr|Ms|Mrs|Dr|Col|Maj|Capt|Lt|Gen|CAPT|COL|LTC|CDR)\.?\s+/;
+
+/** The person-like head of a who-to-talk cell ("Helson Roman, FHWA EFL, h@x.gov" -> "Helson Roman"). */
+function personHeadOfCell(cell: unknown): string {
+  const t = String(cell ?? '').replace(/\*\*|_/g, '').replace(/\S+@\S+/g, ' ').trim();
+  return (t.split(/[,;(|\n]|\s-\s|\sat\s/)[0] ?? '').trim().replace(LEADING_TITLE_RE, '');
+}
+
+function whoToTalkTables(model: DocModel): Array<Extract<Block, { type: 'table' }>> {
+  const out: Array<Extract<Block, { type: 'table' }>> = [];
+  for (const s of model.sections ?? []) {
+    const headingHit = RBA_WRITEUP.whoToTalkHeadingSynonyms.some((re) => re.test(s.heading));
+    for (const b of s.blocks ?? []) {
+      if (b.type !== 'table') continue;
+      const hits = b.columns.filter((c) =>
+        RBA_WRITEUP.whoToTalkTableColumnHints.some((re) => re.test(c.label))).length;
+      if (headingHit || hits >= 2) out.push(b);
+    }
+  }
+  return out;
+}
+
+function personColumnKey(table: Extract<Block, { type: 'table' }>): string | null {
+  const col = table.columns.find((c) => /person|contact|name|who/i.test(c.label)) ?? table.columns[0];
+  return col?.key ?? null;
+}
+
+/** Rows whose person cell is an organization (IRS, an agency) instead of a person. */
+function agencyAsPersonRows(model: DocModel): number {
+  let n = 0;
+  for (const table of whoToTalkTables(model)) {
+    const key = personColumnKey(table);
+    if (!key) continue;
+    for (const row of table.rows) {
+      const cell = String(row[key] ?? '');
+      if (IRS_LIKE.test(cell)) { n++; continue; }
+      const head = personHeadOfCell(cell);
+      if (!head || looksLikePersonContactName(head)) continue;
+      const words = head.split(/\s+/);
+      if (words.length >= 2 && words.length <= 6 && words.every((w) => /^[A-Z]/.test(w)) && words.some((w) => ORG_WORDS.has(w.toLowerCase()))) n++;
+    }
+  }
+  return n;
+}
+
+export function fmpDocModelRichness(model: DocModel): FmpDocModelRichness {
+  let people = 0;
+  for (const table of whoToTalkTables(model)) {
+    const key = personColumnKey(table);
+    if (!key) continue;
+    for (const row of table.rows) {
+      if (looksLikePersonContactName(personHeadOfCell(row[key]))) people++;
+    }
+  }
+  return {
+    chars: flattenDocModelText(model).length,
+    whoToTalkPersonRows: people,
+    hasPathways: (model.sections ?? []).some((s) =>
+      RBA_WRITEUP.pathwayHeadingSynonyms.some((re) => re.test(s.heading))),
+  };
+}
+
+function parsePlannerDocModel(plannerArgs: string): { parsed: Record<string, unknown>; model: DocModel } | null {
+  if (!createDocumentArgsHaveUsableDocModel(plannerArgs)) return null;
+  try {
+    const parsed = JSON.parse(plannerArgs) as Record<string, unknown>;
+    return { parsed, model: parsed.doc_model as DocModel };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Keep the planner's DocModel only when it already beats the host rescue model on content:
+ * valid shape, passes the FMP gate (structure, required snippets, bans incl. Mid CTA), is
+ * dense enough, and its who-to-talk table names real people (no IRS / agency-as-person).
+ */
+export function shouldPreferPlannerFmpDocModel(
+  plannerArgs: string,
+  evidence: FmpWriteupEvidence,
+  opts: ResolveFmpCreateDocumentOpts = {},
+): { prefer: boolean; reason: string; model?: DocModel } {
+  const planner = parsePlannerDocModel(plannerArgs);
+  if (!planner) return { prefer: false, reason: 'no_usable_doc_model' };
+
+  const shape = validateDocModel(planner.model);
+  if (!shape.ok) return { prefer: false, reason: `invalid_doc_model:${shape.issues[0]?.path ?? 'unknown'}` };
+
+  const v = validateFmpWriteup(planner.model, {
+    defenseBuyersAppear: opts.defenseBuyersAppear
+      ?? fmpDefenseBuyersAppear(opts.customerText || '') ,
+    requiredSnippets: opts.requiredSnippets ?? requiredSnippetsForWriteup(evidence),
+  });
+  if (v.issues.some((i) => i.code === 'mid_cta_ban')) return { prefer: false, reason: 'mid_cta_ban' };
+  if (!v.ok || !v.model) {
+    const codes = [...new Set(v.issues.filter((i) => i.severity === 'error').map((i) => i.code))];
+    return { prefer: false, reason: `fmp_writeup_invalid:${codes.join(',')}` };
+  }
+
+  const rich = fmpDocModelRichness(v.model);
+  if (rich.chars < FMP_PLANNER_MIN_CHARS) return { prefer: false, reason: `too_thin:${rich.chars}` };
+  if (rich.whoToTalkPersonRows < FMP_PLANNER_MIN_PERSON_ROWS) {
+    return { prefer: false, reason: `who_to_talk_person_rows:${rich.whoToTalkPersonRows}` };
+  }
+  if (!rich.hasPathways) return { prefer: false, reason: 'no_pathways' };
+  if (agencyAsPersonRows(v.model) > 0) return { prefer: false, reason: 'irs_like_contact' };
+  return { prefer: true, reason: 'planner_rich_valid', model: v.model };
+}
+
+/**
+ * create_document arguments for an FMP turn: the planner's rich DocModel when it clears the bar,
+ * otherwise the host model. Pass plannerArgs '{}' to force the host model (empty-planner inject).
+ */
+export function resolveFmpCreateDocumentArgs(
+  plannerArgs: string,
+  evidence: FmpWriteupEvidence,
+  opts: ResolveFmpCreateDocumentOpts = {},
+): { args: string; source: 'planner' | 'host'; notice: string; reason: string } {
+  const pick = shouldPreferPlannerFmpDocModel(plannerArgs, evidence, opts);
+  if (pick.prefer && pick.model) {
+    let base: Record<string, unknown> = {};
+    try { base = JSON.parse(plannerArgs) as Record<string, unknown>; } catch { /* keep {} */ }
+    return {
+      args: JSON.stringify({ ...base, doc_model: pick.model }),
+      source: 'planner',
+      notice: 'fmp_create_document:planner_doc_model_kept',
+      reason: pick.reason,
+    };
+  }
+  return {
+    args: buildFmpCreateDocumentInjectArgs(evidence, opts),
+    source: 'host',
+    notice: 'fmp_create_document:host_doc_model_forced',
+    reason: pick.reason,
+  };
 }

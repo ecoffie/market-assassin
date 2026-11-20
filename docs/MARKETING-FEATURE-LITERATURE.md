@@ -1,3 +1,11 @@
+### Ask Mindy Federal Market Profile content parity (Claude gold) — 2026-11-20
+
+**What shipped.** Host-built FMP DocModels now assemble The read, metrics, multi-pathway detail, awards table, PAE, buyer pain, named contacts, and readiness from tool JSON — and Ask keeps a rich planner DocModel when it clears the FMP gate instead of always forcing the thin rescue shell. Agency names like Internal Revenue Service can no longer appear as person contacts.
+
+**Why it matters.** The Claude+MCP RBA profile bar is usable from Ask/Vault downloads, not a cover page with a one-paragraph pathways section.
+
+**Proof.** Unit: `fmp-writeup-grounding.unit.test.ts` enriched host ≥3500 chars + IRS rejection + planner prefer. Live proof appended after prod cold Ask.
+
 
 ### Ask Mindy Federal Market Profile write-up (host-grounded Vault DocModel) — 2026-11-20
 

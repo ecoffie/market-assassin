@@ -94,10 +94,10 @@ import { fmpDefenseBuyersAppear, type FmpWriteupContext } from '@/lib/chat/fmp-w
 import {
   accumulateFmpEvidence,
   buildFmpCreateDocumentAnswerNote,
-  buildFmpCreateDocumentInjectArgs,
   buildFmpWriteupGroundingNote,
   FMP_DOC_TOOL_ROUND_MAX_TOKENS,
   requiredSnippetsForWriteup,
+  resolveFmpCreateDocumentArgs,
   rewriteFmpAnswerDownloadLinks,
   type FmpWriteupEvidence,
 } from '@/lib/chat/fmp-writeup-grounding';
@@ -1518,13 +1518,19 @@ export async function POST(request: NextRequest) {
                   }
                   return fmpEvidence;
                 };
-                const fmpCreateDocumentInjectArgs = (customerFmp: string): string => {
+                // Keep the planner's DocModel when it is rich and valid; otherwise the host model.
+                // plannerArgs '{}' (empty planner inject) always resolves to the host model.
+                const resolveFmpCreateDocumentToolArgs = (plannerArgs: string, customerFmp: string) => {
                   const evidence = ensureFmpEvidence(customerFmp);
-                  return buildFmpCreateDocumentInjectArgs(evidence, {
+                  const resolved = resolveFmpCreateDocumentArgs(plannerArgs, evidence, {
                     customerText: customerFmp,
                     defenseBuyersAppear: fmpWriteupCtx?.defenseBuyersAppear
                       ?? fmpDefenseBuyersAppear(customerFmp),
+                    requiredSnippets: fmpWriteupCtx?.requiredSnippets,
                   });
+                  turnTrace.notices.push(resolved.notice);
+                  turnTrace.notices.push(`fmp_create_document_reason:${resolved.reason}`);
+                  return resolved.args;
                 };
                 const prepareFmpWriteupGrounding = () => {
                   if (!fmpState || !fmpWriteupCtx) return;
@@ -1660,8 +1666,7 @@ export async function POST(request: NextRequest) {
                   })();
                   const forcedToolInjectArgs = (toolName: string): string => {
                     if (toolName === CREATE_DOCUMENT) {
-                      turnTrace.notices.push('fmp_create_document:host_doc_model_forced');
-                      return fmpCreateDocumentInjectArgs(customerFmpText);
+                      return resolveFmpCreateDocumentToolArgs('{}', customerFmpText);
                     }
                     if (toolName === MARKET_REPORT_TOOL && fmpState) {
                       return JSON.stringify(buildFmpNextMarketReportArgs(
@@ -1690,11 +1695,10 @@ export async function POST(request: NextRequest) {
                     const prepared = prepareChatToolArgs(String(tc.function?.name || ''), String(tc.function?.arguments ?? ''));
                     let args = prepared.args;
                     const toolNm = String(tc.function?.name || '');
-                    // FMP writeup: ALWAYS use the host DocModel. Planner bodies often have
-                    // title+sections but miss required snippets → fmp_writeup_invalid loop.
+                    // FMP writeup: keep a rich planner DocModel that already passes the FMP gate;
+                    // otherwise swap in the host model (thin planner bodies loop on fmp_writeup_invalid).
                     if (toolNm === CREATE_DOCUMENT) {
-                      args = fmpCreateDocumentInjectArgs(customerFmpText);
-                      turnTrace.notices.push('fmp_create_document:host_doc_model_forced');
+                      args = resolveFmpCreateDocumentToolArgs(args, customerFmpText);
                     }
                     const identityArgs = enforceFederalMarketProfileIdentityArgs(toolNm, args, customerFmpText);
                     args = identityArgs.args;
