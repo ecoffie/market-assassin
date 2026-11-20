@@ -4,10 +4,11 @@
  * WHY ONLY THESE TWO: a health sweep of all 9 registered scrapers on 2026-07-31
  * found 2 alive; a second sweep of all 13 stale sources on 2026-08-01 found
  * exactly one more that can be automated. DHS historically returned ~754 records
- * from apfs-cloud.dhs.gov JSON — that host now serves migration HTML, so the
- * default path FAIL-LOUDs (never upserts empty). Optional
- * `DHS_FORECAST_ALLRECORDS_URL` switches to the DHS.gov public allRecords file
- * (see src/lib/forecasts/dhs-allrecords.ts). DOE's current file is the dated
+ * from apfs-cloud.dhs.gov JSON — that host now serves a migration notice (HTML 200),
+ * and era-apfs.dhs.gov does not resolve. The default path classifies that body and
+ * then tries the public allRecords CSV. A 403, HTML notice, or empty file FAIL-LOUDs
+ * (never upserts empty). Optional `DHS_FORECAST_ALLRECORDS_URL` still overrides.
+ * DOE's current file is the dated
  * CSV linked from energy.gov/osbp/acquisition-forecast (not the July 2026 XLSX,
  * which still returns 200). Everything else is blocked, not merely broken:
  *
@@ -36,18 +37,23 @@
  */
 import { canonicalDhsExternalId } from '@/lib/forecasts/dhs-identity';
 import {
+  DHS_ALLRECORDS_CSV_URL,
   DHS_ALLRECORDS_SOURCE_TYPE,
+  DHS_ERA_FORECASTS_URL,
   dhsAllrecordsToDbRow,
+  dhsEraToStoredRow,
   parseDhsAllrecordsBuffer,
 } from '@/lib/forecasts/dhs-allrecords';
+import { classifyDhsBody } from '@/lib/forecasts/dhs-source';
+import { fetchWithRetry } from '@/lib/forecasts/http-retry';
 import { NextRequest, NextResponse } from 'next/server';
-import { forecastWriterClient, guardForecastInserts, countNewForecastRows, quarantineRefusedLoad } from '@/lib/forecasts/writer';
+import { forecastWriterClient, guardForecastInserts, countNewForecastRows, existingForecastIds, forecastRowsForDailySync, quarantineRefusedLoad } from '@/lib/forecasts/writer';
 import { sendOpsAlert } from '@/lib/ops-alert';
 import { reportCronOutcome } from '@/lib/cron-self-report';
 import {
   DOE_FORECAST_PAGE,
   absoluteDoeUrl,
-  doeExternalId,
+  doeForecastToDbRow,
   extractDoeForecastDocuments,
   parseDoeCsv,
 } from '@/lib/forecasts/doe-forecast';
@@ -103,10 +109,10 @@ interface DhsForecast { [k: string]: unknown }
  * (scripts/ingest-dhs-forecast-allrecords.ts).
  */
 async function fetchDhsAllrecordsFile(url: string): Promise<Record<string, unknown>[]> {
-  const res = await fetch(url, {
+  const { response: res } = await fetchWithRetry(url, {
     headers: { 'User-Agent': 'GovConGiants-Mindy/1.0' },
     cache: 'no-store',
-  });
+  }, { attempts: 3, retryBaseMs: 500 });
   if (!res.ok) {
     throw new Error(
       `DHS allRecords HTTP ${res.status} — check DHS.gov Advance Acquisition Planning download URL`,
@@ -128,6 +134,25 @@ async function fetchDhsAllrecordsFile(url: string): Promise<Record<string, unkno
   }));
 }
 
+/** Live public list on apfs-era.dhs.gov. Empty or non-array is a failure. 5xx retries, then the caller falls back to the CSV. */
+async function fetchDhsEraJson(): Promise<Record<string, unknown>[]> {
+  const { response: res, attempts } = await fetchWithRetry(DHS_ERA_FORECASTS_URL, {
+    headers: { Accept: 'application/json', 'User-Agent': 'GovConGiants-Mindy/1.0' },
+    cache: 'no-store',
+  }, { attempts: 3, retryBaseMs: 500 });
+  if (!res.ok) throw new Error(`apfs-era forecasts/all HTTP ${res.status} after ${attempts} attempt(s)`);
+  const data = await res.json() as unknown;
+  if (!Array.isArray(data)) throw new Error('apfs-era forecasts/all was not an array');
+  const now = new Date().toISOString();
+  const rows: Record<string, unknown>[] = [];
+  for (const item of data) {
+    const stored = dhsEraToStoredRow(item, now);
+    if (stored) rows.push(stored);
+  }
+  if (!rows.length) throw new Error('apfs-era forecasts/all parsed to 0 rows — refusing empty upsert');
+  return rows;
+}
+
 /**
  * Fetch + map DHS APFS.
  *
@@ -145,29 +170,27 @@ async function fetchDHS(): Promise<Record<string, unknown>[]> {
     headers: { Accept: 'application/json', 'User-Agent': 'GovConGiants-Mindy/1.0' },
     cache: 'no-store',
   });
-  if (!res.ok) throw new Error(`DHS APFS HTTP ${res.status}`);
-
   const text = await res.text();
-  const trimmed = text.trim();
-  // Migration / Login.gov pages return 200 with HTML. That is a hard failure —
-  // never JSON.parse into [] and never upsert empty.
-  if (/^<!DOCTYPE\s+html/i.test(trimmed) || /^<html[\s>]/i.test(trimmed)) {
-    throw new Error(
-      'DHS APFS returned HTML (not JSON) — apfs-cloud migrated; ' +
-        'use scripts/ingest-dhs-forecast-allrecords.ts dry-run, or set DHS_FORECAST_ALLRECORDS_URL after review',
-    );
+  const classified = classifyDhsBody(res.status, text);
+  if (classified.kind !== 'json_array') {
+    // apfs-cloud is the migration notice. The live list is apfs-era
+    // /forecasts/all. The dhs.gov CSV is the same corpus when Akamai serves it.
+    try {
+      return await fetchDhsEraJson();
+    } catch (eraErr) {
+      const eraMsg = eraErr instanceof Error ? eraErr.message : String(eraErr);
+      try {
+        return await fetchDhsAllrecordsFile(DHS_ALLRECORDS_CSV_URL);
+      } catch (csvErr) {
+        const csvMsg = csvErr instanceof Error ? csvErr.message : String(csvErr);
+        // Keep the fail-loud phrase the repair ledger anchors on.
+        throw new Error(
+          `DHS APFS returned HTML (not JSON) — ${classified.detail}. apfs-era: ${eraMsg}. Public allRecords file: ${csvMsg}`,
+        );
+      }
+    }
   }
-  let data: unknown;
-  try {
-    data = JSON.parse(text);
-  } catch {
-    throw new Error(
-      'DHS APFS returned non-JSON body — refusing empty upsert. ' +
-        'Official public file: DHS.gov APFS_forecast_allRecords.csv',
-    );
-  }
-  if (!Array.isArray(data)) throw new Error('DHS APFS returned a non-array payload');
-  if (data.length === 0) throw new Error('DHS APFS returned 0 rows — refusing empty upsert');
+  const data = classified.rows;
 
   const now = new Date().toISOString();
   return (data as DhsForecast[]).map((r) => {
@@ -265,30 +288,7 @@ async function fetchDOE(): Promise<Record<string, unknown>[]> {
   if (!parsed.rows.length) throw new Error(`DOE forecast ${current.edition} parsed to 0 rows — refusing empty upsert`);
 
   const now = new Date().toISOString();
-  return parsed.rows.map((r) => ({
-    source_agency: 'DOE',
-    source_type: 'osdbu_xlsx',
-    source_url: sourceUrl,
-    external_id: doeExternalId(r),
-    title: r.title,
-    description: r.naicsDescription || null,
-    bureau: r.programOffice || null,
-    contracting_office: r.programOffice || null,
-    program_office: r.programOffice || null,
-    naics_code: r.naicsCode || null,
-    naics_description: r.naicsDescription || null,
-    estimated_value_min: r.estimatedValueMin ?? null,
-    estimated_value_max: r.estimatedValueMax ?? null,
-    estimated_value_range: r.estimatedValueRange || null,
-    set_aside_type: r.setAside || null,
-    contract_type: r.contractType || null,
-    incumbent_name: r.incumbentName || null,
-    incumbent_contract_number: r.incumbentContractNumber || null,
-    performance_end_date: r.performanceEndDate || null,
-    pop_state: r.popState || null,
-    status: 'forecasted',
-    last_synced_at: now,
-  }));
+  return parsed.rows.map((r) => doeForecastToDbRow(r, { sourceUrl, syncedAt: now }));
 }
 
 /** Per-source baselines. A source that drops far below its observed floor has
@@ -421,23 +421,44 @@ export async function GET(request: NextRequest) {
     }
     if (normalized) console.log(`[${JOB_NAME}] normalized ${normalized} row(s) before upsert`);
 
-    // BACKFILL SAFETY (src/lib/forecasts/writer.ts): per publisher, a daily run may not CREATE a bulk of new rows
-    // while its alert floor is active. A refused publisher's rows are held back entirely (its updates wait for the
-    // backfill that must handle the bulk) and the run reports an error; other publishers still sync.
-    // The decision is made per publisher over its FULL row set before the first upsert, so a refused publisher
-    // has zero rows written (no partial prefix from earlier batches) and its whole payload is quarantined.
+    // BACKFILL SAFETY: a daily run may not CREATE a bulk of new rows while the alert floor is active.
+    // Updates to an existing (source_agency, external_id) still upsert — a Nov 16 DOE file must be
+    // able to refresh rows it already holds even when the new-identity count trips the cap.
+    // New identities over the cap are quarantined whole (no partial insert of that new set).
     const refused: string[] = [];
     const refusedSources = new Set<string>();
     for (const src of [...new Set(deduped.map((r) => String(r.source_agency)))]) {
       const srcRows = deduped.filter((r) => String(r.source_agency) === src);
-      const nr = await countNewForecastRows(supabase, src, srcRows.map((r) => String(r.external_id)));
-      const g = 'error' in nr ? { allow: false as const, reason: `${src}: new-row count failed: ${nr.error}` } : await guardForecastInserts(supabase, src, nr.newRows);
+      const ids = srcRows.map((r) => String(r.external_id));
+      const nr = await countNewForecastRows(supabase, src, ids);
+      if ('error' in nr) {
+        const reason = `${src}: new-row count failed: ${nr.error}`;
+        // Unknown new-row count refuses the publisher. Do not guess a count of zero.
+        await guardForecastInserts(supabase, src, Number.NaN);
+        for (const r of srcRows) refusedSources.add(`${src}|${r.external_id}`);
+        const q = await quarantineRefusedLoad(supabase, src, reason, -1, srcRows);
+        refused.push(`${reason} — ${q.quarantined ? 'quarantined for replay' : `QUARANTINE FAILED (${q.quarantineError}); replay needs a re-fetch`}`);
+        continue;
+      }
+      const g = await guardForecastInserts(supabase, src, nr.newRows);
       if (g.allow) continue;
-      refusedSources.add(src);
-      const q = await quarantineRefusedLoad(supabase, src, g.reason, 'error' in nr ? -1 : nr.newRows, srcRows);
-      refused.push(`${g.reason} — ${q.quarantined ? 'quarantined for replay' : `QUARANTINE FAILED (${q.quarantineError}); replay needs a re-fetch`}`);
+      const heldIds = await existingForecastIds(supabase, src, ids);
+      if ('error' in heldIds) {
+        for (const r of srcRows) refusedSources.add(`${src}|${r.external_id}`);
+        const q = await quarantineRefusedLoad(supabase, src, g.reason, nr.newRows, srcRows);
+        refused.push(`${g.reason} — ${q.quarantined ? 'quarantined for replay' : `QUARANTINE FAILED (${q.quarantineError}); replay needs a re-fetch`}`);
+        continue;
+      }
+      const split = forecastRowsForDailySync(
+        srcRows.map((r) => ({ ...r, external_id: String(r.external_id) })),
+        heldIds.ids,
+        false,
+      );
+      for (const r of split.quarantinedNew) refusedSources.add(`${src}|${r.external_id}`);
+      const q = await quarantineRefusedLoad(supabase, src, g.reason, nr.newRows, split.quarantinedNew);
+      refused.push(`${g.reason} — updates to existing keys still upsert (${split.write.length}); new rows ${q.quarantined ? 'quarantined' : `NOT quarantined (${q.quarantineError})`}`);
     }
-    const writable = deduped.filter((r) => !refusedSources.has(String(r.source_agency)));
+    const writable = deduped.filter((r) => !refusedSources.has(`${r.source_agency}|${r.external_id}`));
     if (refused.length) {
       failures.push(...refused.map((r) => `insert_refused: ${r}`));
       await sendOpsAlert({ subject: 'Forecast sync — bulk of NEW rows refused (publisher floor active)', html: `<p>${refused.map((r) => `<div>${r}</div>`).join('')}</p>` }).catch(() => {});

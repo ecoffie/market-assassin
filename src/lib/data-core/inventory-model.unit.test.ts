@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { execFileSync } from 'node:child_process';
 import {
+  classifyJobPostingHealth,
+  classifyDodSbirHealth,
   computeTotals,
   countUpstreamPublishers,
   inventoryViolations,
@@ -10,6 +12,7 @@ import {
   registryDebt,
   scheduleTruth,
   STATIC_FILE_AS_OF,
+  corpusFreshness,
   timestampState,
   worstState,
   type InventoryDataset,
@@ -154,6 +157,15 @@ describe('freshness', () => {
     expect(worstState(['CURRENT'])).toBe('CURRENT');
   });
 
+  it('a corpus with a living feed and a dead feed is stale, not unreachable and not current', () => {
+    expect(corpusFreshness(['CURRENT', 'UNREACHABLE', 'STALE'])).toBe('STALE');
+    expect(corpusFreshness(['UNREACHABLE', 'UNREACHABLE'])).toBe('UNREACHABLE');
+    expect(corpusFreshness(['UNREACHABLE', 'UNKNOWN'])).toBe('UNREACHABLE');
+    expect(corpusFreshness(['CURRENT', 'STALE'])).toBe('STALE');
+    expect(corpusFreshness(['CURRENT'])).toBe('CURRENT');
+    expect(corpusFreshness([])).toBe('UNKNOWN');
+  });
+
   it('judges a timestamp only when the cadence is known', () => {
     const now = new Date('2026-09-26T18:00:00Z');
     expect(timestampState('2026-09-26T13:00:00Z', 24, now)).toBe('CURRENT');
@@ -235,6 +247,48 @@ describe('registryDebt', () => {
       { where: 'c', claimed: null, measured: 5 },
       { where: 'calc', claimed: 240_000, measured: 0 },
     ]).map((d) => d.where)).toEqual(['a', 'calc']);
+  });
+});
+
+describe('job postings are live when the mirror is not serving', () => {
+  const now = new Date('2026-11-19T12:00:00Z');
+  it('an empty or unmeasured mirror is live, not stale and not a zero job count', () => {
+    for (const held of [0, null] as const) {
+      const h = classifyJobPostingHealth({ held, asOf: null, cadenceHours: 24, now });
+      expect(h.state).toBe('PASSTHROUGH');
+      expect(h.stored).toBeNull();
+      expect(h.headlineContribution).toBeNull();
+      expect(h.detail).not.toMatch(/stale/i);
+    }
+    const unclocked = classifyJobPostingHealth({
+      held: 12, asOf: null, cadenceHours: 24, now,
+    });
+    expect(unclocked.state).toBe('PASSTHROUGH');
+    expect(unclocked.stored).toBeNull();
+    expect(unclocked.mirrorRows).toBe(12);
+  });
+
+  it('a mirror with rows and a clock uses that clock', () => {
+    const h = classifyJobPostingHealth({
+      held: 40,
+      asOf: '2026-11-19T06:00:00Z',
+      cadenceHours: 24,
+      now,
+    });
+    expect(h.state).toBe('CURRENT');
+    expect(h.stored).toBe(40);
+    expect(h.headlineContribution).toBe(40);
+  });
+});
+
+describe('DoD SBIR is degraded when the source is down', () => {
+  it('a 503 is unreachable, and an unmeasured count is not zero', () => {
+    const down = classifyDodSbirHealth({ held: 0, httpStatus: 503, runStatus: 'error' });
+    expect(down.state).toBe('UNREACHABLE');
+    expect(down.detail).toMatch(/stays enabled/);
+    const unknown = classifyDodSbirHealth({ held: null, httpStatus: null, runStatus: null });
+    expect(unknown.state).toBe('UNKNOWN');
+    expect(unknown.detail).toMatch(/not zero/);
   });
 });
 

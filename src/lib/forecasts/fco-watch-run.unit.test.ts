@@ -48,12 +48,9 @@ describe('clock semantics', () => {
     expect(RUN).not.toMatch(/held_population\s*=\s*\d{4}/);   // no hardcoded 9092 etc
   });
 
-  it('behind upstream is content_stale — a successful watch never implies current', () => {
-    expect(RUN).toMatch(/heldCanonical < census\.uniqueListingIds \? 'content_stale' : 'current'/);
-  });
-
-  it('an unreachable source is recorded as such', () => {
-    expect(RUN).toMatch(/pagesFetched === 0[\s\S]{0,80}'unreachable'/);
+  it('source_state comes from gatewayWatchState, which is not current on a partial read', () => {
+    expect(RUN).toContain('gatewayWatchState');
+    expect(RUN).toMatch(/if \(watched\) clocks\.source_state = watched/);
   });
 });
 
