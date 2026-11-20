@@ -13,6 +13,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { isManufacturedDarpaRow } from '@/lib/scrapers/manufactured-darpa';
 import { createClient } from '@supabase/supabase-js';
 import { saveSnapshot, readSnapshot, freshMeta, degradedMeta, isUpstreamOutage } from '@/lib/resilience/last-good';
 
@@ -234,6 +235,7 @@ export async function GET(request: NextRequest) {
       if (error && isUpstreamOutage(error)) upstreamOutage = true;
       if (!error && data) {
         for (const opp of data) {
+          if (isManufacturedDarpaRow(opp)) continue;
           results.push({
             id: opp.id,
             title: opp.title,

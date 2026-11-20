@@ -8,6 +8,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { isManufacturedDarpaRow } from '@/lib/scrapers/manufactured-darpa';
 import {
   industryNames,
   naicsExpansion,
@@ -724,7 +725,7 @@ async function fetchSbirOpportunities(
       return [];
     }
 
-    return (data || []).map((opp) => {
+    return (data || []).filter((opp) => !isManufacturedDarpaRow(opp)).map((opp) => {
       const closeDate = opp.close_date;
       return {
         id: opp.external_id || opp.id,
