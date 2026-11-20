@@ -84,7 +84,7 @@ export async function agencyForecasts(input: ForecastsToolInput): Promise<Foreca
         : 'No grounded forecasts; say none matched rather than inventing one.',
       key_caveats: [
         'Forecast dates and values are agency estimates that frequently change or cancel.',
-        'Each row carries as_of (when Mindy last synced it). Some agency sources are refreshed manually and can be months old; name any agency in _meta.stale_sources as possibly out of date.',
+        'Each row carries as_of only when as_of_basis is last_synced_at (when Mindy last synced that row). as_of_basis unavailable means the sync clock is missing; row_updated_at is the database clock and is not a source sync. Name any agency in _meta.stale_sources as possibly out of date.',
         'Coverage is ~12 agencies, not government-wide — an empty result may be a coverage gap, not absence of demand.',
       ],
     };

@@ -1,0 +1,29 @@
+{
+  "listing": {
+    "total": "13468",
+    "count": 1,
+    "data": [
+      {
+        "nid": "56250",
+        "render": {
+          "nid": "56250",
+          "title": "FY27 Western Oregon BLM GeoPlatform Stocking Survey Contract",
+          "body": "<p><span>The FY27 Western Oregon GeoPlatform Stocking Survey contract will allow all western Oregon BLM Districts to complete required stocking data collection to achieve required reforestation planning and implementation and subsequent O&a",
+          "field_result_id": "Department of the Interior",
+          "field_funding_organization": "Bureau of Land Management",
+          "field_place_of_performance": "<p class=\"address\" translate=\"no\"><span class=\"locality\">Various</span>, <span class=\"administrative-area\">OR</span><br>\n<span class=\"country\">United States</span></p>",
+          "field_source_listing_id": "2027_ORWA_10101",
+          "field_award_status": "",
+          "field_contract_type": "Firm Fixed Price",
+          "field_estimated_award_fy": "",
+          "field_estimated_contract_v_max": "$500K - $999K",
+          "field_naics_code": "<div id=\"taxonomy-term-741\" class=\"taxonomy-term vocabulary-naics-code\">\n  \n      <h2><a href=\"/taxonomy/term/741\">\n            <div class=\"field field--name-name field--type-string field--label-hidden field__item\">115310</div>\n      </a></h2>\n    \n  <div class=\"content\">\n      <div class=\"layout layout--onecol\">\n    <div  class=\"layout__region layout__region--content\">\n      <div class=\"block block-layout-builder block-field-blocktaxonomy-termnaics-codefield-label\">\n  \n    \n      \n            <div class=\"field field--name-field-label field--type-string field--label-hidden field__item\">Support Activities for Forestry</div>\n      \n  </div>\n\n    </div>\n  </div>\n\n  </div>\n</div>\n",
+          "field_acquisition_strategy": "Small Business Set Aside - Total",
+          "field_period_of_performance": "<time datetime=\"2027-03-31T12:00:00Z\" class=\"datetime\">03/31/2027</time>\n - <time datetime=\"2028-03-30T12:00:00Z\" class=\"datetime\">03/30/2028</time>\n",
+          "created": "<time datetime=\"2026-11-18T11:32:18-05:00\" title=\"Wednesday, November 18, 2026 - 11:32\" class=\"datetime\">11/18/2026</time>\n",
+          "changed": "<time datetime=\"2026-11-18T11:32:18-05:00\" title=\"Wednesday, November 18, 2026 - 11:32\" class=\"datetime\">11/18/2026</time>\n"
+        }
+      }
+    ]
+  }
+}

@@ -12,6 +12,7 @@ import {
   registryDebt,
   scheduleTruth,
   STATIC_FILE_AS_OF,
+  corpusFreshness,
   timestampState,
   worstState,
   type InventoryDataset,
@@ -154,6 +155,15 @@ describe('freshness', () => {
     expect(worstState(['CURRENT', 'STALE', 'CURRENT'])).toBe('STALE');
     expect(worstState(['CURRENT', 'UNREACHABLE', 'STALE'])).toBe('UNREACHABLE');
     expect(worstState(['CURRENT'])).toBe('CURRENT');
+  });
+
+  it('a corpus with a living feed and a dead feed is stale, not unreachable and not current', () => {
+    expect(corpusFreshness(['CURRENT', 'UNREACHABLE', 'STALE'])).toBe('STALE');
+    expect(corpusFreshness(['UNREACHABLE', 'UNREACHABLE'])).toBe('UNREACHABLE');
+    expect(corpusFreshness(['UNREACHABLE', 'UNKNOWN'])).toBe('UNREACHABLE');
+    expect(corpusFreshness(['CURRENT', 'STALE'])).toBe('STALE');
+    expect(corpusFreshness(['CURRENT'])).toBe('CURRENT');
+    expect(corpusFreshness([])).toBe('UNKNOWN');
   });
 
   it('judges a timestamp only when the cadence is known', () => {
