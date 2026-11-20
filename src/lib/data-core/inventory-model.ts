@@ -409,9 +409,52 @@ export function summarizeStates(states: FreshnessState[]): string {
 }
 
 /**
- * Freshness from a data timestamp and the producer's cadence. With no known cadence
- * the age cannot be judged, so the state is UNKNOWN (the date is still shown).
+ * Contractor + federal job postings.
+ *
+ * Federal openings on /jobs and search_govcon_jobs are a live USAJobs read
+ * (Eric, 2026-11-09) whenever the persisted mirror is empty or has no
+ * last_seen_at. That path is live, not stale, and a mirror of 0 is not the
+ * customer job count. A mirror that is actually serving keeps its data clock.
  */
+export function classifyJobPostingHealth(input: {
+  held: number | null;
+  asOf: string | null;
+  cadenceHours: number;
+  now: Date;
+}): {
+  state: FreshnessState;
+  stored: number | null;
+  headlineContribution: number | null;
+  basis: string;
+  detail: string;
+  mirrorRows: number | null;
+} {
+  const serving = input.held != null && input.held > 0 && !!input.asOf;
+  if (!serving) {
+    const detail = input.held == null
+      ? 'Persisted mirror unmeasured. That is not zero jobs.'
+      : input.held === 0
+        ? 'Persisted mirror holds 0 rows. Customers are not shown that as the job count; federal openings are read live.'
+        : 'Persisted mirror has rows but no last_seen_at. Customer federal jobs stay the live query.';
+    return {
+      state: 'PASSTHROUGH',
+      stored: null,
+      headlineContribution: null,
+      basis: 'Customer federal jobs are a live USAJobs query (6h cache) via /jobs and search_govcon_jobs. The persisted mirror is not the serving clock.',
+      detail,
+      mirrorRows: input.held,
+    };
+  }
+  return {
+    state: timestampState(input.asOf, input.cadenceHours, input.now),
+    stored: input.held,
+    headlineContribution: input.held,
+    basis: 'MAX(contractor_job_postings.last_seen_at)',
+    detail: 'Persisted mirror is serving. The live USAJobs read remains the fallback when this mirror is empty.',
+    mirrorRows: input.held,
+  };
+}
+
 /**
  * DoD SBIR/STTR health. A down source is UNREACHABLE (degraded). A failed
  * count is UNKNOWN, never a manufactured zero. The collector stays enabled.
@@ -449,6 +492,11 @@ export function classifyDodSbirHealth(input: {
     detail: 'Rows are held. A missing synced_at clock is not current.',
   };
 }
+
+/**
+ * Freshness from a data timestamp and the producer's cadence. With no known cadence
+ * the age cannot be judged, so the state is UNKNOWN (the date is still shown).
+ */
 
 export function timestampState(
   asOf: string | null,

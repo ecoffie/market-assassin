@@ -34,6 +34,7 @@ async function mount(me: Record<string, unknown>) {
     upgrade: d.getElementById('mindyUpg'),
     plan: d.getElementById('mindyPlan'),
     credits: d.getElementById('mindyCred'),
+    menuCredits: d.getElementById('mindyAcctCredRow')?.style.display === 'flex' ? d.getElementById('mindyAcctCredN')?.textContent : null,
   };
 }
 
@@ -43,7 +44,9 @@ describe('header plan chip agrees with the server Pro verdict', () => {
     expect(r.upgrade).toBeNull();
     expect(r.plan?.textContent).toBe('Pro');
     expect(r.plan?.getAttribute('href')).toBe('/app?panel=settings&section=credits&tab=billing');
-    expect(r.credits?.textContent).toBe('100 credits');
+    // Credits live in the dropdown now, not the top bar (owner 2026-11-19).
+    expect(r.credits).toBeNull();
+    expect(r.menuCredits).toBe('100');
   });
   it('proFeatures true alone (trial/staff, whatever plan label) is treated as Pro', async () => {
     const r = await mount({ plan: 'free', credits: 0, proFeatures: true });

@@ -39,6 +39,7 @@ import {
 } from '@/lib/bigquery/award-scope';
 import { runScopedAggregate, type ScopedAggregateDeps } from '@/lib/bigquery/scoped-aggregate';
 import type { IgnoredArg } from '@/lib/mcp/result-contract';
+import { type DirectoryOfficeName } from '@/lib/gov-contacts/directory-office-name';
 import { isDodAgency, warehouseDefenseLag, type WarehouseDefenseLag } from '@/lib/usaspending/freshness';
 
 const AWARDS_TABLE = '`market-assasin.usaspending.awards`';
@@ -66,6 +67,13 @@ export interface BuyingOfficesInput {
 export interface BuyingOfficeRow {
   rank: number;
   office_name: string | null;
+  /**
+   * award_record: the warehouse supplied the name.
+   * directory_sam / directory_fpds: dodaac_directory, SAM current name first, else the FPDS historical name.
+   * code_only: a code and no name in either source. not_reported: the award row had no code.
+   * Never invented.
+   */
+  name_provenance: 'award_record' | 'directory_sam' | 'directory_fpds' | 'code_only' | 'not_reported';
   office_code: string | null;
   /** dodaac for Department of Defense awarding offices; agency_office_code otherwise; null for funding offices (the source carries no funding-office code). */
   office_code_type: 'dodaac' | 'agency_office_code' | null;
@@ -317,6 +325,9 @@ export async function getBuyingOffices(
   input: BuyingOfficesInput,
   deps?: ScopedAggregateDeps,
   now: Date = new Date(),
+  directory?: {
+    lookup: (codes: string[]) => Promise<{ names: Map<string, DirectoryOfficeName>; failed: boolean }>;
+  },
 ): Promise<BuyingOfficesResult> {
   const ignored: IgnoredArg[] = [];
   const st = normalizeStateArg(input.state);
@@ -396,6 +407,7 @@ export async function getBuyingOffices(
       ? 'Ranked by AWARDING (contracting) office. top_funding_offices names the customer organization whose money it was; the two often differ (a regional contracting center buying for a local command).'
       : 'Ranked by FUNDING office (the customer). top_awarding_offices names the contracting offices that bought for it. Funding offices carry no office code in the source.',
     'Dollars are net obligations inside the window (de-obligations subtract), not lifetime award values.',
+    'This ranking does not include people, phone numbers, or email. A missing office name was not in the award record and is not filled in.',
   ];
   if (metroStatePinned && metro) notes.push(`No state was given; ${metroCore} is only in ${metro.state} in Mindy's city list, so the metro is ${metro.state} only.`);
   if (metroAmbiguousStates.length > 1) notes.push(`${metroCore} is a city name in ${metroAmbiguousStates.join(', ')}. No metro was expanded because no state was given; pass state for one metro.`);
@@ -470,14 +482,46 @@ export async function getBuyingOffices(
     : { map: new Map<string, NameRow>(), failed: false };
   if (officeNames.failed || fundingAgencies.failed) notes.push('Some office names or agencies could not be looked up; codes and dollars are unaffected.');
 
+  const unnamedCodes = role === 'awarding'
+    ? rows
+      .map((r) => r.office_key)
+      .filter((k): k is string => !!k && k !== NOT_REPORTED && !officeNames.map.get(k)?.name)
+    : [];
+  let directoryNames = new Map<string, DirectoryOfficeName>();
+  if (directory && unnamedCodes.length) {
+    try {
+      const looked = await directory.lookup([...new Set(unnamedCodes.map((c) => c.toUpperCase()))]);
+      directoryNames = looked.names;
+      if (looked.failed) {
+        notes.push('The buying-office directory could not be read. Codes without an award-record name stay unnamed.');
+      }
+    } catch {
+      notes.push('The buying-office directory could not be read. Codes without an award-record name stay unnamed.');
+    }
+  }
+
   const totalObl = first ? num(first.total_obligated) : 0;
   const offices: BuyingOfficeRow[] = rows.map((r, i) => {
     const key = r.office_key === NOT_REPORTED ? null : r.office_key;
     const named = role === 'awarding' && key ? officeNames.map.get(key) : undefined;
     const fundingNamed = role === 'funding' && key ? fundingAgencies.map.get(key) : undefined;
+    const fromDirectory = role === 'awarding' && key ? directoryNames.get(key.toUpperCase()) ?? null : null;
+    const reportedName = role === 'awarding' ? (named?.name ?? fromDirectory?.name ?? null) : key;
+    const nameProvenance: BuyingOfficeRow['name_provenance'] = !key
+      ? 'not_reported'
+      : named?.name
+        ? 'award_record'
+        : fromDirectory?.source === 'sam_office_name'
+          ? 'directory_sam'
+          : fromDirectory?.source === 'fpds_office_name'
+            ? 'directory_fpds'
+            : reportedName
+              ? 'award_record'
+              : 'code_only';
     const row: BuyingOfficeRow = {
       rank: i + 1,
-      office_name: role === 'awarding' ? (named?.name ?? null) : key,
+      office_name: nameProvenance === 'code_only' ? null : reportedName,
+      name_provenance: nameProvenance,
       office_code: role === 'awarding' ? key : null,
       office_code_type: role === 'awarding' && key ? (isDodOffice(named?.agency) ? 'dodaac' : 'agency_office_code') : null,
       agency: role === 'awarding' ? (named?.agency ?? null) : (fundingNamed?.agency ?? null),
@@ -500,6 +544,11 @@ export async function getBuyingOffices(
     }
     return row;
   });
+
+  const namedFromDirectory = offices.filter((o) => o.name_provenance === 'directory_sam' || o.name_provenance === 'directory_fpds').length;
+  if (namedFromDirectory > 0) {
+    notes.push(`${namedFromDirectory} office name(s) came from the buying-office directory (SAM current name, otherwise the FPDS historical name). No contact was added.`);
+  }
 
   const result: BuyingOfficesResult = {
     scope,

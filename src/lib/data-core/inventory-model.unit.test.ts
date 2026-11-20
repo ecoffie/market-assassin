@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { execFileSync } from 'node:child_process';
 import {
+  classifyJobPostingHealth,
   classifyDodSbirHealth,
   computeTotals,
   countUpstreamPublishers,
@@ -236,6 +237,37 @@ describe('registryDebt', () => {
       { where: 'c', claimed: null, measured: 5 },
       { where: 'calc', claimed: 240_000, measured: 0 },
     ]).map((d) => d.where)).toEqual(['a', 'calc']);
+  });
+});
+
+describe('job postings are live when the mirror is not serving', () => {
+  const now = new Date('2026-11-19T12:00:00Z');
+  it('an empty or unmeasured mirror is live, not stale and not a zero job count', () => {
+    for (const held of [0, null] as const) {
+      const h = classifyJobPostingHealth({ held, asOf: null, cadenceHours: 24, now });
+      expect(h.state).toBe('PASSTHROUGH');
+      expect(h.stored).toBeNull();
+      expect(h.headlineContribution).toBeNull();
+      expect(h.detail).not.toMatch(/stale/i);
+    }
+    const unclocked = classifyJobPostingHealth({
+      held: 12, asOf: null, cadenceHours: 24, now,
+    });
+    expect(unclocked.state).toBe('PASSTHROUGH');
+    expect(unclocked.stored).toBeNull();
+    expect(unclocked.mirrorRows).toBe(12);
+  });
+
+  it('a mirror with rows and a clock uses that clock', () => {
+    const h = classifyJobPostingHealth({
+      held: 40,
+      asOf: '2026-11-19T06:00:00Z',
+      cadenceHours: 24,
+      now,
+    });
+    expect(h.state).toBe('CURRENT');
+    expect(h.stored).toBe(40);
+    expect(h.headlineContribution).toBe(40);
   });
 });
 

@@ -20,8 +20,6 @@ import TargetingCard from './TargetingCard';
 import StartHereCard from './StartHereCard';
 import HiddenWorkNudge from './HiddenWorkNudge';
 import TodaysThree, { type TodaysPick } from './TodaysThree';
-import StreakCard from './StreakCard';
-import YourRankingCard from './YourRankingCard';
 import { BOOK_CALL_URL, BOOK_CALL_LABEL } from '@/lib/mindy/book-call';
 import { getNaics } from '@/lib/codes/lookup';
 import ShareButton from '@/components/briefings/ShareButton';
@@ -1353,8 +1351,6 @@ export default function DashboardPanel({ email, tier, onPanelChange }: Dashboard
             the codes/keywords editor discoverable from the home surface (Eric QC:
             users couldn't find how to see/reset them). */}
         <TargetingCard email={email} variant="compact" surface="dashboard" onEdit={onPanelChange} />
-        {/* Login streak — opening For you records today's visit; rewards at 7 and 30 days (owner 2026-11-19). */}
-        <StreakCard getAuthHeaders={getAuthHeaders} />
         {/* Today's 3 — a 30-second daily pick from the newest briefing (owner 2026-11-19). */}
         {!isLoading && (
           <TodaysThree
@@ -1366,8 +1362,7 @@ export default function DashboardPanel({ email, tier, onPanelChange }: Dashboard
             onPass={(id) => { const it = latestItems.find(i => getStableNoticeId(i) === id); if (it) dismissItem(it); }}
           />
         )}
-        {/* Your ranking — lifetime federal dollars to the Vault UEI, overall + in-state (owner 2026-11-19). */}
-        <YourRankingCard email={email} getAuthHeaders={getAuthHeaders} onAddUei={() => onPanelChange?.('vault')} />
+        {/* Streak + ranking live in the top bar beside credits (owner 2026-11-19), not here. */}
         {/* Paid members can book a call with the Mindy team (owner 2026-11-19). For you is Pro/Team/trial only. */}
         <section aria-label="Talk to the team" data-testid="book-call-card" className="rounded-xl border border-surface bg-ground px-4 py-3 mb-4 flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm text-muted">Get help with your market, a pursuit or a proposal. A 30-minute call, free with your plan.</p>
