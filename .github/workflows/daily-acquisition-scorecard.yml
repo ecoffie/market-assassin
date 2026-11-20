@@ -9,10 +9,11 @@ on:
   workflow_dispatch:
   pull_request:
   schedule:
-    # 12:45 UTC Monday–Friday.
-    # 7:45 AM Eastern Standard Time, after the 7:20 AM ET collector and before
-    # the 8:00 AM ET reader. During daylight time this same cron is 8:45 AM ET.
+    # 12:45 UTC Monday–Friday is 7:45 AM EST / 8:45 AM ET during daylight time.
+    # 21:45 UTC is the same-day catch-up when GitHub starts the morning slot late.
+    # The second run does not publish if the scorecard job already succeeded today.
     - cron: '45 12 * * 1-5'
+    - cron: '45 21 * * 1-5'
 
 permissions:
   contents: read
@@ -74,8 +75,10 @@ jobs:
         run: npm ci --no-audit --no-fund
 
       - name: Build scorecard
+        id: build
         env:
           SCORECARD_CREDENTIAL_URL: https://getmindy.ai/api/scorecard/credential
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           set +x
           node scripts/scorecard-run.mjs --out-dir "$RUNNER_TEMP/scorecard"
@@ -85,12 +88,14 @@ jobs:
         run: |
           if [ -f "$RUNNER_TEMP/scorecard/acquisition-scorecard.md" ]; then
             cat "$RUNNER_TEMP/scorecard/acquisition-scorecard.md" >> "$GITHUB_STEP_SUMMARY"
+          elif [ "${{ steps.build.outputs.skip }}" = "true" ]; then
+            echo "Scorecard already published today. No second report." >> "$GITHUB_STEP_SUMMARY"
           else
             echo "Scorecard numbers are unknown. No report was published." >> "$GITHUB_STEP_SUMMARY"
           fi
 
       - name: Upload scorecard
-        if: success()
+        if: success() && steps.build.outputs.skip != 'true'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: daily-acquisition-scorecard

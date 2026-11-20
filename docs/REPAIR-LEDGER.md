@@ -26,6 +26,12 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## 2026-11-20 — Scorecard credential failure names the gate
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-11-20 | Acquisition scorecard | Run 44613974057 logged only `credential is rejected` because the workflow discarded the route reason. Each OIDC and setup gate now has its own reason code, and the log includes the HTTP status. A 21:45 UTC slot does not publish a second report after a success the same Eastern day. Migration still not applied. | `rotator is not configured` → `src/app/api/scorecard/credential/route.ts` | `src/lib/scorecard/oidc-claims.unit.test.ts` | BUILT, NOT MERGED |
+
 ## 2026-11-19 — Scorecard login rotates per run
 
 | Date | Area | Fix | Proof anchor | Verified | Status |

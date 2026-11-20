@@ -4,7 +4,7 @@
 
 This repository is public. Do not put a password, a connection string, or a signing secret in this file, a commit, a log, or a chat.
 
-The weekday job holds no database password and no GitHub admin token. It requests a GitHub OIDC token (`id-token: write`). `POST https://getmindy.ai/api/scorecard/credential` checks the issuer, audience `scorecard-reader`, repository `ecoffie/market-assassin`, workflow `.github/workflows/daily-acquisition-scorecard.yml`, ref `refs/heads/main`, and event `schedule` or `workflow_dispatch`. The route then calls `scorecard_rotate_reader_password`, which sets a random `scorecard_reader` password with `VALID UNTIL` 30 minutes out and writes an audit row (run id, actor, expiry, never the password). The password is returned once over TLS.
+The weekday job holds no database password and no GitHub admin token. A second slot at 21:45 UTC publishes only when the scorecard job has not already succeeded that Eastern day. A failed credential exchange prints the route reason (`rotator is not configured`, `oidc audience rejected`, and the other fixed codes) plus the HTTP status. It does not print the token or any claim value. It requests a GitHub OIDC token (`id-token: write`). `POST https://getmindy.ai/api/scorecard/credential` checks the issuer, audience `scorecard-reader`, repository `ecoffie/market-assassin`, workflow `.github/workflows/daily-acquisition-scorecard.yml`, ref `refs/heads/main`, and event `schedule` or `workflow_dispatch`. The route then calls `scorecard_rotate_reader_password`, which sets a random `scorecard_reader` password with `VALID UNTIL` 30 minutes out and writes an audit row (run id, actor, expiry, never the password). The password is returned once over TLS.
 
 `actions: write` remains on that job only so the successful run can upload the scorecard artifact. It is not permission to change secrets or administration.
 
@@ -20,17 +20,21 @@ A compromised Next.js process is wider than the rotator login. This route runs i
 
 `scorecard_reader` is not granted to `authenticator`. The scorecard connects with `pg` through the Supabase transaction pooler, port 6543, `sslmode=verify-full`. PostgREST is not on this path.
 
-## One-time setup
+## What run 44613974057 showed
 
-Do not apply this migration, create these roles, set the rotator credential, deploy the route, or set any secret until Eric's written authorization for this release package. No production step comes before that authorization. After it, do these in order. After each step, do the check named there. Stop if the check fails.
+The Nov 19 schedule started at 20:58 UTC, about eight hours after 12:45 UTC. The log line was `scorecard numbers are unknown: credential is rejected`. That string was written for every failed token request and every non-2xx from the route; the JSON reason was discarded. A POST with no token still returns 401 `credential is missing`, so the route from #2201 is what answered. The rotator URL, reader host, and reader user were not set, and the migration was not applied. The next run will print the specific reason, including `rotator is not configured` when that env is absent.
 
-1. **Confirm the target.** From the production checkout, confirm `npm run migrate` is aimed at the production database and that a backup exists. Check: the migrate dry run names this file and no other pending file you intend to apply.
-2. **Apply only this migration.** `npm run migrate -- --go --only 20261119_scorecard_reader.sql`. Check: `\du scorecard_reader` shows LOGIN, connection limit 3, and no superuser, CREATEROLE, or BYPASSRLS. `\du scorecard_rotator` shows LOGIN and connection limit 2. Neither role has a password yet, so a password login fails.
-3. **Set the rotator password once.** Generate it locally. Do not echo it. In a SQL session as the migration role: `ALTER ROLE scorecard_rotator PASSWORD '...'`. Do not set `VALID UNTIL`. Check: a connection as `scorecard_rotator` can `SELECT 1 FROM scorecard_rotate_reader_password(...)` only when you choose to test it, and `SELECT * FROM institute_sources` fails.
-4. **Store the rotator URL on the server only.** In the production host env, set `SCORECARD_ROTATOR_URL` to the pooler URL for `scorecard_rotator.<project-ref>` on port 6543 with `sslmode=verify-full`. Set `SCORECARD_READER_HOST` to that pooler host and `SCORECARD_READER_USER` to `scorecard_reader.<project-ref>`. Do not create a GitHub secret for either. Check: GitHub Actions secrets do not list `SCORECARD_ROTATOR_URL`, `SCORECARD_DATABASE_URL`, `SCORECARD_JWT_SECRET`, or `SCORECARD_READONLY_JWT`.
-5. **Remove the unused signing secret.** If `SCORECARD_JWT_SECRET` or `SCORECARD_READONLY_JWT` exists in GitHub or the server env, delete it. Check: both names are absent.
-6. **Deploy the route.** This is covered by the same written authorization above, not a second approval. The route is `POST /api/scorecard/credential`. Check: a request with no token returns 401 and no password.
-7. **One dispatch.** Agent 5 runs the workflow with `workflow_dispatch` on `main`. Check: the job is green, the summary has counts or an unknown that is not a zero, and `scorecard_credential_audit` has one new row with the run id and an expiry about 30 minutes out. The row has no password column.
+## Production setup still required
+
+Do not apply this migration, create these roles, set the rotator credential, deploy the route, or set any secret until Eric's written authorization for this release package. No production step comes before that authorization. Names only. Never write a value into this file.
+
+1. Confirm `npm run migrate` targets production and a backup exists. Dry-run must name only `20261119_scorecard_reader.sql`.
+2. Apply `npm run migrate -- --go --only 20261119_scorecard_reader.sql`. Check `\du scorecard_reader` and `\du scorecard_rotator` are LOGIN, not superuser, not CREATEROLE, not BYPASSRLS, limits 3 and 2.
+3. Generate a rotator password locally and `ALTER ROLE scorecard_rotator PASSWORD` as the migration role. Do not echo it. Do not set `VALID UNTIL` on the rotator.
+4. Set server env `SCORECARD_ROTATOR_URL` (pooler, port 6543, `sslmode=verify-full`, user `scorecard_rotator.<project-ref>`). Set `SCORECARD_READER_HOST` to the pooler host and `SCORECARD_READER_USER` to `scorecard_reader.<project-ref>`. Do not put these in GitHub. Check that GitHub Actions secrets do not list `SCORECARD_ROTATOR_URL`, `SCORECARD_DATABASE_URL`, `SCORECARD_JWT_SECRET`, or `SCORECARD_READONLY_JWT`.
+5. Delete GitHub or server secrets named `SCORECARD_JWT_SECRET` and `SCORECARD_READONLY_JWT` if they exist.
+6. Deploy the app that contains `POST /api/scorecard/credential` under the same authorization. Check: no token returns 401 `credential is missing`.
+7. `workflow_dispatch` on `main`. Check: the log names a reason if it fails, or the summary contains the scorecard and is not a zero. `scorecard_credential_audit` gains one row with the run id and an expiry about 30 minutes out, and no password.
 
 ## Break-glass
 

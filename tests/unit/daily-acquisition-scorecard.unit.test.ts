@@ -8,6 +8,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
+  credentialFailureMessage,
+  priorSuccessToday,
+  publicationDay,
+} from '../../scripts/scorecard-run.mjs';
+import {
   CORPORA,
   EXAMPLE_CAP,
   NOT_VISIBLE,
@@ -647,6 +652,7 @@ describe('the script and the workflow stay read-only', () => {
 
   it('schedules weekdays, publishes the artifact and summary, and mints a short-lived JWT in Actions', () => {
     expect(workflow).toContain("cron: '45 12 * * 1-5'");
+    expect(workflow).toContain("cron: '45 21 * * 1-5'");
     expect(workflow).toContain('8:45 AM ET');
     expect(workflow).toContain('workflow_dispatch:');
     expect(workflow).toContain('scorecard-run.mjs');
@@ -667,6 +673,8 @@ describe('the script and the workflow stay read-only', () => {
     expect(workflow).toContain('id-token: write');
     expect(workflow).toContain('actions: write');
     expect(workflow).toContain('Scorecard numbers are unknown. No report was published.');
+    expect(workflow).toContain('Scorecard already published today. No second report.');
+    expect(workflow).toContain("steps.build.outputs.skip != 'true'");
     expect(workflow.split('- name: Upload scorecard')[1]).toContain('if: success()');
     const privileges = readFileSync(join(process.cwd(), 'scripts/scorecard-privilege-ci.mjs'), 'utf8');
     expect(privileges).toContain("code !== '42501'");
@@ -681,6 +689,30 @@ describe('the script and the workflow stay read-only', () => {
     const build = workflow.split('- name: Build scorecard')[1].split('- name:')[0];
     expect(build).toContain('SCORECARD_CREDENTIAL_URL');
     expect(build).not.toContain('secrets.');
+  });
+
+  it('prints the route reason and skips a second publish the same eastern day', () => {
+    expect(credentialFailureMessage(503, JSON.stringify({ reason: 'rotator is not configured' })))
+      .toBe('scorecard numbers are unknown: rotator is not configured (http 503)');
+    expect(credentialFailureMessage(401, '{"reason":"postgresql://secret@host/db"}'))
+      .toBe('scorecard numbers are unknown: credential is rejected (http 401)');
+    const now = new Date('2026-11-19T21:00:00.000Z');
+    expect(publicationDay(now)).toBe('2026-11-19');
+    const published = {
+      id: 1,
+      conclusion: 'success',
+      event: 'schedule',
+      created_at: '2026-11-19T13:00:00.000Z',
+      jobs: [{ name: 'Acquisition scorecard', conclusion: 'success' }],
+    };
+    expect(priorSuccessToday([published], now, 2)).toBe(true);
+    expect(priorSuccessToday([{ ...published, id: 2 }], now, 2)).toBe(false);
+    expect(priorSuccessToday([{
+      ...published,
+      conclusion: 'failure',
+      jobs: [{ name: 'Acquisition scorecard', conclusion: 'failure' }],
+    }], now, 9)).toBe(false);
+    expect(priorSuccessToday([{ ...published, event: 'pull_request' }], now, 9)).toBe(false);
   });
 
   it('the daily command does not run the seven-day scorecard', () => {
