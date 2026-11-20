@@ -42,10 +42,17 @@ export function assessScorecardOidcClaims(
   if (typeof payload.event_name !== 'string' || !EVENTS.has(payload.event_name)) {
     return { ok: false, reason: 'oidc event rejected' };
   }
-  const workflowRef = [payload.workflow_ref, payload.job_workflow_ref].find((value) => (
-    typeof value === 'string' && value.endsWith(SCORECARD_WORKFLOW)
-  ));
-  if (typeof workflowRef !== 'string') return { ok: false, reason: 'oidc workflow rejected' };
+  // Both claims must name this workflow on main. On a job that is not in a
+  // reusable workflow GitHub sets them equal. Accepting either one would let a
+  // caller workflow on main rotate the password.
+  const workflowRef = payload.workflow_ref;
+  const jobWorkflowRef = payload.job_workflow_ref;
+  if (typeof workflowRef !== 'string' || !workflowRef.endsWith(SCORECARD_WORKFLOW)) {
+    return { ok: false, reason: 'oidc workflow rejected' };
+  }
+  if (typeof jobWorkflowRef !== 'string' || !jobWorkflowRef.endsWith(SCORECARD_WORKFLOW)) {
+    return { ok: false, reason: 'oidc workflow rejected' };
+  }
   if (typeof payload.jti !== 'string' || payload.jti.length < 8) return { ok: false, reason: 'oidc token rejected' };
   if (typeof payload.exp !== 'number' || payload.exp * 1000 <= nowMs) return { ok: false, reason: 'oidc token expired' };
   if (typeof payload.iat !== 'number') return { ok: false, reason: 'oidc token rejected' };

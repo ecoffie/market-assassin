@@ -20,6 +20,7 @@ function claims(overrides: Record<string, unknown> = {}) {
     ref: SCORECARD_REF,
     event_name: 'schedule',
     workflow_ref: `ecoffie/market-assassin/${SCORECARD_WORKFLOW}`,
+    job_workflow_ref: `ecoffie/market-assassin/${SCORECARD_WORKFLOW}`,
     jti: 'jti-scorecard-1',
     exp: Math.floor(NOW / 1000) + 300,
     iat: Math.floor(NOW / 1000),
@@ -58,7 +59,10 @@ describe('scorecard OIDC claims', () => {
     expect(assessScorecardOidcClaims(claims({
       workflow_ref: 'ecoffie/market-assassin/.github/workflows/other.yml@refs/heads/main',
       job_workflow_ref: `ecoffie/market-assassin/${SCORECARD_WORKFLOW}`,
-    }), NOW).ok).toBe(true);
+    }), NOW).reason).toBe('oidc workflow rejected');
+    expect(assessScorecardOidcClaims(claims({
+      job_workflow_ref: 'ecoffie/market-assassin/.github/workflows/other.yml@refs/heads/main',
+    }), NOW).reason).toBe('oidc workflow rejected');
     expect(assessScorecardOidcClaims(claims({ exp: Math.floor(NOW / 1000) - 1 }), NOW).reason).toBe('oidc token expired');
     expect(assessScorecardOidcClaims(claims({ iat: Math.floor(NOW / 1000) - 11 * 60 }), NOW).reason).toBe('oidc token expired');
     expect(assessScorecardOidcClaims(claims({ iat: Math.floor(NOW / 1000) + 120 }), NOW).reason).toBe('oidc token rejected');

@@ -11,7 +11,8 @@ on:
   schedule:
     # 12:45 UTC Monday–Friday is 7:45 AM EST / 8:45 AM ET during daylight time.
     # 21:45 UTC is the same-day catch-up when GitHub starts the morning slot late.
-    # The second run does not publish if the scorecard job already succeeded today.
+    # A run publishes only after it confirms no Acquisition scorecard success
+    # that Eastern day. If that check cannot be read, the run skips.
     - cron: '45 12 * * 1-5'
     - cron: '45 21 * * 1-5'
 
@@ -88,6 +89,8 @@ jobs:
         run: |
           if [ -f "$RUNNER_TEMP/scorecard/acquisition-scorecard.md" ]; then
             cat "$RUNNER_TEMP/scorecard/acquisition-scorecard.md" >> "$GITHUB_STEP_SUMMARY"
+          elif [ "${{ steps.build.outputs.skip_reason }}" = "unconfirmed" ]; then
+            echo "Second report skipped because today's publish could not be confirmed." >> "$GITHUB_STEP_SUMMARY"
           elif [ "${{ steps.build.outputs.skip }}" = "true" ]; then
             echo "Scorecard already published today. No second report." >> "$GITHUB_STEP_SUMMARY"
           else

@@ -26,6 +26,12 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## 2026-11-20 — Scorecard second slot confirms before it publishes
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-11-20 | Acquisition scorecard | `publishedEarlier` referenced `day` before assigning it, so the lookup threw and the 21:45 UTC slot published again. The run now publishes only after a readable list shows no Acquisition scorecard success that Eastern day. An unreadable list or jobs lookup skips, mints no password, and does not say the numbers are unknown. | `const day = publicationDay(now)` → `scripts/scorecard-run.mjs` | `tests/unit/daily-acquisition-scorecard.unit.test.ts` | BUILT, NOT MERGED |
+
 ## 2026-11-20 — Scorecard credential failure names the gate
 
 | Date | Area | Fix | Proof anchor | Verified | Status |

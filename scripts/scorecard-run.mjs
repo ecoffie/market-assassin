@@ -93,55 +93,76 @@ async function readerUrl(oidc) {
   return body.database_url;
 }
 
-async function alreadyPublished() {
-  const token = process.env.GITHUB_TOKEN || '';
-  const repo = process.env.GITHUB_REPOSITORY || '';
-  const runId = process.env.GITHUB_RUN_ID || '';
-  if (!token || !repo || !runId) return false;
-  try {
-    return await publishedEarlier(token, repo, runId);
-  } catch {
-    return false;
-  }
-}
+export const SKIP_ALREADY = 'Scorecard already published today. No second report.';
+export const SKIP_UNCONFIRMED = "Second report skipped because today's publish could not be confirmed.";
 
-async function publishedEarlier(token, repo, runId) {
+/**
+ * publish: the run list was readable and no schedule or workflow_dispatch
+ * success today has an Acquisition scorecard job that succeeded.
+ * already: that job succeeded earlier today.
+ * unconfirmed: the list or a same-day jobs lookup could not be read.
+ * Only publish may request a reader password.
+ */
+export async function publishedEarlier({ token, repo, runId, fetchImpl, now }) {
   const headers = { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' };
-  const list = await fetch(`https://api.github.com/repos/${repo}/actions/workflows/daily-acquisition-scorecard.yml/runs?per_page=20&exclude_pull_requests=true&status=success`, { headers });
-  if (!list.ok) return false;
+  const list = await fetchImpl(`https://api.github.com/repos/${repo}/actions/workflows/daily-acquisition-scorecard.yml/runs?per_page=20&exclude_pull_requests=true&status=success`, { headers });
+  if (!list.ok) return { action: 'unconfirmed' };
   const body = await list.json();
-  const now = new Date();
+  const day = publicationDay(now);
   const candidates = (body.workflow_runs || []).filter((run) => (
     String(run.id) !== String(runId)
     && run.conclusion === 'success'
     && (run.event === 'schedule' || run.event === 'workflow_dispatch')
     && publicationDay(new Date(run.created_at)) === day
   )).slice(0, 5);
-  const detailed = [];
   for (const run of candidates) {
-    const jobs = await fetch(`https://api.github.com/repos/${repo}/actions/runs/${run.id}/jobs`, { headers });
-    if (!jobs.ok) continue;
+    const jobs = await fetchImpl(`https://api.github.com/repos/${repo}/actions/runs/${run.id}/jobs`, { headers });
+    if (!jobs.ok) return { action: 'unconfirmed' };
     const jobBody = await jobs.json();
-    detailed.push({ ...run, jobs: jobBody.jobs || [] });
+    if (priorSuccessToday([{ ...run, jobs: jobBody.jobs || [] }], now, runId)) return { action: 'already' };
   }
-  return priorSuccessToday(detailed, now, runId);
+  return { action: 'publish' };
 }
 
-function markSkip() {
-  if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, 'skip=true\n');
+export async function planScorecardRun({ env, fetchImpl, now, readCredential }) {
+  const token = env.GITHUB_TOKEN || '';
+  const repo = env.GITHUB_REPOSITORY || '';
+  const runId = env.GITHUB_RUN_ID || '';
+  if (!token || !repo || !runId) return { action: 'unconfirmed' };
+  let decision;
+  try {
+    decision = await publishedEarlier({ token, repo, runId, fetchImpl, now });
+  } catch {
+    return { action: 'unconfirmed' };
+  }
+  if (decision.action !== 'publish') return decision;
+  const databaseUrl = await readCredential();
+  return { action: 'publish', databaseUrl };
+}
+
+function markSkip(env, reason) {
+  if (env.GITHUB_OUTPUT) appendFileSync(env.GITHUB_OUTPUT, `skip=true\nskip_reason=${reason}\n`);
 }
 
 async function main() {
   const outFlag = process.argv.indexOf('--out-dir');
   const outDir = outFlag >= 0 ? process.argv[outFlag + 1] : '';
   if (!outDir) fail('credential is missing', 2);
-  if (await alreadyPublished()) {
-    markSkip();
-    console.log('Scorecard already published today. No second report.');
+  const decision = await planScorecardRun({
+    env: process.env,
+    fetchImpl: fetch,
+    now: new Date(),
+    readCredential: async () => {
+      const oidc = await oidcToken();
+      return readerUrl(oidc);
+    },
+  });
+  if (decision.action !== 'publish') {
+    markSkip(process.env, decision.action);
+    console.log(decision.action === 'already' ? SKIP_ALREADY : SKIP_UNCONFIRMED);
     return;
   }
-  const oidc = await oidcToken();
-  const databaseUrl = await readerUrl(oidc);
+  const databaseUrl = decision.databaseUrl;
   console.log(`::add-mask::${databaseUrl}`);
   const child = spawn(process.execPath, ['scripts/daily-acquisition-scorecard.mjs', '--out-dir', outDir], {
     env: { ...process.env, SCORECARD_DATABASE_URL: databaseUrl },
