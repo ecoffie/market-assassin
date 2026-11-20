@@ -41,6 +41,8 @@ export interface FmpPathway {
   buyer?: string;
   /** Notice type text (Sources Sought, Combined Synopsis, ...). */
   noticeType?: string;
+  /** Defaults to an open notice. FIND recompete rows are `recompete`, forecast rows `forecast`. */
+  kind?: 'notice' | 'recompete' | 'forecast';
 }
 
 export interface FmpContactRow {
@@ -273,7 +275,7 @@ function looksLikePersonName(s: string): boolean {
   return looksLikePersonContactName(s);
 }
 
-function extractContactNames(results: readonly FmpToolContent[]): string[] {
+function collectContactNames(results: readonly FmpToolContent[]): { names: string[]; dla: Set<string> } {
   const noticeOrWhs: string[] = [];
   const other: string[] = [];
   const dla: string[] = [];
@@ -313,7 +315,11 @@ function extractContactNames(results: readonly FmpToolContent[]): string[] {
 
   // Prefer non-DLA when notice/WHS contacts exist.
   const preferred = noticeOrWhs.length ? [...noticeOrWhs, ...other] : [...noticeOrWhs, ...other, ...dla];
-  return preferred.slice(0, 8);
+  const nonDla = new Set([...noticeOrWhs, ...other].map((n) => n.toLowerCase()));
+  return {
+    names: preferred.slice(0, 8),
+    dla: new Set(dla.map((n) => n.toLowerCase()).filter((n) => !nonDla.has(n))),
+  };
 }
 
 function extractEightAExit(corpus: string): string | null {
@@ -430,6 +436,8 @@ const VEHICLE_WORD_RE = /\b(MATOC|MACC|IDIQ|BPA|IDV|multiple[- ]award|task order
 const SOURCES_SOUGHT_RE = /\b(sources? sought|RFI|request for information|special notice)\b/i;
 
 function pathwayRank(p: FmpPathway): number {
+  if (p.kind === 'recompete') return 3;
+  if (p.kind === 'forecast') return 4;
   const hay = `${p.title} ${p.noticeType ?? ''}`;
   if (VEHICLE_WORD_RE.test(hay)) return 0;
   if (SOURCES_SOUGHT_RE.test(hay)) return 1;
@@ -441,7 +449,23 @@ function dateOnly(s: string): string {
   return m ? m[0] : s.trim();
 }
 
+function recompeteSummary(o: Record<string, unknown>): string | undefined {
+  const incumbent = firstString(o, ['incumbent_name']);
+  const value = firstString(o, ['value_label']);
+  const parts = [
+    incumbent ? `Incumbent: ${incumbent}.` : '',
+    value ? `Value: ${value}.` : '',
+  ].filter(Boolean);
+  return parts.length ? parts.join(' ') : undefined;
+}
+
 function pathwayMove(p: FmpPathway): string {
+  if (p.kind === 'recompete') {
+    return 'Treat this as a recompete. Ask the buyer when the follow-on is planned and whether it will be set aside, then position before the solicitation posts.';
+  }
+  if (p.kind === 'forecast') {
+    return 'Position on the forecast before a notice posts, and ask the buyer who owns the requirement.';
+  }
   const hay = `${p.title} ${p.noticeType ?? ''}`;
   if (SOURCES_SOUGHT_RE.test(hay)) {
     return 'Respond to the sources sought with a short capability statement tied to your recorded award history, and ask the named point of contact what the buyer wants to see.';
@@ -465,26 +489,45 @@ function extractPathways(results: readonly FmpToolContent[]): FmpPathway[] {
       const inFindList = key != null && FIND_LIST_KEYS.has(key);
       // Other tools only count when the row sits in a FIND-style list and carries a real notice key.
       if (!toolMatches && !inFindList) return;
-      const title = firstString(o, ['title', 'name']);
+      // FIND (`horizons.<h>.items[]`) recompete rows carry no notice. `title` is the incumbent firm,
+      // the work is in `description`, and the identity is the PIID / contract_id.
+      const recompeteId = toolMatches && inFindList && firstString(o, ['contract_id', 'piid']) ? firstString(o, ['piid', 'contract_id']) : undefined;
+      const forecastRow = toolMatches && inFindList && !recompeteId && !!firstString(o, ['forecast_id']);
+      const kind: FmpPathway['kind'] = recompeteId ? 'recompete' : forecastRow ? 'forecast' : 'notice';
+      const title = recompeteId
+        ? firstString(o, ['description', 'naics_description', 'title'])
+        : firstString(o, ['title', 'name']);
       if (!title || title.length < 6) return;
       const solicitation = firstString(o, ['solicitation_number', 'solicitationNumber', 'solicitation']);
-      const notice = firstString(o, ['notice_id', 'noticeId']) ?? (toolMatches && inFindList ? firstString(o, ['id']) : undefined);
-      if (!solicitation && !notice) return;
-      const id = solicitation || notice!;
+      const notice = recompeteId
+        ?? firstString(o, ['notice_id', 'noticeId'])
+        ?? (toolMatches && inFindList ? firstString(o, ['id']) : undefined);
+      if (!solicitation && !notice && !forecastRow) return;
+      const id = solicitation || notice || firstString(o, ['forecast_id'])!;
       const idKey = id.toLowerCase();
       if (seen.has(idKey)) return;
       seen.add(idKey);
-      const deadline = firstString(o, ['response_deadline', 'responseDeadline', 'deadline', 'due']);
+      const deadline = kind === 'recompete'
+        ? firstString(o, ['current_end'])
+        : kind === 'forecast'
+          ? firstString(o, ['anticipated_award_date', 'relevant_date'])
+          : firstString(o, ['response_deadline', 'responseDeadline', 'deadline', 'due']);
       const naicsNum = firstNumber(o, ['naics_code', 'naics', 'naicsCode']);
       const naicsRaw = firstString(o, ['naics_code', 'naics', 'naicsCode']) ?? (naicsNum != null ? String(naicsNum) : undefined);
-      const desc = firstString(o, ['description', 'summary']);
+      const desc = kind === 'recompete'
+        ? recompeteSummary(o)
+        : firstString(o, ['description', 'summary']);
       const agencyObj = o.agency && typeof o.agency === 'object' ? firstString(o.agency as Record<string, unknown>, ['name']) : undefined;
-      const buyer = firstString(o, ['department', 'agency', 'sub_tier', 'office']) ?? agencyObj;
-      const noticeType = firstString(o, ['notice_type', 'noticeType', 'type']);
+      // FIND rows: `sub_agency` (FEDERAL HIGHWAY ADMINISTRATION) is the buyer; `buyer` is only its department.
+      const buyer = firstString(o, ['sub_agency', 'awarding_sub_agency', 'department', 'agency', 'sub_tier', 'office', 'buyer']) ?? agencyObj;
+      const noticeType = kind === 'recompete' ? 'Recompete' : kind === 'forecast' ? 'Forecast' : firstString(o, ['notice_type', 'noticeType', 'type']);
       const pathway: FmpPathway = {
         title: clip(title, 120),
-        ...(deadline ? { when: `Due ${dateOnly(deadline)}` } : {}),
-        noticeId: id,
+        ...(deadline
+          ? { when: `${kind === 'recompete' ? 'Contract ends' : kind === 'forecast' ? 'Award expected' : 'Due'} ${dateOnly(deadline)}` }
+          : {}),
+        ...(kind === 'forecast' ? {} : { noticeId: id }),
+        kind,
         ...(naicsRaw && /^\d{6}$/.test(naicsRaw) ? { naics: naicsRaw } : {}),
         ...(desc && !/^https?:\/\//i.test(desc) ? { summary: clip(desc, 240) } : {}),
         ...(buyer ? { buyer: clip(buyer, 80) } : {}),
@@ -671,8 +714,18 @@ function extractMarketTerritoryDollars(corpus: string): string | null {
 
 const PRESSURE_RE = /\b(deferred maintenance|backlog|funding|reauthori[sz]ation|extension|lapse|shortfall|GAO|CRS|Legacy Restoration|appropriations?)\b/i;
 
+/** Search-result chrome: FAQ boilerplate, nav labels and cut-off snippets are not buyer pressure. */
+const SERP_CHROME_RE = /find answers to commonly asked|frequently asked questions|^\s*(?:home|search results?|skip to (?:main )?content)\b/i;
+const STRONG_PRESSURE_RE = /\b(deferred maintenance|backlog|GAO|CRS|billions?)\b/i;
+const MAX_WEB_BULLETS = 5;
+
+function normalizeTitle(s: string): string {
+  return s.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
 function extractWebSnippets(results: readonly FmpToolContent[]): Array<{ title?: string; snippet: string }> {
-  const out: Array<{ title?: string; snippet: string }> = [];
+  const seen = new Set<string>();
+  const cands: Array<{ title?: string; snippet: string; strong: boolean }> = [];
   for (const r of results) {
     if (!/search_web/i.test(String(r.tool || ''))) continue;
     const p = parseJson(String(r.content || ''));
@@ -683,12 +736,90 @@ function extractWebSnippets(results: readonly FmpToolContent[]): Array<{ title?:
       if (!it || typeof it !== 'object') continue;
       const h = it as Record<string, unknown>;
       const snippet = firstString(h, ['snippet']);
-      if (!snippet || !PRESSURE_RE.test(`${snippet} ${String(h.title ?? '')}`)) continue;
-      out.push({ ...(typeof h.title === 'string' && h.title ? { title: clip(h.title, 90) } : {}), snippet: clip(snippet, 260) });
-      if (out.length >= 5) return out;
+      const rawTitle = typeof h.title === 'string' ? h.title.trim() : '';
+      if (!snippet || !PRESSURE_RE.test(`${snippet} ${rawTitle}`)) continue;
+      if (SERP_CHROME_RE.test(`${rawTitle} ${snippet}`) || /\.{4,}\s*$/.test(snippet)) continue;
+      const key = normalizeTitle(rawTitle || snippet);
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      cands.push({
+        ...(rawTitle ? { title: clip(rawTitle, 90) } : {}),
+        snippet: clip(snippet, 260),
+        strong: STRONG_PRESSURE_RE.test(`${snippet} ${rawTitle}`),
+      });
     }
   }
-  return out;
+  return cands
+    .map((c, i) => ({ c, i }))
+    .sort((x, y) => Number(y.c.strong) - Number(x.c.strong) || x.i - y.i)
+    .slice(0, MAX_WEB_BULLETS)
+    .map(({ c: { strong: _strong, ...rest } }) => rest);
+}
+
+const CIVIL_SIGNAL_RE = /\b(FHWA|Federal Highway|Eastern Federal Lands|EFL|National Park Service|NPS|heavy civil|bridges?|highways?|roadways?|paving|USACE|Army Corps)\b/i;
+/** Agencies whose notice POCs a civil / bridge / highway firm should be talking to. */
+const CIVIL_AGENCY_RE = /\b(FHWA|Federal Highway|Eastern Federal Lands|EFL|National Park|NPS|USACE|Army Corps|Corps of Engineers|WHS|Washington Headquarters|Air Force|JBAB|Transportation|Interior)\b|@[\w.-]*(?:dot|nps|usace|whs)\.(?:gov|mil)\b/i;
+const DLA_EMAIL_RE = /@[\w.-]*dla\.mil\b/i;
+
+function agencyWords(s: string): string[] {
+  return s.toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 3 && !ORG_WORDS.has(w));
+}
+
+interface ContactProfileCtx {
+  dominantNaics: string | null;
+  customerText: string;
+  awardRows: readonly FmpAwardRow[];
+  pathways: readonly FmpPathway[];
+  buyerSpend: readonly FmpBuyerSpend[];
+}
+
+/**
+ * Who-to-talk selection for a construction / civil profile. DLA contacts are logistics buyers: for a
+ * 23x firm they are the wrong office, so they are dropped (never used to fill the table). Contacts
+ * whose agency or email matches a buyer in the award / pathway data (or a civil agency) rank first.
+ */
+function profileContacts(
+  names: readonly string[],
+  structured: ReadonlyMap<string, FmpContactRow>,
+  dlaNames: ReadonlySet<string>,
+  ctx: ContactProfileCtx,
+): string[] {
+  const naics23 = !!ctx.dominantNaics && ctx.dominantNaics.startsWith('23');
+  const buyers = [
+    ...ctx.awardRows.map((r) => r.buyer),
+    ...ctx.pathways.map((p) => p.buyer ?? ''),
+    ...ctx.buyerSpend.map((b) => b.agency),
+  ].filter((b) => b && b !== 'Not stated');
+  const civilBuyers = buyers.some((b) => CIVIL_AGENCY_RE.test(b));
+  const civil = naics23
+    || CIVIL_SIGNAL_RE.test([ctx.customerText, ...buyers, ...ctx.pathways.map((p) => p.title)].join(' '));
+  if (!civil) return [...names];
+
+  const isDla = (n: string): boolean => {
+    const s = structured.get(n.toLowerCase());
+    // The person's own agency / email beat the result-level DLA hint: one payload can mix FHWA and DLA people.
+    if (s?.agency || s?.email) {
+      return (!!s.agency && DLA_HINT.test(s.agency)) || (!!s.email && DLA_EMAIL_RE.test(s.email));
+    }
+    return dlaNames.has(n.toLowerCase());
+  };
+  const nonDla = names.filter((n) => !isDla(n));
+  // A non-23 profile with no other contact and no civil buyer in sight may still use DLA.
+  const keepDla = !naics23 && nonDla.length === 0 && !civilBuyers;
+  const kept = keepDla ? [...names] : nonDla;
+
+  const buyerWords = new Set(buyers.flatMap(agencyWords));
+  const score = (n: string): number => {
+    const s = structured.get(n.toLowerCase());
+    const hay = `${s?.agency ?? ''} ${s?.email ?? ''}`;
+    if (!hay.trim()) return 0;
+    if (agencyWords(hay).some((w) => buyerWords.has(w))) return 2;
+    return CIVIL_AGENCY_RE.test(hay) ? 1 : 0;
+  };
+  return kept
+    .map((n, i) => ({ n, i, sc: score(n) }))
+    .sort((a, b) => b.sc - a.sc || a.i - b.i)
+    .map((x) => x.n);
 }
 
 /**
@@ -725,8 +856,14 @@ export function accumulateFmpEvidence(
   }
 
   const vehicleTokens = extractVehicleTokens(corpus);
-  const contactNames = extractContactNames(results);
+  const collected = collectContactNames(results);
   const pathways = extractPathways(results);
+  const awardRows = extractAwardRows(results);
+  const buyerSpend = extractBuyerSpend(results);
+  const structuredContacts = extractStructuredContacts(results);
+  const contactNames = profileContacts(collected.names, structuredContacts, collected.dla, {
+    dominantNaics, customerText, awardRows, pathways, buyerSpend,
+  });
   return {
     dominantNaics,
     totalObligations: bestDollars != null ? formatObligationSnippet(bestDollars) : null,
@@ -736,10 +873,10 @@ export function accumulateFmpEvidence(
     eightAExitYear: extractEightAExit(corpus) || (/\b2031\b/.test(customerText) ? '2031' : null),
     selfReportLines: selfReportLines(customerText),
     corpus,
-    awardRows: extractAwardRows(results),
+    awardRows,
     pathways,
-    contactRows: buildContactRows(contactNames, extractStructuredContacts(results), vehicleTokens, pathways),
-    buyerSpend: extractBuyerSpend(results),
+    contactRows: buildContactRows(contactNames, structuredContacts, vehicleTokens, pathways),
+    buyerSpend,
     competitors: extractCompetitors(results),
     ranksByState: extractRanksByState(results, corpus),
     marketTerritoryDollars: extractMarketTerritoryDollars(corpus),
@@ -1220,7 +1357,7 @@ export function buildFmpHostDocModel(
     shown.forEach((pw, i) => {
       const n = i + 1;
       const idLine = pw.noticeId
-        ? `Notice ${pw.noticeId}${pw.naics ? `, NAICS ${pw.naics}` : ''}.`
+        ? `${pw.kind === 'recompete' ? 'Contract' : 'Notice'} ${pw.noticeId}${pw.naics ? `, NAICS ${pw.naics}` : ''}.`
         : (pw.naics ? `NAICS ${pw.naics}.` : '');
       const text = [
         `**${n}. ${pw.title}.**`,

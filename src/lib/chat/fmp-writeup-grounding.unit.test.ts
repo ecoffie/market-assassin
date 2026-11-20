@@ -18,6 +18,7 @@ import {
   shouldPreferPlannerFmpDocModel,
 } from './fmp-writeup-grounding';
 import { RBA_FEDERAL_MARKET_PROFILE_PROMPT } from './__fixtures__/rba-federal-market-profile';
+import FIND_LIVE_SHAPE from './__fixtures__/find-opportunities-live-shape.json';
 import { validateFmpWriteup } from './fmp-writeup-validate';
 import type { DocModel } from '@/lib/documents/model';
 import { DOC_SCHEMA } from '@/lib/documents/model';
@@ -596,6 +597,111 @@ describe('fmp-writeup-grounding', () => {
       // no contact in evidence: placeholder is the notice POC, never an agency
       const who = model.sections.find((s) => /who to talk to/i.test(s.heading))!;
       expect(JSON.stringify(who)).toContain('Named notice POC on the active pathway');
+    });
+  });
+
+  describe('construction FMP: contacts, FIND shape, buyer pain', () => {
+    const AWARDS_237310 = JSON.stringify({
+      history: {
+        topNaics: [{ naics: '237310', amount: 40_000_000, count: 14 }],
+        recentAwards: [
+          { id: 'a1', title: 'Bridge rehabilitation', agency: 'Department of Transportation', subAgency: 'Federal Highway Administration', amount: 9_800_000, state: 'DC' },
+        ],
+      },
+    });
+    const DLA_ONLY = JSON.stringify({
+      contacts: [
+        { name: 'Joseph Paulin', agency: 'DLA Aviation', email: 'joseph.paulin@dla.mil' },
+        { name: 'Ryan Kirlin', agency: 'Defense Logistics Agency' },
+      ],
+    });
+    const MIXED = JSON.stringify({
+      contacts: [
+        { name: 'Joseph Paulin', agency: 'DLA Aviation', email: 'joseph.paulin@dla.mil' },
+        { name: 'Helson Roman', agency: 'FHWA Eastern Federal Lands', email: 'helson.roman@dot.gov' },
+      ],
+    });
+    const whoCell = (evidence: ReturnType<typeof accumulateFmpEvidence>) => {
+      const model = buildFmpHostDocModel(evidence, { customerText: RBA_FEDERAL_MARKET_PROFILE_PROMPT, defenseBuyersAppear: true, today: () => '2026-11-20' });
+      return JSON.stringify(model.sections.find((s) => /who to talk to/i.test(s.heading)));
+    };
+
+    it('237310 evidence with only DLA contacts gets the notice-POC fallback, never DLA names', () => {
+      const ev = accumulateFmpEvidence([
+        { tool: 'get_contractor_award_history', content: AWARDS_237310 },
+        { tool: 'search_federal_contacts', content: DLA_ONLY },
+      ], RBA_FEDERAL_MARKET_PROFILE_PROMPT);
+      expect(ev.dominantNaics).toBe('237310');
+      expect(ev.contactNames).toEqual([]);
+      const who = whoCell(ev);
+      expect(who).toContain('Named notice POC on the active pathway');
+      expect(who).not.toMatch(/Paulin|Kirlin|DLA/);
+    });
+
+    it('237310 with Helson (FHWA) and a DLA person in one payload keeps Helson, drops DLA', () => {
+      const ev = accumulateFmpEvidence([
+        { tool: 'get_contractor_award_history', content: AWARDS_237310 },
+        { tool: 'search_federal_contacts', content: MIXED },
+      ], RBA_FEDERAL_MARKET_PROFILE_PROMPT);
+      expect(ev.contactNames).toEqual(['Helson Roman']);
+      const who = whoCell(ev);
+      expect(who).toContain('Helson Roman');
+      expect(who).not.toMatch(/Paulin/);
+    });
+
+    it('ranks contacts whose agency matches an award buyer first', () => {
+      const ev = accumulateFmpEvidence([
+        { tool: 'get_contractor_award_history', content: AWARDS_237310 },
+        { tool: 'search_federal_contacts', content: JSON.stringify({ contacts: [
+          { name: 'Terry Agena', agency: 'General Services' },
+          { name: 'Helson Roman', agency: 'Federal Highway Administration' },
+        ] }) },
+      ], RBA_FEDERAL_MARKET_PROFILE_PROMPT);
+      expect(ev.contactNames[0]).toBe('Helson Roman');
+    });
+
+    it('a non-construction profile still falls back to DLA contacts when nothing else exists', () => {
+      const ev = accumulateFmpEvidence([{ tool: 'search_federal_contacts', content: DLA_ONLY }], 'We sell office supplies.');
+      expect(ev.contactNames).toEqual(['Joseph Paulin', 'Ryan Kirlin']);
+    });
+
+    it('parses the live FIND shape (horizons.<h>.items[]) into pathways with a notice id and buyer', () => {
+      const ev = accumulateFmpEvidence([{ tool: 'find_opportunities', content: JSON.stringify(FIND_LIVE_SHAPE) }]);
+      const open = ev.pathways?.find((p) => p.noticeId === '693C73-27-B-000003');
+      expect(open).toMatchObject({ naics: '237310', buyer: 'FEDERAL HIGHWAY ADMINISTRATION', noticeType: 'Presolicitation', when: 'Due 2026-12-01' });
+      // recompete rows have no notice id; the PIID is the identity and the work is the description
+      const recompete = ev.pathways?.find((p) => p.kind === 'recompete');
+      expect(recompete).toMatchObject({ noticeId: '6982AF26P000022', buyer: 'Federal Highway Administration', noticeType: 'Recompete' });
+      expect(recompete?.title).toMatch(/GUARDRAIL AND PAVING/);
+      expect(recompete?.title).not.toMatch(/HAWK CONTRACTING/);
+      // open notices outrank recompetes
+      const kinds = (ev.pathways ?? []).map((p) => p.kind);
+      expect(kinds.indexOf('notice')).toBeLessThan(kinds.indexOf('recompete'));
+    });
+
+    it('FIND with only recompete rows still yields pathways (open_now empty)', () => {
+      const only = { ...FIND_LIVE_SHAPE, horizons: { ...FIND_LIVE_SHAPE.horizons, open_now: { ...FIND_LIVE_SHAPE.horizons.open_now, status: 'empty', items: [] } } };
+      const ev = accumulateFmpEvidence([{ tool: 'find_opportunities', content: JSON.stringify(only) }]);
+      expect(ev.pathways?.length).toBeGreaterThanOrEqual(1);
+      expect(ev.pathways?.every((p) => p.kind === 'recompete')).toBe(true);
+    });
+
+    it('buyer-pain bullets skip SERP chrome, dedupe by title, and prefer GAO / backlog / billion snippets', () => {
+      const web = JSON.stringify({ results: [
+        { title: 'NPS parks funding', snippet: 'Find answers to commonly asked questions about funding and maintenance of parks.' },
+        { title: 'NPS parks funding', snippet: 'Funding for parks was cut again this year in the extension.' },
+        { title: 'NPS parks funding', snippet: 'Park funding remains in flux ....' },
+        { title: 'Park funding update', snippet: 'Agencies discuss funding and extension timing for road work.' },
+        { title: 'GAO: Park Service backlog', snippet: 'The Park Service deferred maintenance backlog tops $23 billion, GAO found.' },
+      ] });
+      const ev = accumulateFmpEvidence([{ tool: 'search_web', content: web }]);
+      const titles = (ev.webSnippets ?? []).map((w) => w.title);
+      expect(ev.webSnippets?.[0].title).toBe('GAO: Park Service backlog');
+      expect(titles.filter((t) => t === 'NPS parks funding')).toHaveLength(1);
+      const model = buildFmpHostDocModel(ev, { customerText: RBA_FEDERAL_MARKET_PROFILE_PROMPT, defenseBuyersAppear: true, today: () => '2026-11-20' });
+      const text = flattenDocModelText(model);
+      expect(text).not.toMatch(/Find answers to commonly asked/i);
+      expect(text).not.toMatch(/in flux \.\.\.\./);
     });
   });
 
