@@ -478,7 +478,7 @@ function pathwayMove(p: FmpPathway): string {
     : 'Confirm set-aside fit and bonding capacity, then decide whether to bid, team or watch.';
 }
 
-function extractPathways(results: readonly FmpToolContent[]): FmpPathway[] {
+function extractPathways(results: readonly FmpToolContent[], dominantNaics: string | null = null): FmpPathway[] {
   const seen = new Set<string>();
   const out: FmpPathway[] = [];
   for (const r of results) {
@@ -537,8 +537,18 @@ function extractPathways(results: readonly FmpToolContent[]): FmpPathway[] {
       out.push(pathway);
     });
   }
-  const indexed = out.map((p, i) => ({ p, i }));
+  const civilDominant = !!dominantNaics && dominantNaics.startsWith('23');
+  const fitFor = (p: FmpPathway): number => (dominantNaics ? pathwayNaicsFit(p, dominantNaics) : 0);
+  // Hard drops only apply to a construction / civil firm; other profiles are ranked, never emptied.
+  const candidates = civilDominant ? out.filter((p) => !isOffMarketForCivil(p)) : out;
+  const indexed = candidates.map((p, i) => ({ p, i, fit: fitFor(p) }));
   indexed.sort((a, b) => {
+    if (dominantNaics) {
+      const ka = PATHWAY_KIND_ORDER[a.p.kind ?? 'notice'];
+      const kb = PATHWAY_KIND_ORDER[b.p.kind ?? 'notice'];
+      if (ka !== kb) return ka - kb;
+      if (a.fit !== b.fit) return b.fit - a.fit;
+    }
     const ra = pathwayRank(a.p);
     const rb = pathwayRank(b.p);
     if (ra !== rb) return ra - rb;
@@ -547,7 +557,45 @@ function extractPathways(results: readonly FmpToolContent[]): FmpPathway[] {
     if (da !== db) return da < db ? -1 : 1;
     return a.i - b.i;
   });
+  if (civilDominant) {
+    const fits = indexed.filter((x) => x.fit > 0);
+    // Fewer than two on-market pathways: show none so the vehicle-token frame renders instead of junk.
+    return fits.length < 2 ? [] : fits.slice(0, 6).map((x) => x.p);
+  }
   return indexed.slice(0, 8).map((x) => x.p);
+}
+
+/** Open notices first, then recompetes, then forecasts (only applied once a dominant NAICS is known). */
+const PATHWAY_KIND_ORDER: Record<NonNullable<FmpPathway['kind']>, number> = { notice: 0, recompete: 1, forecast: 2 };
+
+/** Civil / heavy-construction wording. Bare "BRIDGE" is deliberately absent: it names bridge CONTRACTS (extensions). */
+const CIVIL_LEXICAL_RE = /\b(highway|parkway|pavement|roadway|bridge rehabilitation|bridge replacement|deck|culvert|retaining wall|heavy civil|marine construction|asphalt|concrete paving)\b/i;
+const OFF_MARKET_TITLE_RE = /\b(software|tax|income tax)\b/i;
+const IRS_BUYER_RE = /\b(Internal Revenue Service|IRS)\b/i;
+
+/** NAICS fit of a pathway against the firm's dominant award NAICS (0 when it says nothing useful). */
+export function pathwayNaicsFit(p: Pick<FmpPathway, 'naics' | 'title' | 'summary'>, dominantNaics: string): number {
+  const n = p.naics;
+  let fit = 0;
+  if (n) {
+    if (n === dominantNaics) fit = 100;
+    else if (n.slice(0, 3) === dominantNaics.slice(0, 3)) fit = 80;
+    else if (dominantNaics.startsWith('23') && n.startsWith('23')) fit = 50;
+    else if (dominantNaics.startsWith('23') && n.startsWith('5413')) fit = 40;
+  }
+  // The lexical boost only rescues a missing / weak NAICS read, and only for a civil profile.
+  if (fit < 50 && dominantNaics.startsWith('23') && CIVIL_LEXICAL_RE.test(`${p.title} ${p.summary ?? ''}`)) fit += 30;
+  return fit;
+}
+
+/** Hard drop for a 23x firm: IT / professional / admin-services NAICS (not 5413), tax or software work, IRS as buyer. */
+function isOffMarketForCivil(p: FmpPathway): boolean {
+  const n = p.naics ?? '';
+  const civilNaics = n.startsWith('23') || n.startsWith('5413');
+  if (/^(54|51|52|56)/.test(n) && !n.startsWith('5413')) return true;
+  if (!n.startsWith('23') && OFF_MARKET_TITLE_RE.test(`${p.title} ${p.summary ?? ''}`)) return true;
+  if (!civilNaics && IRS_BUYER_RE.test(p.buyer ?? '')) return true;
+  return false;
 }
 
 const CONTACT_NAME_KEYS = ['name', 'full_name', 'fullName', 'contact_name', 'poc_name', 'person'] as const;
@@ -857,7 +905,7 @@ export function accumulateFmpEvidence(
 
   const vehicleTokens = extractVehicleTokens(corpus);
   const collected = collectContactNames(results);
-  const pathways = extractPathways(results);
+  const pathways = extractPathways(results, dominantNaics);
   const awardRows = extractAwardRows(results);
   const buyerSpend = extractBuyerSpend(results);
   const structuredContacts = extractStructuredContacts(results);

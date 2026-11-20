@@ -12,6 +12,7 @@ import {
   fmpPlannerMaxTokensForCreateDocument,
   flattenDocModelText,
   looksLikePersonContactName,
+  pathwayNaicsFit,
   requiredSnippetsForWriteup,
   resolveFmpCreateDocumentArgs,
   rewriteFmpAnswerDownloadLinks,
@@ -482,9 +483,10 @@ describe('fmp-writeup-grounding', () => {
       ]);
       expect(evidence.awardRows?.[0]).toMatchObject({ where: 'DC', competition: '8(a) Competed', obligated: '$9.8M' });
       expect(evidence.pathways?.map((p) => p.noticeId)).toContain('693C7326R0001');
-      // vehicle first, then sources sought, then the rest
+      // 237310 dominant: exact-NAICS fits (vehicle first) outrank the 236220 sector-only sources sought
       expect(evidence.pathways?.[0].title).toMatch(/MATOC/);
-      expect(evidence.pathways?.[1].noticeType).toMatch(/sources sought/i);
+      expect(evidence.pathways?.[1].naics).toBe('237310');
+      expect(evidence.pathways?.[2].noticeType).toMatch(/sources sought/i);
       expect(evidence.contactRows?.map((c) => c.person)).toEqual(['Helson Roman', 'David Bogner']);
       expect(evidence.buyerSpend?.[0]).toEqual({ agency: 'Federal Highway Administration', dollars: 310_000_000 });
       expect(evidence.competitors?.[0].firm).toBe('Acme Paving');
@@ -539,14 +541,16 @@ describe('fmp-writeup-grounding', () => {
           { noticeId: 'eeee5555ffff6666aaaa7777bbbb8888', title: 'Pentagon grounds maintenance recompete', department: 'Department of Defense', naics: '561730' },
         ],
         coming_soon: [
-          { title: 'Eastern Lands paving MATOC', notice_id: '99990000aaaabbbbccccddddeeeeffff', response_deadline: '2027-03-01' },
+          { title: 'Eastern Lands paving MATOC', notice_id: '99990000aaaabbbbccccddddeeeeffff', response_deadline: '2027-03-01', naics: '237310' },
         ],
       });
       const ev = accumulateFmpEvidence([{ tool: 'find_opportunities', content: find }]);
       expect(ev.pathways?.length).toBeGreaterThanOrEqual(2);
       expect(ev.pathways?.map((p) => p.noticeId)).toEqual(expect.arrayContaining([
-        '693C7326R0100', 'eeee5555ffff6666aaaa7777bbbb8888', '99990000aaaabbbbccccddddeeeeffff',
+        '693C7326R0100', '99990000aaaabbbbccccddddeeeeffff',
       ]));
+      // 561730 grounds maintenance is off-market for the 237310 firm these rows imply
+      expect(ev.pathways?.map((p) => p.noticeId)).not.toContain('eeee5555ffff6666aaaa7777bbbb8888');
       const first = ev.pathways?.find((p) => p.noticeId === '693C7326R0100');
       expect(first).toMatchObject({ naics: '237310', buyer: 'Federal Highway Administration', when: 'Due 2027-02-01' });
 
@@ -560,6 +564,59 @@ describe('fmp-writeup-grounding', () => {
       // a bare nested {id, name} object is not a notice
       const nested = accumulateFmpEvidence([{ tool: 'find_opportunities', content: JSON.stringify({ meta: { agency: { id: 'x1', name: 'Department of Transportation' } } }) }]);
       expect(nested.pathways).toEqual([]);
+    });
+
+    describe('dominant-NAICS pathway fit (bridge-contract vs civil bridge)', () => {
+      const HISTORY = JSON.stringify({ history: { topNaics: [{ naics: '237310', amount: 40_000_000, count: 14 }] } });
+      const recompete = (id: string, description: string, naics: string, buyer: string) => ({
+        contract_id: id, piid: id, title: 'SOME INCUMBENT LLC', description, naics_code: naics, sub_agency: buyer, current_end: '2027-06-30', incumbent_name: 'SOME INCUMBENT LLC',
+      });
+      const find = (rows: unknown[]) => JSON.stringify({ horizons: { coming_back: { items: rows } } });
+      const run = (rows: unknown[]) => accumulateFmpEvidence([
+        { tool: 'get_contractor_award_history', content: HISTORY },
+        { tool: 'find_opportunities', content: find(rows) },
+      ]);
+      const civilA = recompete('PIID-TOE-DRAIN', 'TOE DRAIN REPAIR AND SLOPE STABILIZATION', '237110', 'National Park Service');
+      const civilB = recompete('PIID-HWY-PAVE', 'PARKWAY CONCRETE PAVING AND GUARDRAIL', '237310', 'Federal Highway Administration');
+      const securityBridge = recompete('PIID-SEC-BRIDGE', 'SECURITY ADMINISTRATIVE SERVICES BRIDGE', '561612', 'Department of State');
+      const taxBridge = recompete('PIID-IRS-BRIDGE', 'BRIDGE CONTRACT FOR TAX ANALYZER SOFTWARE', '541511', 'Internal Revenue Service');
+      const bareTaxBridge = recompete('PIID-IRS-BARE', 'BRIDGE CONTRACT', '', 'Internal Revenue Service');
+      const inspection = recompete('PIID-INSPECT', 'BRIDGE INSPECTION MATOC', '541330', 'Federal Highway Administration');
+
+      it('keeps civil, drops 561612 security bridge-contract and IRS tax software', () => {
+        const ev = run([securityBridge, civilA, taxBridge, civilB]);
+        const ids = ev.pathways?.map((p) => p.noticeId);
+        expect(ids).toEqual(['PIID-HWY-PAVE', 'PIID-TOE-DRAIN']);
+        console.log('KEPT:', ev.pathways?.map((p) => `${p.title} [${p.naics}]`));
+        console.log('DROPPED:', [securityBridge, taxBridge].map((r) => `${r.description} [${r.naics_code}]`));
+      });
+
+      it('drops a bare "BRIDGE CONTRACT" tax pathway (no civil wording, IRS buyer)', () => {
+        const ev = run([bareTaxBridge, civilA, civilB]);
+        expect(ev.pathways?.map((p) => p.noticeId)).not.toContain('PIID-IRS-BARE');
+        expect(ev.pathways?.length).toBe(2);
+        console.log('DROPPED bare:', bareTaxBridge.description, '/', bareTaxBridge.sub_agency);
+      });
+
+      it('keeps a 541330 inspection MATOC for a 237310 firm, ranked below same-kind exact fits', () => {
+        const ev = run([inspection, civilA, civilB]);
+        expect(ev.pathways?.map((p) => p.noticeId)).toEqual(['PIID-HWY-PAVE', 'PIID-TOE-DRAIN', 'PIID-INSPECT']);
+        console.log('KEPT inspection:', inspection.description, `[${inspection.naics_code}]`);
+      });
+
+      it('falls back to the vehicle-token frame when fewer than two pathways fit', () => {
+        const ev = run([securityBridge, taxBridge, civilA]);
+        expect(ev.pathways).toEqual([]);
+      });
+
+      it('pathwayNaicsFit scores exact 100 / prefix 80 / sector 50 / inspection 40, and never boosts bare BRIDGE', () => {
+        expect(pathwayNaicsFit({ title: 'x', naics: '237310' }, '237310')).toBe(100);
+        expect(pathwayNaicsFit({ title: 'x', naics: '237110' }, '237310')).toBe(80);
+        expect(pathwayNaicsFit({ title: 'x', naics: '236220' }, '237310')).toBe(50);
+        expect(pathwayNaicsFit({ title: 'x', naics: '541330' }, '237310')).toBe(40);
+        expect(pathwayNaicsFit({ title: 'BRIDGE CONTRACT' }, '237310')).toBe(0);
+        expect(pathwayNaicsFit({ title: 'Highway bridge rehabilitation' }, '237310')).toBe(30);
+      });
     });
 
     it('host model with garbage-only contact JSON never puts those names in who-to-talk', () => {
