@@ -97,7 +97,8 @@ describe('a shared route cannot report for the wrong job', () => {
 describe('a rehearsal must not speak for the scheduled job', () => {
   it('dry runs do not report an outcome', () => {
     const src = strip(read('src/app/api/cron/sync-gov-buyer-data/route.ts'));
-    expect(src).toMatch(/if \(!dry\) await reportCronOutcome/);
+    expect(src).toMatch(/if \(!dry(?: && [^)]+)?\) await reportCronOutcome/);
+    expect(src).not.toMatch(/if \(dry\) await reportCronOutcome/);
   });
   it('multisite dry runs do not report either', () => {
     const src = strip(read('src/app/api/cron/snapshot-multisite/route.ts'));
