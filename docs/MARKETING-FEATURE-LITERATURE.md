@@ -4,7 +4,7 @@
 
 **Why it matters.** The Claude+MCP RBA profile bar is usable from Ask/Vault downloads, not a cover page with a one-paragraph pathways section.
 
-**Proof.** Unit: `fmp-writeup-grounding.unit.test.ts` enriched host ≥3500 chars + IRS rejection + planner prefer. Live proof appended after prod cold Ask.
+**Proof.** Unit: enriched host ≥3500 chars + IRS/set-aside-as-person rejection + planner prefer. Live Ask 2026-11-20: Vault `df4f8679…` gained Claude section shell (The read → readiness); follow-up rejects "No Range Specified"/"Sole Source" contact leak.
 
 
 ### Ask Mindy Federal Market Profile write-up (host-grounded Vault DocModel) — 2026-11-20

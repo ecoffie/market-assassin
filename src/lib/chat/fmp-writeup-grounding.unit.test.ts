@@ -379,6 +379,32 @@ describe('fmp-writeup-grounding', () => {
       }
     });
 
+    it('rejects procurement / set-aside / placeholder phrases; still accepts real people', () => {
+      for (const junk of [
+        'No Range Specified', 'Sole Source', 'Sources Sought', 'Combined Synopsis', 'Set-Aside Small',
+        'Set Aside Total', 'Full Open', 'Small Business', 'Woman Owned', 'Veteran Owned', 'Hubzone Set',
+        'Not Applicable', 'Unknown Contact', 'None Listed', 'Limited Competition', 'Unrestricted Award',
+        'Contract Ceiling', 'Obligations Amount', 'Request Rfq', 'No Contact', 'Notice Tbd',
+      ]) expect(looksLikePersonContactName(junk), junk).toBe(false);
+      for (const person of ['Helson Roman', 'David Bogner', 'Terry Agena', 'Noel Rangel']) {
+        expect(looksLikePersonContactName(person), person).toBe(true);
+      }
+    });
+
+    it('accumulate keeps garbage award-field strings out of contacts', () => {
+      const evidence = accumulateFmpEvidence([
+        {
+          tool: 'get_contractor_award_history',
+          content: JSON.stringify({
+            history: { recentAwards: [{ id: 'a1', title: 'Bridge repair', setAside: 'No Range Specified', competition: 'Sole Source', amount: 1_000_000 }] },
+          }),
+        },
+        { tool: 'search_federal_contacts', content: CONTACT_JSON },
+      ]);
+      expect(evidence.contactNames).toEqual(['Helson Roman', 'Spare Dla Person']);
+      expect(JSON.stringify(evidence.contactRows)).not.toMatch(/No Range|Sole Source/);
+    });
+
     it('accumulate drops IRS but keeps Helson Roman from the same payload', () => {
       const evidence = accumulateFmpEvidence([
         {
@@ -503,6 +529,57 @@ describe('fmp-writeup-grounding', () => {
       expect(v.issues.filter((i) => i.severity === 'error')).toEqual([]);
     });
 
+    it('parses a FIND-shaped payload (open / coming_back / coming_soon, id, due) into pathway rows', () => {
+      const find = JSON.stringify({
+        open: [
+          { id: 'aaaa1111bbbb2222cccc3333dddd4444', name: 'Highway bridge inspection services', solicitationNumber: '693C7326R0100', due: '2027-02-01T17:00:00Z', naicsCode: 237310, agency: { name: 'Federal Highway Administration' }, type: 'Sources Sought', summary: 'Bridge inspection support.' },
+        ],
+        coming_back: [
+          { noticeId: 'eeee5555ffff6666aaaa7777bbbb8888', title: 'Pentagon grounds maintenance recompete', department: 'Department of Defense', naics: '561730' },
+        ],
+        coming_soon: [
+          { title: 'Eastern Lands paving MATOC', notice_id: '99990000aaaabbbbccccddddeeeeffff', response_deadline: '2027-03-01' },
+        ],
+      });
+      const ev = accumulateFmpEvidence([{ tool: 'find_opportunities', content: find }]);
+      expect(ev.pathways?.length).toBeGreaterThanOrEqual(2);
+      expect(ev.pathways?.map((p) => p.noticeId)).toEqual(expect.arrayContaining([
+        '693C7326R0100', 'eeee5555ffff6666aaaa7777bbbb8888', '99990000aaaabbbbccccddddeeeeffff',
+      ]));
+      const first = ev.pathways?.find((p) => p.noticeId === '693C7326R0100');
+      expect(first).toMatchObject({ naics: '237310', buyer: 'Federal Highway Administration', when: 'Due 2027-02-01' });
+
+      // a `results` list from an unrecognized tool counts only with a real notice key
+      const other = accumulateFmpEvidence([{ tool: 'custom_tool', content: JSON.stringify({ results: [
+        { notice_id: 'abcd'.repeat(8), title: 'Roadway resurfacing services' },
+        { id: 'xyz123', title: 'Some contact record here' },
+      ] }) }]);
+      expect(other.pathways?.map((p) => p.noticeId)).toEqual(['abcd'.repeat(8)]);
+
+      // a bare nested {id, name} object is not a notice
+      const nested = accumulateFmpEvidence([{ tool: 'find_opportunities', content: JSON.stringify({ meta: { agency: { id: 'x1', name: 'Department of Transportation' } } }) }]);
+      expect(nested.pathways).toEqual([]);
+    });
+
+    it('host model with garbage-only contact JSON never puts those names in who-to-talk', () => {
+      const ev = accumulateFmpEvidence([
+        { tool: 'search_federal_contacts', content: JSON.stringify({ contacts: [{ name: 'No Range Specified' }, { name: 'Sole Source' }] }) },
+        { tool: 'get_contractor_award_history', content: AWARD_JSON },
+      ], RBA_FEDERAL_MARKET_PROFILE_PROMPT);
+      expect(ev.contactNames).toEqual([]);
+      // callers can also hand the builder pre-built garbage rows
+      const withRows = {
+        ...ev,
+        contactNames: ['No Range Specified', 'Sole Source'],
+        contactRows: [{ person: 'No Range Specified, FHWA, x@y.gov' }, { person: 'Sole Source' }],
+      };
+      const model = buildFmpHostDocModel(withRows, hostOpts);
+      const who = JSON.stringify(model.sections.find((s) => /who to talk to/i.test(s.heading)));
+      expect(who).toContain('Named notice POC on the active pathway');
+      expect(who).not.toMatch(/No Range Specified|Sole Source/);
+      expect(flattenDocModelText(model)).not.toMatch(/No Range Specified|Sole Source/);
+    });
+
     it('with no pathway rows the pathways section is a multi-bullet frame, not one thin paragraph', () => {
       const thin = accumulateFmpEvidence(
         [
@@ -599,6 +676,17 @@ describe('fmp-writeup-grounding', () => {
       const irsPick = shouldPreferPlannerFmpDocModel(irs, evidence, opts);
       expect(irsPick.prefer).toBe(false);
       expect(irsPick.reason).toBe('irs_like_contact');
+
+      const garbage = JSON.stringify({
+        doc_model: plannerModel([
+          ...goodRows,
+          { person: 'No Range Specified', why: 'Award field', question: 'Ask about seats.' },
+          { person: 'Sole Source, DLA, a@b.gov', why: 'Award field', question: 'Ask about seats.' },
+        ]),
+      });
+      const garbagePick = shouldPreferPlannerFmpDocModel(garbage, evidence, opts);
+      expect(garbagePick.prefer).toBe(false);
+      expect(garbagePick.reason).toBe('non_person_contact');
 
       const oneContact = JSON.stringify({ doc_model: plannerModel([goodRows[0]]) });
       expect(shouldPreferPlannerFmpDocModel(oneContact, evidence, opts).reason).toBe('who_to_talk_person_rows:1');

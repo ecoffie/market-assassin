@@ -230,20 +230,43 @@ const ORG_WORDS = new Set([
 const IRS_LIKE = /\binternal revenue\b|\bIRS\b/i;
 
 /**
+ * Procurement, set-aside, competition and placeholder words. Award and notice JSON carries
+ * Title Case strings like "No Range Specified" and "Sole Source" that match the person shape,
+ * so shape alone is not evidence of a human. Matched as whole words, case-insensitive.
+ */
+const PROCUREMENT_WORDS = new Set([
+  'range', 'specified', 'sole', 'source', 'sources', 'sought', 'synopsis', 'solicitation', 'aside', 'full',
+  'open', 'small', 'business', 'woman', 'women', 'owned', 'veteran', 'hubzone', 'competitive', 'competed',
+  'award', 'contract', 'naics', 'psc', 'dollars', 'obligations', 'amount', 'ceiling', 'idiq', 'matoc', 'macc',
+  'rfq', 'rfi', 'rfp', 'combined', 'limited', 'unrestricted', 'not', 'applicable', 'tbd', 'unknown', 'none',
+]);
+const PROCUREMENT_PHRASES = /\bset[-\s]?aside\b|\bn\/a\b/i;
+/** Fillers that can never be a name on their own; a string made only of these is not a person. */
+const NON_NAME_TOKENS = new Set(['no', 'yes', 'the', 'of', 'and', 'for', 'to', 'a', 'an', 'in', 'on', 'or', 'by', 'any', 'all']);
+
+/**
  * True for a person-shaped contact name (2 to 4 Title Case words) with no org / place
- * / work-item word in it. Exported for tests. IRS-like names are always rejected.
+ * / work-item / procurement word in it. Exported for tests. IRS-like names are always rejected.
  */
 export function looksLikePersonContactName(s: string): boolean {
   const t = String(s ?? '').trim();
   if (t.length < 5 || t.length > 60) return false;
   if (IRS_LIKE.test(t)) return false;
+  if (/^No\b/i.test(t)) return false;
+  if (PROCUREMENT_PHRASES.test(t)) return false;
   if (!/^[A-Z][a-z]+(?:\s+[A-Z][a-z.'-]+)+$/.test(t)) return false;
   const words = t.split(/\s+/);
   if (words.length > 4) return false;
+  const tokens: string[] = [];
   for (const w of words) {
-    if (ORG_WORDS.has(w.toLowerCase().replace(/[.,]/g, ''))) return false;
+    const lower = w.toLowerCase().replace(/[.,]/g, '');
+    if (ORG_WORDS.has(lower)) return false;
+    for (const part of lower.split('-')) {
+      if (PROCUREMENT_WORDS.has(part)) return false;
+      tokens.push(part);
+    }
   }
-  return true;
+  return !tokens.every((tok) => NON_NAME_TOKENS.has(tok));
 }
 
 function looksLikePersonName(s: string): boolean {
@@ -401,6 +424,8 @@ function extractAwardRows(results: readonly FmpToolContent[]): FmpAwardRow[] {
 }
 
 const PATHWAY_TOOL_RE = /find_opportunities|search_sam_opportunities|lookup_solicitation/i;
+/** Array keys FIND-style tools use for notice lists. */
+const FIND_LIST_KEYS = new Set(['results', 'opportunities', 'items', 'open', 'coming_back', 'comingBack', 'coming_soon', 'comingSoon']);
 const VEHICLE_WORD_RE = /\b(MATOC|MACC|IDIQ|BPA|IDV|multiple[- ]award|task order contract|vehicle)\b/i;
 const SOURCES_SOUGHT_RE = /\b(sources? sought|RFI|request for information|special notice)\b/i;
 
@@ -433,23 +458,28 @@ function extractPathways(results: readonly FmpToolContent[]): FmpPathway[] {
   const seen = new Set<string>();
   const out: FmpPathway[] = [];
   for (const r of results) {
-    if (!PATHWAY_TOOL_RE.test(String(r.tool || ''))) continue;
+    const toolMatches = PATHWAY_TOOL_RE.test(String(r.tool || ''));
     const p = parseJson(String(r.content || ''));
     if (!p) continue;
-    walkObjects(p, (o) => {
+    walkObjects(p, (o, key) => {
+      const inFindList = key != null && FIND_LIST_KEYS.has(key);
+      // Other tools only count when the row sits in a FIND-style list and carries a real notice key.
+      if (!toolMatches && !inFindList) return;
       const title = firstString(o, ['title', 'name']);
       if (!title || title.length < 6) return;
       const solicitation = firstString(o, ['solicitation_number', 'solicitationNumber', 'solicitation']);
-      const notice = firstString(o, ['notice_id', 'noticeId']);
+      const notice = firstString(o, ['notice_id', 'noticeId']) ?? (toolMatches && inFindList ? firstString(o, ['id']) : undefined);
       if (!solicitation && !notice) return;
       const id = solicitation || notice!;
-      const key = id.toLowerCase();
-      if (seen.has(key)) return;
-      seen.add(key);
-      const deadline = firstString(o, ['response_deadline', 'responseDeadline', 'deadline']);
-      const naicsRaw = firstString(o, ['naics_code', 'naics', 'naicsCode']);
+      const idKey = id.toLowerCase();
+      if (seen.has(idKey)) return;
+      seen.add(idKey);
+      const deadline = firstString(o, ['response_deadline', 'responseDeadline', 'deadline', 'due']);
+      const naicsNum = firstNumber(o, ['naics_code', 'naics', 'naicsCode']);
+      const naicsRaw = firstString(o, ['naics_code', 'naics', 'naicsCode']) ?? (naicsNum != null ? String(naicsNum) : undefined);
       const desc = firstString(o, ['description', 'summary']);
-      const buyer = firstString(o, ['department', 'agency', 'sub_tier', 'office']);
+      const agencyObj = o.agency && typeof o.agency === 'object' ? firstString(o.agency as Record<string, unknown>, ['name']) : undefined;
+      const buyer = firstString(o, ['department', 'agency', 'sub_tier', 'office']) ?? agencyObj;
       const noticeType = firstString(o, ['notice_type', 'noticeType', 'type']);
       const pathway: FmpPathway = {
         title: clip(title, 120),
@@ -1413,7 +1443,7 @@ export function buildFmpHostDocModel(
   const contactRows: FmpContactRow[] = (evidence.contactRows?.length
     ? evidence.contactRows
     : evidence.contactNames.filter(looksLikePersonContactName).map((person) => ({ person })))
-    .filter((c) => looksLikePersonContactName(c.person))
+    .filter((c) => looksLikePersonContactName(personHeadOfCell(c.person)))
     .slice(0, 8);
   const whoRows = contactRows.length
     ? contactRows.map((c) => ({
@@ -1568,6 +1598,20 @@ function personColumnKey(table: Extract<Block, { type: 'table' }>): string | nul
   return col?.key ?? null;
 }
 
+/** Who-to-talk rows whose person cell does not name a person (placeholder, procurement phrase, org). */
+function nonPersonWhoRows(model: DocModel): number {
+  let n = 0;
+  for (const table of whoToTalkTables(model)) {
+    const key = personColumnKey(table);
+    if (!key) continue;
+    for (const row of table.rows) {
+      const head = personHeadOfCell(row[key]);
+      if (head && !looksLikePersonContactName(head)) n++;
+    }
+  }
+  return n;
+}
+
 /** Rows whose person cell is an organization (IRS, an agency) instead of a person. */
 function agencyAsPersonRows(model: DocModel): number {
   let n = 0;
@@ -1647,6 +1691,7 @@ export function shouldPreferPlannerFmpDocModel(
   }
   if (!rich.hasPathways) return { prefer: false, reason: 'no_pathways' };
   if (agencyAsPersonRows(v.model) > 0) return { prefer: false, reason: 'irs_like_contact' };
+  if (nonPersonWhoRows(v.model) > 0) return { prefer: false, reason: 'non_person_contact' };
   return { prefer: true, reason: 'planner_rich_valid', model: v.model };
 }
 
