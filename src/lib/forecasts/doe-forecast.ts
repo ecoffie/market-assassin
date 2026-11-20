@@ -205,6 +205,37 @@ export function doeExternalId(r: DoeForecastRow): string {
   return `DOE-${basis.toUpperCase().replace(/[^A-Z0-9:]+/g, '-').replace(/^-|-$/g, '').slice(0, 120)}`;
 }
 
+/** The agency_forecasts row sync-forecasts upserts for one parsed DOE CSV row. */
+export function doeForecastToDbRow(
+  r: DoeForecastRow,
+  opts: { sourceUrl: string; syncedAt: string },
+): Record<string, unknown> {
+  return {
+    source_agency: 'DOE',
+    source_type: 'osdbu_xlsx',
+    source_url: opts.sourceUrl,
+    external_id: doeExternalId(r),
+    title: r.title,
+    description: r.naicsDescription || null,
+    bureau: r.programOffice || null,
+    contracting_office: r.programOffice || null,
+    program_office: r.programOffice || null,
+    naics_code: r.naicsCode || null,
+    naics_description: r.naicsDescription || null,
+    estimated_value_min: r.estimatedValueMin ?? null,
+    estimated_value_max: r.estimatedValueMax ?? null,
+    estimated_value_range: r.estimatedValueRange || null,
+    set_aside_type: r.setAside || null,
+    contract_type: r.contractType || null,
+    incumbent_name: r.incumbentName || null,
+    incumbent_contract_number: r.incumbentContractNumber || null,
+    performance_end_date: r.performanceEndDate || null,
+    pop_state: r.popState || null,
+    status: 'forecasted',
+    last_synced_at: opts.syncedAt,
+  };
+}
+
 export interface DoeForecastDocument {
   /** YYYY-MM-DD edition from the href. */
   edition: string;

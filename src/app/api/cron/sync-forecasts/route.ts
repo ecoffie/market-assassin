@@ -40,12 +40,12 @@ import {
   DHS_ALLRECORDS_CSV_URL,
   DHS_ALLRECORDS_SOURCE_TYPE,
   DHS_ERA_FORECASTS_URL,
-  DHS_ERA_SOURCE_TYPE,
   dhsAllrecordsToDbRow,
-  dhsEraRecordToParsed,
+  dhsEraToStoredRow,
   parseDhsAllrecordsBuffer,
 } from '@/lib/forecasts/dhs-allrecords';
 import { classifyDhsBody } from '@/lib/forecasts/dhs-source';
+import { fetchWithRetry } from '@/lib/forecasts/http-retry';
 import { NextRequest, NextResponse } from 'next/server';
 import { forecastWriterClient, guardForecastInserts, countNewForecastRows, existingForecastIds, forecastRowsForDailySync, quarantineRefusedLoad } from '@/lib/forecasts/writer';
 import { sendOpsAlert } from '@/lib/ops-alert';
@@ -53,7 +53,7 @@ import { reportCronOutcome } from '@/lib/cron-self-report';
 import {
   DOE_FORECAST_PAGE,
   absoluteDoeUrl,
-  doeExternalId,
+  doeForecastToDbRow,
   extractDoeForecastDocuments,
   parseDoeCsv,
 } from '@/lib/forecasts/doe-forecast';
@@ -109,10 +109,10 @@ interface DhsForecast { [k: string]: unknown }
  * (scripts/ingest-dhs-forecast-allrecords.ts).
  */
 async function fetchDhsAllrecordsFile(url: string): Promise<Record<string, unknown>[]> {
-  const res = await fetch(url, {
+  const { response: res } = await fetchWithRetry(url, {
     headers: { 'User-Agent': 'GovConGiants-Mindy/1.0' },
     cache: 'no-store',
-  });
+  }, { attempts: 3, retryBaseMs: 500 });
   if (!res.ok) {
     throw new Error(
       `DHS allRecords HTTP ${res.status} — check DHS.gov Advance Acquisition Planning download URL`,
@@ -134,26 +134,20 @@ async function fetchDhsAllrecordsFile(url: string): Promise<Record<string, unkno
   }));
 }
 
-/** Live public list on apfs-era.dhs.gov. Empty or non-array is a failure. */
+/** Live public list on apfs-era.dhs.gov. Empty or non-array is a failure. 5xx retries, then the caller falls back to the CSV. */
 async function fetchDhsEraJson(): Promise<Record<string, unknown>[]> {
-  const res = await fetch(DHS_ERA_FORECASTS_URL, {
+  const { response: res, attempts } = await fetchWithRetry(DHS_ERA_FORECASTS_URL, {
     headers: { Accept: 'application/json', 'User-Agent': 'GovConGiants-Mindy/1.0' },
     cache: 'no-store',
-  });
-  if (!res.ok) throw new Error(`apfs-era forecasts/all HTTP ${res.status}`);
+  }, { attempts: 3, retryBaseMs: 500 });
+  if (!res.ok) throw new Error(`apfs-era forecasts/all HTTP ${res.status} after ${attempts} attempt(s)`);
   const data = await res.json() as unknown;
   if (!Array.isArray(data)) throw new Error('apfs-era forecasts/all was not an array');
   const now = new Date().toISOString();
   const rows: Record<string, unknown>[] = [];
   for (const item of data) {
-    const parsed = dhsEraRecordToParsed(item);
-    if (!parsed) continue;
-    rows.push({
-      ...dhsAllrecordsToDbRow(parsed, { sourceUrl: DHS_ERA_FORECASTS_URL }),
-      source_agency: 'DHS',
-      source_type: DHS_ERA_SOURCE_TYPE,
-      last_synced_at: now,
-    });
+    const stored = dhsEraToStoredRow(item, now);
+    if (stored) rows.push(stored);
   }
   if (!rows.length) throw new Error('apfs-era forecasts/all parsed to 0 rows — refusing empty upsert');
   return rows;
@@ -294,30 +288,7 @@ async function fetchDOE(): Promise<Record<string, unknown>[]> {
   if (!parsed.rows.length) throw new Error(`DOE forecast ${current.edition} parsed to 0 rows — refusing empty upsert`);
 
   const now = new Date().toISOString();
-  return parsed.rows.map((r) => ({
-    source_agency: 'DOE',
-    source_type: 'osdbu_xlsx',
-    source_url: sourceUrl,
-    external_id: doeExternalId(r),
-    title: r.title,
-    description: r.naicsDescription || null,
-    bureau: r.programOffice || null,
-    contracting_office: r.programOffice || null,
-    program_office: r.programOffice || null,
-    naics_code: r.naicsCode || null,
-    naics_description: r.naicsDescription || null,
-    estimated_value_min: r.estimatedValueMin ?? null,
-    estimated_value_max: r.estimatedValueMax ?? null,
-    estimated_value_range: r.estimatedValueRange || null,
-    set_aside_type: r.setAside || null,
-    contract_type: r.contractType || null,
-    incumbent_name: r.incumbentName || null,
-    incumbent_contract_number: r.incumbentContractNumber || null,
-    performance_end_date: r.performanceEndDate || null,
-    pop_state: r.popState || null,
-    status: 'forecasted',
-    last_synced_at: now,
-  }));
+  return parsed.rows.map((r) => doeForecastToDbRow(r, { sourceUrl, syncedAt: now }));
 }
 
 /** Per-source baselines. A source that drops far below its observed floor has

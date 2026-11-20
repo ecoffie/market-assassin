@@ -259,6 +259,18 @@ export function parseDhsAllrecordsAoa(aoa: unknown[][]): DhsAllrecordsParseResul
  * NAICS and dollar range are parsed with the CSV helpers. Fields the JSON
  * does not carry (POC, place of performance) stay absent — not invented.
  */
+/** The agency_forecasts row sync-forecasts upserts for one apfs-era JSON record. */
+export function dhsEraToStoredRow(raw: unknown, syncedAt: string): (Record<string, unknown> & { external_id: string }) | null {
+  const parsed = dhsEraRecordToParsed(raw);
+  if (!parsed) return null;
+  return {
+    ...dhsAllrecordsToDbRow(parsed, { sourceUrl: DHS_ERA_FORECASTS_URL }),
+    source_agency: 'DHS',
+    source_type: DHS_ERA_SOURCE_TYPE,
+    last_synced_at: syncedAt,
+  };
+}
+
 export function dhsEraRecordToParsed(raw: unknown): DhsAllrecordsParsedRow | null {
   if (!raw || typeof raw !== 'object') return null;
   const row = raw as Record<string, unknown>;
