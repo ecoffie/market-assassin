@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { SaveToPipelineButton } from '@/components/briefings/SaveToPipelineButton';
+import { sbirPanelFromResponse } from '@/lib/sbir/agency-availability';
 
 interface SbirOpportunity {
   id: string;
@@ -81,6 +82,7 @@ export default function SbirPanel({ email }: SbirPanelProps) {
   const [loading, setLoading] = useState(true);
   const [searching, setSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [unavailableReason, setUnavailableReason] = useState<string | null>(null);
 
   // Search filters
   const [keywordFilter, setKeywordFilter] = useState('');
@@ -117,6 +119,7 @@ export default function SbirPanel({ email }: SbirPanelProps) {
 
     setSearching(true);
     setError(null);
+    setUnavailableReason(null);
 
     try {
       const params = new URLSearchParams();
@@ -132,10 +135,13 @@ export default function SbirPanel({ email }: SbirPanelProps) {
 
       if (response.ok) {
         const data = await response.json();
-        if (data.success && data.opportunities) {
-          setOpportunities(data.opportunities);
-        } else if (data.error) {
-          setError(data.error);
+        const shown = sbirPanelFromResponse(data);
+        if (shown.error) setError(shown.error);
+        else if (shown.unavailableReason) {
+          setOpportunities([]);
+          setUnavailableReason(shown.unavailableReason);
+        } else {
+          setOpportunities(shown.opportunities as SbirOpportunity[]);
         }
       } else {
         setError('Failed to search SBIR opportunities');
@@ -388,7 +394,13 @@ export default function SbirPanel({ email }: SbirPanelProps) {
       )}
 
       {/* NIH Institute Quick Select */}
-      {opportunities.length === 0 && metadata && (
+      {unavailableReason && (
+        <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4">
+          <p className="text-amber-200 text-sm">{unavailableReason}</p>
+        </div>
+      )}
+
+      {opportunities.length === 0 && !unavailableReason && metadata && (
         <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
           <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">NIH Institutes</h3>
           <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
@@ -413,7 +425,7 @@ export default function SbirPanel({ email }: SbirPanelProps) {
       )}
 
       {/* SBIR 101 Info */}
-      {opportunities.length === 0 && !error && (
+      {opportunities.length === 0 && !error && !unavailableReason && (
         <div className="bg-gradient-to-br from-blue-900/30 to-indigo-900/30 border border-blue-500/30 rounded-xl p-6">
           <h3 className="text-white font-semibold mb-3">What is SBIR/STTR?</h3>
           <div className="grid md:grid-cols-2 gap-4 text-sm">
