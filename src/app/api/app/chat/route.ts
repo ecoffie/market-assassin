@@ -39,6 +39,7 @@ import { loadBidderProfile, formatProfileForPrompt } from '@/lib/proposal/loader
 import { isUserOverBudget, recordLlmUsage } from '@/lib/llm/usage-cost';
 import { makeTier0Tools, TIER0_TOOL_DEFS, TIER0_TOOL_NAMES } from '@/lib/chat/tier0-tools';
 import { makeMyDocumentsTool, MY_DOCUMENTS_TOOL_DEF, FIND_MY_DOCUMENTS } from '@/lib/chat/my-documents-tool';
+import { makeSearchWebTool, SEARCH_WEB_TOOL_DEF, SEARCH_WEB } from '@/lib/chat/search-web-tool';
 import { makeGenerateDocumentTool, CREATE_DOCUMENT_TOOL_DEF, CREATE_DOCUMENT, isDocumentCreationRequest, parseCreateDocumentDeliverables, type CreateDocumentDeliverable } from '@/lib/chat/generate-document-tool';
 import { vaultDocEnabledFor } from '@/lib/vault/flags';
 // Tools run ONLY through the chat tool executor (policy check at offer AND execution,
@@ -51,7 +52,55 @@ import { fitMessages, inputBudget, type MsgKind } from '@/lib/chat/token-budget'
 import { stagingModelConfig, STAGING_CONFIG_HEADER } from '@/lib/chat/staging-model-config';
 import { customerErrorMessage } from '@/lib/chat/customer-errors';
 import { boundToolResult, perResultBudget } from '@/lib/chat/bound-tool-result';
-import { filterToolsForTurn, enforceFindArgs, enforceMarketReportArgs, SAM_ONLY_TOOL, MARKET_REPORT_TOOL, restrictWritesWhenDocumentText } from '@/lib/chat/tool-selection';
+import {
+  filterToolsForTurn,
+  enforceFindArgs,
+  enforceMarketReportArgs,
+  enforceFederalMarketProfileIdentityArgs,
+  enforceFederalMarketProfilePathwayArgs,
+  enforceFederalMarketProfileVehicleArgs,
+  enforceFederalMarketProfileMarketSizeArgs,
+  enforceFederalMarketProfileContactsArgs,
+  federalMarketProfileSelfReportNote,
+  federalMarketProfilePathwayNote,
+  federalMarketProfileVehicleNote,
+  federalMarketProfileMarketSizeNote,
+  federalMarketProfileContactsNote,
+  federalMarketProfileOutsideWebNote,
+  federalMarketProfileWriteupNote,
+  isFederalMarketProfileRequest,
+  SAM_ONLY_TOOL,
+  MARKET_REPORT_TOOL,
+  AWARD_HISTORY_TOOL,
+  FEDERAL_MARKET_PROFILE_CHAT_CONTRACT,
+  restrictWritesWhenDocumentText,
+  buildFmpNextMarketReportArgs,
+  extractDominantAwardNaics,
+} from '@/lib/chat/tool-selection';
+import {
+  applyFmpToolResults,
+  earliestIncompleteFmpPhase,
+  filterToolsForFmpPhase,
+  fmpPhaseHostNote,
+  fmpReadyForAnswer,
+  fmpToolAllowedInPhase,
+  FMP_MAX_ROUNDS,
+  initialFmpPhaseState,
+  markFmpBudgetExhausted,
+  markFmpWriteupSkippedNoDocTool,
+  type FmpPhaseState,
+} from '@/lib/chat/fmp-phase-machine';
+import { fmpDefenseBuyersAppear, type FmpWriteupContext } from '@/lib/chat/fmp-writeup-validate';
+import {
+  accumulateFmpEvidence,
+  buildFmpCreateDocumentAnswerNote,
+  buildFmpCreateDocumentInjectArgs,
+  buildFmpWriteupGroundingNote,
+  createDocumentArgsHaveUsableDocModel,
+  FMP_DOC_TOOL_ROUND_MAX_TOKENS,
+  requiredSnippetsForWriteup,
+  type FmpWriteupEvidence,
+} from '@/lib/chat/fmp-writeup-grounding';
 import { CURRENT_FIND_CHAT_CONTRACT } from '@/lib/mcp/potato-journey';
 import { findCompletionFooter, comingBackListLeadsWithNotCompeted, type FindResultWithItems } from '@/lib/chat/find-completeness';
 import { inferredCodeDisclosure } from '@/lib/chat/code-disclosure';
@@ -123,6 +172,8 @@ const TOOL_ROUND_MAX_TOKENS = 1024;
 // tokens cut a capability statement mid-JSON and the executor refused the unreadable arguments. A cap, not a
 // spend: only generated tokens are billed by the provider.
 const DOC_TOOL_ROUND_MAX_TOKENS = 4096;
+// FMP write-up doc_model is larger (pathways + contacts table + checklist). plannerMaxTokens used to be
+// frozen at TOOL_ROUND_MAX_TOKENS=1024 before create_document unlocked — bump to FMP_DOC_TOOL_ROUND_MAX_TOKENS.
 /** Characters of the document being revised given to the planner (≈4K tokens). */
 const REVISION_DOC_CHARS = 12_000;
 const HISTORY_LIMIT = 6;          // last 3 exchanges (6 messages) for continuity
@@ -251,9 +302,11 @@ You have a LARGE toolset over the federal Data Core — each tool's own descript
   When you show a mixed set, group or tag each item by type so the user instantly sees which are bid-now vs early-signal.
 - COMPETITORS: a company's award history + profile, the firms that win a NAICS/PSC (teaming or competition), incumbent financials, the likely incumbent behind an opp, SAM entity/registration. When the user pastes a SAM solicitation/RFQ NUMBER (e.g. 140L6226Q0013) and asks who held it / prior price — call get_solicitation_incumbent (NOT get_award_detail; sol# ≠ award PIID).
 - MARKET & PRICING: price-to-win labor rates, small-business/Rule-of-Two depth, buyer keyword coverage, market vocabulary, regulatory demand signals, SBA goaling.
-- MARKET RESEARCH REPORT (packaged — Mindy IP, same engine as MCP): when the user asks for a comprehensive / full / client-ready market research report, call generate_market_report ONCE with a keyword (best) or NAICS, optional state/agency, and client_name when they named a company. Do NOT assemble that report from many separate tool calls and create_document — that path is thinner than the packaged research. After it returns, summarize the answer in plain English and point them at the hosted deliverable URL when present; the in-app report pane opens that deliverable. create_document is for other deliverables (capability statements, short briefs), or a later turn if they explicitly want a Vault Word/PDF copy.
+- FEDERAL MARKET PROFILE (company-first pathway report): when the user asks for a federal market profile, or pathways in priority order from a named firm's award history, follow the FEDERAL MARKET PROFILE contract below — awards first (primary NAICS from THEIR award codes), then vehicles / sources sought / direct 8(a). Do NOT treat that ask as a keyword market-size report and do NOT assume 236220 from the word "construction".
+- MARKET RESEARCH REPORT (packaged — Mindy IP, same engine as MCP): when the user asks for a comprehensive / full / client-ready market research report (and it is NOT a federal market profile), call generate_market_report ONCE with a keyword (best) or NAICS, optional state/agency, and client_name when they named a company. Do NOT assemble that report from many separate tool calls and create_document — that path is thinner than the packaged research. After it returns, summarize the answer in plain English and point them at the hosted deliverable URL when present; the in-app report pane opens that deliverable. create_document is for other deliverables (capability statements, short briefs), or a later turn if they explicitly want a Vault Word/PDF copy.
 - AGENCIES: an agency's pain points & priorities, spending detail, single-award detail (get_award_detail only for true contract PIIDs).
 - PEOPLE & EVENTS: the named contacts/decision-makers at a buying office (search_federal_contacts — use it whenever they ask WHO to contact; do NOT punt to SAM), the SBLO at a prime, agency OSBP, and federal events/series.
+- OPEN WEB: search_web for public facts Mindy does not store (CRS reports, bill text, highway extensions, GAO reports, PAE / Navy construction press, 8(a) rule-change coverage). Quote only returned snippets + URLs. If available=false or grounded=false, say so — never invent those facts from memory.
 - PROPOSAL HELP: bid/no-bid evaluation, compliance-matrix extraction, proposal structure, DQ-risk scan, independent compliance referee, SOW extraction, solicitation documents.
 Tool-use rules:
 - Some tools take a notice_id or RFP text (proposal tools) — if the user hasn't given one, ask for the solicitation number/text rather than guessing.
@@ -631,10 +684,26 @@ export async function POST(request: NextRequest) {
         cardRecord = noticeRecord;
         const userProfileBlock = formatProfileForPrompt(profile);
         const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
-        // F1: the CURRENT_FIND contract (shared with the MCP host's P2 rule). Not for card chat, which answers
-        // about one opportunity with its own tool allowlist.
+        // F1: CURRENT_FIND contract (shared with MCP P2). Federal Market Profile replaces it for that
+        // ask — "sources sought" in a pathway profile must not flip into FIND-first open-bid framing.
+        // Not for card chat (one-opportunity allowlist).
+        const customerAskForContract = splitViewPreamble(message).rest || message;
+        const federalMarketProfileAsk = !cardCtx && isFederalMarketProfileRequest(customerAskForContract);
+        const hostContract = cardCtx
+          ? ''
+          : federalMarketProfileAsk
+            ? `\n\n${FEDERAL_MARKET_PROFILE_CHAT_CONTRACT}`
+            : `\n\n${CURRENT_FIND_CHAT_CONTRACT}`;
         const systemPrompt = SYSTEM_PROMPT_TEMPLATE.replace('{today}', today).replace('{userProfile}', userProfileBlock)
-          + (cardCtx ? '' : `\n\n${CURRENT_FIND_CHAT_CONTRACT}`);
+          + hostContract;
+        // Step 2–8: self-report → pathways → vehicles → market size → contacts → web gap → write-up.
+        const selfReportNote = federalMarketProfileSelfReportNote(customerAskForContract);
+        const pathwayNote = federalMarketProfilePathwayNote(customerAskForContract);
+        const vehicleNote = federalMarketProfileVehicleNote(customerAskForContract);
+        const marketSizeNote = federalMarketProfileMarketSizeNote(customerAskForContract);
+        const contactsNote = federalMarketProfileContactsNote(customerAskForContract);
+        const outsideWebNote = federalMarketProfileOutsideWebNote(customerAskForContract);
+        const writeupNote = federalMarketProfileWriteupNote(customerAskForContract);
 
         // Presentation hint from the asking surface (src/lib/chat/display-hint.ts): answer prompt only.
         const displayNote = displayHintNote(parseDisplayHint(body.display));
@@ -646,6 +715,13 @@ export async function POST(request: NextRequest) {
           ? buildOpportunityContextBlock(cardRecord, splitViewPreamble(message).rest || message, noticeFacts ? formatSelectedNoticeFacts(noticeFacts) : [], noticeOrigin)
           : null;
         if (cardContext) messages.push({ role: 'system', content: cardContext.block });
+        if (selfReportNote) messages.push({ role: 'system', content: selfReportNote });
+        if (pathwayNote) messages.push({ role: 'system', content: pathwayNote });
+        if (vehicleNote) messages.push({ role: 'system', content: vehicleNote });
+        if (marketSizeNote) messages.push({ role: 'system', content: marketSizeNote });
+        if (contactsNote) messages.push({ role: 'system', content: contactsNote });
+        if (outsideWebNote) messages.push({ role: 'system', content: outsideWebNote });
+        if (writeupNote) messages.push({ role: 'system', content: writeupNote });
         const customerWords = splitViewPreamble(message).rest || message;
         // Uploaded documents (src/lib/chat/document-context.ts): loaded server-side for THIS conversation and the
         // acting-scope owner on every turn, fenced as untrusted data. Only when the conversation id was accepted
@@ -776,9 +852,17 @@ export async function POST(request: NextRequest) {
         const capabilityLabels = interpretCapabilityNaics(message).items.map((it) => it.label);
         // What the customer has said in this conversation (for the stated-filters guard).
         const conversationText = [...history.filter((h) => h.role === 'user').map((h) => String(h.content || '')), message].join('\n');
+        const plannerSystem = [systemPrompt, capabilityNote, selfReportNote, pathwayNote, vehicleNote, marketSizeNote, contactsNote, outsideWebNote, writeupNote].filter(Boolean).join('\n\n');
         const toolRoundMessages: Array<{ role: string; content: string }> = [
-          { role: 'system', content: capabilityNote ? `${systemPrompt}\n\n${capabilityNote}` : systemPrompt },
+          { role: 'system', content: plannerSystem },
         ];
+        if (selfReportNote) turnTrace0.push('fmp_self_report_note');
+        if (pathwayNote) turnTrace0.push('fmp_pathway_note');
+        if (vehicleNote) turnTrace0.push('fmp_vehicle_note');
+        if (marketSizeNote) turnTrace0.push('fmp_market_size_note');
+        if (contactsNote) turnTrace0.push('fmp_contacts_note');
+        if (outsideWebNote) turnTrace0.push('fmp_outside_web_note');
+        if (writeupNote) turnTrace0.push('fmp_writeup_note');
         if (cardContext) toolRoundMessages.push({ role: 'system', content: cardContext.block });
         // The planner sees which documents exist, not their text.
         if (documentContext) toolRoundMessages.push({ role: 'system', content: documentContext.manifest });
@@ -886,19 +970,55 @@ export async function POST(request: NextRequest) {
           const turnSessionId = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(sessionId) ? sessionId : null;
           // find_my_documents (Vault documents, metadata then excerpts) — behind VAULT_ASK_MINDY_UPLOADS.
           const myDocs = isVaultChatDocumentsEnabled(auth.email) ? makeMyDocumentsTool(getSupabase(), actingScope, { chatSessionId: body.sessionId === sessionId ? turnSessionId : null }) : null;
+          // Mutable FMP write-up context: requiredSnippets filled from accumulated tool JSON
+          // before create_document rounds (object identity preserved for the tool deps).
+          const fmpWriteupCtx: FmpWriteupContext | null = federalMarketProfileAsk
+            ? {
+              defenseBuyersAppear: fmpDefenseBuyersAppear(customerAskForContract),
+              requiredSnippets: [],
+            }
+            : null;
+          const fmpToolContents: Array<{ tool: string; content: string }> = [];
+          let fmpEvidence: FmpWriteupEvidence | null = null;
+          let fmpGroundingNotePushed = false;
+          let fmpCreateDocAnswerNotePushed = false;
           // create_document (PDF + Word saved to the Vault) — behind VAULT_GENERATED_FILES for the VERIFIED caller
           // ('true' or 'allowlist'). Non-billable; never offered in card chat (CARD_CHAT_TOOLS excludes it).
           const genDoc = vaultDocEnabledFor('generate', auth.email)
-            ? makeGenerateDocumentTool({ db: getSupabase(), storage: getSupabase().storage, scope: actingScope, callerEmail: auth.email!, request, chatSessionId: body.sessionId === sessionId ? turnSessionId : null })
+            ? makeGenerateDocumentTool({
+              db: getSupabase(),
+              storage: getSupabase().storage,
+              scope: actingScope,
+              callerEmail: auth.email!,
+              request,
+              chatSessionId: body.sessionId === sessionId ? turnSessionId : null,
+              // FMP step-8 validator: refuse incomplete / banned profiles before Vault save.
+              ...(federalMarketProfileAsk && fmpWriteupCtx
+                ? {
+                  federalMarketProfile: true,
+                  fmpWriteupContext: fmpWriteupCtx,
+                }
+                : {}),
+            })
             : null;
-          const privateDefs = [...TIER0_TOOL_DEFS, ...(myDocs ? [MY_DOCUMENTS_TOOL_DEF] : []), ...(genDoc ? [CREATE_DOCUMENT_TOOL_DEF] : [])];
-          const privateNames = new Set([...TIER0_TOOL_NAMES, ...(myDocs ? [FIND_MY_DOCUMENTS] : []), ...(genDoc ? [CREATE_DOCUMENT] : [])]);
+          const searchWeb = makeSearchWebTool();
+          const privateDefs = [...TIER0_TOOL_DEFS, SEARCH_WEB_TOOL_DEF, ...(myDocs ? [MY_DOCUMENTS_TOOL_DEF] : []), ...(genDoc ? [CREATE_DOCUMENT_TOOL_DEF] : [])];
+          const privateNames = new Set([...TIER0_TOOL_NAMES, SEARCH_WEB, ...(myDocs ? [FIND_MY_DOCUMENTS] : []), ...(genDoc ? [CREATE_DOCUMENT] : [])]);
           const executor = createChatToolExecutor({
             userEmail: auth.email!,
             ...(actingScope.kind === 'client' ? { vaultEmail: actingScope.vaultEmail } : {}),
             ...(actingScope.kind === 'unavailable' ? { privateScopeUnavailable: true } : {}),
             chatSessionId: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(sessionId) ? sessionId : null,
-            tier0: { defs: privateDefs, names: privateNames, execute: (n, a) => (myDocs && n === FIND_MY_DOCUMENTS ? myDocs.execute(a) : genDoc && n === CREATE_DOCUMENT ? genDoc.execute(a) : tier0Runtime.execute(n, a)) },
+            tier0: {
+              defs: privateDefs,
+              names: privateNames,
+              execute: (n, a) => {
+                if (n === SEARCH_WEB) return searchWeb.execute(a);
+                if (myDocs && n === FIND_MY_DOCUMENTS) return myDocs.execute(a);
+                if (genDoc && n === CREATE_DOCUMENT) return genDoc.execute(a);
+                return tier0Runtime.execute(n, a);
+              },
+            },
             // Card chat offers only its opportunity tools (narrowing; the policy still applies).
             ...(cardCtx ? { allowedToolNames: CARD_CHAT_TOOLS } : {}),
             toolTimeoutMs: (n) => toolTimeoutMs(n, deadlines),
@@ -910,6 +1030,7 @@ export async function POST(request: NextRequest) {
           // is not offered the open-only search_sam_opportunities when find_opportunities is offered.
           const priorCustomerText = [...history].reverse().find((h) => h.role === 'user')?.content;
           const toolOffer = filterToolsForTurn(executor.offeredToolDefs(), splitViewPreamble(message).rest, priorCustomerText ? splitViewPreamble(String(priorCustomerText)).rest : null);
+          if (toolOffer.federalMarketProfile) turnTrace.notices.push('intent:federal_market_profile');
           if (toolOffer.marketResearch) turnTrace.notices.push('intent:market_research');
           // Industry codes the CUSTOMER typed (a planner-chosen code is not passed to find_opportunities).
           const customerTypedCodes = interpretCapabilityNaics(splitViewPreamble(message).rest).typedCodes;
@@ -924,14 +1045,50 @@ export async function POST(request: NextRequest) {
             ALL_TOOL_DEFS = restricted.defs;
             for (const n of restricted.removed) { notOfferedThisTurn.add(n); turnTrace.notices.push(`tool_not_offered:${n}:document_text_in_planner`); }
           }
+          // Federal Market Profile: catalog stays the pre-phase set; each round re-filters by
+          // unlocked phases so the model cannot jump to market size / web before awards.
+          const fmpCatalogDefs = ALL_TOOL_DEFS;
+          let fmpState: FmpPhaseState | null = toolOffer.federalMarketProfile
+            ? initialFmpPhaseState(splitViewPreamble(message).rest || message)
+            : null;
+          let fmpPhaseForce: string | null = null;
+          if (fmpState) {
+            let phaseFilter = filterToolsForFmpPhase(fmpCatalogDefs, fmpState);
+            // Vault generate off: create_document never offered — skip writeup file gate.
+            if (
+              earliestIncompleteFmpPhase(fmpState) === 'writeup'
+              && !phaseFilter.defs.some((d) => (d.function as { name?: string })?.name === CREATE_DOCUMENT)
+            ) {
+              fmpState = markFmpWriteupSkippedNoDocTool(fmpState);
+              turnTrace.notices.push('fmp_phase:writeup_skipped_no_create_document');
+              phaseFilter = filterToolsForFmpPhase(fmpCatalogDefs, fmpState);
+            }
+            ALL_TOOL_DEFS = phaseFilter.defs;
+            fmpPhaseForce = phaseFilter.forceTool;
+            for (const n of phaseFilter.removed) {
+              notOfferedThisTurn.add(n);
+              turnTrace.notices.push(`tool_not_offered:${n}:fmp_phase_locked`);
+            }
+            turnTrace.notices.push(`fmp_phase:start:${earliestIncompleteFmpPhase(fmpState) || 'writeup'}`);
+            const phaseNote = fmpPhaseHostNote(fmpState);
+            messages.push({ role: 'system', content: phaseNote });
+            toolRoundMessages.splice(1, 0, { role: 'system', content: phaseNote });
+          }
           turnTrace.tools_offered = ALL_TOOL_DEFS.length;
 
           // OpenAI {type:'function',function:{name,description,parameters}} →
           // Anthropic {name,description,input_schema}. Only used when Claude is enabled.
-          const anthropicTools = ALL_TOOL_DEFS.map((d) => {
+          // Rebuilt when FMP phase rounds re-filter ALL_TOOL_DEFS.
+          let anthropicTools = ALL_TOOL_DEFS.map((d) => {
             const fn = (d.function || {}) as { name?: string; description?: string; parameters?: unknown };
             return { name: fn.name, description: fn.description, input_schema: fn.parameters };
           });
+          const rebuildAnthropicTools = () => {
+            anthropicTools = ALL_TOOL_DEFS.map((d) => {
+              const fn = (d.function || {}) as { name?: string; description?: string; parameters?: unknown };
+              return { name: fn.name, description: fn.description, input_schema: fn.parameters };
+            });
+          };
           // Translate an Anthropic response → OpenAI choices[0].message so the consumer
           // downstream is provider-agnostic.
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -953,14 +1110,29 @@ export async function POST(request: NextRequest) {
           // One planner attempt. Returns the OpenAI-shaped JSON, or the failure details.
           // create_document offered → room for a whole doc_model; a resolved revision → that call is forced.
           // Market research → force generate_market_report (packaged Mindy IP; same engine as MCP).
-          const createOffered = ALL_TOOL_DEFS.some((d) => (d.function as { name?: string })?.name === CREATE_DOCUMENT);
+          // Federal Market Profile → force award history on round 1 only (NAICS from THEIR awards before
+          // any market-size call). Round 2 uses forceAutoToolChoice and must not re-force.
+          // plannerMaxTokens is recomputed when FMP unlocks create_document (was frozen at 1024).
+          let createOffered = ALL_TOOL_DEFS.some((d) => (d.function as { name?: string })?.name === CREATE_DOCUMENT);
           const marketReportOffered = ALL_TOOL_DEFS.some((d) => (d.function as { name?: string })?.name === MARKET_REPORT_TOOL);
-          const plannerMaxTokens = createOffered ? DOC_TOOL_ROUND_MAX_TOKENS : TOOL_ROUND_MAX_TOKENS;
+          const awardHistoryOffered = ALL_TOOL_DEFS.some((d) => (d.function as { name?: string })?.name === AWARD_HISTORY_TOOL);
+          let plannerMaxTokens = createOffered
+            ? (federalMarketProfileAsk ? FMP_DOC_TOOL_ROUND_MAX_TOKENS : DOC_TOOL_ROUND_MAX_TOKENS)
+            : TOOL_ROUND_MAX_TOKENS;
           const forceCreate = !!revision && createOffered;
           const forceMarketReport = !forceCreate && !cardCtx && toolOffer.marketResearch && marketReportOffered;
+          // FMP phase machine owns the forced tool (usually award history on round 1).
+          const forceAwardHistory = !forceCreate && !forceMarketReport && !cardCtx && !!fmpPhaseForce && awardHistoryOffered && fmpPhaseForce === AWARD_HISTORY_TOOL;
           if (forceCreate) turnTrace.notices.push('revision:create_document_forced');
           if (forceMarketReport) turnTrace.notices.push('market_research:generate_market_report_forced');
-          const forcedToolName = forceCreate ? CREATE_DOCUMENT : forceMarketReport ? MARKET_REPORT_TOOL : null;
+          if (fmpPhaseForce) turnTrace.notices.push(`federal_market_profile:phase_forced:${fmpPhaseForce}`);
+          let forcedToolName: string | null = forceCreate
+            ? CREATE_DOCUMENT
+            : forceMarketReport
+              ? MARKET_REPORT_TOOL
+              : (fmpPhaseForce && ALL_TOOL_DEFS.some((d) => (d.function as { name?: string })?.name === fmpPhaseForce))
+                ? fmpPhaseForce
+                : null;
           // Round 1 keeps OPP_INTENT → required (Andre fix). Round 2 always uses auto so the
           // planner can stop after a seed without re-calling the same tool (R2 hygiene).
           const callPlanner = async (
@@ -1050,9 +1222,15 @@ export async function POST(request: NextRequest) {
             // A planner that calls a tool it was not offered this turn is not obeyed (B2).
             const rawCalls = (Array.isArray(plannedCalls) ? plannedCalls : []).filter((tc) => {
               const n = String(tc.function?.name || '');
-              if (!notOfferedThisTurn.has(n)) return true;
-              turnTrace.notices.push(`unoffered_tool_call_dropped:${n}`);
-              return false;
+              if (notOfferedThisTurn.has(n)) {
+                turnTrace.notices.push(`unoffered_tool_call_dropped:${n}`);
+                return false;
+              }
+              if (fmpState && !fmpToolAllowedInPhase(n, fmpState)) {
+                turnTrace.notices.push(`fmp_phase_call_dropped:${n}`);
+                return false;
+              }
+              return true;
             });
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const u = (first.json as any)?.usage;
@@ -1087,9 +1265,40 @@ export async function POST(request: NextRequest) {
                   splitViewPreamble(message).rest || message,
                 );
                 for (const c of reportArgs.changes) turnTrace.notices.push(`market_report_args_enforced:${c}`);
+                // Federal Market Profile identity gate: legal name / UEI — never trade alias alone (VRBA trap).
+                const identityArgs = enforceFederalMarketProfileIdentityArgs(
+                  String(tc.function?.name || ''),
+                  reportArgs.args,
+                  splitViewPreamble(message).rest || message,
+                );
+                for (const c of identityArgs.changes) turnTrace.notices.push(`fmp_identity_enforced:${c}`);
+                const pathwayArgs = enforceFederalMarketProfilePathwayArgs(
+                  String(tc.function?.name || ''),
+                  identityArgs.args,
+                  splitViewPreamble(message).rest || message,
+                );
+                for (const c of pathwayArgs.changes) turnTrace.notices.push(`fmp_pathway_enforced:${c}`);
+                const vehicleArgs = enforceFederalMarketProfileVehicleArgs(
+                  String(tc.function?.name || ''),
+                  pathwayArgs.args,
+                  splitViewPreamble(message).rest || message,
+                );
+                for (const c of vehicleArgs.changes) turnTrace.notices.push(`fmp_vehicle_enforced:${c}`);
+                const marketSizeArgs = enforceFederalMarketProfileMarketSizeArgs(
+                  String(tc.function?.name || ''),
+                  vehicleArgs.args,
+                  splitViewPreamble(message).rest || message,
+                );
+                for (const c of marketSizeArgs.changes) turnTrace.notices.push(`fmp_market_size_enforced:${c}`);
+                const contactsArgs = enforceFederalMarketProfileContactsArgs(
+                  String(tc.function?.name || ''),
+                  marketSizeArgs.args,
+                  splitViewPreamble(message).rest || message,
+                );
+                for (const c of contactsArgs.changes) turnTrace.notices.push(`fmp_contacts_enforced:${c}`);
                 // A resolved revision decides revises_document_id, not the model: the generated document's real id,
                 // or none for the user's own file (create_document only versions documents Mindy generated).
-                let docArgs = reportArgs.args;
+                let docArgs = contactsArgs.args;
                 if (revision && String(tc.function?.name || '') === CREATE_DOCUMENT) {
                   try {
                     const a = JSON.parse(docArgs || '{}');
@@ -1190,6 +1399,26 @@ export async function POST(request: NextRequest) {
                   if (d) {
                     turnDeliverables.push(...d.files);
                     if (d.pdf_note) turnDeliverablePdfNote = d.pdf_note;
+                    if (federalMarketProfileAsk && !fmpCreateDocAnswerNotePushed) {
+                      const evidence: FmpWriteupEvidence = fmpEvidence
+                        ?? accumulateFmpEvidence(
+                          fmpToolContents.length
+                            ? fmpToolContents
+                            : results.map((x) => ({ tool: x.record.tool, content: x.content })),
+                          splitViewPreamble(message).rest || message,
+                        );
+                      fmpEvidence = evidence;
+                      messages.push({
+                        role: 'system',
+                        content: buildFmpCreateDocumentAnswerNote({
+                          evidence,
+                          downloadPaths: d.files.map((f) => f.download_path || '').filter(Boolean),
+                          title: d.title ?? null,
+                        }),
+                      });
+                      fmpCreateDocAnswerNotePushed = true;
+                      turnTrace.notices.push('fmp_answer_note:create_document_paths');
+                    }
                   }
                 }
                 // Packaged market report: keep html for the Ask pane SSE; strip it from the model
@@ -1254,6 +1483,344 @@ export async function POST(request: NextRequest) {
               const incomplete = incompleteToolNotice(results.map((r) => r.record));
               if (incomplete) notify(incomplete.code, incomplete.message);
 
+              // Federal Market Profile: continue phase rounds until writeup unlocked or budget.
+              // Non-FMP keeps the bounded single second hop below.
+              if (fmpState) {
+                for (const r of results) {
+                  fmpToolContents.push({ tool: r.record.tool, content: r.content });
+                }
+                fmpState = applyFmpToolResults(
+                  fmpState,
+                  results.map((r) => ({ tool: r.record.tool, status: r.record.status, content: r.content })),
+                  { requireWriteupOk: true },
+                );
+                turnTrace.notices.push(`fmp_phase:after_r1:${earliestIncompleteFmpPhase(fmpState) || 'writeup'}`);
+                let fmpRound = 1;
+                let fmpLastResults = results;
+                let priorFmpFingerprints = toolCalls
+                  .filter((tc) => keepIds.has(tc.id))
+                  .map((tc) => ({
+                    tool: String(tc.function?.name || ''),
+                    args: String(tc.function?.arguments ?? ''),
+                  }));
+                const ensureFmpEvidence = (customerFmp: string): FmpWriteupEvidence => {
+                  fmpEvidence = accumulateFmpEvidence(fmpToolContents, customerFmp);
+                  if (fmpWriteupCtx) {
+                    fmpWriteupCtx.requiredSnippets = requiredSnippetsForWriteup(fmpEvidence);
+                  }
+                  return fmpEvidence;
+                };
+                const fmpCreateDocumentInjectArgs = (customerFmp: string): string => {
+                  const evidence = ensureFmpEvidence(customerFmp);
+                  return buildFmpCreateDocumentInjectArgs(evidence, {
+                    customerText: customerFmp,
+                    defenseBuyersAppear: fmpWriteupCtx?.defenseBuyersAppear
+                      ?? fmpDefenseBuyersAppear(customerFmp),
+                  });
+                };
+                const prepareFmpWriteupGrounding = () => {
+                  if (!fmpState || !fmpWriteupCtx) return;
+                  const customerFmp = splitViewPreamble(message).rest || message;
+                  const evidence = ensureFmpEvidence(customerFmp);
+                  const snippets = requiredSnippetsForWriteup(evidence);
+                  if (!fmpGroundingNotePushed) {
+                    const note = buildFmpWriteupGroundingNote(evidence, customerFmp);
+                    messages.push({ role: 'system', content: note });
+                    const userIdxG = toolRoundMessages.length - 1;
+                    if (userIdxG >= 0 && toolRoundMessages[userIdxG]?.role === 'user') {
+                      toolRoundMessages.splice(userIdxG, 0, { role: 'system', content: note });
+                    } else {
+                      toolRoundMessages.push({ role: 'system', content: note });
+                    }
+                    fmpGroundingNotePushed = true;
+                    turnTrace.notices.push(
+                      `fmp_writeup_grounding:${snippets.length ? snippets.join('|') : 'none'}`,
+                    );
+                  }
+                };
+                const bumpFmpCreateDocTokens = () => {
+                  createOffered = ALL_TOOL_DEFS.some((d) => (d.function as { name?: string })?.name === CREATE_DOCUMENT);
+                  if (createOffered || forcedToolName === CREATE_DOCUMENT) {
+                    if (plannerMaxTokens < FMP_DOC_TOOL_ROUND_MAX_TOKENS) {
+                      plannerMaxTokens = FMP_DOC_TOOL_ROUND_MAX_TOKENS;
+                      turnTrace.notices.push(`fmp_planner_max_tokens:${FMP_DOC_TOOL_ROUND_MAX_TOKENS}`);
+                    }
+                  }
+                };
+                while (
+                  fmpState
+                  && !turnTimedOut
+                  && !fmpReadyForAnswer(fmpState)
+                  && fmpRound < FMP_MAX_ROUNDS
+                ) {
+                  fmpRound += 1;
+                  let phaseFilter = filterToolsForFmpPhase(fmpCatalogDefs, fmpState);
+                  if (
+                    earliestIncompleteFmpPhase(fmpState) === 'writeup'
+                    && !phaseFilter.defs.some((d) => (d.function as { name?: string })?.name === CREATE_DOCUMENT)
+                  ) {
+                    fmpState = markFmpWriteupSkippedNoDocTool(fmpState);
+                    turnTrace.notices.push('fmp_phase:writeup_skipped_no_create_document');
+                    if (fmpReadyForAnswer(fmpState)) break;
+                    phaseFilter = filterToolsForFmpPhase(fmpCatalogDefs, fmpState);
+                  }
+                  ALL_TOOL_DEFS = phaseFilter.defs;
+                  rebuildAnthropicTools();
+                  // Re-open tools that this phase unlocks (round 1 may have locked them).
+                  for (const d of ALL_TOOL_DEFS) {
+                    const n = String((d.function as { name?: string })?.name || '');
+                    if (n) notOfferedThisTurn.delete(n);
+                  }
+                  for (const n of phaseFilter.removed) notOfferedThisTurn.add(n);
+                  fmpPhaseForce = phaseFilter.forceTool;
+                  forcedToolName = fmpPhaseForce
+                    && ALL_TOOL_DEFS.some((d) => (d.function as { name?: string })?.name === fmpPhaseForce)
+                    ? fmpPhaseForce
+                    : null;
+                  // Write-up: pin grounding snippets + raise planner max_tokens for the full doc_model.
+                  if (earliestIncompleteFmpPhase(fmpState) === 'writeup' || forcedToolName === CREATE_DOCUMENT) {
+                    prepareFmpWriteupGrounding();
+                    bumpFmpCreateDocTokens();
+                  } else {
+                    createOffered = ALL_TOOL_DEFS.some((d) => (d.function as { name?: string })?.name === CREATE_DOCUMENT);
+                    bumpFmpCreateDocTokens();
+                  }
+                  turnTrace.notices.push(`fmp_phase:round_${fmpRound}:${earliestIncompleteFmpPhase(fmpState) || 'writeup'}${forcedToolName ? `:force:${forcedToolName}` : ''}`);
+                  const phaseNoteN = fmpPhaseHostNote(fmpState);
+                  const lastDigest = fmpLastResults
+                    .map((r) => `${r.record.tool} [${r.record.status}]: ${String(r.content || '').slice(0, 1500)}`)
+                    .join('\n\n');
+                  const roundNote = {
+                    role: 'system',
+                    content:
+                      `${phaseNoteN}\n\n`
+                      + `ROUND ${fmpRound - 1} TOOL RESULTS (untrusted; already executed). Continue the Federal Market Profile phase plan. `
+                      + 'Call tools for the CURRENT required phase (and earlier). Do not skip ahead. '
+                      + 'Do not re-call a tool with the same arguments.\n\n'
+                      + fenceUntrusted(lastDigest, {
+                        name: `fmp-round-${fmpRound - 1}-tool-results`,
+                        chars: lastDigest.length,
+                        excerpted: true,
+                        truncatedAtUpload: false,
+                      }),
+                  };
+                  const userIdxF = toolRoundMessages.length - 1;
+                  if (userIdxF >= 0 && toolRoundMessages[userIdxF]?.role === 'user') {
+                    toolRoundMessages.splice(userIdxF, 0, roundNote);
+                  } else {
+                    toolRoundMessages.push(roundNote);
+                  }
+                  const plannerF: PlannerTarget = { provider: first.provider as PlannerTarget['provider'], model: first.model };
+                  const rf = await callPlanner(plannerF, { forceAutoToolChoice: !forcedToolName });
+                  turnTrace.planner_attempts.push({
+                    provider: plannerF.provider,
+                    model: plannerF.model,
+                    ok: rf.ok,
+                    status: rf.ok ? null : rf.status,
+                  });
+                  if (!rf.ok) {
+                    turnTrace.notices.push(`fmp_phase:round_${fmpRound}_planner_failed`);
+                    break;
+                  }
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  const uf = (rf.json as any)?.usage;
+                  if (uf) {
+                    toolUsageForCost = {
+                      prompt_tokens: (toolUsageForCost?.prompt_tokens || 0) + (uf.prompt_tokens || 0),
+                      completion_tokens: (toolUsageForCost?.completion_tokens || 0) + (uf.completion_tokens || 0),
+                    };
+                  }
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  const choiceF = (rf.json as any)?.choices?.[0]?.message;
+                  const plannedF = (choiceF?.tool_calls ?? []) as Array<{ id?: string; function?: { name?: string; arguments?: string } }>;
+                  let rawCallsF = (Array.isArray(plannedF) ? plannedF : []).filter((tc) => {
+                    const n = String(tc.function?.name || '');
+                    if (notOfferedThisTurn.has(n) || !(fmpState && fmpToolAllowedInPhase(n, fmpState))) {
+                      turnTrace.notices.push(`fmp_phase_call_dropped:${n}`);
+                      return false;
+                    }
+                    return true;
+                  });
+                  const customerFmpText = splitViewPreamble(message).rest || message;
+                  const awardNaicsFromTools = (() => {
+                    for (const r of fmpLastResults) {
+                      if (r.record.tool !== AWARD_HISTORY_TOOL) continue;
+                      const n = extractDominantAwardNaics(String(r.content || ''));
+                      if (n) return n;
+                    }
+                    return null;
+                  })();
+                  const forcedToolInjectArgs = (toolName: string): string => {
+                    if (toolName === CREATE_DOCUMENT) {
+                      turnTrace.notices.push('fmp_create_document:host_doc_model_injected');
+                      return fmpCreateDocumentInjectArgs(customerFmpText);
+                    }
+                    if (toolName === MARKET_REPORT_TOOL && fmpState) {
+                      return JSON.stringify(buildFmpNextMarketReportArgs(
+                        customerFmpText,
+                        fmpState.marketReportCount,
+                        { awardNaics: awardNaicsFromTools },
+                      ));
+                    }
+                    return '{}';
+                  };
+                  if (rawCallsF.length === 0 && forcedToolName) {
+                    // NEVER inject create_document with {} — that yields invalid_document and burns rewrite.
+                    rawCallsF = [{
+                      id: `call_fmp_force_${fmpRound}`,
+                      function: { name: forcedToolName, arguments: forcedToolInjectArgs(forcedToolName) },
+                    }];
+                    turnTrace.notices.push(`fmp_phase:force_injected_empty_planner:${forcedToolName}`);
+                  }
+                  if (rawCallsF.length === 0) {
+                    turnTrace.notices.push(`fmp_phase:round_${fmpRound}_no_calls`);
+                    // No progress — stop rather than spin.
+                    break;
+                  }
+                  const preparedF = rawCallsF.map((tc, i) => {
+                    const id = tc.id || `call_fmp${fmpRound}_${i}`;
+                    const prepared = prepareChatToolArgs(String(tc.function?.name || ''), String(tc.function?.arguments ?? ''));
+                    let args = prepared.args;
+                    const toolNm = String(tc.function?.name || '');
+                    // Planner returned create_document without a usable doc_model → host DocModel.
+                    if (toolNm === CREATE_DOCUMENT && !createDocumentArgsHaveUsableDocModel(args)) {
+                      args = fmpCreateDocumentInjectArgs(customerFmpText);
+                      turnTrace.notices.push('fmp_create_document:host_doc_model_replaced_empty');
+                    }
+                    const identityArgs = enforceFederalMarketProfileIdentityArgs(toolNm, args, customerFmpText);
+                    args = identityArgs.args;
+                    const pathwayArgs = enforceFederalMarketProfilePathwayArgs(toolNm, args, customerFmpText);
+                    args = pathwayArgs.args;
+                    const vehicleArgs = enforceFederalMarketProfileVehicleArgs(toolNm, args, customerFmpText);
+                    args = vehicleArgs.args;
+                    const marketSizeArgs = enforceFederalMarketProfileMarketSizeArgs(toolNm, args, customerFmpText);
+                    args = marketSizeArgs.args;
+                    // Rotate state + pin award NAICS so each market_size round is a new fingerprint.
+                    if (toolNm === MARKET_REPORT_TOOL && fmpState) {
+                      try {
+                        const parsed = JSON.parse(args || '{}') as Record<string, unknown>;
+                        const next = buildFmpNextMarketReportArgs(customerFmpText, fmpState.marketReportCount, {
+                          awardNaics: typeof parsed.naics === 'string' ? parsed.naics : awardNaicsFromTools,
+                        });
+                        args = JSON.stringify({ ...parsed, ...next });
+                        turnTrace.notices.push(`fmp_market_size_args_pinned:state=${String(next.state || '')}:naics=${String(next.naics || '')}`);
+                      } catch { /* keep enforced args */ }
+                    }
+                    const contactsArgs = enforceFederalMarketProfileContactsArgs(toolNm, args, customerFmpText);
+                    args = contactsArgs.args;
+                    return { ...tc, id, type: 'function' as const, function: { ...tc.function, arguments: args } };
+                  });
+                  const crossF = dropDuplicateRound2Calls(preparedF, priorFmpFingerprints);
+                  for (const d of crossF.duplicates) turnTrace.notices.push(`fmp_phase_dup_skipped:${d.tool}`);
+                  let toolCallsF = crossF.keep;
+                  // Dup-skip or empty planner: inject the forced tool with host args (do not stall the plan).
+                  if (toolCallsF.length === 0 && forcedToolName && fmpState) {
+                    const injectArgs = forcedToolInjectArgs(forcedToolName);
+                    toolCallsF = [{
+                      id: `call_fmp_force_${fmpRound}`,
+                      type: 'function' as const,
+                      function: { name: forcedToolName, arguments: injectArgs },
+                    }];
+                    turnTrace.notices.push(`fmp_phase:force_injected:${forcedToolName}`);
+                  }
+                  if (toolCallsF.length === 0) {
+                    turnTrace.notices.push(`fmp_phase:round_${fmpRound}_no_calls`);
+                    break;
+                  }
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  pendingToolTurnIdx = (messages as any[]).push({ role: 'assistant', content: choiceF?.content ?? null, tool_calls: toolCallsF }) - 1;
+                  if (turnTimedOut) { recordPlannerUsage(); return; }
+                  const resultsF = await executor.executeRound(
+                    toolCallsF,
+                    { provider: plannerF.provider, model: plannerF.model },
+                    { deadlineAt: Date.now() + deadlines.toolRoundBudgetMs, isCancelled: () => turnTimedOut },
+                  );
+                  const perResultCapF = perResultBudget(resultsF.length);
+                  for (const r of resultsF) {
+                    toolOriginals.set(r.tool_call_id, r.content);
+                    const bounded = boundToolResult(r.content, perResultCapF);
+                    if (bounded.truncated) turnTrace.notices.push(`tool_result_bounded:${r.record.tool}:${bounded.originalChars}->${bounded.content.length}`);
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    (messages as any[]).push({ role: 'tool', tool_call_id: r.tool_call_id, content: bounded.content });
+                  }
+                  pendingToolTurnIdx = null;
+                  turnTrace.tool_executions = [...turnTrace.tool_executions, ...resultsF.map((r) => r.record)];
+                  for (const r of resultsF) toolBillingOutcomes.push(toolBillingOutcome(r.record.status, r.content));
+                  const retrievedAtF = new Date().toISOString();
+                  for (const r of resultsF) {
+                    fmpToolContents.push({ tool: r.record.tool, content: r.content });
+                    groundingTexts.push(r.content);
+                    allResultsRendered = false;
+                    unrenderedResults.push({ tool: r.record.tool, status: r.record.status });
+                    turnSources.push(sourceFromToolResult({
+                      tool: r.record.tool, toolCallId: r.tool_call_id, status: r.record.status, content: r.content,
+                      rendered: null, argsRedacted: r.argsRedacted,
+                      owner: { email: (actingScope.kind === 'client' ? actingScope.vaultEmail : auth.email!) || auth.email!, scope: actingScopeKey },
+                      retrievedAt: retrievedAtF,
+                    }));
+                    if (r.record.tool === CREATE_DOCUMENT && r.record.status === 'success') {
+                      const d = parseCreateDocumentDeliverables(r.content);
+                      if (d) {
+                        turnDeliverables.push(...d.files);
+                        if (d.pdf_note) turnDeliverablePdfNote = d.pdf_note;
+                        if (!fmpCreateDocAnswerNotePushed) {
+                          const evidence: FmpWriteupEvidence = fmpEvidence
+                            ?? accumulateFmpEvidence(fmpToolContents, splitViewPreamble(message).rest || message);
+                          fmpEvidence = evidence;
+                          const answerNote = buildFmpCreateDocumentAnswerNote({
+                            evidence,
+                            downloadPaths: d.files.map((f) => f.download_path || '').filter(Boolean),
+                            title: d.title ?? null,
+                          });
+                          messages.push({ role: 'system', content: answerNote });
+                          fmpCreateDocAnswerNotePushed = true;
+                          turnTrace.notices.push('fmp_answer_note:create_document_paths');
+                        }
+                      }
+                    }
+                    if (r.record.tool === MARKET_REPORT_TOOL && r.record.status === 'success') {
+                      try {
+                        const parsed = JSON.parse(r.content) as {
+                          client_name?: string;
+                          market?: { keyword?: string; naics?: string };
+                          deliverable?: { html?: string; url?: string | null; report_id?: string | null };
+                        };
+                        const html = typeof parsed.deliverable?.html === 'string' ? parsed.deliverable.html : '';
+                        if (html) {
+                          const titleBits = [parsed.client_name, parsed.market?.keyword || parsed.market?.naics, 'Market report'].filter(Boolean);
+                          turnMarketReport = {
+                            report_id: parsed.deliverable?.report_id ?? null,
+                            url: parsed.deliverable?.url ?? null,
+                            title: String(titleBits[0] || 'Market report'),
+                            html,
+                          };
+                        }
+                      } catch { /* ignore */ }
+                    }
+                  }
+                  fmpState = applyFmpToolResults(
+                    fmpState,
+                    resultsF.map((r) => ({ tool: r.record.tool, status: r.record.status, content: r.content })),
+                    { requireWriteupOk: true },
+                  );
+                  priorFmpFingerprints = [
+                    ...priorFmpFingerprints,
+                    ...toolCallsF.map((tc) => ({
+                      tool: String(tc.function?.name || ''),
+                      args: String(tc.function?.arguments ?? ''),
+                    })),
+                  ];
+                  fmpLastResults = resultsF;
+                }
+                if (fmpState && !fmpReadyForAnswer(fmpState)) {
+                  fmpState = markFmpBudgetExhausted(fmpState);
+                  turnTrace.notices.push('fmp_phase:budget_exhausted');
+                  messages.push({ role: 'system', content: fmpPhaseHostNote(fmpState) });
+                } else if (fmpState) {
+                  turnTrace.notices.push('fmp_phase:ready_for_answer');
+                  messages.push({ role: 'system', content: fmpPhaseHostNote(fmpState) });
+                }
+              } else {
               // Bounded second planner round (multi-hop): seed success + hop cue, and R1 did not
               // already complete the hop. Same executor budgets, policy, timeouts; R2 is read-only
               // and uses tool_choice:auto (even under OPP_INTENT). Never a third round.
@@ -1303,6 +1870,8 @@ export async function POST(request: NextRequest) {
                 } else {
                   toolRoundMessages.push(round1Note);
                 }
+                // Round 2 must not re-force award history (or any round-1 forced tool).
+                if (forceAwardHistory) forcedToolName = null;
                 const planner2: PlannerTarget = { provider: first.provider as PlannerTarget['provider'], model: first.model };
                 const r2 = await callPlanner(planner2, { forceAutoToolChoice: true });
                 turnTrace.planner_attempts.push({
@@ -1409,6 +1978,7 @@ export async function POST(request: NextRequest) {
                   turnTrace.notices.push('tool_round:2_planner_failed');
                 }
               }
+              } // end non-FMP second-round branch
             }
           }
         } catch (toolErr) {

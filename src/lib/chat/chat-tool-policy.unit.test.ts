@@ -34,6 +34,8 @@ describe('Ask Mindy chat tool policy', () => {
     // Same generateMarketReport engine as MCP (Mindy IP) — Ask orchestration, not Claude's.
     expect(chatToolPolicy('generate_market_report', true).decision).toBe('allowed_write');
     expect(isChatOfferable(chatToolPolicy('generate_market_report', true))).toBe(true);
+    expect(chatToolPolicy('search_web', true).decision).toBe('allowed_read');
+    expect(isChatOfferable(chatToolPolicy('search_web', true))).toBe(true);
   });
 
   it('every registered WRITE tool is either explicitly classified or fails closed', () => {

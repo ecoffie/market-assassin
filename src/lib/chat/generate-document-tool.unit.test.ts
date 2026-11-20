@@ -62,7 +62,13 @@ const model = (over: R = {}) => ({
   ...over,
 });
 
-function setup(opts: { scope?: R; rows?: R[]; pdfDegraded?: boolean } = {}) {
+function setup(opts: {
+  scope?: R;
+  rows?: R[];
+  pdfDegraded?: boolean;
+  federalMarketProfile?: boolean;
+  defenseBuyersAppear?: boolean;
+} = {}) {
   const tables: Record<string, R[]> = { user_boilerplate_docs: opts.rows ?? [], mindy_chat_sessions: [] };
   const storage = fakeStorage();
   const renders: Array<{ format: string; model: R }> = [];
@@ -74,6 +80,12 @@ function setup(opts: { scope?: R; rows?: R[]; pdfDegraded?: boolean } = {}) {
     request: { headers: { get: () => null } },
     chatSessionId: null,
     today: () => '2026-11-17',
+    ...(opts.federalMarketProfile
+      ? {
+        federalMarketProfile: true,
+        fmpWriteupContext: { defenseBuyersAppear: opts.defenseBuyersAppear ?? true },
+      }
+      : {}),
     render: (async (m: R, format: string) => {
       renders.push({ format, model: m });
       if (format === 'pdf' && opts.pdfDegraded) return { ok: true, format: 'html', bytes: Buffer.from('<html>'), mime: 'text/html', filename: 'x.html', degraded: { requested: 'pdf', reason: 'no browser' } };
@@ -82,6 +94,50 @@ function setup(opts: { scope?: R; rows?: R[]; pdfDegraded?: boolean } = {}) {
   });
   const docs = () => tables.user_boilerplate_docs;
   return { tool, tables, storage, renders, docs };
+}
+
+function fmpDocModel(): R {
+  return {
+    title: 'RBA Federal Market Profile',
+    sources: [{ id: 's1', kind: 'usaspending', label: 'USAspending' }],
+    sections: [
+      {
+        id: 'sec-path',
+        heading: 'Six pathways, in priority order',
+        blocks: [{ type: 'paragraph', id: 'p1', text: 'Vehicles then sources sought. Market $470M.', claim: 'fact', cites: ['s1'] }],
+      },
+      {
+        id: 'sec-pae',
+        heading: 'Who owns defense construction now: the PAE shift',
+        blocks: [{ type: 'paragraph', id: 'p2', text: 'PAE oversight.', claim: 'fact', cites: ['s1'] }],
+      },
+      {
+        id: 'sec-pain',
+        heading: 'What buyers are under pressure to fix',
+        blocks: [{ type: 'paragraph', id: 'p3', text: 'Deferred maintenance.', claim: 'fact', cites: ['s1'] }],
+      },
+      {
+        id: 'sec-who',
+        heading: 'Who to talk to and what to say',
+        blocks: [{
+          type: 'table',
+          id: 't1',
+          columns: [{ key: 'contact', label: 'Contact' }, { key: 'question', label: 'Question to ask' }],
+          rows: [{ contact: 'Helson Roman', question: 'Ask about MATOC seats.' }],
+        }],
+      },
+      {
+        id: 'sec-ready',
+        heading: 'Readiness checklist',
+        blocks: [{
+          type: 'bullets',
+          id: 'b1',
+          ordered: false,
+          items: [{ text: 'Update DSBS keywords for bridge work.', claim: 'recommendation' }],
+        }],
+      },
+    ],
+  };
 }
 
 beforeEach(() => { vi.stubEnv('VAULT_GENERATED_FILES', 'allowlist'); vi.stubEnv('VAULT_DOC_ALLOWLIST', ME); });
@@ -376,6 +432,29 @@ describe('create_document', () => {
     expect(CARD_CHAT_TOOLS.has(CREATE_DOCUMENT)).toBe(false);
     expect(chatToolPolicy(CREATE_DOCUMENT, true).decision).toBe('allowed_write');
     expect(VAULT_GROUNDED_TOOLS.has(CREATE_DOCUMENT)).toBe(true);
+  });
+});
+
+describe('create_document FMP write-up gate', () => {
+  it('FMP flag on + incomplete profile → fmp_writeup_invalid, nothing saved', async () => {
+    const s = setup({ federalMarketProfile: true, defenseBuyersAppear: true });
+    const r = await s.tool.execute({ doc_model: model() });
+    expect(r).toMatchObject({ ok: false, error: 'fmp_writeup_invalid' });
+    expect(s.docs()).toEqual([]);
+    expect(s.renders).toEqual([]);
+  });
+
+  it('FMP flag on + valid pathway profile → saves', async () => {
+    const s = setup({ federalMarketProfile: true, defenseBuyersAppear: true });
+    const r = await s.tool.execute({ doc_model: fmpDocModel() });
+    expect(r).toMatchObject({ ok: true, saved_to: 'vault' });
+    expect(s.docs().length).toBeGreaterThan(0);
+  });
+
+  it('non-FMP create_document is unchanged (short brief still saves)', async () => {
+    const s = setup();
+    const r = await s.tool.execute({ doc_model: model() });
+    expect(r).toMatchObject({ ok: true, saved_to: 'vault' });
   });
 });
 

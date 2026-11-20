@@ -75,6 +75,12 @@ const CHAT_OVERRIDES: Readonly<Record<string, ChatToolPolicy>> = {
       'Packaged market research (Mindy IP — same generateMarketReport engine as MCP). One-shot sections + hosted deliverable; owner from verified session email. Ask uses this instead of ad-hoc tool scraps → create_document.',
   },
 
+  // ── Chat-local open-web read (Serper; not an MCP tool) ──
+  search_web: {
+    decision: 'allowed_read',
+    reason: 'Open-web search via Serper for public facts Ask does not store (CRS, bills, GAO, PAE press, 8(a) coverage).',
+  },
+
   // ── Chat-specific exceptions ──
   verify_m_scale: {
     decision: 'blocked_chat_exception',

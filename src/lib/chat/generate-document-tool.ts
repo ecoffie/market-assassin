@@ -29,6 +29,7 @@ import type { VaultStorage, VaultUploadInput } from '@/lib/vault/upload';
 import { detectProhibitedMarkings, markingRefusalMessage } from '@/lib/vault/marking-detect';
 import { vaultEmailFor, WORKSPACE_UNCONFIRMED_NOTE, type ChatActingScope } from './chat-acting-scope';
 import { vaultDocEnabledFor } from '@/lib/vault/flags';
+import { validateFmpWriteup, type FmpWriteupContext } from './fmp-writeup-validate';
 
 export const CREATE_DOCUMENT = 'create_document';
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -145,6 +146,17 @@ export interface GenerateDocumentDeps {
   chatSessionId: string | null;
   render?: typeof renderDocument;
   today?: () => string;
+  /**
+   * Federal Market Profile turn: run the step-8 write-up validator after DocModel
+   * repair/validate/demote and BEFORE render/save. Hard failures return
+   * `fmp_writeup_invalid` and save nothing.
+   */
+  federalMarketProfile?: boolean;
+  /**
+   * PAE section required when defenseBuyersAppear; optional requiredSnippets from
+   * host-extracted tool JSON (FmpWriteupContext.requiredSnippets).
+   */
+  fmpWriteupContext?: FmpWriteupContext;
 }
 
 type Row = { id: string; original_filename: string; mime_type: string | null; version: number | null; parent_id: string | null; doc_model: unknown };
@@ -315,6 +327,25 @@ export function makeGenerateDocumentTool(deps: GenerateDocumentDeps) {
     // Method boilerplate repeated across sections is reported, never a reason to refuse or cut.
     const repeats = repeatedSentences(model);
 
+    // FMP step 8: structure + ban gate (Choice B). Soft em-dash replace; hard refuse on missing sections / CTAs.
+    let fmpWarnings: string[] = [];
+    if (deps.federalMarketProfile) {
+      const fmpCtx: FmpWriteupContext = deps.fmpWriteupContext ?? { defenseBuyersAppear: false };
+      const fmp = validateFmpWriteup(model, fmpCtx);
+      if (fmp.model) model = fmp.model;
+      const hard = fmp.issues.filter((i) => i.severity === 'error');
+      fmpWarnings = fmp.issues.filter((i) => i.severity === 'warn').map((i) => i.message);
+      if (hard.length) {
+        return {
+          ok: false,
+          error: 'fmp_writeup_invalid',
+          issues: hard.map((i) => `${i.code}: ${i.message}`),
+          ...(fmpWarnings.length ? { warnings: fmpWarnings } : {}),
+          note: 'Federal Market Profile write-up failed the structure gate. Nothing was saved. Fix the listed issues and call create_document once more.',
+        };
+      }
+    }
+
     const text = docModelText(model);
     const marking = detectProhibitedMarkings(markingText(model));
     if (marking.blocked && marking.kind) return { ok: false, error: 'prohibited_marking', note: markingRefusalMessage(marking.kind) };
@@ -411,6 +442,7 @@ export function makeGenerateDocumentTool(deps: GenerateDocumentDeps) {
       ...(pdfNote ? { pdf_note: pdfNote } : {}),
       ...(spreadsheetNote ? { spreadsheet_note: spreadsheetNote } : {}),
       ...(repeats.length ? { repeated_sentences: repeats.length } : {}),
+      ...(fmpWarnings.length ? { fmp_warnings: fmpWarnings } : {}),
       diagnostics,
       note: 'Saved privately to the Vault (Documents → Generated). Under this answer the user gets an "Open report" card (on the Map the report also opens in a reading pane beside the chat) plus Download buttons — tell the user the file names, that they can read it there and ask you for changes (a new version is saved, the old one is kept), and that they can download from those buttons or from Documents → Generated; do not paste download links.'
         + (unverified.length ? ` ${unverified.length} statement(s) are labeled "Unverified — no source"; say so.` : '')
