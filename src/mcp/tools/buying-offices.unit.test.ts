@@ -283,4 +283,21 @@ describe('unresolved offices stay unnamed', () => {
     expect(r.offices.every((o) => !('email' in o) && !('phone' in o))).toBe(true);
     expect(r.notes.join(' ')).toMatch(/not filled in/);
   });
+
+  it('uses a directory name when the award record has only a code', async () => {
+    const { d } = deps({
+      rows: [{ ...OFFICE_ROWS[0], office_key: 'ABC123' }],
+    });
+    const r = await getBuyingOffices({ state: 'TN', naics: '5613' }, d, NOW, {
+      lookup: async () => ({
+        names: new Map([['ABC123', { name: 'NAVSUP FLT LOG CTR NORFOLK', source: 'sam_office_name' as const }]]),
+        failed: false,
+      }),
+    });
+    expect(r.offices[0].name_provenance).toBe('directory_sam');
+    expect(r.offices[0].office_name).toBe('NAVSUP FLT LOG CTR NORFOLK');
+    expect(r.offices[0].office_code).toBe('ABC123');
+    expect(r.notes.join(' ')).toMatch(/buying-office directory/);
+    expect(r.notes.join(' ')).toMatch(/No contact was added/);
+  });
 });
