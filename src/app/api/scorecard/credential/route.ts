@@ -26,7 +26,7 @@ async function signingKey(token: string) {
   const res = await fetch(`${SCORECARD_OIDC_ISSUER}/.well-known/jwks`);
   if (!res.ok) return null;
   const body = await res.json() as { keys?: Array<JsonWebKey & { kid?: string }> };
-  const jwk = body.keys?.find((key) => key.kid === header.kid) ?? body.keys?.[0];
+  const jwk = body.keys?.find((key) => key.kid === header.kid);
   if (!jwk) return null;
   return publicKeyFromJwk(jwk as Parameters<typeof publicKeyFromJwk>[0]);
 }
@@ -53,20 +53,25 @@ export async function POST(request: NextRequest) {
   let payload;
   try {
     const key = await signingKey(token);
-    if (!key) return NextResponse.json({ reason: 'credential is rejected' }, { status: 401 });
+    if (!key) return NextResponse.json({ reason: 'oidc key rejected' }, { status: 401 });
     const verified = verifyRs256(token, key);
     if (!verified.ok) return NextResponse.json({ reason: verified.reason }, { status: 401 });
     payload = assessScorecardOidcClaims(verified.payload);
   } catch {
-    return NextResponse.json({ reason: 'credential is rejected' }, { status: 401 });
+    return NextResponse.json({ reason: 'oidc token rejected' }, { status: 401 });
   }
   if (!payload.ok) {
-    const status = payload.reason === 'credential is expired' ? 401 : 403;
+    const status = payload.reason === 'oidc token expired' ? 401 : 403;
     return NextResponse.json({ reason: payload.reason }, { status });
   }
 
   const rotator = process.env.SCORECARD_ROTATOR_URL || '';
-  if (!rotator) return NextResponse.json({ reason: 'credential is missing' }, { status: 503 });
+  if (!rotator) return NextResponse.json({ reason: 'rotator is not configured' }, { status: 503 });
+  const host = process.env.SCORECARD_READER_HOST || '';
+  const user = process.env.SCORECARD_READER_USER || '';
+  if (!host.endsWith('.pooler.supabase.com') || !user.startsWith('scorecard_reader')) {
+    return NextResponse.json({ reason: 'reader host is not configured' }, { status: 503 });
+  }
 
   const client = new pg.Client({ connectionString: rotator, ssl: { rejectUnauthorized: true } });
   try {
@@ -79,7 +84,7 @@ export async function POST(request: NextRequest) {
     const row = rotated.rows[0];
     const databaseUrl = row ? readerUrl(String(row.password)) : null;
     if (!databaseUrl || !row?.expires_at) {
-      return NextResponse.json({ reason: 'credential is rejected' }, { status: 503 });
+      return NextResponse.json({ reason: 'reader host is not configured' }, { status: 503 });
     }
     return NextResponse.json({
       database_url: databaseUrl,
@@ -89,9 +94,12 @@ export async function POST(request: NextRequest) {
   } catch (err) {
     const message = err instanceof Error ? err.message : '';
     const match = message.match(REFUSAL);
-    if (match?.[1] === 'replay') return NextResponse.json({ reason: 'credential is rejected' }, { status: 409 });
-    if (match?.[1] === 'rate') return NextResponse.json({ reason: 'credential is rejected' }, { status: 429 });
-    return NextResponse.json({ reason: 'credential is rejected' }, { status: 401 });
+    if (match?.[1] === 'replay') return NextResponse.json({ reason: 'rotation replay' }, { status: 409 });
+    if (match?.[1] === 'rate') return NextResponse.json({ reason: 'rotation rate limited' }, { status: 429 });
+    if (/password authentication failed|no encryption|ECONNREFUSED|ENOTFOUND|certificate/i.test(message)) {
+      return NextResponse.json({ reason: 'rotator connection failed' }, { status: 503 });
+    }
+    return NextResponse.json({ reason: 'rotation refused' }, { status: 401 });
   } finally {
     await client.end().catch(() => {});
   }

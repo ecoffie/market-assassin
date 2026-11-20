@@ -82,7 +82,8 @@ const CRON_JOBS = {
   dodSbir: ['sync-dod-sbir'],
   budgetIntel: ['sync-budget-intel'],
   usaspendingAwards: ['sync-usaspending-awards'],
-  samEntities: ['sync-gov-buyer-data'],
+  samEntities: ['sync-sam-entities', 'sync-gov-buyer-data'],
+  dodaac: ['refresh-dodaac-directory'],
 } as const;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -517,8 +518,13 @@ export async function GET(request: NextRequest) {
       key: 'sam_entities', label: 'SAM entity registrations', kind: 'source_corpus',
       stored: c.samEntities, unit: 'entity records',
       headlineContribution: c.samEntities,
-      freshness: fresh({ asOf: e.samEntities, cadenceHours: null, basis: 'MAX(sam_entities.synced_at) — sync-gov-buyer-data has no registered schedule', jobs: CRON_JOBS.samEntities }),
-      surface: { state: 'customer_readable', tools: ['lookup_sam_entity'], note: 'local-first entity lookup; live SAM only for gaps' },
+      freshness: fresh({
+        asOf: e.samEntities,
+        cadenceHours: 24 * 7,
+        basis: 'MAX(sam_entities.synced_at). Incremental slices via sync-gov-buyer-data?pull=entities, checkpointed in sam_entities_sync_state, chained from the full SAM opportunity sync. Not a full reimport. A missing synced_at is unknown, not stale and not zero.',
+        jobs: CRON_JOBS.samEntities,
+      }),
+      surface: { state: 'customer_readable', tools: ['lookup_sam_entity'], note: 'local-first entity lookup; live SAM only for gaps. A mirror hit is labeled as_of the row sync time.' },
       upstreams: ['sam_gov'], provenance: 'SAM.gov entity export (UEI, CAGE, NAICS, certifications). Overlaps the award-derived contractor companies — different record type, not deduplicated.',
     },
     {
@@ -760,8 +766,13 @@ export async function GET(request: NextRequest) {
       derivedFrom: ['bq_awards'],
       stored: c.dodaac, unit: 'offices',
       headlineContribution: 0,
-      freshness: { state: 'UNKNOWN', asOf: e.dodaac, basis: 'MAX(dodaac_directory.updated_at) — monthly producer refresh-dodaac-directory (0 9 6 * *); age + row coverage judged by check-data-freshness (table-measured), never by last_built' },
-      surface: { state: 'internal_only', tools: [], note: 'anchors office rosters, events and opportunity office names' },
+      freshness: {
+        state: timestampState(e.dodaac, 24 * 32, now),
+        asOf: e.dodaac,
+        basis: 'MAX(dodaac_directory.updated_at). Monthly producer refresh-dodaac-directory (0 9 6 * *). A missing clock is unknown. A code with no stored name stays unnamed.',
+        schedules: schedules(CRON_JOBS.dodaac),
+      },
+      surface: { state: 'customer_readable', tools: ['get_buying_offices'], note: 'Ask Mindy ranks offices from award transactions. Unresolved codes stay unnamed. This directory does not invent contacts.' },
       upstreams: ['usaspending'], provenance: 'Contracting offices decoded from award DoDAACs (USASpending/FPDS in BigQuery).',
     },
     {

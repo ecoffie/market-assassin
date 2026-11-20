@@ -20,6 +20,7 @@ function claims(overrides: Record<string, unknown> = {}) {
     ref: SCORECARD_REF,
     event_name: 'schedule',
     workflow_ref: `ecoffie/market-assassin/${SCORECARD_WORKFLOW}`,
+    job_workflow_ref: `ecoffie/market-assassin/${SCORECARD_WORKFLOW}`,
     jti: 'jti-scorecard-1',
     exp: Math.floor(NOW / 1000) + 300,
     iat: Math.floor(NOW / 1000),
@@ -45,24 +46,38 @@ describe('scorecard OIDC claims', () => {
     if (result.ok) expect(result.eventName).toBe('schedule');
   });
 
-  it('accepts workflow_dispatch and rejects every other event, ref, repo, and audience', () => {
+  it('names each OIDC gate without echoing the claim', () => {
     expect(assessScorecardOidcClaims(claims({ event_name: 'workflow_dispatch' }), NOW).ok).toBe(true);
-    expect(assessScorecardOidcClaims(claims({ event_name: 'pull_request' }), NOW).ok).toBe(false);
-    expect(assessScorecardOidcClaims(claims({ ref: 'refs/heads/feature' }), NOW).ok).toBe(false);
-    expect(assessScorecardOidcClaims(claims({ repository: 'other/market-assassin' }), NOW).ok).toBe(false);
-    expect(assessScorecardOidcClaims(claims({ aud: 'https://github.com/ecoffie' }), NOW).ok).toBe(false);
-    expect(assessScorecardOidcClaims(claims({ iss: 'https://example.invalid' }), NOW).ok).toBe(false);
+    expect(assessScorecardOidcClaims(claims({ event_name: 'pull_request' }), NOW).reason).toBe('oidc event rejected');
+    expect(assessScorecardOidcClaims(claims({ ref: 'refs/heads/feature' }), NOW).reason).toBe('oidc ref rejected');
+    expect(assessScorecardOidcClaims(claims({ repository: 'other/market-assassin' }), NOW).reason).toBe('oidc repository rejected');
+    expect(assessScorecardOidcClaims(claims({ aud: 'https://github.com/ecoffie' }), NOW).reason).toBe('oidc audience rejected');
+    expect(assessScorecardOidcClaims(claims({ iss: 'https://example.invalid' }), NOW).reason).toBe('oidc issuer rejected');
     expect(assessScorecardOidcClaims(claims({
       workflow_ref: 'ecoffie/market-assassin/.github/workflows/other.yml@refs/heads/main',
-    }), NOW).ok).toBe(false);
+    }), NOW).reason).toBe('oidc workflow rejected');
+    expect(assessScorecardOidcClaims(claims({
+      workflow_ref: 'ecoffie/market-assassin/.github/workflows/other.yml@refs/heads/main',
+      job_workflow_ref: `ecoffie/market-assassin/${SCORECARD_WORKFLOW}`,
+    }), NOW).reason).toBe('oidc workflow rejected');
+    expect(assessScorecardOidcClaims(claims({
+      job_workflow_ref: 'ecoffie/market-assassin/.github/workflows/other.yml@refs/heads/main',
+    }), NOW).reason).toBe('oidc workflow rejected');
+    expect(assessScorecardOidcClaims(claims({ exp: Math.floor(NOW / 1000) - 1 }), NOW).reason).toBe('oidc token expired');
+    expect(assessScorecardOidcClaims(claims({ iat: Math.floor(NOW / 1000) - 11 * 60 }), NOW).reason).toBe('oidc token expired');
+    expect(assessScorecardOidcClaims(claims({ iat: Math.floor(NOW / 1000) + 120 }), NOW).reason).toBe('oidc token rejected');
+    expect(assessScorecardOidcClaims(claims({ nbf: Math.floor(NOW / 1000) + 120 }), NOW).reason).toBe('oidc token rejected');
+    expect(assessScorecardOidcClaims(claims({ run_id: null }), NOW).reason).toBe('oidc token rejected');
+    expect(assessScorecardOidcClaims(claims({ jti: 'short' }), NOW).reason).toBe('oidc token rejected');
   });
 
-  it('rejects an expired token and a replayed signature that is not RS256', () => {
-    expect(assessScorecardOidcClaims(claims({ exp: Math.floor(NOW / 1000) - 1 }), NOW).reason).toBe('credential is expired');
+  it('verifies a locally signed RS256 token and rejects a bad signature', () => {
     const { token, publicKey } = signed(claims());
-    expect(verifyRs256(token, publicKey).ok).toBe(true);
+    const verified = verifyRs256(token, publicKey);
+    expect(verified.ok).toBe(true);
+    if (verified.ok) expect(assessScorecardOidcClaims(verified.payload, NOW).ok).toBe(true);
     const bad = signed(claims(), 'none');
-    expect(verifyRs256(bad.token, bad.publicKey).ok).toBe(false);
-    expect(verifyRs256(`${token}x`, publicKey).ok).toBe(false);
+    expect(verifyRs256(bad.token, bad.publicKey).reason).toBe('oidc signature rejected');
+    expect(verifyRs256(`${token}x`, publicKey).reason).toBe('oidc signature rejected');
   });
 });
