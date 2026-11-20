@@ -616,7 +616,7 @@ export async function GET(request: NextRequest) {
         { label: 'NIH RePORTER', count: c.resNih, note: e.resNih ? `last advanced ${e.resNih.slice(0, 10)}` : undefined },
         { label: 'Grants.gov research slice', count: c.resGrantsGov, note: e.resGrantsGov ? `last advanced ${e.resGrantsGov.slice(0, 10)}` : undefined },
         { label: 'DARPA BAA', count: c.resDarpa, note: e.resDarpa ? `last advanced ${e.resDarpa.slice(0, 10)}` : undefined },
-        { label: 'NSF SBIR/STTR', count: c.resNsf, note: (c.resNsf ?? 0) === 0 ? 'contributes 0 rows — never written' : undefined },
+        { label: 'NSF SBIR/STTR', count: null, note: 'unavailable — api.www.sbir.gov returns HTTP 403, so this feed is not collected. That is not a count of zero opportunities.' },
         { label: 'view: SBIR / STTR (opportunity_type) — what search_sbir reads', count: c.resTypeSbir, note: 'subset of the above, not additive' },
         { label: 'view: grant-type', count: c.resTypeGrant, note: 'subset, not additive' },
         { label: 'view: BAA', count: c.resTypeBaa, note: 'subset, not additive' },
