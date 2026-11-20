@@ -1,0 +1,18 @@
+{
+  "forecastId": 76057,
+  "apfsNumber": "F2027076057",
+  "naics": "488310 - Port and Harbor Operations",
+  "component": "USCG/LOGCOM",
+  "title": "Singapore Pier and Shoreside Support",
+  "contractType": "Firm Fixed Price",
+  "contractVehicle": "PO (FAR Subpart 13.5)",
+  "dollarRange": "$1M - $1.9M",
+  "smallBusinessSetAside": "N/A",
+  "smallBusinessProgram": "None",
+  "contractStatus": "New Requirement",
+  "requirementsOffice": "LOG-45 (Requirements)",
+  "description": "Vendor to provide pier services and shoreside support in the Republic of Singapore",
+  "estimatedSolicitationRelease": "2026-11-18",
+  "forecastPublished": "2026-11-18",
+  "forecastPreviouslyPublished": null
+}

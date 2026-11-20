@@ -54,6 +54,13 @@ export interface FcoCensus {
   /** TRUE only when enumeration is provably complete. A partial census is NOT a success. */
   complete: boolean;
   incompleteReason?: string;
+  /**
+   * Next page index to request. Null when the census finished or truly exhausted.
+   * A later run passes this as startPage. A partial read is degraded, not complete.
+   */
+  resumePage: number | null;
+  /** True when we read the source but did not finish. Never means unreachable. */
+  degraded: boolean;
 }
 
 const strip = (s: unknown): string =>
@@ -116,14 +123,23 @@ type FetchLike = (url: string) => Promise<{ ok: boolean; status: number; json: (
  * than the source" is the failure shape that hid State.
  */
 export async function runFcoCensus(
-  opts: { fetchImpl?: FetchLike; pageDelayMs?: number; concurrency?: number; budgetMs?: number } = {},
+  opts: {
+    fetchImpl?: FetchLike;
+    pageDelayMs?: number;
+    concurrency?: number;
+    budgetMs?: number;
+    /** Continue a previous partial census. Page 2 of the live API repeats page 1; dedupe handles that. */
+    startPage?: number;
+    /** Base delay for 429/503/network retries. Tests pass 0. */
+    retryBaseMs?: number;
+  } = {},
 ): Promise<FcoCensus> {
   const doFetch: FetchLike = opts.fetchImpl ?? ((url) => fetch(url) as unknown as ReturnType<FetchLike>);
   const delay = opts.pageDelayMs ?? 0;
-  // Bounded concurrency. Sequential at 120ms/page took ~7 minutes for 370 pages, which EXCEEDS the
-  // 300s cron ceiling — a watcher that always times out never succeeds. A small pool keeps us well
-  // inside it without hammering the source. De-dup is on `nid`, so overlapping pages are harmless.
-  const pool = Math.max(1, Math.min(opts.concurrency ?? 3, 12));
+  const retryBaseMs = opts.retryBaseMs ?? 1_000;
+  // Default pool is 1. Measured 2026-11-19: a pool of 3 from this network 503'd after page 2.
+  // A sequential walk with backoff finishes degraded and resumable instead of looking dead.
+  const pool = Math.max(1, Math.min(opts.concurrency ?? 1, 4));
   // SOFT WALL-CLOCK BUDGET. Measured 2026-09-14: a full 372-page census takes ~215s at pool 6,
   // against a 300s cron ceiling. Rather than be KILLED mid-run (which looks like nothing happened),
   // stop at the budget and report INCOMPLETE — the watcher then alerts on incomplete enumeration
@@ -134,39 +150,57 @@ export async function runFcoCensus(
   let reportedTotal = 0;
   let pagesFetched = 0;
   let pagesFailed = 0;
-  let consecutiveNoNew = 0;
+  let duplicatePages = 0;
   let failure: string | undefined;
+  let resumePage: number | null = null;
+  let exhausted = false;
+  const startPage = Math.max(0, opts.startPage ?? 0);
 
-  type FcoPayload = { listing?: { total?: number | string; data?: Record<string, { render?: Record<string, unknown> }> } };
+  type FcoPayload = { listing?: { total?: number | string; data?: Record<string, { render?: Record<string, unknown> }> | Array<{ render?: Record<string, unknown> }> } };
   const fetchPage = async (page: number): Promise<FcoPayload | null> => {
-    // MEASURED 2026-09-14: a pool of 6 from a laptop completed 372/372 pages cleanly, but the SAME
-    // code from Vercel egress failed 6 pages within 54 — the source throttles datacenter IPs harder.
-    // So: more attempts, exponential backoff with jitter, and a smaller default pool. A page that
-    // still fails every attempt marks the census INCOMPLETE; it is never treated as an empty page.
-    for (let attempt = 0; attempt < 5; attempt++) {
+    // 503/429: back off and retry THIS page. A failed page is not an empty page and
+    // does not make the source unreachable if an earlier page was read.
+    for (let attempt = 0; attempt < 6; attempt++) {
       try {
         const res = await doFetch(`${FCO_BASE}?range=${PAGE_SIZE}&page=${page}`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return (await res.json()) as FcoPayload;
       } catch {
-        if (attempt === 4) return null;
-        await new Promise((r) => setTimeout(r, 500 * 2 ** attempt + Math.floor(Math.random() * 250)));
+        if (attempt === 5) return null;
+        const wait = retryBaseMs * 2 ** attempt;
+        if (wait > 0) await new Promise((r) => setTimeout(r, wait));
       }
     }
     return null;
   };
 
-  for (let start = 0; start < MAX_PAGES; start += pool) {
-    const batch = await Promise.all(
-      Array.from({ length: pool }, (_, k) => fetchPage(start + k)),
-    );
-    let added = 0;
-    for (const payload of batch) {
+  const nidKey = (payload: FcoPayload): string => {
+    const data = payload.listing?.data;
+    const values = Array.isArray(data) ? data : Object.values(data ?? {});
+    return values.map((v) => String((v as { nid?: unknown; render?: { nid?: unknown } }).nid
+      ?? (v as { render?: { nid?: unknown } }).render?.nid ?? '')).join(',');
+  };
+
+  let page = startPage;
+  let previousKey = '';
+  while (page < MAX_PAGES) {
+    if (Date.now() - startedAt > budgetMs) {
+      failure = `soft time budget ${budgetMs}ms exceeded after ${byNid.size} rows`;
+      resumePage = page;
+      break;
+    }
+    const batchPages = Array.from({ length: pool }, (_, k) => page + k).filter((p) => p < MAX_PAGES);
+    const batch = await Promise.all(batchPages.map((p) => fetchPage(p)));
+    let stop = false;
+    for (let i = 0; i < batch.length; i++) {
+      const payload = batch[i];
+      const pageNo = batchPages[i];
       if (!payload?.listing) {
-        // A page we could not read. Record it and STOP claiming completeness.
         pagesFailed++;
-        failure = `a page in batch starting ${start} was unreadable after 3 attempts`;
-        continue;
+        failure = `page ${pageNo} unreadable after backoff`;
+        resumePage = pageNo;
+        stop = true;
+        break;
       }
       pagesFetched++;
       // ⚠️ `listing.total` arrives as a STRING ("9225"), not a number. A `typeof === 'number'`
@@ -175,24 +209,38 @@ export async function runFcoCensus(
       const rawTotal = Number(payload.listing.total);
       if (Number.isFinite(rawTotal) && rawTotal > 0) reportedTotal = rawTotal;
 
+      const key = nidKey(payload);
+      const values = Array.isArray(payload.listing.data)
+        ? payload.listing.data
+        : Object.values(payload.listing.data ?? {});
+      if (values.length === 0) {
+        exhausted = true;
+        stop = true;
+        break;
+      }
+      // Measured 2026-11-19 with range=5 and range=25: page=2 returns the same nids as page=1.
+      // That is a repeated index, not the end of the source. Do not stop.
+      if (key && key === previousKey) {
+        duplicatePages++;
+        previousKey = key;
+        continue;
+      }
+      previousKey = key;
       // ⚠️ `listing.data` is keyed by POSITION (0..24) on every page, NOT by record id. De-duping on
       // that key collapses the entire corpus to 25 rows — measured. Always key on the row's own nid.
-      for (const v of Object.values(payload.listing.data ?? {})) {
+      for (const v of values) {
         const row = mapFcoRow((v as { render?: Record<string, unknown> })?.render ?? {});
         if (!row.nid) continue;
-        if (!byNid.has(row.nid)) { byNid.set(row.nid, row); added++; }
+        if (!byNid.has(row.nid)) byNid.set(row.nid, row);
+      }
+      if (reportedTotal > 0 && byNid.size >= reportedTotal) {
+        exhausted = true;
+        stop = true;
+        break;
       }
     }
-    if (pagesFailed > 0) break;
-    if (Date.now() - startedAt > budgetMs) {
-      failure = `soft time budget ${budgetMs}ms exceeded after ${byNid.size} rows`;
-      break;
-    }
-    if (added === 0) {
-      consecutiveNoNew++;
-      if (consecutiveNoNew >= 1) break;   // a whole batch yielding nothing new = exhausted
-    } else consecutiveNoNew = 0;
-    if (reportedTotal > 0 && byNid.size >= reportedTotal) break;
+    if (stop) break;
+    page += pool;
     if (delay) await new Promise((r) => setTimeout(r, delay));
   }
 
@@ -211,10 +259,13 @@ export async function runFcoCensus(
   const changedList = rows.map((r) => r.changed).filter((x): x is string => !!x).sort();
 
   // Complete ONLY when every page read cleanly AND we hold at least the source's own reported total.
-  const complete = pagesFailed === 0 && reportedTotal > 0 && byNid.size >= reportedTotal;
+  // A 503 mid-walk is degraded (resumePage set), not complete, and not unreachable.
+  const complete = pagesFailed === 0 && reportedTotal > 0 && byNid.size >= reportedTotal && resumePage == null;
+  if (exhausted) resumePage = null;
   if (!complete && !failure) {
     failure = reportedTotal === 0 ? 'source reported no total'
-      : `enumerated ${byNid.size} of reported ${reportedTotal}`;
+      : `enumerated ${byNid.size} of reported ${reportedTotal}`
+        + (duplicatePages ? ` (${duplicatePages} repeated page index${duplicatePages === 1 ? '' : 'es'} skipped)` : '');
   }
 
   return {
@@ -231,5 +282,7 @@ export async function runFcoCensus(
     pagesFailed,
     complete,
     incompleteReason: complete ? undefined : failure,
+    resumePage: complete ? null : resumePage,
+    degraded: !complete && pagesFetched > 0,
   };
 }

@@ -41,7 +41,10 @@ import {
   scheduleTruth,
   STATIC_FILE_AS_OF,
   UPSTREAM_PUBLISHERS,
+  corpusFreshness,
   summarizeStates,
+  classifyJobPostingHealth,
+  classifyDodSbirHealth,
   timestampState,
   worstState,
   type Freshness,
@@ -81,7 +84,8 @@ const CRON_JOBS = {
   dodSbir: ['sync-dod-sbir'],
   budgetIntel: ['sync-budget-intel'],
   usaspendingAwards: ['sync-usaspending-awards'],
-  samEntities: ['sync-gov-buyer-data'],
+  samEntities: ['sync-sam-entities', 'sync-gov-buyer-data'],
+  dodaac: ['refresh-dodaac-directory'],
 } as const;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -516,8 +520,13 @@ export async function GET(request: NextRequest) {
       key: 'sam_entities', label: 'SAM entity registrations', kind: 'source_corpus',
       stored: c.samEntities, unit: 'entity records',
       headlineContribution: c.samEntities,
-      freshness: fresh({ asOf: e.samEntities, cadenceHours: null, basis: 'MAX(sam_entities.synced_at) — sync-gov-buyer-data has no registered schedule', jobs: CRON_JOBS.samEntities }),
-      surface: { state: 'customer_readable', tools: ['lookup_sam_entity'], note: 'local-first entity lookup; live SAM only for gaps' },
+      freshness: fresh({
+        asOf: e.samEntities,
+        cadenceHours: 24 * 7,
+        basis: 'MAX(sam_entities.synced_at). Incremental slices via sync-gov-buyer-data?pull=entities, checkpointed in sam_entities_sync_state, chained from the full SAM opportunity sync. Not a full reimport. A missing synced_at is unknown, not stale and not zero.',
+        jobs: CRON_JOBS.samEntities,
+      }),
+      surface: { state: 'customer_readable', tools: ['lookup_sam_entity'], note: 'local-first entity lookup; live SAM only for gaps. A mirror hit is labeled as_of the row sync time.' },
       upstreams: ['sam_gov'], provenance: 'SAM.gov entity export (UEI, CAGE, NAICS, certifications). Overlaps the award-derived contractor companies — different record type, not deduplicated.',
     },
     {
@@ -543,10 +552,15 @@ export async function GET(request: NextRequest) {
       ],
       headlineContribution: c.forecasts,
       freshness: {
-        state: forecastInstances.length ? worstState(forecastInstances.map((i) => i.state)) : timestampState(e.forecasts, 24, now),
+        state: forecastInstances.length ? corpusFreshness(forecastInstances.map((i) => i.state)) : timestampState(e.forecasts, 24, now),
         asOf: e.forecasts,
-        basis: `worst of ${forecastInstances.length} registered feeds (data_source_instances); aggregate clock MAX(agency_forecasts.updated_at)`,
-        detail: `${forecastIssuers.length} issuing agencies hold rows; ${forecastInstances.length} have a registered feed in the control plane (${summarizeStates(forecastInstances.map((i) => i.state))}). Agencies without a registered feed are not health-monitored.`,
+        basis: `corpus of ${forecastInstances.length} registered feeds (data_source_instances); aggregate clock MAX(agency_forecasts.updated_at)`,
+        detail: [
+          `${forecastIssuers.length} issuing agencies hold rows; ${forecastInstances.length} have a registered feed in the control plane (${summarizeStates(forecastInstances.map((i) => i.state))}). Agencies without a registered feed are not health-monitored.`,
+          forecastInstances.some((i) => i.state === 'UNREACHABLE')
+            ? `Unreachable feeds (not zero rows): ${forecastInstances.filter((i) => i.state === 'UNREACHABLE').map((i) => i.sourceKey).join(', ')}.`
+            : '',
+        ].filter(Boolean).join(' '),
         instances: forecastInstances,
         schedules: schedules(CRON_JOBS.forecasts),
       },
@@ -594,15 +608,37 @@ export async function GET(request: NextRequest) {
       upstreams: ['grants_gov'], provenance: 'Grants.gov mirrored nightly into grants_cache.',
       note: 'The research corpus below also holds a small Grants.gov slice from a different producer. Not deduplicated.',
     },
-    {
-      key: 'contractor_job_postings', label: 'Contractor + federal job postings', kind: 'source_corpus',
-      stored: c.jobPostings, unit: 'postings',
-      breakdown: [{ label: 'contractor postings (JSearch)', count: c.jobPostingsJsearch }, { label: 'federal agency postings (USAJobs)', count: c.jobPostingsUsajobs }],
-      headlineContribution: c.jobPostings,
-      freshness: fresh({ asOf: e.jobPostings, cadenceHours: 24, basis: 'MAX(contractor_job_postings.last_seen_at)', jobs: CRON_JOBS.contractorJobs }),
-      surface: { state: 'internal_only', tools: [], app: [] },
-      upstreams: ['jsearch', 'usajobs'], provenance: 'Public job postings pulled daily: JSearch (LinkedIn/Indeed/Glassdoor/ZipRecruiter) and USAJobs. Raw material for hiring signals; not yet shown to customers.',
-    },
+    (() => {
+      const jobsHealth = classifyJobPostingHealth({
+        held: c.jobPostings,
+        asOf: e.jobPostings,
+        cadenceHours: 24,
+        now,
+      });
+      const live = jobsHealth.state === 'PASSTHROUGH';
+      return {
+      key: 'contractor_job_postings', label: 'Contractor + federal job postings', kind: 'source_corpus' as const,
+      stored: jobsHealth.stored, unit: 'postings',
+      breakdown: [
+        { label: 'persisted mirror rows — not the customer count while the live USAJobs read is serving', count: jobsHealth.mirrorRows },
+        { label: 'contractor postings (JSearch)', count: c.jobPostingsJsearch },
+        { label: 'federal agency postings (USAJobs)', count: c.jobPostingsUsajobs },
+      ],
+      headlineContribution: jobsHealth.headlineContribution,
+      freshness: {
+        state: jobsHealth.state,
+        asOf: live ? null : e.jobPostings,
+        basis: jobsHealth.basis,
+        detail: jobsHealth.detail,
+        schedules: schedules(CRON_JOBS.contractorJobs),
+      },
+      surface: live
+        ? { state: 'passthrough' as const, tools: ['search_govcon_jobs'], app: ['/jobs'], note: 'Federal openings are read live from USAJobs. Contractor (JSearch) counts stay unknown until the mirror is serving.' }
+        : { state: 'internal_only' as const, tools: [], app: [] as string[], note: 'Persisted mirror is the serving copy. The live USAJobs read is the fallback when it is empty.' },
+      upstreams: ['jsearch', 'usajobs'],
+      provenance: 'Federal customer jobs are a live USAJobs query when the mirror has no clock. JSearch contractor postings are persisted only when sync-contractor-jobs writes them.',
+      };
+    })(),
     {
       key: 'research_funding', label: 'Research & Lab Funding Opportunities', kind: 'source_corpus',
       stored: c.research, unit: 'opportunities',
@@ -610,39 +646,59 @@ export async function GET(request: NextRequest) {
         { label: 'NIH RePORTER', count: c.resNih, note: e.resNih ? `last advanced ${e.resNih.slice(0, 10)}` : undefined },
         { label: 'Grants.gov research slice', count: c.resGrantsGov, note: e.resGrantsGov ? `last advanced ${e.resGrantsGov.slice(0, 10)}` : undefined },
         { label: 'DARPA BAA', count: c.resDarpa, note: e.resDarpa ? `last advanced ${e.resDarpa.slice(0, 10)}` : undefined },
-        { label: 'NSF SBIR/STTR', count: c.resNsf, note: (c.resNsf ?? 0) === 0 ? 'contributes 0 rows — never written' : undefined },
+        { label: 'NSF SBIR/STTR', count: null, note: 'unavailable — api.www.sbir.gov returns HTTP 403, so this feed is not collected. That is not a count of zero opportunities.' },
         { label: 'view: SBIR / STTR (opportunity_type) — what search_sbir reads', count: c.resTypeSbir, note: 'subset of the above, not additive' },
         { label: 'view: grant-type', count: c.resTypeGrant, note: 'subset, not additive' },
         { label: 'view: BAA', count: c.resTypeBaa, note: 'subset, not additive' },
       ],
       headlineContribution: c.research,
       freshness: {
-        state: researchInstances.length ? worstState(researchInstances.map((i) => i.state)) : timestampState(e.resNih, 24, now),
+        state: researchInstances.length ? corpusFreshness(researchInstances.map((i) => i.state)) : timestampState(e.resNih, 24, now),
         asOf: e.resNih,
-        basis: `worst of ${researchInstances.length} registered feeds; asOf = newest NIH advance`,
-        detail: summarizeStates(researchInstances.map((i) => i.state)),
+        basis: `corpus of ${researchInstances.length} registered feeds; asOf = newest NIH advance`,
+        detail: [
+          summarizeStates(researchInstances.map((i) => i.state)),
+          researchInstances.some((i) => i.state === 'UNREACHABLE')
+            ? `Unreachable feeds (not zero rows): ${researchInstances.filter((i) => i.state === 'UNREACHABLE').map((i) => i.sourceKey).join(', ')}.`
+            : '',
+          'NSF SBIR stays uncollected while api.www.sbir.gov returns HTTP 403. That absence is not a count of zero.',
+        ].filter(Boolean).join(' '),
         instances: researchInstances,
         schedules: schedules(CRON_JOBS.research),
       },
       surface: { state: 'customer_readable', tools: ['search_sbir'], app: ['Market scan'] },
       upstreams: researchUpstreams, provenance: 'Research/lab funding that never posts to SAM.gov, mirrored into one store. Only sources with rows count as contributing.',
     },
-    {
-      key: 'dod_sbir_topics', label: 'DoD SBIR/STTR topics', kind: 'source_corpus',
+    (() => {
+      const dodRun = latestRun('sync-dod-sbir');
+      const dodHealth = classifyDodSbirHealth({
+        held: c.dodSbir,
+        httpStatus: dodRun?.httpStatus ?? null,
+        runStatus: dodRun?.status ?? null,
+      });
+      return {
+      key: 'dod_sbir_topics', label: 'DoD SBIR/STTR topics', kind: 'source_corpus' as const,
       stored: c.dodSbir, unit: 'topics',
       headlineContribution: c.dodSbir,
       freshness: {
-        state: 'UNKNOWN',
+        state: dodHealth.state,
         asOf: null,
-        basis: 'no data clock — the table holds no rows',
-        detail: (c.dodSbir ?? 0) === 0
-          ? 'EMPTY. The collector reports HTTP 200 while sbir.gov is unreachable (reachability gate, #604) — a green run here is NOT evidence of data.'
-          : undefined,
+        basis: 'dod_sbir_topics count plus the latest sync-dod-sbir run. A failed count is unknown, not zero. The job stays enabled when sbir.gov is down.',
+        detail: dodHealth.detail,
         schedules: schedules(CRON_JOBS.dodSbir),
       },
-      surface: { state: 'customer_readable', tools: ['search_sbir'], note: (c.dodSbir ?? 0) === 0 ? 'wired to search_sbir, currently contributes nothing' : undefined },
-      upstreams: ['sbir_gov'], provenance: 'SBIR.gov DoD topics API mirrored into dod_sbir_topics.',
-    },
+      surface: {
+        state: 'customer_readable' as const,
+        tools: ['search_sbir'],
+        note: c.dodSbir == null
+          ? 'held count unmeasured — search_sbir must not be told this corpus is empty'
+          : c.dodSbir === 0
+            ? 'wired to search_sbir; the corpus has 0 rows, which is not a successful sync'
+            : undefined,
+      },
+      upstreams: ['sbir_gov'], provenance: 'SBIR.gov DoD topics API mirrored into dod_sbir_topics. sync-dod-sbir returns 503 when the source is down.',
+      };
+    })(),
     {
       key: 'legislation', label: 'Legislation (NDAA / defense acquisition measures)', kind: 'source_corpus',
       stored: legislativeRows ? leg.length : null, unit: 'source records',
@@ -737,8 +793,13 @@ export async function GET(request: NextRequest) {
       derivedFrom: ['bq_awards'],
       stored: c.dodaac, unit: 'offices',
       headlineContribution: 0,
-      freshness: { state: 'UNKNOWN', asOf: e.dodaac, basis: 'MAX(dodaac_directory.updated_at) — monthly producer refresh-dodaac-directory (0 9 6 * *); age + row coverage judged by check-data-freshness (table-measured), never by last_built' },
-      surface: { state: 'internal_only', tools: [], note: 'anchors office rosters, events and opportunity office names' },
+      freshness: {
+        state: timestampState(e.dodaac, 24 * 32, now),
+        asOf: e.dodaac,
+        basis: 'MAX(dodaac_directory.updated_at). Monthly producer refresh-dodaac-directory (0 9 6 * *). A missing clock is unknown. A code with no stored name stays unnamed.',
+        schedules: schedules(CRON_JOBS.dodaac),
+      },
+      surface: { state: 'customer_readable', tools: ['get_buying_offices'], note: 'Ask Mindy ranks offices from award transactions. Unresolved codes stay unnamed. This directory does not invent contacts.' },
       upstreams: ['usaspending'], provenance: 'Contracting offices decoded from award DoDAACs (USASpending/FPDS in BigQuery).',
     },
     {
@@ -750,8 +811,13 @@ export async function GET(request: NextRequest) {
         { label: 'change-log events (intelligence_changes)', count: c.intelChanges, note: 'history of these claims, not additional claims' },
       ],
       headlineContribution: 0,
-      freshness: { state: 'UNKNOWN', asOf: e.claimsEvidence, basis: 'MAX(agency_pain_points_db.last_evidence_at) — derived alongside the GAO collector; no independent clock' },
-      surface: { state: 'customer_readable', tools: ['get_agency_intel', 'understand_customer'], note: 'preferred over legacy claims; served with citations' },
+      freshness: {
+        state: timestampState(e.claimsEvidence, 24, now),
+        asOf: e.claimsEvidence,
+        basis: 'MAX(agency_pain_points_db.last_evidence_at). Same daily collector as institute-gao-sync. A missing clock is unknown, not stale and not zero.',
+        schedules: schedules(CRON_JOBS.gao),
+      },
+      surface: { state: 'customer_readable', tools: ['get_agency_intel', 'understand_customer'], note: 'preferred over legacy claims; public pages show finding, report number, date, and .gov/.mil link. Recommendations stay signed-in.' },
       upstreams: ['gao'], provenance: 'Claims derived from the living GAO corpus, each citing its institute_sources document.',
     },
     {

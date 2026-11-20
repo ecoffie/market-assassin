@@ -264,9 +264,12 @@ describe('Data Core inventory truth', () => {
     expect(row('forecasts').freshness.state).toBe('UNREACHABLE');
   });
 
-  it('RESEARCH: a source with 0 rows is labelled as contributing nothing and is not counted as an upstream', () => {
+  it('RESEARCH: NSF is labelled unavailable and is not counted as an upstream', () => {
     const r = row('research_funding');
-    expect(r.breakdown.find((b: { label: string }) => b.label === 'NSF SBIR/STTR').note).toMatch(/0 rows/);
+    const nsf = r.breakdown.find((b: { label: string }) => b.label === 'NSF SBIR/STTR');
+    expect(nsf.note).toMatch(/unavailable/);
+    expect(nsf.note).not.toMatch(/0 rows/);
+    expect(nsf.count).toBeNull();
     expect(r.upstreams).not.toContain('nsf_sbir');
   });
 

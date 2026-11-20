@@ -402,6 +402,25 @@ export function worstState(states: FreshnessState[]): FreshnessState {
   return 'UNKNOWN';
 }
 
+/**
+ * Corpus tile for a dataset that is several feeds.
+ *
+ * UNREACHABLE only when every monitored feed is unreachable (or the only
+ * non-dead feeds are UNKNOWN — we have not proved anything is alive).
+ * A living feed (CURRENT or STALE) beside an unreachable sibling is STALE:
+ * the dead feed is named in the tile detail, and the corpus is not painted
+ * as if the stored rows cannot be read. Never CURRENT while any feed is
+ * unreachable. Never a zero.
+ */
+export function corpusFreshness(states: FreshnessState[]): FreshnessState {
+  if (!states.length) return 'UNKNOWN';
+  const living = states.some((s) => s === 'CURRENT' || s === 'STALE');
+  const dead = states.some((s) => s === 'UNREACHABLE');
+  if (dead && !living) return 'UNREACHABLE';
+  if (dead && living) return 'STALE';
+  return worstState(states);
+}
+
 export function summarizeStates(states: FreshnessState[]): string {
   const counts = new Map<FreshnessState, number>();
   for (const s of states) counts.set(s, (counts.get(s) ?? 0) + 1);
@@ -409,9 +428,95 @@ export function summarizeStates(states: FreshnessState[]): string {
 }
 
 /**
+ * Contractor + federal job postings.
+ *
+ * Federal openings on /jobs and search_govcon_jobs are a live USAJobs read
+ * (Eric, 2026-11-09) whenever the persisted mirror is empty or has no
+ * last_seen_at. That path is live, not stale, and a mirror of 0 is not the
+ * customer job count. A mirror that is actually serving keeps its data clock.
+ */
+export function classifyJobPostingHealth(input: {
+  held: number | null;
+  asOf: string | null;
+  cadenceHours: number;
+  now: Date;
+}): {
+  state: FreshnessState;
+  stored: number | null;
+  headlineContribution: number | null;
+  basis: string;
+  detail: string;
+  mirrorRows: number | null;
+} {
+  const serving = input.held != null && input.held > 0 && !!input.asOf;
+  if (!serving) {
+    const detail = input.held == null
+      ? 'Persisted mirror unmeasured. That is not zero jobs.'
+      : input.held === 0
+        ? 'Persisted mirror holds 0 rows. Customers are not shown that as the job count; federal openings are read live.'
+        : 'Persisted mirror has rows but no last_seen_at. Customer federal jobs stay the live query.';
+    return {
+      state: 'PASSTHROUGH',
+      stored: null,
+      headlineContribution: null,
+      basis: 'Customer federal jobs are a live USAJobs query (6h cache) via /jobs and search_govcon_jobs. The persisted mirror is not the serving clock.',
+      detail,
+      mirrorRows: input.held,
+    };
+  }
+  return {
+    state: timestampState(input.asOf, input.cadenceHours, input.now),
+    stored: input.held,
+    headlineContribution: input.held,
+    basis: 'MAX(contractor_job_postings.last_seen_at)',
+    detail: 'Persisted mirror is serving. The live USAJobs read remains the fallback when this mirror is empty.',
+    mirrorRows: input.held,
+  };
+}
+
+/**
+ * DoD SBIR/STTR health. A down source is UNREACHABLE (degraded). A failed
+ * count is UNKNOWN, never a manufactured zero. The collector stays enabled.
+ */
+export function classifyDodSbirHealth(input: {
+  held: number | null;
+  httpStatus: number | null;
+  runStatus: string | null;
+}): { state: FreshnessState; detail: string } {
+  const down = input.httpStatus === 503
+    || input.httpStatus === 502
+    || input.runStatus === 'error';
+  if (down) {
+    const held = input.held == null
+      ? 'Held count unmeasured — not zero.'
+      : input.held === 0
+        ? 'dod_sbir_topics holds 0 rows.'
+        : `${input.held} held rows were not advanced.`;
+    return {
+      state: 'UNREACHABLE',
+      detail: `DoD topic source degraded (DSIP public list, then sbir.gov). ${held} sync-dod-sbir stays enabled; do not park it.`,
+    };
+  }
+  if (input.held == null) {
+    return { state: 'UNKNOWN', detail: 'Held count unmeasured — not zero.' };
+  }
+  if (input.held === 0) {
+    return {
+      state: 'UNKNOWN',
+      detail: '0 rows measured and no degraded run is on record. An empty corpus is not a current feed.',
+    };
+  }
+  return {
+    state: 'UNKNOWN',
+    detail: 'Rows are held. A missing synced_at clock is not current.',
+  };
+}
+
+/**
  * Freshness from a data timestamp and the producer's cadence. With no known cadence
  * the age cannot be judged, so the state is UNKNOWN (the date is still shown).
  */
+
 export function timestampState(
   asOf: string | null,
   cadenceHours: number | null,
