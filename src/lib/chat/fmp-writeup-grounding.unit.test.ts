@@ -10,6 +10,7 @@ import {
   formatObligationSnippet,
   fmpPlannerMaxTokensForCreateDocument,
   requiredSnippetsForWriteup,
+  rewriteFmpAnswerDownloadLinks,
 } from './fmp-writeup-grounding';
 import { RBA_FEDERAL_MARKET_PROFILE_PROMPT } from './__fixtures__/rba-federal-market-profile';
 import { validateFmpWriteup } from './fmp-writeup-validate';
@@ -205,6 +206,52 @@ describe('fmp-writeup-grounding', () => {
     expect(note).toMatch(/Never invent URLs/i);
     expect(note).toMatch(/Summarize the federal market profile/i);
     expect(note).not.toMatch(/—/);
+  });
+
+  describe('rewriteFmpAnswerDownloadLinks', () => {
+    const docId = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890';
+    const realPath = `/api/app/vault/documents/download?id=${docId}`;
+    const docId2 = '11111111-2222-3333-4444-555555555555';
+    const realPath2 = `/api/app/vault/documents/download?id=${docId2}`;
+
+    it('rewrites your-link-to-download.com/<uuid> markdown links to the matching real path', () => {
+      const before = [
+        'Your federal market profile is ready.',
+        '',
+        `- [Word](https://your-link-to-download.com/${docId})`,
+        `- [PDF](https://your-link-to-download.com/${docId2})`,
+      ].join('\n');
+      const after = rewriteFmpAnswerDownloadLinks(before, [realPath, realPath2]);
+      expect(after).toContain(`[Word](${realPath})`);
+      expect(after).toContain(`[PDF](${realPath2})`);
+      expect(after).not.toMatch(/your-link-to-download\.com/i);
+    });
+
+    it('replaces invent-only link lists with a short bullet list of real paths', () => {
+      const before = [
+        'Downloads:',
+        `- [file](https://your-link-to-download.com/not-a-real-id)`,
+        `- [other](https://example.com/download/foo)`,
+      ].join('\n');
+      const after = rewriteFmpAnswerDownloadLinks(before, [realPath]);
+      expect(after).not.toMatch(/your-link-to-download\.com/i);
+      expect(after).toContain(realPath);
+      expect(after).toMatch(/Downloads \(Vault\):/);
+      expect(after).toContain(`- ${realPath}`);
+    });
+
+    it('preserves already-allowlisted vault download paths', () => {
+      const before = `Open [the profile](${realPath}) from Vault.`;
+      const after = rewriteFmpAnswerDownloadLinks(before, [realPath]);
+      expect(after).toBe(before);
+    });
+
+    it('strips bare fake-host URLs and never leaves your-link-to-download.com', () => {
+      const before = `Grab it at https://your-link-to-download.com/${docId} thanks.`;
+      const after = rewriteFmpAnswerDownloadLinks(before, [realPath]);
+      expect(after).toContain(realPath);
+      expect(after).not.toMatch(/your-link-to-download\.com/i);
+    });
   });
 
   it('formatObligationSnippet scales millions', () => {

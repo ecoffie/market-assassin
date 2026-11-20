@@ -378,6 +378,119 @@ export function buildFmpCreateDocumentAnswerNote(opts: {
   return lines.join('\n');
 }
 
+const REAL_DOWNLOAD_PATH_RE = /^\/api\/app\/vault\/documents\/download\?id=([0-9a-f-]{36})$/i;
+const MD_LINK_RE = /\[([^\]]*)\]\(([^)]+)\)/g;
+const FAKE_DOWNLOAD_HOST_RE = /your-link-to-download\.com|example\.com\/download|placeholder.*download|bit\.ly\/|tinyurl\.com\//i;
+const UUID_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+
+function normalizeDownloadPath(p: string): string | null {
+  const raw = String(p || '').trim();
+  if (!raw) return null;
+  // Allow absolute URLs that already point at our vault download route.
+  try {
+    if (/^https?:\/\//i.test(raw)) {
+      const u = new URL(raw);
+      if (u.pathname === '/api/app/vault/documents/download' && u.searchParams.get('id')) {
+        return `/api/app/vault/documents/download?id=${u.searchParams.get('id')}`;
+      }
+      return null;
+    }
+  } catch { /* fall through */ }
+  const m = raw.match(REAL_DOWNLOAD_PATH_RE);
+  return m ? `/api/app/vault/documents/download?id=${m[1]}` : null;
+}
+
+function pathByDocumentId(downloadPaths: readonly string[]): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const p of downloadPaths) {
+    const norm = normalizeDownloadPath(p);
+    if (!norm) continue;
+    const id = norm.match(REAL_DOWNLOAD_PATH_RE)?.[1];
+    if (id) map.set(id.toLowerCase(), norm);
+  }
+  return map;
+}
+
+function realDownloadBulletList(downloadPaths: readonly string[]): string {
+  const paths = [...pathByDocumentId(downloadPaths).values()];
+  if (!paths.length) return 'Download files from the in-chat download chips (Vault).';
+  return ['Downloads (Vault):', ...paths.map((p) => `- ${p}`)].join('\n');
+}
+
+/**
+ * Host post-process: never leave invented download URLs in the chat answer.
+ * Allowlists only `/api/app/vault/documents/download?id=<uuid>` (relative OK).
+ * Fake hosts (your-link-to-download.com, etc.) are rewritten to the matching real
+ * path when the fake URL ends with that document uuid; otherwise the fake link
+ * list is replaced with a short bullet list of real download_path values.
+ */
+export function rewriteFmpAnswerDownloadLinks(
+  answer: string,
+  downloadPaths: readonly string[],
+): string {
+  const text = String(answer || '');
+  if (!text) return text;
+  const byId = pathByDocumentId(downloadPaths);
+  const allow = new Set([...byId.values()]);
+  let invented = false;
+  let out = text.replace(MD_LINK_RE, (full, label: string, url: string) => {
+    const trimmed = String(url || '').trim();
+    const asReal = normalizeDownloadPath(trimmed);
+    if (asReal && (allow.size === 0 || allow.has(asReal))) {
+      return `[${label}](${asReal})`;
+    }
+    if (asReal) {
+      // Vault-shaped but not in this turn's allowlist — treat as invent.
+      invented = true;
+      const id = asReal.match(REAL_DOWNLOAD_PATH_RE)?.[1];
+      if (id && byId.has(id.toLowerCase())) {
+        return `[${label}](${byId.get(id.toLowerCase())})`;
+      }
+      return label || 'download';
+    }
+    const looksFake =
+      FAKE_DOWNLOAD_HOST_RE.test(trimmed)
+      || /^https?:\/\//i.test(trimmed)
+      || (/download/i.test(trimmed) && !trimmed.startsWith('/api/app/vault/'));
+    if (!looksFake) {
+      // Relative non-download links (anchors, app paths) left alone.
+      return full;
+    }
+    invented = true;
+    const uuid = trimmed.match(UUID_RE)?.[0];
+    if (uuid && byId.has(uuid.toLowerCase())) {
+      return `[${label}](${byId.get(uuid.toLowerCase())})`;
+    }
+    // Drop this fake link; a list of real paths is appended once below if needed.
+    return label || 'download';
+  });
+
+  // Bare fake URLs not in markdown.
+  out = out.replace(
+    /https?:\/\/[^\s)]*your-link-to-download\.com[^\s)]*/gi,
+    (url) => {
+      invented = true;
+      const uuid = url.match(UUID_RE)?.[0];
+      if (uuid && byId.has(uuid.toLowerCase())) return byId.get(uuid.toLowerCase())!;
+      return '';
+    },
+  );
+
+  if (invented) {
+    // If no real path remained in the answer as a markdown link, append the allowlisted list.
+    const stillHasReal = [...allow].some((p) => out.includes(p));
+    if (!stillHasReal && allow.size) {
+      out = `${out.replace(/\n{3,}/g, '\n\n').trimEnd()}\n\n${realDownloadBulletList([...allow])}`;
+    } else if (!stillHasReal && !allow.size) {
+      out = `${out.replace(/\n{3,}/g, '\n\n').trimEnd()}\n\nUse the in-chat download chips to open the Vault files.`;
+    }
+  }
+
+  // Absolute last pass: never leave the fake domain.
+  out = out.replace(/https?:\/\/[^\s)]*your-link-to-download\.com[^\s)]*/gi, '');
+  return out.replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trimEnd();
+}
+
 /** Planner output room when create_document is offered/forced on an FMP turn. */
 export const FMP_DOC_TOOL_ROUND_MAX_TOKENS = 8192;
 

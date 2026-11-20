@@ -98,6 +98,7 @@ import {
   buildFmpWriteupGroundingNote,
   FMP_DOC_TOOL_ROUND_MAX_TOKENS,
   requiredSnippetsForWriteup,
+  rewriteFmpAnswerDownloadLinks,
   type FmpWriteupEvidence,
 } from '@/lib/chat/fmp-writeup-grounding';
 import { CURRENT_FIND_CHAT_CONTRACT } from '@/lib/mcp/potato-journey';
@@ -962,6 +963,10 @@ export async function POST(request: NextRequest) {
         let turnDeliverablePdfNote: string | null = null;
         // Packaged market report (generate_market_report) — html for the Ask pane; stripped from model context.
         let turnMarketReport: { report_id: string | null; url: string | null; title: string; html: string } | null = null;
+        // Hoisted out of the tool try so the answer call can rewrite invent-links + re-push the note.
+        const fmpToolContents: Array<{ tool: string; content: string }> = [];
+        let fmpEvidence: FmpWriteupEvidence | null = null;
+        let createDocAnswerNoteContent: string | null = null;
         try {
           if (actingScope.kind === 'client') turnTrace.notices.push('acting_scope:client_workspace');
           if (actingScope.kind === 'unavailable') turnTrace.notices.push('acting_scope:unavailable');
@@ -977,8 +982,6 @@ export async function POST(request: NextRequest) {
               requiredSnippets: [],
             }
             : null;
-          const fmpToolContents: Array<{ tool: string; content: string }> = [];
-          let fmpEvidence: FmpWriteupEvidence | null = null;
           let fmpGroundingNotePushed = false;
           let fmpCreateDocAnswerNotePushed = false;
           // create_document (PDF + Word saved to the Vault) — behind VAULT_GENERATED_FILES for the VERIFIED caller
@@ -1398,25 +1401,26 @@ export async function POST(request: NextRequest) {
                   if (d) {
                     turnDeliverables.push(...d.files);
                     if (d.pdf_note) turnDeliverablePdfNote = d.pdf_note;
-                    if (federalMarketProfileAsk && !fmpCreateDocAnswerNotePushed) {
-                      const evidence: FmpWriteupEvidence = fmpEvidence
-                        ?? accumulateFmpEvidence(
-                          fmpToolContents.length
-                            ? fmpToolContents
-                            : results.map((x) => ({ tool: x.record.tool, content: x.content })),
-                          splitViewPreamble(message).rest || message,
-                        );
-                      fmpEvidence = evidence;
-                      messages.push({
-                        role: 'system',
-                        content: buildFmpCreateDocumentAnswerNote({
+                    if (!fmpCreateDocAnswerNotePushed) {
+                      const paths = d.files.map((f) => f.download_path || '').filter(Boolean);
+                      if (paths.length) {
+                        const evidence: FmpWriteupEvidence = fmpEvidence
+                          ?? accumulateFmpEvidence(
+                            fmpToolContents.length
+                              ? fmpToolContents
+                              : results.map((x) => ({ tool: x.record.tool, content: x.content })),
+                            splitViewPreamble(message).rest || message,
+                          );
+                        fmpEvidence = evidence;
+                        createDocAnswerNoteContent = buildFmpCreateDocumentAnswerNote({
                           evidence,
-                          downloadPaths: d.files.map((f) => f.download_path || '').filter(Boolean),
+                          downloadPaths: paths,
                           title: d.title ?? null,
-                        }),
-                      });
-                      fmpCreateDocAnswerNotePushed = true;
-                      turnTrace.notices.push('fmp_answer_note:create_document_paths');
+                        });
+                        messages.push({ role: 'system', content: createDocAnswerNoteContent });
+                        fmpCreateDocAnswerNotePushed = true;
+                        turnTrace.notices.push('fmp_answer_note:create_document_paths');
+                      }
                     }
                   }
                 }
@@ -1764,17 +1768,20 @@ export async function POST(request: NextRequest) {
                         turnDeliverables.push(...d.files);
                         if (d.pdf_note) turnDeliverablePdfNote = d.pdf_note;
                         if (!fmpCreateDocAnswerNotePushed) {
-                          const evidence: FmpWriteupEvidence = fmpEvidence
-                            ?? accumulateFmpEvidence(fmpToolContents, splitViewPreamble(message).rest || message);
-                          fmpEvidence = evidence;
-                          const answerNote = buildFmpCreateDocumentAnswerNote({
-                            evidence,
-                            downloadPaths: d.files.map((f) => f.download_path || '').filter(Boolean),
-                            title: d.title ?? null,
-                          });
-                          messages.push({ role: 'system', content: answerNote });
-                          fmpCreateDocAnswerNotePushed = true;
-                          turnTrace.notices.push('fmp_answer_note:create_document_paths');
+                          const paths = d.files.map((f) => f.download_path || '').filter(Boolean);
+                          if (paths.length) {
+                            const evidence: FmpWriteupEvidence = fmpEvidence
+                              ?? accumulateFmpEvidence(fmpToolContents, splitViewPreamble(message).rest || message);
+                            fmpEvidence = evidence;
+                            createDocAnswerNoteContent = buildFmpCreateDocumentAnswerNote({
+                              evidence,
+                              downloadPaths: paths,
+                              title: d.title ?? null,
+                            });
+                            messages.push({ role: 'system', content: createDocAnswerNoteContent });
+                            fmpCreateDocAnswerNotePushed = true;
+                            turnTrace.notices.push('fmp_answer_note:create_document_paths');
+                          }
                         }
                       }
                     }
@@ -2062,6 +2069,23 @@ export async function POST(request: NextRequest) {
         let usedProvider = '';
         let usedModel = '';
         let answerFallback = false;
+        // Host rewrite allowlist: real Vault download paths from this turn's create_document.
+        const downloadPathsForRewrite = turnDeliverables
+          .map((f) => f.download_path || '')
+          .filter(Boolean);
+        // Buffer answer tokens so invents never paint before rewrite (chips still arrive after).
+        const deferAnswerTokens = downloadPathsForRewrite.length > 0;
+        // If deliverables landed but the tool-loop note was skipped, build it before answerKinds
+        // so fitMessages kinds stay parallel to messages.
+        if (!createDocAnswerNoteContent && downloadPathsForRewrite.length) {
+          createDocAnswerNoteContent = buildFmpCreateDocumentAnswerNote({
+            evidence: fmpEvidence ?? accumulateFmpEvidence(fmpToolContents, splitViewPreamble(message).rest || message),
+            downloadPaths: downloadPathsForRewrite,
+            title: null,
+          });
+          messages.push({ role: 'system', content: createDocAnswerNoteContent });
+          turnTrace.notices.push('fmp_answer_note:create_document_paths');
+        }
         // B2: whole-request token budget for the answer call (see token-budget.ts).
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const answerKinds: MsgKind[] = (messages as any[]).map((m, i) => {
@@ -2085,6 +2109,12 @@ export async function POST(request: NextRequest) {
             turnTrace.answer_attempts.push({ provider: t.provider, model: t.model, status: null, code: 'request_too_large_not_sent' });
             void recordProviderEvent({ kind: answerChain[i + 1] ? 'answer_fallback' : 'answer_failure', provider: t.provider, model: t.model, status: null, detail: `request_too_large: est ${fit.estimate} > budget ${fit.budget} tokens (not sent)`, userEmail: auth.email! });
             continue;
+          }
+          // Push the download-path note onto the SAME array streamFrom consumes (fit.messages),
+          // as the last message so it is not buried under tool JSON the model ignores.
+          if (createDocAnswerNoteContent) {
+            fit.messages.push({ role: 'system', content: createDocAnswerNoteContent });
+            if (i === 0) turnTrace.notices.push('answer_note:on_fit_messages');
           }
           // A7: the connect wait is bounded (then the next model is tried); the same controller lets the
           // watchdog stop a stream that is already flowing.
@@ -2204,7 +2234,8 @@ export async function POST(request: NextRequest) {
               if (typeof delta === 'string' && delta.length > 0) {
                 assistantContent += delta;
                 // With a verified list on screen, the analysis is checked before it is shown (see below).
-                if (!renderedRecords.length) send({ type: 'token', content: delta });
+                // When create_document left download paths, buffer until host rewrite runs.
+                if (!renderedRecords.length && !deferAnswerTokens) send({ type: 'token', content: delta });
               }
               if (parsed?.usage?.total_tokens) {
                 tokensUsed = parsed.usage.total_tokens;
@@ -2275,14 +2306,14 @@ export async function POST(request: NextRequest) {
             console.warn('[chat] analysis sentences dropped:', linted.dropped);
           }
           assistantContent = assistantContent.slice(0, modelTextStart) + linted.text;
-          send({ type: 'token', content: linted.text });
+          if (!deferAnswerTokens) send({ type: 'token', content: linted.text });
           // A1: in a mixed turn, part 1 counts belong to the OTHER lookups; only part 2 speaks about the records.
           const problems = checkSummaryAgainstRecords(mixed ? mixed.nextStepsText : assistantContent.slice(modelTextStart), renderedRecords);
           if (problems.length) {
             const totals = renderedRecords.map((r) => r.total).join(' and ');
             const correction = `\n\nCount check: the verified record count for this search is ${totals}; the list above is authoritative.`;
             assistantContent += correction;
-            send({ type: 'token', content: correction });
+            if (!deferAnswerTokens) send({ type: 'token', content: correction });
             turnTrace.notices.push('summary_count_corrected');
             console.warn('[chat] summary contradicted verified records:', problems);
           }
@@ -2299,9 +2330,23 @@ export async function POST(request: NextRequest) {
           const { text: footer, addedTable } = findCompletionFooter(assistantContent, findResult);
           if (footer) {
             assistantContent += footer;
-            send({ type: 'token', content: footer });
+            if (!deferAnswerTokens) send({ type: 'token', content: footer });
             turnTrace.notices.push(addedTable ? 'find_coming_back_table_from_tool' : 'find_horizons_completed_from_summary');
           }
+        }
+        // Host post-process: never leave invented download URLs when create_document succeeded.
+        if (downloadPathsForRewrite.length && assistantContent) {
+          const prevAnswer = assistantContent;
+          assistantContent = rewriteFmpAnswerDownloadLinks(assistantContent, downloadPathsForRewrite);
+          if (assistantContent !== prevAnswer) {
+            turnTrace.notices.push('answer_download_links_rewritten');
+          }
+        }
+        if (deferAnswerTokens && assistantContent) {
+          const toSend = renderedRecords.length
+            ? assistantContent.slice(modelTextStart)
+            : assistantContent;
+          if (toSend) send({ type: 'token', content: toSend });
         }
         turnTrace.answer = { provider: usedProvider, model: usedModel, finish_reason: finishReason, fallback: answerFallback };
         if (TRACE_EVENTS) {
