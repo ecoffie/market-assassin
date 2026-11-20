@@ -76,6 +76,38 @@ export async function guardForecastInserts(
   };
 }
 
+/**
+ * When the daily cap refuses NEW rows, updates to keys that already exist still write.
+ * New identities are quarantined. An allowed run writes every row.
+ */
+export function forecastRowsForDailySync<T extends { external_id: string }>(
+  rows: T[],
+  existing: Set<string>,
+  allowNew: boolean,
+): { write: T[]; quarantinedNew: T[] } {
+  if (allowNew) return { write: rows, quarantinedNew: [] };
+  return {
+    write: rows.filter((r) => existing.has(r.external_id)),
+    quarantinedNew: rows.filter((r) => !existing.has(r.external_id)),
+  };
+}
+
+/** Ids in `externalIds` that already exist for `source`. */
+export async function existingForecastIds(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  db: any, source: string, externalIds: string[],
+): Promise<{ ids: Set<string> } | { error: string }> {
+  const ids = [...new Set(externalIds.filter(Boolean))];
+  const found = new Set<string>();
+  for (let i = 0; i < ids.length; i += 200) {
+    const { data, error } = await db.from('agency_forecasts').select('external_id').eq('source_agency', source).in('external_id', ids.slice(i, i + 200)).limit(1000);
+    if (error) return { error: error.message };
+    for (const row of data ?? []) found.add(String((row as { external_id?: unknown }).external_id ?? ''));
+  }
+  found.delete('');
+  return { ids: found };
+}
+
 /** How many of `externalIds` do NOT yet exist for `source` (the rows an upsert would CREATE). */
 export async function countNewForecastRows(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

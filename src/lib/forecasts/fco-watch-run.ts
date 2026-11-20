@@ -10,6 +10,7 @@
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { runFcoCensus, type FcoCensus } from './fco-census';
+import { gatewayWatchState } from './gateway-watch-state';
 import { evaluateFcoWatch, type FcoEvent, type FcoWatchState } from './fco-roster-watch';
 
 export const FCO_SOURCE_KEY = 'forecast_gsa_gateway';
@@ -42,10 +43,24 @@ export async function countCanonicalGatewayHeld(sb: SupabaseClient): Promise<num
 }
 
 /** Prior observation, stored on the instance row's fingerprint/revision fields. */
-function parsePrevious(row: Record<string, unknown> | null): FcoWatchState | null {
-  const raw = row?.upstream_fingerprint;
+function parseFingerprint(raw: unknown): Record<string, unknown> | null {
   if (typeof raw !== 'string' || !raw.startsWith('{')) return null;
-  try { return JSON.parse(raw) as FcoWatchState; } catch { return null; }
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    return parsed && typeof parsed === 'object' ? parsed as Record<string, unknown> : null;
+  } catch { return null; }
+}
+
+function parsePrevious(row: Record<string, unknown> | null): FcoWatchState | null {
+  const parsed = parseFingerprint(row?.upstream_fingerprint);
+  if (!parsed || !Array.isArray(parsed.departments)) return null;
+  return parsed as unknown as FcoWatchState;
+}
+
+function parseResumePage(row: Record<string, unknown> | null): number | undefined {
+  const parsed = parseFingerprint(row?.upstream_fingerprint);
+  const n = parsed?.resumePage;
+  return typeof n === 'number' && Number.isFinite(n) && n > 0 ? n : undefined;
 }
 
 export async function runFcoWatch(
@@ -61,7 +76,12 @@ export async function runFcoWatch(
     .maybeSingle();
   if (instErr) throw new Error(instErr.message);
 
-  const census = await runFcoCensus({ concurrency: opts.concurrency, budgetMs: opts.budgetMs });
+  const census = await runFcoCensus({
+    concurrency: opts.concurrency ?? 1,
+    budgetMs: opts.budgetMs,
+    startPage: parseResumePage(inst as Record<string, unknown> | null),
+    retryBaseMs: 1_000,
+  });
   const heldCanonical = await countCanonicalGatewayHeld(sb);
 
   const result = evaluateFcoWatch({
@@ -84,10 +104,27 @@ export async function runFcoWatch(
     if (result.clocks.lastSourceAdvance) clocks.last_source_advance = result.clocks.lastSourceAdvance;
     // held_population is the VERIFIED canonical count — never an aspirational future number.
     clocks.held_population = heldCanonical;
-    // Behind upstream is CONTENT_STALE, not "current". A successful watch never implies currency.
-    clocks.source_state = heldCanonical < census.uniqueListingIds ? 'content_stale' : 'current';
-  } else if (census.pagesFetched === 0) {
-    clocks.source_state = 'unreachable';
+  }
+  // A page we could read is not unreachable, even when the census is incomplete
+  // (the source throttles and page=1 can repeat page=2). Unreachable only when
+  // nothing was read. current only from gatewayWatchState on a complete census.
+  const watched = gatewayWatchState({
+    pagesFetched: census.pagesFetched,
+    reportedTotal: census.reportedTotal,
+    complete: census.complete,
+    heldCanonical,
+    uniqueListingIds: census.uniqueListingIds,
+  });
+  if (watched) clocks.source_state = watched;
+  if (watched === 'content_stale' && !result.clocks.lastSuccessfulCheck && census.reportedTotal > 0) {
+    clocks.upstream_population = census.reportedTotal;
+  }
+  // Resume cursor lives beside the last good roster. A partial run must not erase departments.
+  if (!census.complete && census.resumePage != null) {
+    const prior = parseFingerprint(inst?.upstream_fingerprint) ?? {};
+    const { resumePage: _drop, partial: _partial, ...rest } = prior;
+    void _drop; void _partial;
+    clocks.upstream_fingerprint = JSON.stringify({ ...rest, resumePage: census.resumePage, partial: true });
   }
 
   if (!dry) {

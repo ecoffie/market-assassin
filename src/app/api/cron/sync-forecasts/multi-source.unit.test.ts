@@ -77,7 +77,9 @@ describe('DOE source', () => {
   });
 
   it('carries the incumbent fields that make a forecast actionable', () => {
-    const fn = SRC.slice(SRC.indexOf('async function fetchDOE'));
+    const writer = readFileSync(join(__dirname, '../../../../lib/forecasts/doe-forecast.ts'), 'utf8');
+    const fn = writer.slice(writer.indexOf('export function doeForecastToDbRow'));
+    expect(SRC).toContain('doeForecastToDbRow');
     expect(fn).toContain('incumbent_name');
     expect(fn).toContain('incumbent_contract_number');
   });

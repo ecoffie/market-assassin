@@ -64,8 +64,15 @@ export interface ForecastRow {
   incumbent_name: string | null;
   pop_state: string | null;
   status: string | null;
-  /** When Mindy last synced this row from its source (ISO). Manual sources can be months old. */
+  /**
+   * When Mindy last synced this row from its source (ISO). Null when
+   * last_synced_at is missing. updated_at is never substituted here.
+   */
   as_of: string | null;
+  /** last_synced_at when as_of is set. unavailable when the sync clock is missing. */
+  as_of_basis: 'last_synced_at' | 'unavailable';
+  /** The database row clock. Not a source sync. Shown only under this name. */
+  row_updated_at: string | null;
   /** Where the row came from (agency forecast page / file), when recorded. */
   source_url: string | null;
 }
@@ -82,6 +89,58 @@ export interface ForecastSourceFreshness {
 
 /** A forecast source not refreshed in this long is reported as stale (agency feeds publish monthly–quarterly). */
 export const FORECAST_STALE_DAYS = 45;
+
+function clockString(v: unknown): string | null {
+  return typeof v === 'string' && v ? v : null;
+}
+
+/**
+ * Customer clock for a stored agency_forecasts row.
+ * as_of is last_synced_at only. A row whose sync clock was never written
+ * stays unavailable; updated_at is returned beside it as row_updated_at.
+ */
+export function forecastSyncClock(row: { last_synced_at?: unknown; updated_at?: unknown }): {
+  as_of: string | null;
+  as_of_basis: 'last_synced_at' | 'unavailable';
+  row_updated_at: string | null;
+} {
+  const synced = clockString(row.last_synced_at);
+  return {
+    as_of: synced,
+    as_of_basis: synced ? 'last_synced_at' : 'unavailable',
+    row_updated_at: clockString(row.updated_at),
+  };
+}
+
+/** The row get_agency_forecasts returns for one stored agency_forecasts record. */
+export function forecastCustomerRow(r: Record<string, unknown>): ForecastRow {
+  const clock = forecastSyncClock(r);
+  return {
+    id: String(r.id ?? ''),
+    external_id: clockString(r.external_id),
+    title: String(r.title ?? ''),
+    description: clockString(r.description),
+    agency: clockString(r.source_agency),
+    department: clockString(r.department),
+    office: clockString(r.contracting_office),
+    naics_code: clockString(r.naics_code),
+    naics_description: clockString(r.naics_description),
+    psc_code: clockString(r.psc_code),
+    fiscal_year: clockString(r.fiscal_year),
+    quarter: clockString(r.anticipated_quarter),
+    award_date: clockString(r.anticipated_award_date),
+    value_min: typeof r.estimated_value_min === 'number' ? r.estimated_value_min : null,
+    value_max: typeof r.estimated_value_max === 'number' ? r.estimated_value_max : null,
+    value_range: clockString(r.estimated_value_range),
+    set_aside_type: clockString(r.set_aside_type),
+    contract_type: clockString(r.contract_type),
+    incumbent_name: clockString(r.incumbent_name),
+    pop_state: clockString(r.pop_state),
+    status: clockString(r.status),
+    source_url: clockString(r.source_url),
+    ...clock,
+  };
+}
 
 export interface ForecastQueryResult {
   forecasts: ForecastRow[];
@@ -270,31 +329,7 @@ export async function queryForecasts(input: ForecastQueryInput): Promise<Forecas
   const rows = rowsRaw.slice(0, limit);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const forecasts: ForecastRow[] = rows.map((r: any) => ({
-    id: r.id,
-    external_id: r.external_id ?? null,
-    title: r.title,
-    description: r.description ?? null,
-    agency: r.source_agency ?? null,
-    department: r.department ?? null,
-    office: r.contracting_office ?? null,
-    naics_code: r.naics_code ?? null,
-    naics_description: r.naics_description ?? null,
-    psc_code: r.psc_code ?? null,
-    fiscal_year: r.fiscal_year ?? null,
-    quarter: r.anticipated_quarter ?? null,
-    award_date: r.anticipated_award_date ?? null,
-    value_min: r.estimated_value_min ?? null,
-    value_max: r.estimated_value_max ?? null,
-    value_range: r.estimated_value_range ?? null,
-    set_aside_type: r.set_aside_type ?? null,
-    contract_type: r.contract_type ?? null,
-    incumbent_name: r.incumbent_name ?? null,
-    pop_state: r.pop_state ?? null,
-    status: r.status ?? null,
-    as_of: r.last_synced_at ?? r.updated_at ?? null,
-    source_url: r.source_url ?? null,
-  }));
+  const forecasts: ForecastRow[] = rows.map((r: any) => forecastCustomerRow(r));
 
   // `count` is now the POST-filter total: the past-FY exclusion runs in SQL
   // above, so Postgres counts only rows the user can actually see. Previously

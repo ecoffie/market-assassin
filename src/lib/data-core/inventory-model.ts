@@ -402,6 +402,25 @@ export function worstState(states: FreshnessState[]): FreshnessState {
   return 'UNKNOWN';
 }
 
+/**
+ * Corpus tile for a dataset that is several feeds.
+ *
+ * UNREACHABLE only when every monitored feed is unreachable (or the only
+ * non-dead feeds are UNKNOWN — we have not proved anything is alive).
+ * A living feed (CURRENT or STALE) beside an unreachable sibling is STALE:
+ * the dead feed is named in the tile detail, and the corpus is not painted
+ * as if the stored rows cannot be read. Never CURRENT while any feed is
+ * unreachable. Never a zero.
+ */
+export function corpusFreshness(states: FreshnessState[]): FreshnessState {
+  if (!states.length) return 'UNKNOWN';
+  const living = states.some((s) => s === 'CURRENT' || s === 'STALE');
+  const dead = states.some((s) => s === 'UNREACHABLE');
+  if (dead && !living) return 'UNREACHABLE';
+  if (dead && living) return 'STALE';
+  return worstState(states);
+}
+
 export function summarizeStates(states: FreshnessState[]): string {
   const counts = new Map<FreshnessState, number>();
   for (const s of states) counts.set(s, (counts.get(s) ?? 0) + 1);
