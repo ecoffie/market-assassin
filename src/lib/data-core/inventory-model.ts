@@ -432,7 +432,7 @@ export function classifyDodSbirHealth(input: {
         : `${input.held} held rows were not advanced.`;
     return {
       state: 'UNREACHABLE',
-      detail: `sbir.gov degraded. ${held} sync-dod-sbir stays enabled; do not park it.`,
+      detail: `DoD topic source degraded (DSIP public list, then sbir.gov). ${held} sync-dod-sbir stays enabled; do not park it.`,
     };
   }
   if (input.held == null) {
