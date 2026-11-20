@@ -1,0 +1,65 @@
+{
+  "errorcode": 0,
+  "msg": "Webservice Succeeds",
+  "data": {
+    "hitCount": 4,
+    "oppHits": [
+      {
+        "id": "359782",
+        "number": "HR001125S0011",
+        "title": "TTO Office Wide (OW) BAA 2025",
+        "agencyCode": "DOD-DARPA-TTO",
+        "agency": "DARPA - Tactical Technology Office",
+        "openDate": "06/23/2025",
+        "closeDate": "12/22/2026",
+        "oppStatus": "posted",
+        "docType": "synopsis",
+        "cfdaList": [
+          "12.910"
+        ]
+      },
+      {
+        "id": "363738",
+        "number": "HR001126S0015",
+        "title": "Defense Sciences Office (DSO) Office-wide BAA",
+        "agencyCode": "DOD-DARPA-DSO",
+        "agency": "DARPA - Defense Sciences Office",
+        "openDate": "08/28/2026",
+        "closeDate": "08/27/2027",
+        "oppStatus": "posted",
+        "docType": "synopsis",
+        "cfdaList": [
+          "12.910"
+        ]
+      },
+      {
+        "id": "362905",
+        "number": "HR001126S0011",
+        "title": "Information Processing Techniques Office Office-Wide",
+        "agencyCode": "DOD-DARPA-IPTO",
+        "agency": "DARPA - Information Processing Technologies Office",
+        "openDate": "06/22/2026",
+        "closeDate": "06/22/2027",
+        "oppStatus": "posted",
+        "docType": "synopsis",
+        "cfdaList": [
+          "12.910"
+        ]
+      },
+      {
+        "id": "364129",
+        "number": "DARPARA2701",
+        "title": "Young Faculty Award (YFA) 2027",
+        "agencyCode": "DOD-DARPA-DSO",
+        "agency": "DARPA - Defense Sciences Office",
+        "openDate": "10/20/2026",
+        "closeDate": "01/13/2027",
+        "oppStatus": "posted",
+        "docType": "synopsis",
+        "cfdaList": [
+          "12.910"
+        ]
+      }
+    ]
+  }
+}

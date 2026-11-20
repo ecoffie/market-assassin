@@ -646,17 +646,23 @@ export async function GET(request: NextRequest) {
         { label: 'NIH RePORTER', count: c.resNih, note: e.resNih ? `last advanced ${e.resNih.slice(0, 10)}` : undefined },
         { label: 'Grants.gov research slice', count: c.resGrantsGov, note: e.resGrantsGov ? `last advanced ${e.resGrantsGov.slice(0, 10)}` : undefined },
         { label: 'DARPA BAA', count: c.resDarpa, note: e.resDarpa ? `last advanced ${e.resDarpa.slice(0, 10)}` : undefined },
-        { label: 'NSF SBIR/STTR', count: c.resNsf, note: (c.resNsf ?? 0) === 0 ? 'contributes 0 rows — never written' : undefined },
+        { label: 'NSF SBIR/STTR', count: null, note: 'unavailable — api.www.sbir.gov returns HTTP 403, so this feed is not collected. That is not a count of zero opportunities.' },
         { label: 'view: SBIR / STTR (opportunity_type) — what search_sbir reads', count: c.resTypeSbir, note: 'subset of the above, not additive' },
         { label: 'view: grant-type', count: c.resTypeGrant, note: 'subset, not additive' },
         { label: 'view: BAA', count: c.resTypeBaa, note: 'subset, not additive' },
       ],
       headlineContribution: c.research,
       freshness: {
-        state: researchInstances.length ? worstState(researchInstances.map((i) => i.state)) : timestampState(e.resNih, 24, now),
+        state: researchInstances.length ? corpusFreshness(researchInstances.map((i) => i.state)) : timestampState(e.resNih, 24, now),
         asOf: e.resNih,
-        basis: `worst of ${researchInstances.length} registered feeds; asOf = newest NIH advance`,
-        detail: summarizeStates(researchInstances.map((i) => i.state)),
+        basis: `corpus of ${researchInstances.length} registered feeds; asOf = newest NIH advance`,
+        detail: [
+          summarizeStates(researchInstances.map((i) => i.state)),
+          researchInstances.some((i) => i.state === 'UNREACHABLE')
+            ? `Unreachable feeds (not zero rows): ${researchInstances.filter((i) => i.state === 'UNREACHABLE').map((i) => i.sourceKey).join(', ')}.`
+            : '',
+          'NSF SBIR stays uncollected while api.www.sbir.gov returns HTTP 403. That absence is not a count of zero.',
+        ].filter(Boolean).join(' '),
         instances: researchInstances,
         schedules: schedules(CRON_JOBS.research),
       },

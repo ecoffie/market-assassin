@@ -18,6 +18,7 @@ import {
   SourceId,
   normalizeOpportunityType,
 } from '../types';
+import { darpaHitsFromSearch, darpaSearchBody, DARPA_GRANTS_SEARCH_URL, type DarpaGrantHit } from './darpa-grants-search';
 
 // ============================================================================
 // TYPES
@@ -71,6 +72,7 @@ const DARPA_OFFICE_NAMES: Record<string, string> = {
   'DOD-DARPA-I2O': 'Information Innovation Office (I2O)',
   'DOD-DARPA-MTO': 'Microsystems Technology Office (MTO)',
   'DOD-DARPA-STO': 'Strategic Technology Office (STO)',
+  'DOD-DARPA-IPTO': 'Information Processing Techniques Office (IPTO)',
 };
 
 // ============================================================================
@@ -162,115 +164,58 @@ export async function searchDARPAFromGrantsGov(
   }
 }
 
+function hitToGrant(hit: DarpaGrantHit): GrantsGovGrant {
+  return {
+    oppNum: hit.number,
+    title: hit.title,
+    agency: hit.agency,
+    agencyCode: hit.agencyCode,
+    status: hit.oppStatus,
+    // Grants.gov labels these "synopsis". They are DARPA research announcements
+    // (office-wide BAAs and YFA). The collector's source id is darpa_baa.
+    type: 'baa',
+    openDate: hit.openDate,
+    closeDate: hit.closeDate,
+    link: hit.id ? `https://www.grants.gov/search-results-detail/${hit.id}` : DARPA_GRANTS_SEARCH_URL,
+  };
+}
+
 /**
- * Fetch DARPA opportunities using internal API call to our Grants.gov endpoint
+ * Fetch open DARPA opportunities from Grants.gov search2.
+ * No hardcoded opportunity list. A failed or empty search is success:false.
  */
 export async function fetchDARPAOpportunities(
   params: DARPAGrantsSearchParams = {}
 ): Promise<ScrapeResult> {
+  void params;
   const startTime = Date.now();
   const errors: ScrapeError[] = [];
 
   try {
-    // Use our internal API endpoint which has the Grants.gov integration
-    const baseUrl = process.env.VERCEL_URL
-      ? `https://${process.env.VERCEL_URL}`
-      : 'https://getmindy.ai';
-
-    const searchParams = new URLSearchParams({
-      keyword: params.keywords ? `DARPA ${params.keywords}` : 'DARPA',
-      status: params.status || 'posted',
-      rows: (params.limit || 50).toString()
+    const response = await fetch(DARPA_GRANTS_SEARCH_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify(darpaSearchBody()),
     });
-
-    // Call our internal Grants.gov search or use MCP directly
-    // For now, we'll construct opportunities from known DARPA BAAs
-
-    // Hardcoded current DARPA BAAs (updated April 2026)
-    // These are fetched from Grants.gov search results
-    const currentDARPABAAs: GrantsGovGrant[] = [
-      {
-        oppNum: 'HR001125S0013',
-        title: 'Defense Sciences Office (DSO) Office-wide BAA',
-        agency: 'DARPA - Defense Sciences Office',
-        agencyCode: 'DOD-DARPA-DSO',
-        status: 'posted',
-        type: 'baa',
-        openDate: '06/03/2025',
-        closeDate: '06/02/2026',
-        link: 'https://www.grants.gov/search-results-detail/359239'
-      },
-      {
-        oppNum: 'HR001126S0003',
-        title: 'Biological Technologies Office-Wide BAA',
-        agency: 'DARPA - Biological Technologies Office',
-        agencyCode: 'DOD-DARPA-BTO',
-        status: 'posted',
-        type: 'baa',
-        openDate: '10/01/2025',
-        closeDate: '09/30/2026',
-        link: 'https://www.grants.gov/search-results-detail/360698'
-      },
-      {
-        oppNum: 'HR001125S0011',
-        title: 'TTO Office Wide (OW) BAA 2025',
-        agency: 'DARPA - Tactical Technology Office',
-        agencyCode: 'DOD-DARPA-TTO',
-        status: 'posted',
-        type: 'baa',
-        openDate: '06/23/2025',
-        closeDate: '12/22/2026',
-        link: 'https://www.grants.gov/search-results-detail/359782'
-      },
-      {
-        oppNum: 'HR001126S0001',
-        title: 'Information Innovation Office (I2O) Office-Wide BAA',
-        agency: 'DARPA - Information Innovation Office',
-        agencyCode: 'DOD-DARPA-I2O',
-        status: 'posted',
-        type: 'baa',
-        openDate: '11/28/2025',
-        closeDate: '11/30/2026',
-        link: 'https://www.grants.gov/search-results-detail/360922'
-      },
-      {
-        oppNum: 'HR001126S0008',
-        title: 'Automated Discovery for Design and Control of Turbulent Systems (AutoDIDACTS)',
-        agency: 'DARPA - Defense Sciences Office',
-        agencyCode: 'DOD-DARPA-DSO',
-        status: 'posted',
-        type: 'baa',
-        openDate: '04/01/2026',
-        closeDate: '05/20/2026',
-        link: 'https://www.grants.gov/search-results-detail/361737'
-      },
-      {
-        oppNum: 'DARPARA2601',
-        title: 'Protean - Programmable Biological Systems',
-        agency: 'DARPA - Biological Technologies Office',
-        agencyCode: 'DOD-DARPA-BTO',
-        status: 'posted',
-        type: 'baa',
-        openDate: '02/11/2026',
-        closeDate: '05/07/2026',
-        link: 'https://www.grants.gov/search-results-detail/361285'
-      }
-    ];
-
-    const opportunities = currentDARPABAAs.map(grant => transformGrantsGovOpportunity(grant));
-
+    if (!response.ok) {
+      throw new Error(`Grants.gov search2 HTTP ${response.status}`);
+    }
+    const parsed = darpaHitsFromSearch(await response.json());
+    if (parsed.error) {
+      throw new Error(parsed.error);
+    }
+    const opportunities = parsed.hits.map((hit) => transformGrantsGovOpportunity(hitToGrant(hit)));
     return {
       success: true,
       source: SOURCE_ID,
       opportunities,
-      totalFound: opportunities.length,
+      totalFound: parsed.hitCount ?? opportunities.length,
       newCount: 0,
       updatedCount: 0,
       unchangedCount: 0,
       durationMs: Date.now() - startTime,
-      scrapedAt: new Date().toISOString()
+      scrapedAt: new Date().toISOString(),
     };
-
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
     errors.push({
@@ -367,7 +312,6 @@ function transformGrantsGovOpportunity(grant: GrantsGovGrant): ScrapedOpportunit
     agency: 'Defense Advanced Research Projects Agency (DARPA)',
     subAgency: officeName,
 
-    naicsCode: '541715',  // R&D in Physical/Engineering/Life Sciences
     opportunityType: normalizeOpportunityType(grant.type || 'baa'),
 
     postedDate: parseDate(grant.openDate),
