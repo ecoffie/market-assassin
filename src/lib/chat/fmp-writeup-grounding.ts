@@ -478,7 +478,41 @@ function pathwayMove(p: FmpPathway): string {
     : 'Confirm set-aside fit and bonding capacity, then decide whether to bid, team or watch.';
 }
 
-function extractPathways(results: readonly FmpToolContent[], dominantNaics: string | null = null): FmpPathway[] {
+/** Stop-words for pathway↔award buyer affinity (narrower than ORG_WORDS — keep highway/park/corps). */
+const AFFINITY_STOP = new Set([
+  'department', 'administration', 'service', 'services', 'federal', 'national',
+  'agency', 'office', 'united', 'states', 'the', 'and', 'of', 'inc', 'llc', 'corp',
+]);
+
+function pathwayBuyerAffinity(
+  p: Pick<FmpPathway, 'buyer' | 'title' | 'noticeId'>,
+  awardRows: readonly FmpAwardRow[],
+): number {
+  const hay = `${p.buyer ?? ''} ${p.title} ${p.noticeId ?? ''}`.toLowerCase();
+  if (!awardRows.length || !hay.trim()) return 0;
+  let score = 0;
+  for (const r of awardRows) {
+    const b = (r.buyer || '').trim();
+    if (!b || b === 'Not stated') continue;
+    const bl = b.toLowerCase();
+    // Exact buyer string on the notice beats token overlap (and avoids park ⊂ parkway).
+    if (hay.includes(bl)) {
+      score += 40;
+      continue;
+    }
+    for (const w of bl.split(/[^a-z0-9]+/)) {
+      if (w.length < 5 || AFFINITY_STOP.has(w)) continue;
+      if (hay.includes(w)) score += 20;
+    }
+  }
+  return Math.min(60, score);
+}
+
+function extractPathways(
+  results: readonly FmpToolContent[],
+  dominantNaics: string | null = null,
+  awardRows: readonly FmpAwardRow[] = [],
+): FmpPathway[] {
   const seen = new Set<string>();
   const out: FmpPathway[] = [];
   for (const r of results) {
@@ -541,12 +575,17 @@ function extractPathways(results: readonly FmpToolContent[], dominantNaics: stri
   const fitFor = (p: FmpPathway): number => (dominantNaics ? pathwayNaicsFit(p, dominantNaics) : 0);
   // Hard drops only apply to a construction / civil firm; other profiles are ranked, never emptied.
   const candidates = civilDominant ? out.filter((p) => !isOffMarketForCivil(p)) : out;
-  const indexed = candidates.map((p, i) => ({ p, i, fit: fitFor(p) }));
+  const indexed = candidates.map((p, i) => {
+    const fit = fitFor(p);
+    const buyer = pathwayBuyerAffinity(p, awardRows);
+    return { p, i, fit, buyer, score: fit + buyer };
+  });
   indexed.sort((a, b) => {
     if (dominantNaics) {
       const ka = PATHWAY_KIND_ORDER[a.p.kind ?? 'notice'];
       const kb = PATHWAY_KIND_ORDER[b.p.kind ?? 'notice'];
       if (ka !== kb) return ka - kb;
+      if (a.score !== b.score) return b.score - a.score;
       if (a.fit !== b.fit) return b.fit - a.fit;
     }
     const ra = pathwayRank(a.p);
@@ -558,7 +597,12 @@ function extractPathways(results: readonly FmpToolContent[], dominantNaics: stri
     return a.i - b.i;
   });
   if (civilDominant) {
-    const fits = indexed.filter((x) => x.fit > 0);
+    // Sibling 23x NAICS alone is not enough (dredging beat bridges for RBA). Prefer
+    // exact/prefix fit, 5413 inspection lanes, or an award-buyer hit.
+    const fits = indexed.filter((x) => {
+      const inspection = (x.p.naics ?? '').startsWith('5413') && x.fit >= 40;
+      return x.fit >= 80 || x.buyer >= 30 || inspection || (x.fit >= 40 && x.buyer > 0);
+    });
     // Fewer than two on-market pathways: show none so the vehicle-token frame renders instead of junk.
     return fits.length < 2 ? [] : fits.slice(0, 6).map((x) => x.p);
   }
@@ -570,11 +614,18 @@ const PATHWAY_KIND_ORDER: Record<NonNullable<FmpPathway['kind']>, number> = { no
 
 /** Civil / heavy-construction wording. Bare "BRIDGE" is deliberately absent: it names bridge CONTRACTS (extensions). */
 const CIVIL_LEXICAL_RE = /\b(highway|parkway|pavement|roadway|bridge rehabilitation|bridge replacement|deck|culvert|retaining wall|heavy civil|marine construction|asphalt|concrete paving)\b/i;
+/** Marine dredging / harbor work — adjacent 237xxx, wrong pathway for a highway/bridge primary (237310). */
+const MARINE_OFF_RE = /\b(dredg(?:e|ing)?|jetty|breakwater|harbor\b|channel maintenance|maintenance dredging|inner channel)\b/i;
 const OFF_MARKET_TITLE_RE = /\b(software|tax|income tax)\b/i;
 const IRS_BUYER_RE = /\b(Internal Revenue Service|IRS)\b/i;
 
 /** NAICS fit of a pathway against the firm's dominant award NAICS (0 when it says nothing useful). */
 export function pathwayNaicsFit(p: Pick<FmpPathway, 'naics' | 'title' | 'summary'>, dominantNaics: string): number {
+  const hay = `${p.title} ${p.summary ?? ''}`;
+  // Highway/bridge primary: dredging notices share 237xxx but are a different market (RBA Ask→Claude gap).
+  if (/^2373/.test(dominantNaics) && dominantNaics !== '237990' && MARINE_OFF_RE.test(hay)) {
+    return 0;
+  }
   const n = p.naics;
   let fit = 0;
   if (n) {
@@ -584,7 +635,7 @@ export function pathwayNaicsFit(p: Pick<FmpPathway, 'naics' | 'title' | 'summary
     else if (dominantNaics.startsWith('23') && n.startsWith('5413')) fit = 40;
   }
   // The lexical boost only rescues a missing / weak NAICS read, and only for a civil profile.
-  if (fit < 50 && dominantNaics.startsWith('23') && CIVIL_LEXICAL_RE.test(`${p.title} ${p.summary ?? ''}`)) fit += 30;
+  if (fit < 50 && dominantNaics.startsWith('23') && CIVIL_LEXICAL_RE.test(hay)) fit += 30;
   return fit;
 }
 
@@ -905,8 +956,8 @@ export function accumulateFmpEvidence(
 
   const vehicleTokens = extractVehicleTokens(corpus);
   const collected = collectContactNames(results);
-  const pathways = extractPathways(results, dominantNaics);
   const awardRows = extractAwardRows(results);
+  const pathways = extractPathways(results, dominantNaics, awardRows);
   const buyerSpend = extractBuyerSpend(results);
   const structuredContacts = extractStructuredContacts(results);
   const contactNames = profileContacts(collected.names, structuredContacts, collected.dla, {

@@ -8,7 +8,7 @@
  * resumable history).
  *
  * Layout: thin header → scrolling message list (auto-scroll on new) →
- * sticky input row. Empty state shows 4 starter prompt chips.
+ * sticky input row. Empty state is blank (no starter prompt ideas).
  *
  * Streaming render: tokens flush into the in-progress assistant
  * bubble as they arrive. After the stream emits `citations`, those
@@ -25,7 +25,6 @@ import { GeneratedDownloadChips, type GeneratedDownloadFile } from '../chat/Gene
 import { ChatReportPreview, type ChatInlineReport } from '../chat/ChatReportPreview';
 import { useVaultCapabilities } from '../chat/useVaultCapabilities';
 import { UpgradeModal } from '../UpgradeModal';
-import { DEFAULT_STARTER_PROMPTS } from '@/lib/chat/starter-prompts';
 import { renderSafeMarkdown } from '@/lib/chat/safe-markdown';
 import { startProposalFromNotice } from '@/lib/chat/start-proposal';
 import {
@@ -178,29 +177,6 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
     inputRef.current?.focus();
   }, []);
 
-  // Empty-state starter chips. Seeded with the generic v2 set (showcases the Data
-  // Core tools: pipeline · live SAM · contractor intel · Vault); swapped for a
-  // profile-personalized set once /api/app/chat/suggestions returns (their real
-  // NAICS, whether they have pursuits). Never blocks — falls back to generic.
-  const [starterPrompts, setStarterPrompts] = useState<string[]>(DEFAULT_STARTER_PROMPTS);
-  useEffect(() => {
-    if (!email) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await authedFetch(`/api/app/chat/suggestions?email=${encodeURIComponent(email)}`, email);
-        if (!res.ok) return;
-        const data = await res.json();
-        if (!cancelled && Array.isArray(data?.prompts) && data.prompts.length) {
-          setStarterPrompts(data.prompts);
-        }
-      } catch {
-        // keep the generic set on any failure
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [email]);
-
   // Track whether we've already consumed a voice-pivot seed for this
   // mount so React StrictMode's double-invoke can't fire it twice.
   const seedHandledRef = useRef(false);
@@ -279,6 +255,10 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
       const decoder = new TextDecoder();
       let leftover = '';
       let finalContent = ''; // full answer text — used to fetch contextual follow-ups
+      // Follow-ups only after a real outcome: a downloadable/report, or a finished
+      // Q&A answer. Never invent "what next?" chips while the turn is still gathering.
+      let sawOutcome = false;
+      let turnErrored = false;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -305,6 +285,7 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
                 (f) => f && typeof f.document_id === 'string' && typeof f.format === 'string',
               );
               if (files.length) {
+                sawOutcome = true;
                 setMessages(prev => prev.map(m =>
                   m.id === assistantMsg.id
                     ? {
@@ -316,6 +297,7 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
                 ));
               }
             } else if (evt.type === 'market_report' && typeof evt.html === 'string' && evt.html) {
+              sawOutcome = true;
               const report: ChatInlineReport = {
                 html: evt.html,
                 title: typeof evt.title === 'string' && evt.title ? evt.title : 'Market report',
@@ -327,14 +309,16 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
                 m.id === assistantMsg.id ? { ...m, ledger: evt.ledger } : m
               ));
             } else if (evt.type === 'citations' && Array.isArray(evt.sources)) {
+              if (evt.sources.length) sawOutcome = true;
               setMessages(prev => prev.map(m =>
                 m.id === assistantMsg.id ? { ...m, citations: evt.sources } : m
               ));
-            } else if ((evt.type === 'notice' || evt.type === 'truncated') && typeof evt.message === 'string') {
+            } else if ((evt.type === 'notice' || evt.type === 'progress') && typeof evt.message === 'string') {
               setMessages(prev => prev.map(m =>
                 m.id === assistantMsg.id ? { ...m, notices: [...(m.notices || []), evt.message] } : m
               ));
             } else if (evt.type === 'error') {
+              turnErrored = true;
               setMessages(prev => prev.map(m =>
                 m.id === assistantMsg.id
                   // B2: only messages from the fixed customer-safe table are displayed verbatim.
@@ -352,10 +336,10 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
         }
       }
 
-      // Contextual "what next?" chips — fetched AFTER the answer completes so
-      // they never add latency to the response. Fire-and-forget; no chips on any
-      // failure. Skipped for empty/errored answers.
-      if (finalContent.trim().length > 0) {
+      // Contextual "what next?" chips — only after an outcome lands (files, report,
+      // citations, or a finished Q&A answer). Never while the turn failed or is empty.
+      const answerOutcome = !turnErrored && finalContent.trim().length >= 80;
+      if (sawOutcome || answerOutcome) {
         authedFetch('/api/app/chat/suggestions', email, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -691,53 +675,10 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
                 Upgrade to Pro to chat
               </button>
             </div>
-            <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-3 opacity-50 pointer-events-none">
-              {starterPrompts.map((prompt: string) => (
-                <div
-                  key={prompt}
-                  className="text-left rounded-lg border border-surface bg-ground/50 p-4"
-                >
-                  <div className="text-sm text-ink-soft">{prompt}</div>
-                </div>
-              ))}
-            </div>
           </div>
         ) : messages.length === 0 ? (
-          <div className="max-w-2xl mx-auto pt-12">
-            <div className="text-center mb-8">
-              <MessageCircle className="h-10 w-10 mx-auto mb-3 text-accent" strokeWidth={1.5} />
-              <h2 className="text-xl font-semibold text-white mb-1">Ask in plain English</h2>
-              <p className="text-sm text-muted max-w-lg mx-auto">
-                Type a question the way you would ask a colleague. Mindy looks things up and can turn the answer into a downloadable Word, PDF, Excel, or CSV file.
-              </p>
-            </div>
-            <ol className="mb-8 space-y-3 rounded-xl border border-surface bg-ground/40 p-4 text-left" data-testid="ask-mindy-how-to">
-              <li className="flex gap-3 text-sm text-slate-200">
-                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 text-xs font-semibold text-emerald-300">1</span>
-                <span><span className="font-medium text-white">Attach</span> a capability statement or RFP (optional) using the paperclip below.</span>
-              </li>
-              <li className="flex gap-3 text-sm text-slate-200">
-                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 text-xs font-semibold text-emerald-300">2</span>
-                <span><span className="font-medium text-white">Ask</span> what you need — for example, “Who buys my kind of work?” or “Write a strategy brief I can download.”</span>
-              </li>
-              <li className="flex gap-3 text-sm text-slate-200">
-                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 text-xs font-semibold text-emerald-300">3</span>
-                <span><span className="font-medium text-white">Download</span> the green buttons under Mindy’s answer, or find the files later in Documents.</span>
-              </li>
-            </ol>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {starterPrompts.map((prompt: string) => (
-                <button
-                  key={prompt}
-                  onClick={() => sendMessage(prompt)}
-                  disabled={isStreaming}
-                  className="text-left rounded-lg border border-surface bg-ground/50 hover:border-purple-500/40 hover:bg-purple-500/5 transition-colors p-4 group disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <div className="text-sm text-slate-200 group-hover:text-white">{prompt}</div>
-                </button>
-              ))}
-            </div>
-          </div>
+          // Blank start — no starter chips, no how-to, no prompt ideas. The input is the product.
+          <div className="flex-1" data-testid="ask-mindy-blank" aria-hidden />
         ) : (
           <div className="max-w-3xl mx-auto space-y-6">
             {messages.map(msg => (

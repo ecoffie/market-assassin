@@ -483,10 +483,10 @@ describe('fmp-writeup-grounding', () => {
       ]);
       expect(evidence.awardRows?.[0]).toMatchObject({ where: 'DC', competition: '8(a) Competed', obligated: '$9.8M' });
       expect(evidence.pathways?.map((p) => p.noticeId)).toContain('693C7326R0001');
-      // 237310 dominant: exact-NAICS fits (vehicle first) outrank the 236220 sector-only sources sought
+      // 237310 dominant: vehicle + exact-NAICS first; sector-only 236220 without an award-buyer hit drops
       expect(evidence.pathways?.[0].title).toMatch(/MATOC/);
       expect(evidence.pathways?.[1].naics).toBe('237310');
-      expect(evidence.pathways?.[2].noticeType).toMatch(/sources sought/i);
+      expect(evidence.pathways?.some((p) => p.noticeId === 'N4008026S0042')).toBe(false);
       expect(evidence.contactRows?.map((c) => c.person)).toEqual(['Helson Roman', 'David Bogner']);
       expect(evidence.buyerSpend?.[0]).toEqual({ agency: 'Federal Highway Administration', dollars: 310_000_000 });
       expect(evidence.competitors?.[0].firm).toBe('Acme Paving');
@@ -646,6 +646,22 @@ describe('fmp-writeup-grounding', () => {
         expect(pathwayNaicsFit({ title: 'x', naics: '541330' }, '237310')).toBe(40);
         expect(pathwayNaicsFit({ title: 'BRIDGE CONTRACT' }, '237310')).toBe(0);
         expect(pathwayNaicsFit({ title: 'Highway bridge rehabilitation' }, '237310')).toBe(30);
+      });
+
+      it('zeros dredging/jetty pathways for a 237310 highway firm even under sibling 237990', () => {
+        expect(pathwayNaicsFit({
+          title: 'Norfolk Harbor Inner Channel Maintenance Dredging',
+          naics: '237990',
+        }, '237310')).toBe(0);
+        expect(pathwayNaicsFit({
+          title: 'St. Lucie South Jetty Repair Industry Day',
+          naics: '237990',
+        }, '237310')).toBe(0);
+        const dredge = recompete('PIID-DREDGE', 'Norfolk Harbor Maintenance Dredging', '237990', 'DEPT OF THE ARMY');
+        const jetty = recompete('PIID-JETTY', 'St. Lucie South Jetty Repair', '237990', 'DEPT OF THE ARMY');
+        const ev = run([dredge, jetty, civilA, civilB]);
+        expect(ev.pathways?.map((p) => p.noticeId)).toEqual(['PIID-HWY-PAVE', 'PIID-TOE-DRAIN']);
+        expect(ev.pathways?.map((p) => p.noticeId)).not.toEqual(expect.arrayContaining(['PIID-DREDGE', 'PIID-JETTY']));
       });
     });
 

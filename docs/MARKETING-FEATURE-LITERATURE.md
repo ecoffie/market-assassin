@@ -1,3 +1,12 @@
+### Ask Mindy blank start + pathway fit (no prompt ideas, no dredging false leads) — 2026-11-20
+
+**What shipped.** New Ask chats open blank (no starter prompt chips / how-to). Follow-up chips only after a real outcome (files, report, citations, or a finished answer). FMP pathway ranking zeros marine dredging/jetty for highway/bridge firms (237310) and prefers award-buyer affinity over sibling-NAICS noise.
+
+**Why it matters.** Customers asked for a blank screen and for Ask to pick the same kind of pathways Claude does (Eastern Federal Lands / inspection vehicles), not the first open 237990 dredging notices.
+
+**Proof.** Unit `fmp-writeup-grounding` 43/43 including dredging demotion. Live verify after deploy: empty Ask has `ask-mindy-blank`; cold RBA profile pathways must not lead with dredging/jetty.
+
+
 ### Ask Mindy Federal Market Profile content parity (Claude gold) — 2026-11-20
 
 **What shipped.** Host-built FMP DocModels now assemble The read, metrics, multi-pathway detail, awards table, PAE, buyer pain, named contacts, and readiness from tool JSON — and Ask keeps a rich planner DocModel when it clears the FMP gate instead of always forcing the thin rescue shell. Agency names like Internal Revenue Service can no longer appear as person contacts.
