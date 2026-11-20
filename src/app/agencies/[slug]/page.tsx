@@ -17,11 +17,12 @@
  */
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { notFound } from 'next/navigation';
+import { notFound, permanentRedirect } from 'next/navigation';
 import {
   getRelatedAgencies,
   type AgencySeo,
 } from '@/data/agencies-seo';
+import { canonicalAgencySlug } from '@/lib/seo/agency-slug-redirects';
 import {
   buildPublicPainSection,
   getPublicAgencyBySlug,
@@ -120,6 +121,8 @@ export default async function AgencyPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
+  const canonical = canonicalAgencySlug(slug);
+  if (canonical) permanentRedirect(`/agencies/${canonical}`);
   const agency = getPublicAgencyBySlug(slug);
   if (!agency) notFound();
 

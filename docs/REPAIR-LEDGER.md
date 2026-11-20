@@ -42,6 +42,7 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 | Date | Area | Fix | Proof anchor | Verified | Status |
 |---|---|---|---|---|---|
+| 2026-11-20 | Data Core / agency slugs | /agencies/va, /cpsc, /fdic, and /treasury permanently redirect to the canonical pages that already exist. Ask Mindy and MCP citations keep finding text, report number, date, and the official URL on separate fields from the recommendation. | `canonicalAgencySlug` → `src/lib/seo/agency-slug-redirects.ts` | `agency-slug-redirects.unit.test.ts`, `sourced-pain-points.unit.test.ts` | BUILT, NOT MERGED |
 | 2026-11-19 | Budget labeling | Agency-level live years are USASpending budgetary resources, a budget signal, not awards or spending. `budget_programs` rows stay federal-account obligations (`amount_basis: 'obligations'`), distinct from those agency figures, and the program copy does not say they predict solicitations or opportunities. `/api/budget-intel?mode=opportunities` is unchanged. | `USASpending budgetary resources are a budget signal` → `src/mcp/tools/agency-budget-trends.ts` | `budget-label.unit.test.ts` | BUILT, NOT MERGED |
 
 ## 2026-11-18 — Budget tables acquire from USASpending

@@ -1,6 +1,7 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { NextConfig } from "next";
+import { agencySlugRedirects } from "./src/lib/seo/agency-slug-redirects";
 
 /**
  * Git worktrees live at `.claude/worktrees/<slug>` inside the parent checkout.
@@ -421,6 +422,8 @@ const nextConfig: NextConfig = {
   // Redirects for legacy URLs and convenience
   async redirects() {
     return [
+      // Abbreviation URLs customers type. The canonical pages already exist.
+      ...agencySlugRedirects(),
       // ── RETIRED LEGACY STOREFRONT (Eric, 2026-07-28) ────────────────────────────────
       // These 7 routes are pure SALES pages for products we no longer sell. Their Stripe
       // payment links were deactivated the same day (10 links: GovCon Starter Bundle $697,
