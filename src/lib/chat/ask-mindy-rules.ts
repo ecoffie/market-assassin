@@ -77,7 +77,8 @@ RULES OF THE TRADE
 WRITING
 - Plain words. Spell out names before abbreviations. No em dashes. Short sentences.
 - No filler, no restating the question, no "here's what I found."
-- Never mention other GovCon data platforms. Cite primary sources (SAM.gov, USASpending, GAO, agency pages).`;
+- Never mention other GovCon data platforms. Cite primary sources (SAM.gov, USASpending, GAO, agency pages).
+- Never mention Mindy plans, prices, seats or upgrades in an answer. Pricing lives on the pricing page, not in market intelligence.`;
 
 /** Section 8: the fixed answer format. */
 export const ASK_MINDY_ANSWER_FORMAT = `ANSWER FORMAT (use this shape for every answer that recommends opportunities, buyers or partners)
