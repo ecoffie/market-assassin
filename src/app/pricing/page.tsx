@@ -42,7 +42,7 @@ const creditPlans = SUBSCRIPTION_PLANS.filter((p) => p.id !== 'agency').map((p) 
 export const metadata: Metadata = {
   title: 'Pricing — Pro, Team and Enterprise | Mindy',
   description:
-    'Pro at $149/mo, Team at $499/mo, both with a 14-day free trial. Save up to 33% billed annually. 100x cheaper than GovWin.',
+    'Pro at $149/mo, Team at $499/mo, both with a 14-day free trial. Save up to 33% billed annually. GovWin runs $15K–$50K/yr.',
   alternates: {
     canonical: 'https://getmindy.ai/pricing',
   },
