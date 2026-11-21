@@ -1358,7 +1358,14 @@ const ZLAYOUT_CSS = '<style>'
   // The tile-status notice ("Map tiles blocked by your network…", template.html) is not a Leaflet
   // control, so the rule above never lifted it: at its 44px it sat under this bar and the attribution
   // (iPhone SE: 0 of 3 rows visible; iPhone 13 / Pixel 7: 1 of 3). Lift it over both.
-  +   '.mapwrap .tilestatus{bottom:118px!important}'
+  +   '.mapwrap .tilestatus{bottom:164px!important;max-width:calc(100% - 104px)!important}'
+  // The pin-colour legend (#mapLegend, template.html: bottom 12px) is not a Leaflet control either, so it
+  // sat entirely under the bottom bar on every phone (Open Now / Coming Back / Coming Soon unexplained).
+  // It goes just above the attribution row, left side, capped so it wraps before the zoom control
+  // (which starts ~44px from the right edge); the tile notice above sits over the legend, narrowed to
+  // clear the zoom control too.
+  +   '.mapwrap .maplegend{bottom:108px!important;max-width:calc(100% - 76px)}'
+  +   '.mapwrap .maplegend .lg-grp{flex-wrap:wrap;column-gap:10px;row-gap:4px}'
   // The map's count pill is mirrored into the bottom bar (#mToggleCount, same words, including
   // "N not shown on map"), so it is hidden here rather than shown twice.
   +   '#mapCount{display:none!important}'
