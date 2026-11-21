@@ -34,10 +34,10 @@ describe('detectLocations', () => {
 
 describe('cleanInputText', () => {
   it('removes the place with its cue and the brand phrase', () => {
-    const text = 'Superb Staffing is a light industrial, clerical and warehouse staffing firm in Memphis';
-    const out = cleanInputText(text, ['Superb Staffing'], detectLocations(text));
+    const text = 'Example Staffing is a light industrial, clerical and warehouse staffing firm in Memphis';
+    const out = cleanInputText(text, ['Example Staffing'], detectLocations(text));
     expect(out.toLowerCase()).not.toContain('memphis');
-    expect(out.toLowerCase()).not.toContain('superb');
+    expect(out.toLowerCase()).not.toContain('example');
     expect(out).toContain('warehouse staffing firm');
     expect(out).not.toMatch(/\bin\s*\.?$/);
   });
@@ -46,14 +46,14 @@ describe('cleanInputText', () => {
 describe('distinctiveBrandTokens', () => {
   it('strips only brand-distinctive words, keeping capability words used elsewhere', () => {
     const cleaned = 'is a light industrial, clerical and warehouse staffing firm';
-    expect([...distinctiveBrandTokens(['Superb Staffing'], cleaned, new Set())]).toEqual(['superb']);
+    expect([...distinctiveBrandTokens(['Example Staffing'], cleaned, new Set())]).toEqual(['example']);
   });
   it('keeps a brand word the market sources use even if the input only has it in the brand', () => {
-    expect([...distinctiveBrandTokens(['Superb Staffing'], 'provides warehouse workers', new Set(['staffing']))]).toEqual(['superb']);
+    expect([...distinctiveBrandTokens(['Example Staffing'], 'provides warehouse workers', new Set(['staffing']))]).toEqual(['example']);
   });
   it('containsBlockedToken matches whole words only', () => {
-    expect(containsBlockedToken('superb staffing', new Set(['superb']))).toBe(true);
-    expect(containsBlockedToken('superbly staffed', new Set(['superb']))).toBe(false);
+    expect(containsBlockedToken('example staffing', new Set(['example']))).toBe(true);
+    expect(containsBlockedToken('examples staffed', new Set(['example']))).toBe(false);
   });
 });
 
