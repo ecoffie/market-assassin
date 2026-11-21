@@ -182,6 +182,12 @@ export interface HorizonResult {
   status: HorizonStatus;
   matched_count: number | null;
   returned_count: number;
+  /**
+   * Rows ranked before the page cut (the fetched candidate window). Shared fit-scorer contract (#2252):
+   * a scorer ranks THIS window, so "top of what was ranked" is never read as "top of the market" —
+   * compare it with matched_count. Absent when the horizon did not rank rows (unavailable / empty paths).
+   */
+  window_size?: number;
   items: HorizonItem[];
   source: string;
   as_of: string | null;
@@ -403,6 +409,13 @@ const WATCH_COVERAGE = ['open_now', 'coming_soon'] as const;
 
 function sb(): SupabaseClient {
   return createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+}
+
+/** A published number, or null when absent / blank / not a number. Never a 0 stand-in. */
+function finiteOrNull(v: unknown): number | null {
+  if (v === null || v === undefined || (typeof v === 'string' && v.trim() === '')) return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
 }
 
 function clampLimit(n: unknown): number {
@@ -931,6 +944,11 @@ async function queryOpenNow(
         naics_code: (r.naics_code as string) || null,
         psc_code: (r.psc_code as string) || null,
         sub_agency: (r.sub_tier as string) || null,
+        // Structured fields for the shared fit scorer (#2252). Raw values; null = not published / unknown.
+        place_of_performance_state: (r.pop_state as string) || null,
+        office_state: office?.state || null,
+        set_aside_code: (r.set_aside_code as string) || null,
+        set_aside_description: (r.set_aside_description as string) || null,
       };
     });
 
@@ -938,6 +956,7 @@ async function queryOpenNow(
       status: 'grounded',
       matched_count: count ?? null,
       returned_count: items.length,
+      window_size: ranked.length,
       items,
       source,
       as_of: asOf,
@@ -1136,6 +1155,8 @@ async function queryComingBack(
       psc_code: (r.psc_code as string) || null,
       description: (r.description as string) || null,
       awarding_sub_agency: (r.awarding_sub_agency as string) || null,
+      // Structured place of performance for the shared fit scorer (#2252); null = USASpending reported none.
+      place_of_performance_state: (r.place_of_performance_state as string) || null,
       // The award's public record (the citation for holder, value, dates and competition).
       ...(r.contract_id ? { source_url: `https://www.usaspending.gov/award/${encodeURIComponent(String(r.contract_id))}` } : {}),
       };
@@ -1171,6 +1192,7 @@ async function queryComingBack(
       // Row count minus duplicate-id rows collapsed in the fetched window (never below the true distinct count).
       matched_count: count == null ? null : Math.max(count - duplicatesCollapsed, items.length),
       returned_count: items.length,
+      window_size: classified.length,
       items,
       source,
       as_of: asOf,
@@ -1266,7 +1288,9 @@ async function queryComingSoon(
       if (!da) return 1;
       if (!db) return -1;
       return da.localeCompare(db);
-    }).slice(0, limit);
+    });
+    const forecastWindow = rows.length;
+    rows.splice(limit);
 
     // Partial coverage: the count measures ONLY the covered buyers; the missing ones are named, never zero.
     const partial = fcCov.coverage === 'partial'
@@ -1334,6 +1358,10 @@ async function queryComingSoon(
         incumbent_name: (r.incumbent_name as string) || null,
         contracting_office: (r.contracting_office as string) || null,
         source_url: typeof r.source_url === 'string' ? r.source_url : null,
+        // Structured fields for the shared fit scorer (#2252). null = not published (never 0).
+        place_of_performance_state: (r.pop_state as string) || null,
+        estimated_value_min: finiteOrNull(r.estimated_value_min),
+        estimated_value_max: finiteOrNull(r.estimated_value_max),
         ...forecastSyncClock(r),
       };
     });
@@ -1342,6 +1370,7 @@ async function queryComingSoon(
       status: partial ? 'partial' : 'grounded',
       matched_count: count ?? null,
       returned_count: items.length,
+      window_size: forecastWindow,
       items,
       source,
       as_of: asOf,
