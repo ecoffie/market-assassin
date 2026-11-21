@@ -40,9 +40,10 @@ function isMissingProfileStatsColumnError(error: unknown): boolean {
   );
 }
 
+/** Accepts one row or several (one round-trip for a batch of same-shape rows). */
 export async function upsertAlertLog(
   supabase: MinimalSupabaseClient,
-  payload: Record<string, unknown>
+  payload: Record<string, unknown> | Record<string, unknown>[]
 ): Promise<void> {
   const preferredConflictTarget = 'user_email,alert_date,alert_type';
   const legacyConflictTarget = 'user_email,alert_date';
