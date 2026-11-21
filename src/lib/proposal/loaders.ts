@@ -66,7 +66,21 @@ export function filterRealRows<T extends Record<string, unknown>>(rows: T[] | nu
 
 // ---- Bidder profile (NAICS / agencies / set-asides) ----------------
 
+/**
+ * The settings profile with its read state: 'ok' (a row with data), 'empty' (no row), or 'unavailable' (the
+ * query failed). loadBidderProfile below keeps its old contract ({} for both empty and failed) for existing
+ * callers; new callers that must not read a failure as "no profile" use this.
+ */
+export type BidderProfileResult =
+  | { status: 'ok'; profile: BidderProfile }
+  | { status: 'empty'; profile: BidderProfile }
+  | { status: 'unavailable'; profile: BidderProfile; error: string };
+
 export async function loadBidderProfile(email: string): Promise<BidderProfile> {
+  return (await loadBidderProfileResult(email)).profile;
+}
+
+export async function loadBidderProfileResult(email: string): Promise<BidderProfileResult> {
   try {
     const supabase = getSupabase();
     // NOTE: `company_name` is NOT a column on user_notification_settings — it
@@ -83,19 +97,22 @@ export async function loadBidderProfile(email: string): Promise<BidderProfile> {
     // loud, not a silent empty profile (that's how the company_name bug hid).
     if (error) {
       console.error('[proposal/loaders] bidder profile query error:', error.message);
-      return {};
+      return { status: 'unavailable', profile: {}, error: error.message || 'query error' };
     }
-    if (!data) return {};
+    if (!data) return { status: 'empty', profile: {} };
     return {
-      businessType: data.business_type || undefined,
-      naicsCodes: Array.isArray(data.naics_codes) ? data.naics_codes : [],
-      agencies: Array.isArray(data.agencies) ? data.agencies : [],
-      setAsides: Array.isArray(data.set_aside_preferences) ? data.set_aside_preferences : [],
-      locationStates: Array.isArray(data.location_states) ? data.location_states : [],
+      status: 'ok',
+      profile: {
+        businessType: data.business_type || undefined,
+        naicsCodes: Array.isArray(data.naics_codes) ? data.naics_codes : [],
+        agencies: Array.isArray(data.agencies) ? data.agencies : [],
+        setAsides: Array.isArray(data.set_aside_preferences) ? data.set_aside_preferences : [],
+        locationStates: Array.isArray(data.location_states) ? data.location_states : [],
+      },
     };
   } catch (err) {
     console.error('[proposal/loaders] profile lookup failed:', err);
-    return {};
+    return { status: 'unavailable', profile: {}, error: (err as Error)?.message || 'lookup failed' };
   }
 }
 
@@ -180,10 +197,16 @@ export async function loadVaultContext(email: string, sectionType: SectionType, 
   // as an empty Vault — the same swallowed-error trap that hid the company_name
   // bug in loadBidderProfile. Behaviour is unchanged (still degrades to empty),
   // but a broken query is now loud.
+  // The fields still degrade to empty (unchanged for existing callers), but each failed section is now listed
+  // in ctx.unavailable so a caller can tell "unavailable" from "empty".
   type QResult = { data: unknown; error: { message?: string } | null };
-  const take = (label: string): unknown => {
+  const failed: NonNullable<VaultContext['unavailable']> = [];
+  const take = (label: VaultSection): unknown => {
     const r = results[idx++] as QResult;
-    if (r?.error) console.error(`[proposal/loaders] vault ${label} query error:`, r.error.message);
+    if (r?.error) {
+      console.error(`[proposal/loaders] vault ${label} query error:`, r.error.message);
+      failed.push(label);
+    }
     return r?.data;
   };
   if (needsIdentity)     { ctx.identity = take('identity') as Record<string, unknown> | null; }
@@ -195,6 +218,7 @@ export async function loadVaultContext(email: string, sectionType: SectionType, 
     k !== 'user_email' && k !== 'created_at' && k !== 'updated_at' &&
     v !== null && v !== '' && !(Array.isArray(v) && v.length === 0));
   ctx.has_any = Boolean(identityHas) || (ctx.past_performance?.length ?? 0) > 0 || (ctx.capabilities?.length ?? 0) > 0 || (ctx.team?.length ?? 0) > 0;
+  if (failed.length) ctx.unavailable = failed;
 
   return ctx;
 }
