@@ -308,6 +308,7 @@ export default function AdminDashboard() {
     // Staff self-serve Pro/Team grants — uses the team /app login, not the
     // admin password the other tabs share.
     { href: '/admin/members', label: 'Members', icon: '👥' },
+    { href: '/admin/customer-health', label: 'Customer Health', icon: '❤️' },
     { href: '/admin/purchases', label: 'Purchases', icon: '💳' },
     { href: '/admin/data-inventory', label: 'Mindy Data Core', icon: '🧠' },
     { href: '/admin/emails', label: 'Email History', icon: '📧' },
