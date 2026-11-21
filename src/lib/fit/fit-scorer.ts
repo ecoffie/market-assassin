@@ -1,5 +1,5 @@
 /**
- * Ask Mindy fit scorer (Ask Mindy Backend Spec, Nov 21 2026, section 4): a 0 to 100 score of how well ONE
+ * Fit scorer, shared by MCP and Ask Mindy (Ask Mindy Backend Spec, Nov 21 2026, section 4): a 0 to 100 score of how well ONE
  * result (open notice, contract coming back, or forecast) fits ONE company, with the top two reasons in plain
  * words. Pure: no I/O, not wired into any route. Starting weights are the spec's; they are meant to be tuned
  * against the regression set before anything is shown to a customer.
@@ -7,14 +7,20 @@
  * Step 1, eligibility gate: a set-aside the company does not hold, or a notice NAICS the company is not small
  * under, does not drop the result. It is relabeled route:'subcontract'. The spec says such results are
  * "scored for teaming instead" without defining that score, so they are scored on the same factors and
- * labeled; a teaming score is an open product question.
+ * labeled (Eric, 2026-11-21: temporary, until a teaming score is defined). The gate text leads the reasons
+ * ("subcontract route: ...") so a gated result never reads as prime-eligible.
  *
  * Step 2, score. Unknown is never guessed (spec section 3 and CLAUDE.md rule 5): a factor whose inputs are
  * unknown is left out and the score is scaled over the factors that ARE known. `known_weight` says how much of
  * the 100 points the score rests on, so a caller can refuse to show a score that rests on too little.
  *
- * Bands: 60+ show, 40 to 59 related (shown only when the user asks for more), below 40 hidden. A notice whose
- * response deadline has passed is hidden regardless.
+ * Bands: 60+ show, 40 to 59 related (shown only when the user asks for more), below 40 hidden. 'show' also
+ * needs the evidence floor: capability known and SHOW_MIN_KNOWN_WEIGHT points known, else capped at related
+ * with an `evidenceNote`. Nothing known at all = score null, band 'unscored'. A passed deadline is hidden.
+ *
+ * Shared lib (CLAUDE.md rule 9): MCP find_opportunities and Ask Mindy chat both call this. Keep it free of
+ * chat- or MCP-specific imports. Contract with Data Core: score the FULL candidate set before any paging cut
+ * (rank-then-filter), then page by score; surfaces add no second relevance filter.
  *
  * Decisions the spec leaves open, made here and listed so review can overrule them:
  *   - "Same industry family" = same 4-digit NAICS industry group.
@@ -79,8 +85,10 @@ export interface FactorScore {
 }
 
 export interface FitScore {
-  score: number;
-  band: 'show' | 'related' | 'hidden';
+  /** null = unscored: nothing about the fit could be checked. Never print or rank a made-up 0. */
+  score: number | null;
+  /** 'unscored' when score is null. 'show' needs the evidence floor (see SHOW_MIN_KNOWN_WEIGHT). */
+  band: 'show' | 'related' | 'hidden' | 'unscored';
   route: 'prime' | 'subcontract';
   /** Plain-word reasons, strongest first, at most two. */
   reasons: string[];
@@ -90,10 +98,27 @@ export interface FitScore {
   /** Why the result was relabeled to the subcontract route, when it was. */
   gate?: string;
   hiddenBecause?: string;
+  /** Set when the score was kept out of 'show' for thin evidence, e.g. "limited evidence: only location and timing could be checked". */
+  evidenceNote?: string;
 }
 
 export const SHOW_AT = 60;
 export const RELATED_AT = 40;
+/**
+ * Evidence floor for 'show' (Agent 4 review, approved by Eric 2026-11-21): capability must be known and at
+ * least this many of the 100 points must rest on known inputs. Otherwise the band is capped at 'related'.
+ * A starting value, to tune against the regression set.
+ */
+export const SHOW_MIN_KNOWN_WEIGHT = 50;
+
+const FACTOR_WORDS: Readonly<Record<FactorId, string>> = {
+  capability: 'work match', past_performance: 'past performance', timing: 'timing', competition: 'competition',
+  size: 'size', location: 'location', pathway: 'contract vehicle',
+};
+
+function listWords(ws: string[]): string {
+  return ws.length <= 1 ? (ws[0] ?? '') : `${ws.slice(0, -1).join(', ')} and ${ws[ws.length - 1]}`;
+}
 
 const CERT_PATTERNS: Array<[string, RegExp]> = [
   ['8(a)', /\b8\s*\(?a\)?/i],
@@ -203,10 +228,10 @@ function pathway(r: FitResult, p: FitProfile): FactorScore {
 export function eligibilityGate(r: FitResult, p: FitProfile): string | null {
   const need = r.setAside ? requiredCertification(r.setAside) : null;
   if (need && need !== 'small' && p.certifications !== undefined && !has(p.certifications, need)) {
-    return `set aside for ${need}, which you do not hold`;
+    return `subcontract route: set aside for ${need}, which you do not hold`;
   }
   if (r.naics && p.smallUnder && p.smallUnder[r.naics] === false && need !== null) {
-    return `you are not small under NAICS ${r.naics}`;
+    return `subcontract route: you are not small under NAICS ${r.naics}`;
   }
   return null;
 }
@@ -217,18 +242,34 @@ export function scoreFit(r: FitResult, p: FitProfile, nowMs: number = Date.now()
   const known = factors.filter((f) => f.points !== null);
   const knownWeight = known.reduce((n, f) => n + WEIGHTS[f.id], 0);
   const earned = known.reduce((n, f) => n + (f.points as number), 0);
-  const score = knownWeight ? Math.round((earned / knownWeight) * 100) : 0;
   const gate = eligibilityGate(r, p);
-  const reasons = known
+  const route: FitScore['route'] = gate ? 'subcontract' : 'prime';
+
+  // Nothing could be checked: unscored, never a fabricated 0 (CLAUDE.md rule 5).
+  if (!knownWeight) {
+    return { score: null, band: 'unscored', route, reasons: gate ? [gate] : [], known_weight: 0, factors, ...(gate ? { gate } : {}) };
+  }
+
+  const score = Math.round((earned / knownWeight) * 100);
+  const fitReasons = known
     .filter((f) => f.reason && (f.points as number) > 0)
     .sort((a, b) => (b.points as number) / WEIGHTS[b.id] - (a.points as number) / WEIGHTS[a.id] || WEIGHTS[b.id] - WEIGHTS[a.id])
-    .slice(0, 2)
     .map((f) => f.reason as string);
-  const band: FitScore['band'] = t.expired ? 'hidden' : score >= SHOW_AT ? 'show' : score >= RELATED_AT ? 'related' : 'hidden';
+  // A gated result leads with its route so it can never read as prime-eligible.
+  const reasons = (gate ? [gate, ...fitReasons] : fitReasons).slice(0, 2);
+
+  let band: FitScore['band'] = t.expired ? 'hidden' : score >= SHOW_AT ? 'show' : score >= RELATED_AT ? 'related' : 'hidden';
+  let evidenceNote: string | undefined;
+  const capabilityKnown = factors.find((f) => f.id === 'capability')?.points !== null;
+  if (band === 'show' && (!capabilityKnown || knownWeight < SHOW_MIN_KNOWN_WEIGHT)) {
+    band = 'related';
+    evidenceNote = `limited evidence: only ${listWords(known.map((f) => FACTOR_WORDS[f.id]))} could be checked`;
+  }
   return {
-    score, band, route: gate ? 'subcontract' : 'prime', reasons, known_weight: knownWeight, factors,
+    score, band, route, reasons, known_weight: knownWeight, factors,
     ...(gate ? { gate } : {}),
     ...(t.expired ? { hiddenBecause: 'response deadline has passed' } : {}),
+    ...(evidenceNote ? { evidenceNote } : {}),
   };
 }
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { RELATED_AT, SHOW_AT, WEIGHTS, eligibilityGate, reasonSentence, requiredCertification, scoreFit, type FitProfile, type FitResult } from './fit-scorer';
+import { RELATED_AT, SHOW_AT, SHOW_MIN_KNOWN_WEIGHT, WEIGHTS, eligibilityGate, reasonSentence, requiredCertification, scoreFit, type FitProfile, type FitResult } from './fit-scorer';
 
 const NOW = Date.parse('2026-11-21T12:00:00Z');
 const days = (n: number) => new Date(NOW + n * 86_400_000).toISOString();
@@ -105,11 +105,11 @@ describe('unknown is never guessed', () => {
     expect(f.score).toBe(Math.round(((30 + 15 + 7) / 55) * 100));
   });
 
-  it('an empty profile and an empty result score 0 on nothing, never a made-up number', () => {
+  it('nothing known → score null and band unscored, never a made-up 0', () => {
     const f = scoreFit({ kind: 'open' }, {}, NOW);
     expect(f.known_weight).toBe(0);
-    expect(f.score).toBe(0);
-    expect(f.band).toBe('hidden');
+    expect(f.score).toBeNull();
+    expect(f.band).toBe('unscored');
     expect(f.reasons).toEqual([]);
   });
 
@@ -124,12 +124,12 @@ describe('eligibility gate (step 1)', () => {
   it('a set-aside the company does not hold relabels to the subcontract route instead of dropping', () => {
     const f = scoreFit(open({ setAside: 'Service-Disabled Veteran-Owned Small Business' }), STAFFING, NOW);
     expect(f.route).toBe('subcontract');
-    expect(f.gate).toBe('set aside for SDVOSB, which you do not hold');
+    expect(f.gate).toBe('subcontract route: set aside for SDVOSB, which you do not hold');
     expect(f.score).toBeGreaterThan(0);
   });
 
   it('not small under the notice NAICS relabels a small business set-aside to subcontract', () => {
-    expect(eligibilityGate(open({ naics: '541512' }), { ...STAFFING, smallUnder: { '541512': false } })).toBe('you are not small under NAICS 541512');
+    expect(eligibilityGate(open({ naics: '541512' }), { ...STAFFING, smallUnder: { '541512': false } })).toBe('subcontract route: you are not small under NAICS 541512');
   });
 
   it('full and open work is never gated on size', () => {
@@ -141,5 +141,65 @@ describe('eligibility gate (step 1)', () => {
     expect(requiredCertification('Women-Owned Small Business (WOSB) Program Set-Aside')).toBe('WOSB');
     expect(requiredCertification('Total Small Business Set-Aside (FAR 19.5)')).toBe('small');
     expect(requiredCertification('')).toBeNull();
+  });
+});
+
+describe('evidence floor for show (Agent 4 review, approved by Eric)', () => {
+  it('the floor is capability known and 50 known points', () => {
+    expect(SHOW_MIN_KNOWN_WEIGHT).toBe(50);
+  });
+
+  it('a location-only match does not score its way into show', () => {
+    const f = scoreFit({ kind: 'open', state: 'TN' }, { states: ['TN'] }, NOW);
+    expect(f.score).toBe(100);
+    expect(f.band).toBe('related');
+    expect(f.evidenceNote).toBe('limited evidence: only location could be checked');
+  });
+
+  it('capability unknown keeps a high score out of show, even with plenty of known weight', () => {
+    const f = scoreFit(open({ naics: undefined, title: undefined, description: undefined }), { ...STAFFING, naicsCodes: undefined, queryConcepts: undefined }, NOW);
+    expect(f.factors.find((x) => x.id === 'capability')?.points).toBeNull();
+    expect(f.known_weight).toBeGreaterThanOrEqual(SHOW_MIN_KNOWN_WEIGHT);
+    expect(f.score).toBeGreaterThanOrEqual(SHOW_AT);
+    expect(f.band).toBe('related');
+    expect(f.evidenceNote).toMatch(/^limited evidence: only past performance, timing, competition, size and location could be checked$/);
+  });
+
+  it('capability known but under 50 known points stays out of show', () => {
+    const f = scoreFit({ kind: 'open', naics: '561320', date: days(30) }, { naicsCodes: ['561320'] }, NOW);
+    expect(f.known_weight).toBe(45);
+    expect(f.band).toBe('related');
+  });
+
+  it('a capability exact match with enough known weight is shown, with no evidence note', () => {
+    const f = scoreFit(open(), STAFFING, NOW);
+    expect(f.band).toBe('show');
+    expect(f).not.toHaveProperty('evidenceNote');
+  });
+});
+
+describe('subcontract route never reads as prime-eligible (Eric, 2026-11-21)', () => {
+  const gated = [
+    scoreFit(open({ setAside: 'SDVOSB' }), STAFFING, NOW),
+    scoreFit(open({ setAside: '8(a) Set-Aside' }), STAFFING, NOW),
+    scoreFit(open({ naics: '541512' }), { ...STAFFING, naicsCodes: ['541512'], smallUnder: { '541512': false } }, NOW),
+  ];
+  it('is labelled the subcontract route and leads its reasons with that label', () => {
+    for (const f of gated) {
+      expect(f.route).toBe('subcontract');
+      expect(f.reasons[0]).toMatch(/^subcontract route: /);
+      expect(reasonSentence(f)).toMatch(/^Subcontract route: /);
+    }
+  });
+  it('never claims the company holds the set-aside or can prime it', () => {
+    for (const f of gated) {
+      for (const r of f.reasons) expect(r).not.toMatch(/which you hold|you can (bid|prime)|eligible/i);
+      expect(f.factors.find((x) => x.id === 'competition')?.points ?? 0).toBeLessThan(10);
+    }
+  });
+  it('a thin-evidence gated result still carries the route label (the gate itself is known evidence)', () => {
+    const f = scoreFit({ kind: 'open', setAside: 'HUBZone' }, { certifications: [] }, NOW);
+    expect(f).toMatchObject({ route: 'subcontract', known_weight: 10, score: 0, band: 'hidden' });
+    expect(f.reasons).toEqual(['subcontract route: set aside for HUBZone, which you do not hold']);
   });
 });
