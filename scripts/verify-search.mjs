@@ -96,6 +96,29 @@ for (const term of ['cybersecurity', 'janitorial', 'roofing']) {
     error ? 'error: ' + error.message : `${rows.length} rows (was 0), top-10 avg ${topAvg.toFixed(1)} terms ≥ bottom-10 ${botAvg.toFixed(1)}`);
 }
 
+// A 2–3 WORD CONCEPT (2026-11-07). "risk management framework" used to OR its words and return
+// 2,415 open notices; "active directory" matched a building generator job. Oracle: every row has the
+// words in order (at most one word between) somewhere in its text, or all of them in its title.
+{
+  const q = 'risk management framework';
+  const words = queryWords(q);
+  const near = /\brisk\w*\W+\w*\W*management\w*\W+\w*\W*framework/i;
+  const { data, error } = await sb
+    .from('sam_opportunities')
+    .select('notice_id,title,description,sow_text,department,solicitation_number')
+    .eq('active', true)
+    .or(buildSearchOr(q))
+    .limit(60);
+  const rows = error ? [] : (data || []);
+  const ok = rows.filter((r) => {
+    const blob = [r.title, r.description, r.sow_text, r.department, r.solicitation_number].map((s) => s || '').join(' ');
+    const title = (r.title || '').toLowerCase();
+    return near.test(blob) || words.every((w) => title.includes(w));
+  });
+  record(`concept "${q}"`, !error && rows.length > 0 && ok.length === rows.length,
+    error ? 'error: ' + error.message : `${rows.length} rows, ${ok.length}/${rows.length} have the phrase (or every word in the title)`);
+}
+
 // Garbage term → MUST be 0 (the honest-miss contract; never fabricate).
 {
   const { data, error } = await sb

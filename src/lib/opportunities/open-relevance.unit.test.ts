@@ -186,8 +186,10 @@ describe('Open retrieval expr (one path, no related-market manufacture)', () => 
     expect(expr).toMatch(/psc_code\.like\.DA%/);
     expect(expr).toMatch(/psc_code\.like\.DB%/);
     expect(expr).toMatch(/psc_code\.like\.DJ%/);
-    // recall may still contain the residue token; ranking must not treat it as DIRECT
-    expect(expr).toMatch(/ilike\.%it%/i);
+    // recall may still contain the residue token; ranking must not treat it as DIRECT.
+    // It matches as a whole word (2026-11-07): as a substring "it" is inside nearly every notice.
+    expect(expr).toContain('title.imatch.\\mits?\\M');
+    expect(expr).not.toMatch(/ilike\.%it%/i);
   });
 
   it('cyber Open retrieval uses DIRECT taxonomy only — not related 54151x', () => {

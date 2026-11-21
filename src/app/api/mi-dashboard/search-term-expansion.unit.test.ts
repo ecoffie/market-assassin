@@ -24,8 +24,9 @@ describe('buildSearchOr (shared) — term-of-art expansion, actually executed', 
     const or = buildSearchOr('drones');
     expect(or).toContain('title.ilike.%drones%');
     expect(or).toContain('title.ilike.%unmanned aircraft%');
-    expect(or).toContain('description.ilike.%UAS%');
-    expect(or).toContain('sow_text.ilike.%UAV%');
+    // Acronym aliases match as whole words (2026-11-07): "uas" as a substring is inside "casualty".
+    expect(or).toContain('description.imatch.\\mUASs?\\M');
+    expect(or).toContain('sow_text.imatch.\\mUAVs?\\M');
   });
   it('code-like terms (M7) take the word-boundary regex branch, NOT expanded', () => {
     const or = buildSearchOr('M7');
