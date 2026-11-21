@@ -1,10 +1,12 @@
 /**
  * MCP tool: get_agency_intel — a target-research read on a federal agency.
  *
- * Prefers living sourced GAO rows (Institute → agency_pain_points_db) via the
- * shared reader. Legacy JSON is returned only as LEGACY_MANUAL with provenance
- * unavailable — never as if it has the same evidentiary status as a cited GAO
- * report. No fabricated source URLs.
+ * Pain points are ONLY cited GAO / Inspector General findings (SOURCE_FACT: an Institute source id and
+ * a source URL, with the report number and date when the source carries them). Ask Mindy Backend Spec
+ * (Nov 21 2026): "Return only sourced GAO and Inspector General items, with report number and date."
+ * Legacy static-JSON claims and unsourced interpretations are WITHHELD and counted
+ * (_meta.withheld_unsourced_pain_points) — before this, `painPoints` showed the legacy JSON strings
+ * whenever the agency had any, even when cited findings existed. No fabricated source URLs.
  */
 import { getAgency, type UnifiedAgencyResult } from '@/lib/agency-hierarchy/unified-search';
 import { getAgencySpendingDetail } from '@/lib/usaspending/agency-spending-detail';
@@ -77,10 +79,10 @@ export interface AgencyIntelResult {
     cgacCode: string | null;
     level: UnifiedAgencyResult['level'];
     parent: string | null;
-    /** Display strings — sourced claims carry citations; legacy are labeled. */
+    /** Display strings for the cited findings in painPointCitations, in the same order. Nothing unsourced. */
     painPoints: string[];
     priorities: string[];
-    /** Structured citations — prefer this over painPoints for evidence work. */
+    /** Cited GAO / IG findings only (provenance SOURCE_FACT) — prefer this over painPoints for evidence work. */
     painPointCitations: AgencyIntelCitation[];
     priorityCitations: AgencyIntelCitation[];
     matchType: UnifiedAgencyResult['matchType'];
@@ -107,6 +109,8 @@ export interface AgencyIntelResult {
     spending_scope: SpendingScope;
     sourced_pain_points: number;
     legacy_pain_points: number;
+    /** Claims NOT returned because they carry no GAO / IG citation (legacy static file + unsourced interpretations). */
+    withheld_unsourced_pain_points: number;
     legislation_status: LegislativeEvidence['status'] | 'not_applicable';
     legislative_measures: number;
   };
@@ -133,7 +137,7 @@ export async function getAgencyIntel(input: AgencyIntelInput): Promise<AgencyInt
       _meta: {
         grounded: false, degraded: false, has_spending: false,
         spending_scope: 'NOT_ESTABLISHED',
-        sourced_pain_points: 0, legacy_pain_points: 0,
+        sourced_pain_points: 0, legacy_pain_points: 0, withheld_unsourced_pain_points: 0,
         legislation_status: 'not_applicable', legislative_measures: 0,
       },
     };
@@ -171,7 +175,9 @@ export async function getAgencyIntel(input: AgencyIntelInput): Promise<AgencyInt
   let legacyCount = 0;
   let painPointCitations: AgencyIntelCitation[] = [];
   let priorityCitations: AgencyIntelCitation[] = [];
-  let painPoints: string[] = resolved?.painPoints ?? [];
+  let withheldUnsourced = 0;
+  // Never seeded from resolved.painPoints: that is the legacy static file, not a cited finding.
+  let painPoints: string[] = [];
   let priorities: string[] = resolved?.priorities ?? [];
   let hasSourced = false;
   let provenanceNote = 'No agency intelligence found.';
@@ -188,15 +194,20 @@ export async function getAgencyIntel(input: AgencyIntelInput): Promise<AgencyInt
           break;
         }
       }
-      sourcedCount = bundle.meta.sourcedCount;
+      // Only cited findings are returned. SOURCE_FACT already requires an Institute id + URL.
+      const cited = bundle.painPoints.filter((p) => p.provenance === 'SOURCE_FACT' && !!p.source_url);
+      const citedRows = cited
+        .map((p) => ({ citation: toCitation(p), display: formatPainPointForDisplay(p) }))
+        .filter((r) => r.citation.claim.length > 0 && r.display.trim().length > 0);
+      const legacyStrings = (resolved.painPoints ?? []).filter((s) => s.trim().length > 0).length;
+      withheldUnsourced = (bundle.painPoints.length - cited.length) + (bundle.painPoints.length ? 0 : legacyStrings);
+      sourcedCount = citedRows.length;
       legacyCount = bundle.meta.legacyCount;
-      hasSourced = bundle.meta.provenanceAvailable;
-      painPointCitations = bundle.painPoints.map(toCitation).filter((c) => c.claim.length > 0);
+      hasSourced = citedRows.length > 0;
+      if (bundle.meta.sourcedReadFailed) degraded = true;
+      painPointCitations = citedRows.map((r) => r.citation);
       priorityCitations = bundle.priorities.map(toCitation).filter((c) => c.claim.length > 0);
-      painPoints = (resolved.painPoints?.length
-        ? resolved.painPoints
-        : bundle.painPoints.map(formatPainPointForDisplay)
-      ).filter((s) => s.trim().length > 0);
+      painPoints = citedRows.map((r) => r.display);
       priorities = (bundle.meta.priorityBasis === 'live_table'
         ? bundle.priorities.map(formatPainPointForDisplay)
         : resolved.priorities?.length
@@ -205,15 +216,18 @@ export async function getAgencyIntel(input: AgencyIntelInput): Promise<AgencyInt
       ).filter((s) => s.trim().length > 0);
       priorityBasis = bundle.meta.priorityBasis;
       const priorityLabel = priorityBasis ? ` Priorities shown: ${priorityBasis}.` : '';
-      provenanceNote = hasSourced
-        ? `${sourcedCount} living sourced claim(s) from GAO reports or Inspector General recommendations, with citations; ${legacyCount} legacy-manual fallback claim(s).${priorityLabel}`
-        : legacyCount > 0
-          ? `Provenance unavailable — ${legacyCount} legacy-manual claim(s) only. Do not treat as GAO fact. Unsourced dollar amounts are omitted from default priority text until sourced.${priorityLabel}`
-          : `No pain-point claims for this agency.${priorityLabel}`;
+      const withheldLabel = withheldUnsourced ? ` ${withheldUnsourced} unsourced claim(s) withheld (no GAO or Inspector General citation).` : '';
+      provenanceNote = bundle.meta.sourcedReadFailed
+        ? `The cited-findings reader failed, so GAO / Inspector General findings are unavailable for this call (not none).${withheldLabel}${priorityLabel}`
+        : hasSourced
+          ? `${sourcedCount} cited finding(s) from GAO reports or Inspector General recommendations, each with its source link.${withheldLabel}${priorityLabel}`
+          : `No cited GAO or Inspector General finding for this agency.${withheldLabel} Do not state a pain point for it.${priorityLabel}`;
     } catch (err) {
       degraded = true;
       console.error('[mcp:get_agency_intel] sourced intel failed:', err);
-      provenanceNote = 'Sourced reader failed; falling back to unresolved legacy strings if present.';
+      painPoints = [];
+      painPointCitations = [];
+      provenanceNote = 'The cited-findings reader failed, so GAO / Inspector General findings are unavailable for this call (not none).';
     }
 
     try {
@@ -317,6 +331,7 @@ export async function getAgencyIntel(input: AgencyIntelInput): Promise<AgencyInt
       spending_scope: spending?.scope ?? grain.spendingScope,
       sourced_pain_points: sourcedCount,
       legacy_pain_points: legacyCount,
+      withheld_unsourced_pain_points: withheldUnsourced,
       legislation_status: legislation.status,
       legislative_measures: legislativeMeasures,
     },
@@ -331,14 +346,13 @@ export async function getAgencyIntel(input: AgencyIntelInput): Promise<AgencyInt
           : hasSourced
             ? `Grounded agency intel with ${sourcedCount} cited GAO claim(s).`
             : grounded
-              ? 'Agency identity grounded; pain points are legacy-manual (provenance unavailable).'
+              ? 'Agency identity grounded; no cited GAO or Inspector General finding, so state no pain point.'
               : 'No agency matched.',
       how_to_use:
-        'Prefer painPointCitations[].source_url + document_number. Never invent a URL for LEGACY_MANUAL rows. spending.scope names whose dollars spending.totalObligations is — PARENT_SERVICE is the military department, not the command.',
+        'Cite each pain point with painPointCitations[].document_number, published_at and source_url. Only cited findings are returned; never add one from memory. spending.scope names whose dollars spending.totalObligations is — PARENT_SERVICE is the military department, not the command.',
       key_caveats: [
         'SOURCE_FACT = living Institute/GAO citation.',
-        'LEGACY_MANUAL = static JSON; provenance unavailable.',
-        'MINDY_INTERPRETATION = derived claim, not direct GAO wording.',
+        'Unsourced claims (legacy static file, interpretations) are withheld and only counted in _meta.withheld_unsourced_pain_points.',
         'Never attribute PARENT_SERVICE totals to the requested command.',
         'legislation: only ENACTED_LAW is law; bill/report text is not held — obey legislation.host_rules.',
       ],

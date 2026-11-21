@@ -506,7 +506,7 @@ const AGENCY_INTEL_TOOL_DEF = {
       'live federal-account obligations for that word are growing or surging; an empty budget_programs table is ' +
       'unavailable, not zero. Also (when available) live USASpending ' +
       'obligations for the fiscal year with top NAICS. The "size up a buyer before I pursue them" lookup. Pain ' +
-      'points are curated intel, not an official statement. Also returns `legislation`: the NDAA record Mindy ' +
+      'points are only cited GAO / Inspector General findings (report number, date, link); unsourced claims are withheld and counted. Also returns `legislation`: the NDAA record Mindy ' +
       'holds for the department — each bill and version with its stage and law status (enacted law vs House/' +
       'Senate activity vs committee report) and a congress.gov link. Bill text is not held, so it cannot say ' +
       'what a version requires. Returns grounded=false when no agency matches — try the full name or a CGAC ' +
