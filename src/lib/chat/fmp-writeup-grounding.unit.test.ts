@@ -664,6 +664,36 @@ describe('fmp-writeup-grounding', () => {
         expect(ev.pathways?.map((p) => p.noticeId)).not.toEqual(expect.arrayContaining(['PIID-DREDGE', 'PIID-JETTY']));
       });
 
+      it('ranks vehicle / sources-sought notices ahead of exact-NAICS open RFQs (Claude pathway frame)', () => {
+        const openBridge = {
+          notice_id: 'openbr01openbr01openbr01openbr01',
+          solicitation_number: '1240LT27Q0026',
+          title: 'HUMBOLT PACIFIC CREST TRAIL BRIDGE REPLACEMENT',
+          department: 'FOREST SERVICE',
+          naics_code: '237310',
+          response_deadline: '2026-11-29T17:00:00Z',
+          notice_type: 'Combined Synopsis/Solicitation',
+        };
+        const inspectMatoc = {
+          notice_id: 'insp0001insp0001insp0001insp0001',
+          solicitation_number: '693C73-27-R-000006',
+          title: '2027 Construction Inspection Services Multiple Award Task Order Contract (MATOC)',
+          department: 'FEDERAL HIGHWAY ADMINISTRATION',
+          naics_code: '541330',
+          response_deadline: '2027-01-04T17:00:00Z',
+          notice_type: 'Presolicitation',
+        };
+        const findOpen = (rows: unknown[]) => JSON.stringify({ horizons: { open_now: { items: rows } } });
+        const ev = accumulateFmpEvidence([
+          { tool: 'get_contractor_award_history', content: HISTORY },
+          { tool: 'find_opportunities', content: findOpen([openBridge, inspectMatoc, civilA]) },
+        ]);
+        expect(ev.pathways?.[0].noticeId).toBe('693C73-27-R-000006');
+        expect(ev.pathways?.map((p) => p.noticeId)).toEqual(
+          expect.arrayContaining(['693C73-27-R-000006', '1240LT27Q0026']),
+        );
+      });
+
       it('keeps a Sources Sought / MACC in adjacent 236210 for a 237310 firm (JBAB-class gold pathway)', () => {
         const jbab = {
           notice_id: 'jbab0001jbab0001jbab0001jbab0001',

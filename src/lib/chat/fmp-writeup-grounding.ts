@@ -585,8 +585,17 @@ function extractPathways(
       const ka = PATHWAY_KIND_ORDER[a.p.kind ?? 'notice'];
       const kb = PATHWAY_KIND_ORDER[b.p.kind ?? 'notice'];
       if (ka !== kb) return ka - kb;
+      // Claude gold frame: vehicles → sources sought → open bids, THEN fit/buyer score.
+      // Without this, exact-NAICS bridge RFQs outrank the inspection MATOC (measured live).
+      const ra = pathwayRank(a.p);
+      const rb = pathwayRank(b.p);
+      if (ra !== rb) return ra - rb;
       if (a.score !== b.score) return b.score - a.score;
       if (a.fit !== b.fit) return b.fit - a.fit;
+      const da = a.p.when ?? '\uffff';
+      const db = b.p.when ?? '\uffff';
+      if (da !== db) return da < db ? -1 : 1;
+      return a.i - b.i;
     }
     const ra = pathwayRank(a.p);
     const rb = pathwayRank(b.p);
