@@ -10,15 +10,38 @@ export interface DirectoryOfficeName {
   source: 'sam_office_name' | 'fpds_office_name';
 }
 
+/** A stored value that is only the office code is not a name. */
+export function nameThatIsNotTheCode(code: string | null | undefined, raw: string | null | undefined): string {
+  const name = (raw ?? '').trim();
+  if (!name) return '';
+  const key = (code ?? '').trim();
+  if (key && name.toUpperCase() === key.toUpperCase()) return '';
+  return name;
+}
+
 export function directoryOfficeName(row: {
+  dodaac?: string | null;
   sam_office_name?: string | null;
   office_name?: string | null;
 } | null | undefined): DirectoryOfficeName | null {
-  const sam = row?.sam_office_name?.trim() ?? '';
+  const sam = nameThatIsNotTheCode(row?.dodaac, row?.sam_office_name);
   if (sam) return { name: sam, source: 'sam_office_name' };
-  const fpds = row?.office_name?.trim() ?? '';
+  const fpds = nameThatIsNotTheCode(row?.dodaac, row?.office_name);
   if (fpds) return { name: fpds, source: 'fpds_office_name' };
   return null;
+}
+
+/**
+ * Pass 1 can write historical names while the current-name pass throws.
+ * That run is not a success. The early-signal score is not a name, so its
+ * failure stays in the body and does not flip this verdict.
+ */
+export function directoryRefreshOutcome(input: {
+  samNamesError: string | null;
+}): { success: boolean; httpStatus: number; cronOutcome: 'success' | 'partial'; disclosure: string } {
+  const disclosure = (input.samNamesError ?? '').slice(0, 500);
+  if (!disclosure) return { success: true, httpStatus: 200, cronOutcome: 'success', disclosure: '' };
+  return { success: false, httpStatus: 500, cronOutcome: 'partial', disclosure };
 }
 
 /**
