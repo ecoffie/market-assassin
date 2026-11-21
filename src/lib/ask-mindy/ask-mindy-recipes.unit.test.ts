@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { RECIPES, RECIPE_IDS, isImplemented, type RecipeId } from './recipes';
 import { planWaves, runRecipe, type ToolExecutor } from './orchestrator';
-import { classifyIntent, extractIdentifiers, buildIntentPrompt, type IntentModel } from './intent';
+import { classifyIntent, extractIdentifiers, buildIntentPrompt, PROFILE_COMPLETION_STEP, type IntentModel } from './intent';
 import { askMindyRecipesEnabledFor } from './flags';
 import { REGRESSION_CASES, REGRESSION_VERSION, profileFor, prohibitedHits } from './regression';
 import { isMcpTool, toolParameters } from '@/lib/mcp/tool-registry';
@@ -91,6 +91,8 @@ describe('orchestrator', () => {
     if (run.status !== 'ran') throw new Error('expected ran');
     expect(run.results.sba_profile.state).toBe('missing_tool');
     expect((run.results.sba_profile as { reason: string }).reason).toMatch(/^SBA profile lookup/);
+    // Eric, 2026-11-21: SBA-only fields are reported unknown, never guessed or filled from other tools.
+    expect((run.results.sba_profile as { unknownFields?: string[] }).unknownFields).toEqual(['owner', 'sba_capabilities_narrative', 'sba_keywords', 'certification_dates', 'sba_certified_status']);
     expect(run.steps.find((s) => s.id === 'awards')?.args).toEqual({ uei: 'ABCDEFGH1234' });
   });
 
@@ -143,9 +145,15 @@ describe('intent classification', () => {
     expect((await classifyIntent('q', {}, answering('where_to_start', 'where_to_start'))).secondary).toBeNull();
   });
 
-  it('reports profile-first for an empty profile without applying it (product decision)', async () => {
-    const r = await classifyIntent('What should I go after?', {}, answering('where_to_start'));
-    expect(r).toMatchObject({ primary: 'where_to_start', profileFirst: true });
+  it('value first: an empty profile never changes the recipe, it only offers profile completion (Eric, 2026-11-21)', async () => {
+    const empty = await classifyIntent('What should I go after?', {}, answering('where_to_start'));
+    const full = await classifyIntent('What should I go after?', { companyName: 'Acme', naicsCodes: ['561320'] }, answering('where_to_start'));
+    expect(empty).toMatchObject({ primary: 'where_to_start', secondary: null, offerProfileCompletion: true });
+    expect(full).toMatchObject({ primary: 'where_to_start', secondary: null, offerProfileCompletion: false });
+    expect(PROFILE_COMPLETION_STEP).toBe('Complete your company profile for better ranking');
+    for (const id of ['where_to_start', 'opportunity_deep_dive', 'buyer_brief'] as const) {
+      expect((await classifyIntent('q', {}, answering(id))).primary).toBe(id);
+    }
   });
 
   it('extracts identifiers from inside a sentence', () => {
@@ -186,14 +194,14 @@ describe('regression set v1', () => {
     for (const id of ['where_to_start', 'opportunity_deep_dive', 'profile_setup'] as RecipeId[]) expect(recipes).toContain(id);
   });
 
-  it('rule-routed cases route without a model; identifier and profile-first expectations hold', async () => {
+  it('rule-routed cases route without a model; identifier and profile-completion expectations hold', async () => {
     for (const c of REGRESSION_CASES) {
       const model = vi.fn<IntentModel>(async () => JSON.stringify({ primary: c.expectedRecipe, secondary: null }));
       const r = await classifyIntent(c.question, profileFor(c), model);
       expect(r.primary, c.id).toBe(c.expectedRecipe);
       if (c.expectedVia) expect(r.via, c.id).toBe(c.expectedVia);
       if (c.expectedIdentifiers) expect(r.identifiers, c.id).toMatchObject(c.expectedIdentifiers);
-      if (c.expectProfileFirst !== undefined) expect(r.profileFirst, c.id).toBe(c.expectProfileFirst);
+      if (c.expectOfferProfileCompletion !== undefined) expect(r.offerProfileCompletion, c.id).toBe(c.expectOfferProfileCompletion);
     }
   });
 

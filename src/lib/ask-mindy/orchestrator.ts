@@ -14,7 +14,7 @@ export type StepOutcome =
   | { state: 'ok'; value: unknown }
   | { state: 'unavailable'; reason: string }
   | { state: 'skipped'; reason: string }
-  | { state: 'missing_tool'; reason: string };
+  | { state: 'missing_tool'; reason: string; unknownFields?: string[] };
 
 export interface StepRecord {
   id: string;
@@ -68,7 +68,7 @@ export async function runRecipe(recipeId: RecipeId, ctx: RecipeContext, exec: To
     const frozen: PriorResults = { ...results };
     const records = await Promise.all(waves[w].map(async (step): Promise<StepRecord> => {
       if (!step.tool) {
-        return { id: step.id, tool: null, wave: w, outcome: { state: 'missing_tool', reason: step.requirement ?? 'tool not available' } };
+        return { id: step.id, tool: null, wave: w, outcome: { state: 'missing_tool', reason: step.requirement ?? 'tool not available', ...(step.unknownFields?.length ? { unknownFields: step.unknownFields } : {}) } };
       }
       const planned = step.args ? step.args(ctx, frozen) : { args: {} };
       if ('skip' in planned) return { id: step.id, tool: step.tool, wave: w, outcome: { state: 'skipped', reason: planned.skip } };

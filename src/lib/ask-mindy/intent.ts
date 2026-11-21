@@ -9,9 +9,9 @@
  * model call (`classify`), and its answer is validated: an unknown recipe or a failure falls back to
  * general_research, as the spec says.
  *
- * `profileFirst` reports the spec rule "if a user has no profile, the first recipe is Profile Setup". It is
- * reported, not applied: the existing first-turn contract (Potato P2, value before qualification) says the
- * opposite for FIND questions, so which one wins is a product decision for whoever wires this in.
+ * Value first (Eric, 2026-11-21): an empty profile NEVER blocks, replaces or reorders the first answer. It only
+ * sets `offerProfileCompletion`, which a caller may turn into one optional next step (PROFILE_COMPLETION_STEP).
+ * The spec's "no profile, run Profile Setup first" rule is superseded by Potato P2 (value before qualification).
  */
 import { isNoticeUuid, isSolicitationIdentifier } from '@/lib/sam/resolve-solicitation';
 import { RECIPE_IDS, RECIPES, type AskMindyProfile, type RecipeContext, type RecipeId } from './recipes';
@@ -22,11 +22,14 @@ export interface IntentResult {
   /** 'rule' = deterministic shortcut; 'model' = classified by meaning; 'fallback' = model failed or was invalid. */
   via: 'rule' | 'model' | 'fallback';
   identifiers: NonNullable<RecipeContext['identifiers']>;
-  /** True when the spec would run Profile Setup first because the profile is empty. Not applied here. */
-  profileFirst: boolean;
+  /** The profile is empty: a caller may add PROFILE_COMPLETION_STEP as an optional next step. Never changes `primary`. */
+  offerProfileCompletion: boolean;
 }
 
 /** The model call. Returns raw JSON text: {"primary":"<recipe id>","secondary":"<recipe id>|null"}. */
+/** The only thing an empty profile adds: one optional next step after the answer. */
+export const PROFILE_COMPLETION_STEP = 'Complete your company profile for better ranking';
+
 export type IntentModel = (system: string, user: string) => Promise<string>;
 
 const URL_RE = /^(https?:\/\/)?([a-z0-9-]+\.)+[a-z]{2,}(\/\S*)?$/i;
@@ -70,14 +73,14 @@ function valid(id: unknown): id is RecipeId {
 export async function classifyIntent(question: string, profile: AskMindyProfile, model: IntentModel): Promise<IntentResult> {
   const q = question.trim();
   const identifiers = extractIdentifiers(q);
-  const profileFirst = profileIsEmpty(profile);
+  const offerProfileCompletion = profileIsEmpty(profile);
   const lone = q.split(/\s+/).length === 1 ? q.replace(/[.,;:!?]+$/, '') : null;
 
   if (lone) {
-    if (isNoticeUuid(lone)) return { primary: 'opportunity_deep_dive', secondary: null, via: 'rule', identifiers, profileFirst };
-    if (URL_RE.test(lone) && identifiers.url) return { primary: 'profile_setup', secondary: null, via: 'rule', identifiers, profileFirst };
+    if (isNoticeUuid(lone)) return { primary: 'opportunity_deep_dive', secondary: null, via: 'rule', identifiers, offerProfileCompletion };
+    if (URL_RE.test(lone) && identifiers.url) return { primary: 'profile_setup', secondary: null, via: 'rule', identifiers, offerProfileCompletion };
     if (isSolicitationIdentifier(lone) && !UEI_SHAPE.test(lone)) {
-      return { primary: 'opportunity_deep_dive', secondary: null, via: 'rule', identifiers, profileFirst };
+      return { primary: 'opportunity_deep_dive', secondary: null, via: 'rule', identifiers, offerProfileCompletion };
     }
   }
 
@@ -90,8 +93,8 @@ export async function classifyIntent(question: string, profile: AskMindyProfile,
     const parsed = JSON.parse(await model(buildIntentPrompt(), user)) as { primary?: unknown; secondary?: unknown };
     if (!valid(parsed.primary)) throw new Error('invalid primary');
     const secondary = valid(parsed.secondary) && parsed.secondary !== parsed.primary ? parsed.secondary : null;
-    return { primary: parsed.primary, secondary, via: 'model', identifiers, profileFirst };
+    return { primary: parsed.primary, secondary, via: 'model', identifiers, offerProfileCompletion };
   } catch {
-    return { primary: 'general_research', secondary: null, via: 'fallback', identifiers, profileFirst };
+    return { primary: 'general_research', secondary: null, via: 'fallback', identifiers, offerProfileCompletion };
   }
 }

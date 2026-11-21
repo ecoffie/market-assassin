@@ -42,9 +42,9 @@
     },
     {
       "id": "wts-03", "question": "What should I go after?", "profile": "none",
-      "expectedRecipe": "where_to_start", "expectProfileFirst": true,
-      "graderMustInclude": ["Answers for 'your company' without demanding a profile inside the answer"],
-      "graderMustNotInclude": ["Asking for UEI, NAICS or certifications before showing any value (Potato P2), unless product decides profile-first"]
+      "expectedRecipe": "where_to_start", "expectOfferProfileCompletion": true,
+      "graderMustInclude": ["Shows useful opportunities first, for 'your company'", "At most one optional next step: complete your profile for better ranking"],
+      "graderMustNotInclude": ["Asking for UEI, NAICS or certifications before showing any value (value first, Eric 2026-11-21)", "Invented profile fields"]
     },
     {
       "id": "odd-01", "question": "Tell me about 36C25027R5412", "profile": "superb_staffing_spec",

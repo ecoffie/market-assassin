@@ -12,7 +12,7 @@ export interface RegressionCase {
   profile: string;
   expectedRecipe: RecipeId;
   expectedVia?: 'rule' | 'model' | 'fallback';
-  expectProfileFirst?: boolean;
+  expectOfferProfileCompletion?: boolean;
   expectedIdentifiers?: Record<string, string>;
   notImplementedYet?: boolean;
   graderMustInclude?: string[];

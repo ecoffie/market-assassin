@@ -49,7 +49,7 @@ export interface RecipeContext {
 }
 
 /** Results of earlier steps, by step id. `value` is the tool's result as returned. */
-export type PriorResults = Readonly<Record<string, { state: 'ok'; value: unknown } | { state: 'unavailable' | 'skipped' | 'missing_tool'; reason: string }>>;
+export type PriorResults = Readonly<Record<string, { state: 'ok'; value: unknown } | { state: 'unavailable' | 'skipped' | 'missing_tool'; reason: string; unknownFields?: string[] }>>;
 
 /** Args for a step, or why it cannot run from what is known. Never invents a value. */
 export type StepArgs = { args: Record<string, unknown> } | { skip: string };
@@ -63,6 +63,8 @@ export interface RecipeStep {
   args?: (ctx: RecipeContext, prior: PriorResults) => StepArgs;
   /** For tool:null steps: the interface Data Core would need to provide. */
   requirement?: string;
+  /** For tool:null steps: profile fields only that tool can fill. They stay unknown, never guessed. */
+  unknownFields?: string[];
 }
 
 export interface Recipe {
@@ -220,6 +222,9 @@ const PROFILE_SETUP: Recipe = {
     {
       id: 'sba_profile', tool: null,
       requirement: 'SBA profile lookup (spec section 6, NEW). Input: uei. Output: owner and contacts, capabilities narrative, keywords, past performance, certification types with dates and self-reported vs SBA-certified. Unknown fields returned as null, never empty strings.',
+      // Eric, 2026-11-21: not accelerated. Profile Setup uses the verified fields above (SAM entity, award
+      // history, derived keywords) and reports these as unknown until the tool exists.
+      unknownFields: ['owner', 'sba_capabilities_narrative', 'sba_keywords', 'certification_dates', 'sba_certified_status'],
     },
     {
       id: 'awards', tool: 'get_contractor_award_history', needs: ['sam'],
