@@ -27,12 +27,23 @@ export function decideSavedSearchAlert(input: {
   lastAlertedAt: string | null;
   lastSeenIds: unknown;
   records: AlertRecord[];
+  /**
+   * The Open evaluator that produced `records` differs from the one that wrote last_seen_notice_ids
+   * (open-evaluator.ts openEngineChanged). Re-baseline: seen = current ids ∪ prior seen, send nothing.
+   * Without this, the first run after an engine switch emails every current match the old engine never
+   * stored (up to the 200-row window, notices up to 30 days old) as "new".
+   */
+  engineTransition?: boolean;
 }): SavedSearchAlertDecision {
   const seen = new Set(Array.isArray(input.lastSeenIds) ? (input.lastSeenIds as string[]) : []);
   const allIds = input.records.map((o) => o.notice_id).filter(Boolean) as string[];
 
   if (!input.lastAlertedAt && seen.size === 0) {
     return { action: 'baseline', nextSeen: [...new Set(allIds)].slice(0, SAVED_SEARCH_SEEN_CAP) };
+  }
+
+  if (input.engineTransition) {
+    return { action: 'baseline', nextSeen: [...new Set([...allIds, ...seen])].slice(0, SAVED_SEARCH_SEEN_CAP) };
   }
 
   const fresh = input.records.filter((o) => o.notice_id && !seen.has(o.notice_id));

@@ -37,6 +37,12 @@ export type SavedSearchAlertFailureClass =
   | 'state_update_failed'
   /** The STORED filters cannot be evaluated (e.g. sapBuyer saved as a boolean). Per-row; never blocks other searches. */
   | 'invalid_saved_filters'
+  /**
+   * The canonical Open evaluator REFUSES this search's text (names no capability/buyer/place/code, or only
+   * exclusions). Reported, never run as a zero; nothing is written. The owner must refine it — a config
+   * action, like invalid_saved_naics.
+   */
+  | 'search_needs_refinement'
   | 'unexpected_schedule_error';
 
 /** Most per-search failures listed individually in one invocation's result (the class counts stay complete). */
@@ -109,6 +115,8 @@ export type SavedSearchAlertDueRow = {
   forecast_gap_since?: Record<string, string> | null;
   forecast_pending?: unknown;
   forecast_alert_claim_until?: string | null;
+  /** Open evaluator that last wrote last_seen_notice_ids (selected only once the column exists). */
+  open_engine?: string | null;
 };
 
 export type SavedSearchAlertDrainResult = {
