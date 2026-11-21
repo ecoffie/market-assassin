@@ -41,3 +41,18 @@ Without Vercel secrets, cloud agents should open PRs and stop; Eric (or a linked
 ## Product priority (do not invent a new roadmap)
 
 From repo `CLAUDE.md`: speaking campaign first; only build product that supports that or fixes something users hit. Measurement-integrity tidy and new internal dashboards are default **no**.
+
+## Paste-ready New Run prompts (phone / cursor.com/agents)
+
+Use environment with repo `ecoffie/market-assassin`. Base branch: `fix/ask-mindy-doc-structure-repair` unless noted. Always commit+push; do not merge to `main` unless asked.
+
+**1 — Export regression (map)**  
+`On getmindy.ai/opportunity-map, confirm Ask create_document shows Open report only (no PDF/Word/Excel/CSV chips on the card). Open the report pane and confirm one Export control (amk-export-toggle) lists formats. If broken, fix on a cloud branch from fix/ask-mindy-doc-structure-repair, push, and say whether vercel secrets are needed to redeploy.`
+
+**2 — Export regression (/app chat)**  
+`In /app Ask Mindy, create_document should put Export in the ChatReportPreview header, not under the answer. Strip vault /api/app/vault/documents/download bullets from answer text. Fix + unit tests + push if regressing.`
+
+**3 — FMP content vs Claude gold (only if Eric reports thin report)**  
+`Federal Market Profile for a civil/highway firm must prefer named pathway vehicles (Inspection MATOC, JBAB, Capitol Perimeter, Clara Barton / GWMP forecasts) over random open RFQs; contacts must be people not agencies; no tax-software / security-admin pathways. Measure first against live Ask or fixtures in fmp-writeup-grounding — only change what fails.`
+
+**Desktop unblock:** this Cursor window is multi-root (market-assassin + govcon-giants-os), which blocks in-chat Cloud Task. Close govcon-giants-os or open a market-assassin-only window, then Cloud works from chat too.
