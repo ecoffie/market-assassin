@@ -47,6 +47,8 @@ describe('map shell panels', () => {
   });
 
   it('a reload of an in-app map keeps its panel and view', () => {
-    expect(appPage).toContain("if (isReload && !isMapShellPanel(searchParams.get('panel')))");
+    // Every panel keeps its ?panel= on reload now (panel-url-stability.unit.test.ts); the map is one of them.
+    expect(appPage).not.toContain("nav?.type === 'reload'");
+    expect(appPage).toContain("if (panelParam && KNOWN_PANELS.has(panelParam as AppPanel))");
   });
 });
