@@ -61,6 +61,12 @@ describe('rules layer text', () => {
     expect(ASK_MINDY_ANSWER_FORMAT).toMatch(/Leave out WHO TO CONTACT when no tool returned/);
   });
 
+  it('keeps Mindy plans and pricing out of answers (Eric, 2026-11-21: Mindy subscription only, not contract pricing)', () => {
+    expect(ASK_MINDY_RULES_LAYER).toContain(
+      '- Never mention Mindy plans, prices, seats or upgrades in an answer. Pricing lives on the pricing page, not in market intelligence.',
+    );
+  });
+
   it('bans the "ask me to list them" pattern', () => {
     expect(ASK_MINDY_RULES_LAYER).toMatch(/Never report a count and then say "ask me to list them\."/);
   });
