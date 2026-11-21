@@ -85,6 +85,7 @@ function watchdogBuilder(table: string) {
     select: () => b,
     eq: (c: string, v: unknown) => { filters.push((r) => r[c] === v || String(r[c]) === String(v)); return b; },
     in: (c: string, vs: unknown[]) => { filters.push((r) => vs.includes(r[c])); return b; },
+    not: (c: string, o: string, v: unknown) => { filters.push((r) => !(o === 'is' && v === null && (r[c] ?? null) === null)); return b; },
     gte: (c: string, v: string) => { filters.push((r) => String(r[c]) >= v); return b; },
     order: (col: string, o?: { ascending?: boolean }) => { order = { col, asc: !!o?.ascending }; return b; },
     limit: (n: number) => { limit = n; return b; },
@@ -103,7 +104,9 @@ vi.mock('@supabase/supabase-js', () => ({
 
 // The cron's self-report → a cron_job_runs row, exactly as reportCronOutcome writes it
 // (status = outcome, error = errorSummary — src/lib/cron-self-report.ts).
-vi.mock('@/lib/cron-self-report', () => ({
+vi.mock('@/lib/cron-self-report', async (importOriginal) => ({
+  // The real HTTP mapping the route answers with (200 / 503 partial / 500).
+  cronOutcomeHttpStatus: (await importOriginal<typeof import('@/lib/cron-self-report')>()).cronOutcomeHttpStatus,
   reportCronOutcome: vi.fn(async (job: string, outcome: string, summary?: string) => {
     (tables.cron_job_runs ||= []).push({ job_name: job, started_at: clock, status: outcome, error: summary ?? null });
   }),
@@ -159,13 +162,31 @@ beforeEach(() => {
 afterEach(() => { vi.useRealTimers(); });
 
 describe('saved-search-alerts → cron_job_runs → dispatcher-watchdog → Slack', () => {
-  it("(a) 'suppressed:hard_bounce' → drain success (not an outage); watchdog has nothing failing to open", async () => {
-    // Action-item-only runs report outcome=success so MCP delivery readiness stays green.
-    // Watchdog only reads error/timeout rows, so a pure suppression no longer opens a Slack item —
-    // that is intentional: suppressions are not a cron outage.
-    const { runs, posted } = await cronThenWatchdog([VALID], 'suppressed:hard_bounce');
+  it("(a) 'suppressed:hard_bounce' → drain SUCCESS (not an outage) AND the suppression action item still posts", async () => {
+    // Action-item-only runs report outcome=success so MCP delivery readiness stays green, while the
+    // watchdog reads action items off the success row so ops still get the 🛡️ item (PR #2234).
+    const { runs, posted, body } = await cronThenWatchdog([VALID], 'suppressed:hard_bounce');
     expect(runs.map((r) => [r.status, r.error])).toEqual([['success', 'recipient_suppressed=1'], ['success', 'recipient_suppressed=1']]);
-    expect(posted).toHaveLength(0);
+    expect(body.failing).toEqual([]);
+    expect(body.actionItems).toEqual(['saved-search-alerts']);
+    expect(posted).toHaveLength(1);
+    expect(posted[0].subject).toBe('Cron watchdog: 1 suppression opened');
+    expect(posted[0].text).toContain('🛡️ SUPPRESSION saved-search-alerts — no processing failure');
+    expect(posted[0].text).toContain('🛡️ Recipient suppression (not an outage): 1 email(s) not sent to CONFIRMED-suppressed recipient(s) (recipient_suppressed=1)');
+    expect(posted[0].text).not.toContain('🔴 OPENED');
+  });
+
+  it("(a2) a later CLEAN run supersedes the suppression: no action item is raised", async () => {
+    ss.searches = [VALID]; ss.blockReason = 'suppressed:hard_bounce';
+    clock = '2026-10-03T11:00:27Z'; vi.setSystemTime(new Date(clock));
+    await savedSearchAlerts(new NextRequest('https://x/api/cron/saved-search-alerts?limit=50', { headers: { 'x-cron-dispatch': '1' } }));
+    ss.blockReason = null;
+    clock = '2026-10-04T11:00:28Z'; vi.setSystemTime(new Date(clock));
+    await savedSearchAlerts(new NextRequest('https://x/api/cron/saved-search-alerts?limit=50', { headers: { 'x-cron-dispatch': '1' } }));
+    vi.setSystemTime(new Date('2026-10-05T06:00:29Z'));
+    const body = await (await watchdog(new NextRequest('http://localhost/api/cron/dispatcher-watchdog?password=pw'))).json();
+    expect(body.actionItems).toEqual([]);
+    expect(slack).toHaveLength(0);
   });
 
   it("(b) 'suppression_check_failed' → PROCESSING incident opened (a lookup error is not a suppression)", async () => {

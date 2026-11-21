@@ -49,7 +49,7 @@ import { claimSend, releaseClaim, saveEvaluation } from '@/lib/saved-searches/se
 import { buildEmail } from '@/lib/alerts/saved-search-email';
 import { applyForecastFilters } from '@/lib/opportunities/map-data';
 import { toAlertRow, type ForecastRowForAlert } from '@/lib/alerts/forecast-alert-row';
-import { reportCronOutcome } from '@/lib/cron-self-report';
+import { cronOutcomeHttpStatus, reportCronOutcome } from '@/lib/cron-self-report';
 import {
   forecastCoverageNotice,
   resolveForecastEngine,
@@ -618,10 +618,11 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  // HTTP 500 only for a true job error. `partial` (capacity) and `success` (including
-  // action-item-only suppressions/invalid NAICS) must be 2xx — a non-2xx used to make
-  // delivery-readiness treat an otherwise-healthy or partial run as a whole-job outage,
-  // which is what MCP reported to customers as "alert delivery degraded".
+  // The response carries the SAME status the self-report wrote (cronOutcomeHttpStatus):
+  // success 200 (including action-item-only suppressions / invalid NAICS — those used to 500
+  // and MCP told customers delivery was degraded), partial 503, error 500. A partial must stay
+  // non-2xx: if the self-report write is lost, the dispatcher then records an error, never a
+  // clean success (src/lib/cron/dispatch-final-status.ts).
   return NextResponse.json(
     {
       success: results.success,
@@ -646,6 +647,6 @@ export async function GET(request: NextRequest) {
       invalidNaicsSearches: results.invalidNaicsSearches,
       ...(preview ? { preview: previewRows } : {}),
     },
-    { status: results.outcome === 'error' ? 500 : 200 },
+    { status: cronOutcomeHttpStatus(results.outcome) },
   );
 }

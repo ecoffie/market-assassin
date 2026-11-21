@@ -1,5 +1,0 @@
-{
-  "install": "npm ci",
-  "installTimeoutMinutes": 45,
-  "terminals": []
-}
