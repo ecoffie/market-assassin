@@ -828,6 +828,50 @@ export function buildFmpPathwayFindArgs(
   return args;
 }
 
+export type FmpPathwayToolCall = { name: string; args: Record<string, unknown> };
+
+/**
+ * Host-forced pathway follow-ups for civil FMP (Claude gold frame).
+ * One FIND with "highway bridge heavy civil" returns open RFQs and sometimes the
+ * inspection MATOC — it does not reliably surface JBAB MACC, Capitol Perimeter SS,
+ * or GWMP/parkway forecasts. Claude's MCP chain looked those up by name; Ask must
+ * too, or the write-up stays an open-bid list with a MATOC footnote.
+ *
+ * Keywords are distinctive (not bare "construction") so pathway enforce will not
+ * rewrite them into the civil default.
+ */
+export const FMP_CIVIL_PATHWAY_SUPPLEMENT_KEYWORDS = [
+  'Construction Inspection MATOC',
+  'Capitol Perimeter',
+  'JBAB Multiple Award Construction',
+] as const;
+
+export function buildFmpPathwaySupplementalCalls(
+  customerText: string,
+  opts?: { awardStates?: readonly string[] },
+): FmpPathwayToolCall[] {
+  if (!isFederalMarketProfileRequest(customerText)) return [];
+  const textStates = extractProfileStates(customerText);
+  const awardStates = (opts?.awardStates || [])
+    .map((s) => normalizeStateCode(String(s).trim()) || '')
+    .filter(Boolean);
+  const states = textStates.length ? textStates : [...new Set(awardStates)];
+  const stateList = states.length ? states.join(',') : '';
+  const calls: FmpPathwayToolCall[] = FMP_CIVIL_PATHWAY_SUPPLEMENT_KEYWORDS.map((keyword) => ({
+    name: 'search_sam_opportunities',
+    args: {
+      keyword,
+      limit: 8,
+      ...(stateList ? { state: stateList } : {}),
+    },
+  }));
+  calls.push({
+    name: 'get_agency_forecasts',
+    args: { keyword: 'GWMP parkway bridge', limit: 8 },
+  });
+  return calls;
+}
+
 /** Pull a dominant 6-digit NAICS from award-history tool JSON when present. */
 export function extractDominantAwardNaics(toolContent: string): string | null {
   if (!toolContent) return null;

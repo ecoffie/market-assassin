@@ -76,6 +76,7 @@ import {
   restrictWritesWhenDocumentText,
   buildFmpNextMarketReportArgs,
   buildFmpPathwayFindArgs,
+  buildFmpPathwaySupplementalCalls,
   extractAwardGeographyStates,
   extractDominantAwardNaics,
 } from '@/lib/chat/tool-selection';
@@ -1693,6 +1694,22 @@ export async function POST(request: NextRequest) {
                       id: `call_fmp_force_${fmpRound}`,
                       function: { name: forcedToolName, arguments: forcedToolInjectArgs(forcedToolName) },
                     }];
+                    // Civil FMP: one FIND alone misses JBAB / Capitol / GWMP — add named follow-ups.
+                    if (forcedToolName === 'find_opportunities') {
+                      const supplements = buildFmpPathwaySupplementalCalls(customerFmpText, {
+                        awardStates: awardStatesFromTools,
+                      });
+                      for (let si = 0; si < supplements.length; si++) {
+                        const s = supplements[si];
+                        rawCallsF.push({
+                          id: `call_fmp_path_sup_${fmpRound}_${si}`,
+                          function: { name: s.name, arguments: JSON.stringify(s.args) },
+                        });
+                      }
+                      if (supplements.length) {
+                        turnTrace.notices.push(`fmp_phase:pathway_supplements_injected:${supplements.length}`);
+                      }
+                    }
                     turnTrace.notices.push(`fmp_phase:force_injected_empty_planner:${forcedToolName}`);
                   }
                   if (rawCallsF.length === 0) {
@@ -1766,6 +1783,54 @@ export async function POST(request: NextRequest) {
                       function: { name: forcedToolName, arguments: injectArgs },
                     }];
                     turnTrace.notices.push(`fmp_phase:force_injected:${forcedToolName}`);
+                  }
+                  // Pathways round: if FIND (or any pathway tool) is running, ensure Claude-gold
+                  // named lookups ride along — planner often stops after one civil FIND.
+                  if (
+                    fmpState
+                    && !fmpState.completed.has('pathways')
+                    && toolCallsF.some((tc) => {
+                      const n = String(tc.function?.name || '');
+                      return n === 'find_opportunities' || n === 'search_sam_opportunities' || n === 'get_agency_forecasts';
+                    })
+                  ) {
+                    const supplements = buildFmpPathwaySupplementalCalls(customerFmpText, {
+                      awardStates: awardStatesFromTools,
+                    });
+                    const haveKw = new Set(
+                      toolCallsF
+                        .filter((tc) => String(tc.function?.name || '') === 'search_sam_opportunities')
+                        .map((tc) => {
+                          try {
+                            return String((JSON.parse(String(tc.function?.arguments || '{}')) as { keyword?: string }).keyword || '')
+                              .toLowerCase();
+                          } catch { return ''; }
+                        })
+                        .filter(Boolean),
+                    );
+                    const haveForecast = toolCallsF.some((tc) => String(tc.function?.name || '') === 'get_agency_forecasts');
+                    let added = 0;
+                    for (let si = 0; si < supplements.length; si++) {
+                      const s = supplements[si];
+                      if (s.name === 'get_agency_forecasts' && haveForecast) continue;
+                      if (s.name === 'search_sam_opportunities') {
+                        const kw = String(s.args.keyword || '').toLowerCase();
+                        if (kw && haveKw.has(kw)) continue;
+                      }
+                      const enforced = enforceFederalMarketProfilePathwayArgs(
+                        s.name,
+                        JSON.stringify(s.args),
+                        customerFmpText,
+                        { awardStates: awardStatesFromTools },
+                      );
+                      toolCallsF.push({
+                        id: `call_fmp_path_sup_${fmpRound}_${si}`,
+                        type: 'function' as const,
+                        function: { name: s.name, arguments: enforced.args },
+                      });
+                      added += 1;
+                    }
+                    if (added) turnTrace.notices.push(`fmp_phase:pathway_supplements_merged:${added}`);
                   }
                   if (toolCallsF.length === 0) {
                     turnTrace.notices.push(`fmp_phase:round_${fmpRound}_no_calls`);

@@ -694,6 +694,95 @@ describe('fmp-writeup-grounding', () => {
         );
       });
 
+      it('caps open RFQs so vehicle/SS fill the six-pathway slots (Claude frame)', () => {
+        const open = (n: number, sol: string) => ({
+          notice_id: `open${n}`.padEnd(32, '0'),
+          solicitation_number: sol,
+          title: `HUMBOLT BRIDGE REPLACEMENT ${n}`,
+          department: 'FOREST SERVICE',
+          naics_code: '237310',
+          response_deadline: `2026-11-${20 + n}T17:00:00Z`,
+          notice_type: 'Combined Synopsis/Solicitation',
+        });
+        const inspectMatoc = {
+          notice_id: 'insp0001insp0001insp0001insp0001',
+          solicitation_number: '693C73-27-R-000006',
+          title: '2027 Construction Inspection Services Multiple Award Task Order Contract (MATOC)',
+          department: 'FEDERAL HIGHWAY ADMINISTRATION',
+          naics_code: '541330',
+          response_deadline: '2027-01-04T17:00:00Z',
+          notice_type: 'Presolicitation',
+        };
+        const jbab = {
+          notice_id: 'jbab0001jbab0001jbab0001jbab0001',
+          solicitation_number: 'FA706027RXXX2',
+          title: 'Multiple Award Construction Contract (MACC)',
+          department: 'DEPT OF THE AIR FORCE',
+          naics_code: '236210',
+          response_deadline: '2026-11-30T21:00:00Z',
+          notice_type: 'Sources Sought',
+          description: 'Market research at Joint Base Anacostia Bolling (JBAB), DC and Andrews AFB, MD.',
+        };
+        const capitol = {
+          notice_id: 'cap00001cap00001cap00001cap00001',
+          solicitation_number: 'W912DR27H1CWY',
+          title: 'Capitol Perimeter Enhancements',
+          department: 'DEPT OF THE ARMY',
+          naics_code: '236220',
+          response_deadline: '2026-12-04T16:00:00Z',
+          notice_type: 'Sources Sought',
+        };
+        const findOpen = (rows: unknown[]) => JSON.stringify({ horizons: { open_now: { items: rows } } });
+        const ev = accumulateFmpEvidence([
+          { tool: 'get_contractor_award_history', content: HISTORY },
+          {
+            tool: 'find_opportunities',
+            content: findOpen([
+              open(1, '1240LT27Q0026'),
+              open(2, '140FF027Q0030'),
+              open(3, '127EAW27Q0003'),
+              inspectMatoc,
+              jbab,
+              capitol,
+            ]),
+          },
+        ]);
+        const ids = ev.pathways?.map((p) => p.noticeId) ?? [];
+        expect(ids[0]).toBe('693C73-27-R-000006');
+        expect(ids).toEqual(expect.arrayContaining(['FA706027RXXX2', 'W912DR27H1CWY']));
+        expect(ev.pathways?.some((p) => /JBAB and Andrews/i.test(p.title))).toBe(true);
+        const openCount = (ev.pathways ?? []).filter((p) => /HUMBOLT/i.test(p.title)).length;
+        expect(openCount).toBeLessThanOrEqual(1);
+      });
+
+      it('parses get_agency_forecasts rows into forecast pathways (GWMP / Clara Barton class)', () => {
+        const ev = accumulateFmpEvidence([
+          { tool: 'get_contractor_award_history', content: HISTORY },
+          {
+            tool: 'get_agency_forecasts',
+            content: JSON.stringify({
+              forecasts: [{
+                id: 'fc-gwmp-1',
+                external_id: 'MD NP GWMP 6(2)',
+                title: 'MD NP GWMP 6(2)',
+                description: 'Replace cantilever structure and rehabilitate retaining wall on Clara Barton Parkway.',
+                agency: 'Federal Highway Administration',
+                naics_code: '237310',
+                award_date: '2027-09-01',
+                value_range: '$100M to $249M',
+              }],
+              _meta: { grounded: true, count: 1 },
+            }),
+          },
+          {
+            tool: 'find_opportunities',
+            content: find([civilA, civilB]),
+          },
+        ]);
+        expect(ev.pathways?.some((p) => p.kind === 'forecast' && /GWMP/i.test(p.title))).toBe(true);
+        expect(ev.pathways?.find((p) => p.kind === 'forecast')?.when).toMatch(/2027-09-01/);
+      });
+
       it('keeps a Sources Sought / MACC in adjacent 236210 for a 237310 firm (JBAB-class gold pathway)', () => {
         const jbab = {
           notice_id: 'jbab0001jbab0001jbab0001jbab0001',

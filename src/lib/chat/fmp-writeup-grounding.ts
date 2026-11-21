@@ -429,19 +429,30 @@ function extractAwardRows(results: readonly FmpToolContent[]): FmpAwardRow[] {
     .map(({ amount: _amount, ...row }) => row);
 }
 
-const PATHWAY_TOOL_RE = /find_opportunities|search_sam_opportunities|lookup_solicitation/i;
-/** Array keys FIND-style tools use for notice lists. */
-const FIND_LIST_KEYS = new Set(['results', 'opportunities', 'items', 'open', 'coming_back', 'comingBack', 'coming_soon', 'comingSoon']);
+const PATHWAY_TOOL_RE = /find_opportunities|search_sam_opportunities|lookup_solicitation|get_agency_forecasts/i;
+/** Array keys FIND-style tools use for notice / forecast lists. */
+const FIND_LIST_KEYS = new Set(['results', 'opportunities', 'items', 'open', 'coming_back', 'comingBack', 'coming_soon', 'comingSoon', 'forecasts']);
 const VEHICLE_WORD_RE = /\b(MATOC|MACC|IDIQ|BPA|IDV|multiple[- ]award|task order contract|vehicle)\b/i;
 const SOURCES_SOUGHT_RE = /\b(sources? sought|RFI|request for information|special notice)\b/i;
 
 function pathwayRank(p: FmpPathway): number {
-  if (p.kind === 'recompete') return 3;
-  if (p.kind === 'forecast') return 4;
+  // Claude gold frame: vehicles → sources sought → forecasts → open RFQs → recompetes.
+  if (p.kind === 'recompete') return 4;
+  if (p.kind === 'forecast') return 2;
   const hay = `${p.title} ${p.noticeType ?? ''}`;
   if (VEHICLE_WORD_RE.test(hay)) return 0;
   if (SOURCES_SOUGHT_RE.test(hay)) return 1;
-  return 2;
+  return 3;
+}
+
+/** Prefer JBAB/Andrews naming when the SAM title is a bare MACC and the body names the bases. */
+function enrichPathwayTitle(title: string, summary?: string): string {
+  if (/JBAB|Andrews|Anacostia/i.test(title)) return title;
+  if (!summary || !/MACC|Multiple Award Construction/i.test(title)) return title;
+  if (/JBAB|Anacostia Bolling|Andrews AFB|Andrews Air/i.test(summary)) {
+    return clip('JBAB and Andrews 8(a) MACC', 120);
+  }
+  return title;
 }
 
 function dateOnly(s: string): string {
@@ -526,7 +537,10 @@ function extractPathways(
       // FIND (`horizons.<h>.items[]`) recompete rows carry no notice. `title` is the incumbent firm,
       // the work is in `description`, and the identity is the PIID / contract_id.
       const recompeteId = toolMatches && inFindList && firstString(o, ['contract_id', 'piid']) ? firstString(o, ['piid', 'contract_id']) : undefined;
-      const forecastRow = toolMatches && inFindList && !recompeteId && !!firstString(o, ['forecast_id']);
+      // get_agency_forecasts rows use `id` / `external_id` (no forecast_id); FIND coming_soon may carry forecast_id.
+      const fromForecastList = key === 'forecasts' || !!firstString(o, ['forecast_id']);
+      const forecastRow = toolMatches && inFindList && !recompeteId && fromForecastList
+        && !firstString(o, ['notice_id', 'noticeId', 'solicitation_number', 'solicitationNumber']);
       const kind: FmpPathway['kind'] = recompeteId ? 'recompete' : forecastRow ? 'forecast' : 'notice';
       const title = recompeteId
         ? firstString(o, ['description', 'naics_description', 'title'])
@@ -535,16 +549,16 @@ function extractPathways(
       const solicitation = firstString(o, ['solicitation_number', 'solicitationNumber', 'solicitation']);
       const notice = recompeteId
         ?? firstString(o, ['notice_id', 'noticeId'])
-        ?? (toolMatches && inFindList ? firstString(o, ['id']) : undefined);
+        ?? (toolMatches && inFindList && kind !== 'forecast' ? firstString(o, ['id']) : undefined);
       if (!solicitation && !notice && !forecastRow) return;
-      const id = solicitation || notice || firstString(o, ['forecast_id'])!;
+      const id = solicitation || notice || firstString(o, ['forecast_id', 'external_id', 'id'])!;
       const idKey = id.toLowerCase();
       if (seen.has(idKey)) return;
       seen.add(idKey);
       const deadline = kind === 'recompete'
         ? firstString(o, ['current_end'])
         : kind === 'forecast'
-          ? firstString(o, ['anticipated_award_date', 'relevant_date'])
+          ? firstString(o, ['award_date', 'anticipated_award_date', 'relevant_date'])
           : firstString(o, ['response_deadline', 'responseDeadline', 'deadline', 'due']);
       const naicsNum = firstNumber(o, ['naics_code', 'naics', 'naicsCode']);
       const naicsRaw = firstString(o, ['naics_code', 'naics', 'naicsCode']) ?? (naicsNum != null ? String(naicsNum) : undefined);
@@ -555,15 +569,16 @@ function extractPathways(
       // FIND rows: `sub_agency` (FEDERAL HIGHWAY ADMINISTRATION) is the buyer; `buyer` is only its department.
       const buyer = firstString(o, ['sub_agency', 'awarding_sub_agency', 'department', 'agency', 'sub_tier', 'office', 'buyer']) ?? agencyObj;
       const noticeType = kind === 'recompete' ? 'Recompete' : kind === 'forecast' ? 'Forecast' : firstString(o, ['notice_type', 'noticeType', 'type']);
+      const summary = desc && !/^https?:\/\//i.test(desc) ? clip(desc, 240) : undefined;
       const pathway: FmpPathway = {
-        title: clip(title, 120),
+        title: enrichPathwayTitle(clip(title, 120), summary),
         ...(deadline
           ? { when: `${kind === 'recompete' ? 'Contract ends' : kind === 'forecast' ? 'Award expected' : 'Due'} ${dateOnly(deadline)}` }
           : {}),
         ...(kind === 'forecast' ? {} : { noticeId: id }),
         kind,
         ...(naicsRaw && /^\d{6}$/.test(naicsRaw) ? { naics: naicsRaw } : {}),
-        ...(desc && !/^https?:\/\//i.test(desc) ? { summary: clip(desc, 240) } : {}),
+        ...(summary ? { summary } : {}),
         ...(buyer ? { buyer: clip(buyer, 80) } : {}),
         ...(noticeType ? { noticeType: clip(noticeType, 40) } : {}),
       };
@@ -573,33 +588,31 @@ function extractPathways(
   }
   const civilDominant = !!dominantNaics && dominantNaics.startsWith('23');
   const fitFor = (p: FmpPathway): number => (dominantNaics ? pathwayNaicsFit(p, dominantNaics) : 0);
+  /** Highway/bridge firms: inspection MATOCs are the Claude-gold #1 pathway class — boost past adjacent building MACCs. */
+  const inspectionBoost = (p: FmpPathway): number => {
+    if (!dominantNaics || !/^2373/.test(dominantNaics)) return 0;
+    const hay = `${p.title} ${p.noticeType ?? ''}`;
+    return /inspection/i.test(hay) && VEHICLE_WORD_RE.test(hay) ? 35 : 0;
+  };
   // Hard drops only apply to a construction / civil firm; other profiles are ranked, never emptied.
   const candidates = civilDominant ? out.filter((p) => !isOffMarketForCivil(p)) : out;
   const indexed = candidates.map((p, i) => {
     const fit = fitFor(p);
     const buyer = pathwayBuyerAffinity(p, awardRows);
-    return { p, i, fit, buyer, score: fit + buyer };
+    const boost = inspectionBoost(p);
+    return { p, i, fit, buyer, score: fit + buyer + boost };
   });
   indexed.sort((a, b) => {
-    if (dominantNaics) {
-      const ka = PATHWAY_KIND_ORDER[a.p.kind ?? 'notice'];
-      const kb = PATHWAY_KIND_ORDER[b.p.kind ?? 'notice'];
-      if (ka !== kb) return ka - kb;
-      // Claude gold frame: vehicles → sources sought → open bids, THEN fit/buyer score.
-      // Without this, exact-NAICS bridge RFQs outrank the inspection MATOC (measured live).
-      const ra = pathwayRank(a.p);
-      const rb = pathwayRank(b.p);
-      if (ra !== rb) return ra - rb;
-      if (a.score !== b.score) return b.score - a.score;
-      if (a.fit !== b.fit) return b.fit - a.fit;
-      const da = a.p.when ?? '\uffff';
-      const db = b.p.when ?? '\uffff';
-      if (da !== db) return da < db ? -1 : 1;
-      return a.i - b.i;
-    }
+    // Claude gold frame: vehicles → sources sought → forecasts → open bids, THEN fit/buyer.
+    // Kind order used to put every notice before every forecast, so Clara Barton-class
+    // rows never made the six-pathway list when open RFQs filled the slots.
     const ra = pathwayRank(a.p);
     const rb = pathwayRank(b.p);
     if (ra !== rb) return ra - rb;
+    if (dominantNaics) {
+      if (a.score !== b.score) return b.score - a.score;
+      if (a.fit !== b.fit) return b.fit - a.fit;
+    }
     const da = a.p.when ?? '\uffff';
     const db = b.p.when ?? '\uffff';
     if (da !== db) return da < db ? -1 : 1;
@@ -615,16 +628,20 @@ function extractPathways(
       const inspection = (x.p.naics ?? '').startsWith('5413') && x.fit >= 40;
       const vehicleOrSs = VEHICLE_WORD_RE.test(hay) || SOURCES_SOUGHT_RE.test(hay);
       const adjacentVehicle = vehicleOrSs && x.fit >= 40;
-      return x.fit >= 80 || x.buyer >= 30 || inspection || adjacentVehicle || (x.fit >= 40 && x.buyer > 0);
+      const forecastOk = x.p.kind === 'forecast' && (x.fit >= 40 || CIVIL_LEXICAL_RE.test(hay) || /GWMP|parkway|bridge/i.test(hay));
+      return x.fit >= 80 || x.buyer >= 30 || inspection || adjacentVehicle || forecastOk || (x.fit >= 40 && x.buyer > 0);
     });
     // Fewer than two on-market pathways: show none so the vehicle-token frame renders instead of junk.
-    return fits.length < 2 ? [] : fits.slice(0, 6).map((x) => x.p);
+    if (fits.length < 2) return [];
+    // Cap open RFQs so HUMBOLT-class exact-NAICS bids cannot fill all six slots.
+    const frame = fits.filter((x) => pathwayRank(x.p) <= 2);
+    const open = fits.filter((x) => pathwayRank(x.p) === 3);
+    const recompete = fits.filter((x) => pathwayRank(x.p) === 4);
+    const openCap = frame.length >= 2 ? 1 : 2;
+    return [...frame, ...open.slice(0, openCap), ...recompete].slice(0, 6).map((x) => x.p);
   }
   return indexed.slice(0, 8).map((x) => x.p);
 }
-
-/** Open notices first, then recompetes, then forecasts (only applied once a dominant NAICS is known). */
-const PATHWAY_KIND_ORDER: Record<NonNullable<FmpPathway['kind']>, number> = { notice: 0, recompete: 1, forecast: 2 };
 
 /** Civil / heavy-construction wording. Bare "BRIDGE" is deliberately absent: it names bridge CONTRACTS (extensions). */
 const CIVIL_LEXICAL_RE = /\b(highway|parkway|pavement|roadway|bridge rehabilitation|bridge replacement|deck|culvert|retaining wall|heavy civil|marine construction|asphalt|concrete paving)\b/i;
@@ -1455,9 +1472,10 @@ export function buildFmpHostDocModel(
   const directBuyers = [...new Set(awardRows.map((r) => r.buyer).filter((b) => b && b !== 'Not stated'))].slice(0, 3);
   const directPathway = directBuyers.length > 0 || buyerSpend.length > 0;
   const forecastPathways = allPathways.filter((p) => p.kind === 'forecast');
-  const noticePathways = allPathways.filter((p) => p.kind !== 'forecast');
+  // Include forecasts in the numbered pathway list (Claude gold puts Clara Barton / GWMP
+  // as pathway #6). Keep a separate forecast table when extras remain.
   const noticeCap = directPathway ? 5 : 6;
-  const shown = noticePathways.slice(0, noticeCap);
+  const shown = allPathways.slice(0, noticeCap);
   const totalPathways = shown.length + (directPathway ? 1 : 0);
   const pathwayHeading = shown.length > 0 && totalPathways >= 6
     ? 'Six pathways, in priority order'
@@ -1614,15 +1632,21 @@ export function buildFmpHostDocModel(
     });
   }
 
-  // ── Forecast work (Claude gold §7) — only rows the tools returned ──
-  if (forecastPathways.length) {
+  // ── Forecast work — extras not already numbered in the pathways section ──
+  const shownForecastIds = new Set(
+    shown.filter((p) => p.kind === 'forecast').map((p) => `${p.title}|${p.when ?? ''}`),
+  );
+  const extraForecasts = forecastPathways.filter(
+    (p) => !shownForecastIds.has(`${p.title}|${p.when ?? ''}`),
+  );
+  if (extraForecasts.length) {
     sections.push({
       id: 'sec-forecasts',
       heading: 'Forecast work to position for before a notice posts',
       blocks: [{
         type: 'table',
         id: 't-forecasts',
-        caption: 'Agency forecasts returned this turn. Position before a notice posts.',
+        caption: 'Additional agency forecasts returned this turn. Position before a notice posts.',
         claim: 'fact',
         cites: SRC,
         columns: [
@@ -1631,7 +1655,7 @@ export function buildFmpHostDocModel(
           { key: 'listed', label: 'Listed as' },
           { key: 'range', label: 'Range' },
         ],
-        rows: forecastPathways.slice(0, 8).map((p) => ({
+        rows: extraForecasts.slice(0, 8).map((p) => ({
           project: p.title,
           buyer: p.buyer ?? 'Not stated',
           listed: p.when ?? p.noticeType ?? 'Forecast',

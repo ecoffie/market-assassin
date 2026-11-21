@@ -19,6 +19,8 @@ import {
   extractVehiclePiidPrefixes,
   derivePathwaySearchQuery,
   buildFmpPathwayFindArgs,
+  buildFmpPathwaySupplementalCalls,
+  FMP_CIVIL_PATHWAY_SUPPLEMENT_KEYWORDS,
   federalMarketProfileSelfReportNote,
   federalMarketProfilePathwayNote,
   federalMarketProfileVehicleNote,
@@ -220,6 +222,34 @@ describe('Federal Market Profile pathways (step 3 — civil + Mid-Atlantic)', ()
     expect(String(args.location).split(',').sort()).toEqual(['DC', 'MD', 'VA']);
     // Award NAICS must NOT be pinned — JBAB/inspection/Capitol live on adjacent codes.
     expect(args.advanced).toBeUndefined();
+  });
+
+  it('host pathway supplements name inspection MATOC, Capitol, JBAB, and GWMP forecasts', () => {
+    const calls = buildFmpPathwaySupplementalCalls(RBA_NAME_ONLY_PROMPT, {
+      awardStates: ['VA', 'MD', 'DC'],
+    });
+    expect(calls.map((c) => c.name)).toEqual([
+      'search_sam_opportunities',
+      'search_sam_opportunities',
+      'search_sam_opportunities',
+      'get_agency_forecasts',
+    ]);
+    const keywords = calls
+      .filter((c) => c.name === 'search_sam_opportunities')
+      .map((c) => String(c.args.keyword));
+    expect(keywords).toEqual([...FMP_CIVIL_PATHWAY_SUPPLEMENT_KEYWORDS]);
+    expect(String(calls[0].args.state).split(',').sort()).toEqual(['DC', 'MD', 'VA']);
+    expect(calls[3].args.keyword).toMatch(/GWMP|parkway/i);
+    // Distinctive keywords must survive pathway enforce (not rewritten to civil default).
+    for (const kw of keywords) {
+      const r = enforceFederalMarketProfilePathwayArgs(
+        'search_sam_opportunities',
+        JSON.stringify({ keyword: kw, state: 'VA,MD,DC' }),
+        RBA_NAME_ONLY_PROMPT,
+        { awardStates: ['VA', 'MD', 'DC'] },
+      );
+      expect(JSON.parse(r.args).keyword).toBe(kw);
+    }
   });
 
   it('pathway enforce fills states from award geography when the prompt has none', () => {

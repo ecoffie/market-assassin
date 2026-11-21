@@ -1,10 +1,10 @@
-### Ask FMP closer to Claude gold (FIND pin + gold sections) — 2026-11-20
+### Ask FMP closer to Claude gold (named pathway lookups) — 2026-11-20
 
-**What shipped.** Short name-only FMP asks now pin `find_opportunities` to award geography + civil query + award NAICS (no empty `{}` national sweep). Pathway filter keeps Sources Sought / MACC in adjacent 23x (JBAB / Capitol / Pentagon paving class). Host DocModel adds Forecast work + Where the money is moving when evidence supports.
+**What shipped.** Pathways phase host-injects named SAM lookups (Inspection MATOC, Capitol Perimeter, JBAB MACC) plus GWMP/parkway forecasts alongside the civil FIND. Ranking is vehicle → sources sought → forecasts → at most one open RFQ. Bare MACC titles that name JBAB/Andrews in the body render as “JBAB and Andrews 8(a) MACC.”
 
-**Why it matters.** Map report placement was right; content still lagged Claude (generic MATOC frame, missing forecast/shifts, wrong geography on a one-line ask).
+**Why it matters.** Report placement over the map was right; content still lagged Claude — open bridge RFQs filled the six pathways while JBAB, Capitol Perimeter, and GWMP forecasts never entered the tool results on a short name-only ask.
 
-**Proof.** Units: `fmp-writeup-grounding` + `current-find` FMP pathway pins + JBAB/Capitol keep. Live after deploy: name-only RBA Ask → pathways not generic-only; report includes forecast/shifts when tools return them.
+**Proof.** Units: `fmp-writeup-grounding` + `current-find` supplemental pathway calls. Live after deploy: name-only RBA Ask → pathway #1 Inspection MATOC; pathways include Capitol and/or JBAB when active; not a HUMBOLT-led open-bid list.
 
 
 ### Map Ask Mindy blank start (same rule as /app chat) — 2026-11-20
