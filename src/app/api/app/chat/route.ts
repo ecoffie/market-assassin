@@ -1682,7 +1682,6 @@ export async function POST(request: NextRequest) {
                     }
                     if (toolName === 'find_opportunities') {
                       return JSON.stringify(buildFmpPathwayFindArgs(customerFmpText, {
-                        awardNaics: awardNaicsFromTools,
                         awardStates: awardStatesFromTools,
                       }));
                     }
@@ -1714,7 +1713,6 @@ export async function POST(request: NextRequest) {
                     const identityArgs = enforceFederalMarketProfileIdentityArgs(toolNm, args, customerFmpText);
                     args = identityArgs.args;
                     const pathwayArgs = enforceFederalMarketProfilePathwayArgs(toolNm, args, customerFmpText, {
-                      awardNaics: awardNaicsFromTools,
                       awardStates: awardStatesFromTools,
                     });
                     args = pathwayArgs.args;
@@ -1738,17 +1736,17 @@ export async function POST(request: NextRequest) {
                       try {
                         const parsed = JSON.parse(args || '{}') as Record<string, unknown>;
                         const next = buildFmpPathwayFindArgs(customerFmpText, {
-                          awardNaics: awardNaicsFromTools,
                           awardStates: awardStatesFromTools,
                         });
-                        args = JSON.stringify({ ...parsed, ...next, advanced: {
-                          ...(typeof parsed.advanced === 'object' && parsed.advanced && !Array.isArray(parsed.advanced)
-                            ? parsed.advanced as Record<string, unknown>
-                            : {}),
-                          ...(next.advanced as Record<string, unknown>),
-                        } });
+                        const merged: Record<string, unknown> = { ...parsed, ...next };
+                        // Keep planner advanced filters except a buildings NAICS we already strip in enforce.
+                        if (parsed.advanced && typeof parsed.advanced === 'object' && !Array.isArray(parsed.advanced)
+                          && !('advanced' in next)) {
+                          merged.advanced = parsed.advanced;
+                        }
+                        args = JSON.stringify(merged);
                         turnTrace.notices.push(
-                          `fmp_pathway_find_args_pinned:location=${String(next.location || '')}:naics=${String((next.advanced as { naics?: string })?.naics || '')}`,
+                          `fmp_pathway_find_args_pinned:location=${String(next.location || '')}:query=${String(next.query || '').slice(0, 60)}`,
                         );
                       } catch { /* keep enforced args */ }
                     }

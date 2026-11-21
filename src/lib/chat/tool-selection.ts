@@ -443,7 +443,7 @@ export function enforceFederalMarketProfilePathwayArgs(
   toolName: string,
   rawArgs: string,
   customerText: string,
-  opts?: { awardStates?: readonly string[]; awardNaics?: string | null },
+  opts?: { awardStates?: readonly string[] },
 ): { args: string; changes: string[] } {
   if (!isFederalMarketProfileRequest(customerText)) return { args: rawArgs, changes: [] };
   if (!FEDERAL_MARKET_PROFILE_PATHWAY_TOOLS.has(toolName)) return { args: rawArgs, changes: [] };
@@ -483,21 +483,19 @@ export function enforceFederalMarketProfilePathwayArgs(
       a.query = civilQuery;
       changes.push('pathway_civil_query_enforced');
     }
-    // Pin award NAICS into advanced so FIND is not a national open-bid sweep.
-    const naicsRaw = (opts?.awardNaics || '').replace(/\D/g, '').slice(0, 6);
+    // Strip a buildings-only NAICS pin the planner may have invented from "construction".
+    // Do not replace it with award NAICS — that hides inspection / JBAB / Capitol pathways.
     const adv = (a.advanced && typeof a.advanced === 'object' && !Array.isArray(a.advanced))
       ? { ...(a.advanced as Record<string, unknown>) }
-      : {};
-    const curNaics = typeof adv.naics === 'string' ? adv.naics.replace(/\D/g, '').slice(0, 6) : '';
-    if (!curNaics || BUILDINGS_NAICS.has(curNaics) || BUILDINGS_NAICS.has(curNaics.slice(0, 3))) {
-      const pinned = naicsRaw.length >= 3
-        && !BUILDINGS_NAICS.has(naicsRaw)
-        && !BUILDINGS_NAICS.has(naicsRaw.slice(0, 3))
-        ? naicsRaw
-        : '237310';
-      adv.naics = pinned.length === 6 ? pinned : pinned.slice(0, 3);
-      a.advanced = adv;
-      changes.push('pathway_award_naics_enforced');
+      : null;
+    if (adv) {
+      const curNaics = typeof adv.naics === 'string' ? adv.naics.replace(/\D/g, '').slice(0, 6) : '';
+      if (curNaics && (BUILDINGS_NAICS.has(curNaics) || BUILDINGS_NAICS.has(curNaics.slice(0, 3)))) {
+        delete adv.naics;
+        if (Object.keys(adv).length) a.advanced = adv;
+        else delete a.advanced;
+        changes.push('pathway_buildings_naics_stripped');
+      }
     }
   }
 
@@ -808,27 +806,23 @@ export function extractAwardGeographyStates(toolContents: readonly string[]): st
  * Short "Build a federal market profile for RBA…" has no states in the prompt — without
  * this pin, force-inject `{}` searches nationally and the write-up collapses to a generic
  * MATOC frame after the civil pathway filter empties dredging/harbor noise.
+ *
+ * Do NOT pin award NAICS on FIND. Claude gold pathways include adjacent codes
+ * (inspection 541330, JBAB 236210, Capitol 236220); a 237310-only FIND never sees them.
+ * Geography + civil keywords are the pin; write-up ranking filters the noise.
  */
 export function buildFmpPathwayFindArgs(
   customerText: string,
-  opts?: { awardNaics?: string | null; awardStates?: readonly string[] },
+  opts?: { awardStates?: readonly string[] },
 ): Record<string, unknown> {
   const textStates = extractProfileStates(customerText);
   const awardStates = (opts?.awardStates || [])
     .map((s) => normalizeStateCode(String(s).trim()) || '')
     .filter(Boolean);
   const states = textStates.length ? textStates : [...new Set(awardStates)];
-  const query = derivePathwaySearchQuery(customerText);
-  const naicsRaw = (opts?.awardNaics || '').replace(/\D/g, '').slice(0, 6);
-  const naics = naicsRaw.length >= 3
-    && !BUILDINGS_NAICS.has(naicsRaw)
-    && !BUILDINGS_NAICS.has(naicsRaw.slice(0, 3))
-    ? naicsRaw
-    : '237310';
   const args: Record<string, unknown> = {
-    query,
+    query: derivePathwaySearchQuery(customerText),
     limit_per_horizon: 15,
-    advanced: { naics: naics.length === 6 ? naics : naics.slice(0, 3) },
   };
   if (states.length) args.location = states.join(',');
   return args;

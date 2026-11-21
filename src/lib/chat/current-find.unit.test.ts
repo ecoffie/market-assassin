@@ -201,7 +201,7 @@ describe('Federal Market Profile self-report (step 2 — not federal data)', () 
 });
 
 describe('Federal Market Profile pathways (step 3 — civil + Mid-Atlantic)', () => {
-  it('name-only FMP FIND pin uses award geography + civil query + award NAICS (not empty {})', () => {
+  it('name-only FMP FIND pin uses award geography + civil query (not empty {}, not award-NAICS-only)', () => {
     const awardJson = JSON.stringify({
       history: {
         recentAwards: [
@@ -214,12 +214,12 @@ describe('Federal Market Profile pathways (step 3 — civil + Mid-Atlantic)', ()
     expect(extractAwardGeographyStates([awardJson]).sort()).toEqual(['DC', 'MD', 'VA']);
     expect(extractProfileStates(RBA_NAME_ONLY_PROMPT)).toEqual([]);
     const args = buildFmpPathwayFindArgs(RBA_NAME_ONLY_PROMPT, {
-      awardNaics: '237310',
       awardStates: extractAwardGeographyStates([awardJson]),
     });
     expect(args.query).toMatch(/highway|bridge|heavy civil/i);
     expect(String(args.location).split(',').sort()).toEqual(['DC', 'MD', 'VA']);
-    expect((args.advanced as { naics: string }).naics).toBe('237310');
+    // Award NAICS must NOT be pinned — JBAB/inspection/Capitol live on adjacent codes.
+    expect(args.advanced).toBeUndefined();
   });
 
   it('pathway enforce fills states from award geography when the prompt has none', () => {
@@ -227,17 +227,27 @@ describe('Federal Market Profile pathways (step 3 — civil + Mid-Atlantic)', ()
       'find_opportunities',
       '{}',
       RBA_NAME_ONLY_PROMPT,
-      { awardNaics: '237310', awardStates: ['VA', 'MD', 'DC'] },
+      { awardStates: ['VA', 'MD', 'DC'] },
     );
     expect(r.changes).toEqual(expect.arrayContaining([
       'pathway_states_enforced',
       'pathway_civil_query_enforced',
-      'pathway_award_naics_enforced',
     ]));
-    const a = JSON.parse(r.args) as { location: string; query: string; advanced: { naics: string } };
+    const a = JSON.parse(r.args) as { location: string; query: string; advanced?: { naics?: string } };
     expect(a.location.split(',').sort()).toEqual(['DC', 'MD', 'VA']);
     expect(a.query).toMatch(/highway|bridge|heavy civil/i);
-    expect(a.advanced.naics).toBe('237310');
+    expect(a.advanced?.naics).toBeUndefined();
+  });
+
+  it('pathway enforce strips a buildings NAICS the planner invented from construction', () => {
+    const r = enforceFederalMarketProfilePathwayArgs(
+      'find_opportunities',
+      JSON.stringify({ query: 'highway bridge', location: 'VA,MD,DC', advanced: { naics: '236220' } }),
+      RBA_FEDERAL_MARKET_PROFILE_PROMPT,
+    );
+    expect(r.changes).toContain('pathway_buildings_naics_stripped');
+    const a = JSON.parse(r.args) as { advanced?: { naics?: string } };
+    expect(a.advanced?.naics).toBeUndefined();
   });
 
   it('extracts DC, MD, VA from the cold prompt', () => {
