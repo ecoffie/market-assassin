@@ -29,7 +29,7 @@ import {
 const NOW = new Date(FROZEN_NOW);
 const TODAY = FROZEN_NOW.slice(0, 10);
 
-// Hermetic stand-in for the Supabase query builder: every filter is chainable, `.limit()` resolves
+// Hermetic stand-in for the Supabase query builder: every filter is chainable, `.limit()` / `.range()` resolve
 // with the frozen in-window rows (the fixture helper already applies the tool's own predicate).
 const sb = vi.hoisted(() => ({ rows: [] as unknown[] }));
 vi.mock('@supabase/supabase-js', () => ({
@@ -37,6 +37,8 @@ vi.mock('@supabase/supabase-js', () => ({
     const b: Record<string, unknown> = {};
     for (const m of ['from', 'select', 'lte', 'gt', 'gte', 'is', 'like', 'eq', 'or', 'order']) b[m] = () => b;
     b.limit = async () => ({ data: sb.rows, count: sb.rows.length, error: null });
+    // The primary query pages with .range(from, to); the frozen rows are the whole matched set.
+    b.range = async (from: number, to: number) => ({ data: sb.rows.slice(from, to + 1), count: sb.rows.length, error: null });
     return b;
   },
 }));

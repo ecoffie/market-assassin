@@ -203,7 +203,8 @@ export const CHATGPT_PARAM_COPY: Readonly<Partial<Record<ChatgptToolName, Readon
       'After the user confirms a suggested match ("yes, that\'s the one"), pass that notice ID to get the confirmed, current record.',
   },
   get_expiring_contracts: {
-    limit: 'Maximum results (default 50, max 200).',
+    limit: 'Records per page (default 25, max 200). Keep the default and page with offset.',
+    offset: 'First record to return, starting at 0. For the next page, pass the next_offset value from the previous result with the same filters.',
   },
   search_grants: {
     agency: 'Top-level agency code, for example "DOD" or "HHS". Matches agencies whose code starts with it.',

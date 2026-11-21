@@ -101,7 +101,7 @@ describe('in-window orders are listed at top level', () => {
   it('flags a row-limited result as incomplete (partial), never as the full list', async () => {
     queryMock.mockResolvedValue({ contracts: [standalone('S1')], total: 37, count: 37, duplicates_collapsed: 0, degraded: false, window: WINDOW });
     const r = await expiringContracts({ naics: '5611', limit: 1 }, noLookup);
-    expect(r._meta.incomplete_reason).toMatch(/returned 1 of 37/);
+    expect(r._meta.incomplete_reason).toMatch(/returned records 1-1 of 37 matching; call again with offset=1/);
     annotateResultContract(r, { naics: '5611', limit: 1 }, toolParameters('get_expiring_contracts'));
     expect(r._meta.result_state).toBe('partial');
   });
@@ -119,5 +119,44 @@ describe('through the registry (what chat and MCP actually call)', () => {
     expect(queryMock).toHaveBeenCalledWith(expect.objectContaining({ naicsCodes: ['5613', '5611', '4931'], states: ['TN', 'MS', 'AR'] }));
     expect((result._meta as { ignored_args: unknown[] }).ignored_args).toEqual([]);
     expect((result._meta as { result_state: string }).result_state).toBe('none_found');
+  });
+});
+
+describe('result size: summary plus a page of 25, page the rest (Ask Mindy Backend Spec)', () => {
+  const many = (n: number, from = 0) => Array.from({ length: n }, (_, i) => standalone(`S${from + i}`));
+
+  it('no limit → asks the query for 25 records, not 50', async () => {
+    queryMock.mockResolvedValue({ contracts: many(25), total: 4000, count: 4000, duplicates_collapsed: 0, degraded: false, window: WINDOW });
+    const r = await expiringContracts({ naics: '561320' }, noLookup);
+    expect(queryMock).toHaveBeenCalledWith(expect.objectContaining({ limit: 25, offset: 0 }));
+    expect(r.contracts).toHaveLength(25);
+    expect(r._meta.page).toEqual({ offset: 0, limit: 25, returned: 25, total: 4000, has_more: true, next_offset: 25 });
+    expect(r._meta.incomplete_reason).toMatch(/records 1-25 of 4000 matching; call again with offset=25/);
+  });
+
+  it('offset pages through the matched set; the last page says so', async () => {
+    queryMock.mockResolvedValue({ contracts: many(10, 25), total: 35, count: 35, duplicates_collapsed: 0, degraded: false, window: WINDOW });
+    const r = await expiringContracts({ naics: '561320', offset: 25 }, noLookup);
+    expect(queryMock).toHaveBeenCalledWith(expect.objectContaining({ limit: 25, offset: 25 }));
+    expect(r._meta.page).toEqual({ offset: 25, limit: 25, returned: 10, total: 35, has_more: false, next_offset: null });
+    expect(r._meta.incomplete_reason).toBeUndefined();
+  });
+
+  it('an explicit limit is still honoured (Ask Mindy chat fetches the whole set on purpose)', async () => {
+    queryMock.mockResolvedValue({ contracts: many(200), total: 200, count: 200, duplicates_collapsed: 0, degraded: false, window: WINDOW });
+    const r = await expiringContracts({ naics: '561320', limit: 200 }, noLookup);
+    expect(queryMock).toHaveBeenCalledWith(expect.objectContaining({ limit: 200, offset: 0 }));
+    expect(r._meta.page).toMatchObject({ returned: 200, has_more: false, next_offset: null });
+  });
+
+  it('a degraded query carries no page (unknown is not a last page)', async () => {
+    queryMock.mockResolvedValue({ contracts: [], total: 0, count: null, duplicates_collapsed: 0, degraded: true, window: WINDOW });
+    const r = await expiringContracts({ naics: '561320', offset: 25 }, noLookup);
+    expect(r._meta.page).toBeUndefined();
+  });
+
+  it('offset reaches the query through the registry (hosted MCP and chat)', async () => {
+    await runMcpTool('get_expiring_contracts', { naics: '561320', offset: 50 }, { userEmail: 't@example.com' } as never);
+    expect(queryMock).toHaveBeenCalledWith(expect.objectContaining({ limit: 25, offset: 50 }));
   });
 });

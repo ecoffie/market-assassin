@@ -752,11 +752,12 @@ server.registerTool(
         'Set-aside codes the bidder may compete for — "8(a)", "SDVOSB", "VOSB", "WOSB", "EDWOSB", "HUBZone", "SB-Total", "Indian-SB", "Full & Open". '
         + 'Narrows results to contracts competed under one of these, PLUS any whose set-aside is unknown (unknown is never treated as ineligible). '
         + 'Use it whenever the user says what they are certified as — a small business should not be shown $90M Full & Open work held by a top-10 prime.'),
-      limit: z.number().int().min(1).max(200).optional().describe('Max results (default 25).'),
+      limit: z.number().int().min(1).max(200).optional().describe('Records per page (default 25). Keep the default and page with offset.'),
+      offset: z.number().int().min(0).optional().describe('0-based first record (paging). Pass _meta.page.next_offset from the previous call.'),
     },
   },
-  async ({ naics, agency, state, months_window, months_min, min_value, max_value, likelihood, eligible_set_asides, limit }) => {
-    const result = await expiringContracts({ naics, agency, state, months_window, months_min, min_value, max_value, likelihood, eligible_set_asides, limit });
+  async ({ naics, agency, state, months_window, months_min, min_value, max_value, likelihood, eligible_set_asides, limit, offset }) => {
+    const result = await expiringContracts({ naics, agency, state, months_window, months_min, min_value, max_value, likelihood, eligible_set_asides, limit, offset });
     return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }], structuredContent: result as unknown as Record<string, unknown> };
   },
 );
