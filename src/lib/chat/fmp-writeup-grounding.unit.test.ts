@@ -483,10 +483,10 @@ describe('fmp-writeup-grounding', () => {
       ]);
       expect(evidence.awardRows?.[0]).toMatchObject({ where: 'DC', competition: '8(a) Competed', obligated: '$9.8M' });
       expect(evidence.pathways?.map((p) => p.noticeId)).toContain('693C7326R0001');
-      // 237310 dominant: vehicle + exact-NAICS first; sector-only 236220 without an award-buyer hit drops
+      // 237310 dominant: exact/prefix first; Sources Sought / vehicle in adjacent 23x (Pentagon paving) stays — Claude gold pathway
       expect(evidence.pathways?.[0].title).toMatch(/MATOC/);
-      expect(evidence.pathways?.[1].naics).toBe('237310');
-      expect(evidence.pathways?.some((p) => p.noticeId === 'N4008026S0042')).toBe(false);
+      expect(evidence.pathways?.some((p) => p.naics === '237310')).toBe(true);
+      expect(evidence.pathways?.some((p) => p.noticeId === 'N4008026S0042')).toBe(true);
       expect(evidence.contactRows?.map((c) => c.person)).toEqual(['Helson Roman', 'David Bogner']);
       expect(evidence.buyerSpend?.[0]).toEqual({ agency: 'Federal Highway Administration', dollars: 310_000_000 });
       expect(evidence.competitors?.[0].firm).toBe('Acme Paving');
@@ -662,6 +662,33 @@ describe('fmp-writeup-grounding', () => {
         const ev = run([dredge, jetty, civilA, civilB]);
         expect(ev.pathways?.map((p) => p.noticeId)).toEqual(['PIID-HWY-PAVE', 'PIID-TOE-DRAIN']);
         expect(ev.pathways?.map((p) => p.noticeId)).not.toEqual(expect.arrayContaining(['PIID-DREDGE', 'PIID-JETTY']));
+      });
+
+      it('keeps a Sources Sought / MACC in adjacent 236210 for a 237310 firm (JBAB-class gold pathway)', () => {
+        const jbab = {
+          notice_id: 'jbab0001jbab0001jbab0001jbab0001',
+          solicitation_number: 'FA706027RXXX2',
+          title: 'JBAB and Andrews 8(a) MACC',
+          department: 'DEPT OF THE AIR FORCE',
+          naics_code: '236210',
+          response_deadline: '2026-11-30T21:00:00Z',
+          notice_type: 'Sources Sought',
+          description: 'Competitive 8(a) multiple-award construction contract.',
+        };
+        const capitol = {
+          notice_id: 'cap00001cap00001cap00001cap00001',
+          solicitation_number: 'W912DR27H1CWY',
+          title: 'USACE Baltimore Capitol Perimeter Enhancements',
+          department: 'DEPT OF THE ARMY',
+          naics_code: '236220',
+          response_deadline: '2026-12-04T16:00:00Z',
+          notice_type: 'Sources Sought',
+        };
+        const ev = run([jbab, capitol, civilA, civilB]);
+        expect(ev.pathways?.map((p) => p.noticeId)).toEqual(
+          expect.arrayContaining(['FA706027RXXX2', 'W912DR27H1CWY', 'PIID-HWY-PAVE']),
+        );
+        expect(ev.pathways?.some((p) => /JBAB/i.test(p.title))).toBe(true);
       });
     });
 

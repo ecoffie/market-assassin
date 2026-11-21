@@ -411,6 +411,9 @@ export function extractProfileStates(customerText: string): string[] {
 const BUILDINGS_CONSTRUCTION_QUERY =
   /^(?:8\s*\(\s*a\s*\)\s+)?(?:general\s+)?(?:building\s+)?construction(?:\s+services)?$/i;
 
+/** Buildings / facilities NAICS — never the primary pin for a civil FMP pathway or market-size call. */
+const BUILDINGS_NAICS = new Set(['236220', '236210', '236200', '236']);
+
 /**
  * Civil pathway keywords from self-report / prompt — never bare "construction" (236220 trap).
  */
@@ -440,6 +443,7 @@ export function enforceFederalMarketProfilePathwayArgs(
   toolName: string,
   rawArgs: string,
   customerText: string,
+  opts?: { awardStates?: readonly string[]; awardNaics?: string | null },
 ): { args: string; changes: string[] } {
   if (!isFederalMarketProfileRequest(customerText)) return { args: rawArgs, changes: [] };
   if (!FEDERAL_MARKET_PROFILE_PATHWAY_TOOLS.has(toolName)) return { args: rawArgs, changes: [] };
@@ -449,7 +453,11 @@ export function enforceFederalMarketProfilePathwayArgs(
   if (!a || typeof a !== 'object' || Array.isArray(a)) return { args: rawArgs, changes: [] };
   const changes: string[] = [];
 
-  const states = extractProfileStates(customerText);
+  const textStates = extractProfileStates(customerText);
+  const awardStates = (opts?.awardStates || [])
+    .map((s) => normalizeStateCode(String(s).trim()) || '')
+    .filter(Boolean);
+  const states = textStates.length ? textStates : [...new Set(awardStates)];
   const stateList = states.length ? states.join(',') : '';
   const civilQuery = derivePathwaySearchQuery(customerText);
 
@@ -474,6 +482,22 @@ export function enforceFederalMarketProfilePathwayArgs(
     if (!q || BUILDINGS_CONSTRUCTION_QUERY.test(q)) {
       a.query = civilQuery;
       changes.push('pathway_civil_query_enforced');
+    }
+    // Pin award NAICS into advanced so FIND is not a national open-bid sweep.
+    const naicsRaw = (opts?.awardNaics || '').replace(/\D/g, '').slice(0, 6);
+    const adv = (a.advanced && typeof a.advanced === 'object' && !Array.isArray(a.advanced))
+      ? { ...(a.advanced as Record<string, unknown>) }
+      : {};
+    const curNaics = typeof adv.naics === 'string' ? adv.naics.replace(/\D/g, '').slice(0, 6) : '';
+    if (!curNaics || BUILDINGS_NAICS.has(curNaics) || BUILDINGS_NAICS.has(curNaics.slice(0, 3))) {
+      const pinned = naicsRaw.length >= 3
+        && !BUILDINGS_NAICS.has(naicsRaw)
+        && !BUILDINGS_NAICS.has(naicsRaw.slice(0, 3))
+        ? naicsRaw
+        : '237310';
+      adv.naics = pinned.length === 6 ? pinned : pinned.slice(0, 3);
+      a.advanced = adv;
+      changes.push('pathway_award_naics_enforced');
     }
   }
 
@@ -629,8 +653,6 @@ export function federalMarketProfileVehicleNote(customerText: string): string | 
   ].join('\n');
 }
 
-const BUILDINGS_NAICS = new Set(['236220', '236210', '236200', '236']);
-
 /**
  * Step 5 gate: generate_market_report on FMP must use award NAICS + one state per call.
  * Strips set_aside (known trap that rewrites agency $). Rejects buildings NAICS / bare
@@ -752,6 +774,63 @@ export function buildFmpNextMarketReportArgs(
     args.naics = '237310';
   }
   if (identity.legalName) args.client_name = identity.legalName;
+  return args;
+}
+
+/**
+ * Geography for pathway FIND when the customer typed a short name-only FMP ask
+ * (no "in DC, Maryland and Virginia"). Prefer award-history / profile state fields
+ * already returned this turn — never invent a Mid-Atlantic trio from thin air.
+ */
+export function extractAwardGeographyStates(toolContents: readonly string[]): string[] {
+  const found: string[] = [];
+  const push = (raw: string) => {
+    const code = normalizeStateCode(raw.trim());
+    if (code && !found.includes(code)) found.push(code);
+  };
+  for (const content of toolContents) {
+    if (!content) continue;
+    for (const m of content.matchAll(
+      /"(?:state|pop_state|place_of_performance_state|recipient_state|hq_state|hqState)"\s*:\s*"([A-Za-z .]{2,32})"/g,
+    )) {
+      push(m[1]);
+    }
+    // Compact award-row shape: "where":"VA" / "where":"DC"
+    for (const m of content.matchAll(/"where"\s*:\s*"([A-Z]{2})"/g)) {
+      push(m[1]);
+    }
+  }
+  return found;
+}
+
+/**
+ * Host-built args for FMP `find_opportunities` (pathways phase).
+ * Short "Build a federal market profile for RBA…" has no states in the prompt — without
+ * this pin, force-inject `{}` searches nationally and the write-up collapses to a generic
+ * MATOC frame after the civil pathway filter empties dredging/harbor noise.
+ */
+export function buildFmpPathwayFindArgs(
+  customerText: string,
+  opts?: { awardNaics?: string | null; awardStates?: readonly string[] },
+): Record<string, unknown> {
+  const textStates = extractProfileStates(customerText);
+  const awardStates = (opts?.awardStates || [])
+    .map((s) => normalizeStateCode(String(s).trim()) || '')
+    .filter(Boolean);
+  const states = textStates.length ? textStates : [...new Set(awardStates)];
+  const query = derivePathwaySearchQuery(customerText);
+  const naicsRaw = (opts?.awardNaics || '').replace(/\D/g, '').slice(0, 6);
+  const naics = naicsRaw.length >= 3
+    && !BUILDINGS_NAICS.has(naicsRaw)
+    && !BUILDINGS_NAICS.has(naicsRaw.slice(0, 3))
+    ? naicsRaw
+    : '237310';
+  const args: Record<string, unknown> = {
+    query,
+    limit_per_horizon: 15,
+    advanced: { naics: naics.length === 6 ? naics : naics.slice(0, 3) },
+  };
+  if (states.length) args.location = states.join(',');
   return args;
 }
 

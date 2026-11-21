@@ -75,6 +75,8 @@ import {
   FEDERAL_MARKET_PROFILE_CHAT_CONTRACT,
   restrictWritesWhenDocumentText,
   buildFmpNextMarketReportArgs,
+  buildFmpPathwayFindArgs,
+  extractAwardGeographyStates,
   extractDominantAwardNaics,
 } from '@/lib/chat/tool-selection';
 import {
@@ -1664,6 +1666,9 @@ export async function POST(request: NextRequest) {
                     }
                     return null;
                   })();
+                  const awardStatesFromTools = extractAwardGeographyStates(
+                    fmpLastResults.map((r) => String(r.content || '')),
+                  );
                   const forcedToolInjectArgs = (toolName: string): string => {
                     if (toolName === CREATE_DOCUMENT) {
                       return resolveFmpCreateDocumentToolArgs('{}', customerFmpText);
@@ -1674,6 +1679,12 @@ export async function POST(request: NextRequest) {
                         fmpState.marketReportCount,
                         { awardNaics: awardNaicsFromTools },
                       ));
+                    }
+                    if (toolName === 'find_opportunities') {
+                      return JSON.stringify(buildFmpPathwayFindArgs(customerFmpText, {
+                        awardNaics: awardNaicsFromTools,
+                        awardStates: awardStatesFromTools,
+                      }));
                     }
                     return '{}';
                   };
@@ -1702,7 +1713,10 @@ export async function POST(request: NextRequest) {
                     }
                     const identityArgs = enforceFederalMarketProfileIdentityArgs(toolNm, args, customerFmpText);
                     args = identityArgs.args;
-                    const pathwayArgs = enforceFederalMarketProfilePathwayArgs(toolNm, args, customerFmpText);
+                    const pathwayArgs = enforceFederalMarketProfilePathwayArgs(toolNm, args, customerFmpText, {
+                      awardNaics: awardNaicsFromTools,
+                      awardStates: awardStatesFromTools,
+                    });
                     args = pathwayArgs.args;
                     const vehicleArgs = enforceFederalMarketProfileVehicleArgs(toolNm, args, customerFmpText);
                     args = vehicleArgs.args;
@@ -1717,6 +1731,25 @@ export async function POST(request: NextRequest) {
                         });
                         args = JSON.stringify({ ...parsed, ...next });
                         turnTrace.notices.push(`fmp_market_size_args_pinned:state=${String(next.state || '')}:naics=${String(next.naics || '')}`);
+                      } catch { /* keep enforced args */ }
+                    }
+                    // Pin FIND geography + civil query + award NAICS (short name-only FMP asks have no states).
+                    if (toolNm === 'find_opportunities') {
+                      try {
+                        const parsed = JSON.parse(args || '{}') as Record<string, unknown>;
+                        const next = buildFmpPathwayFindArgs(customerFmpText, {
+                          awardNaics: awardNaicsFromTools,
+                          awardStates: awardStatesFromTools,
+                        });
+                        args = JSON.stringify({ ...parsed, ...next, advanced: {
+                          ...(typeof parsed.advanced === 'object' && parsed.advanced && !Array.isArray(parsed.advanced)
+                            ? parsed.advanced as Record<string, unknown>
+                            : {}),
+                          ...(next.advanced as Record<string, unknown>),
+                        } });
+                        turnTrace.notices.push(
+                          `fmp_pathway_find_args_pinned:location=${String(next.location || '')}:naics=${String((next.advanced as { naics?: string })?.naics || '')}`,
+                        );
                       } catch { /* keep enforced args */ }
                     }
                     const contactsArgs = enforceFederalMarketProfileContactsArgs(toolNm, args, customerFmpText);

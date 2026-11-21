@@ -598,10 +598,15 @@ function extractPathways(
   });
   if (civilDominant) {
     // Sibling 23x NAICS alone is not enough (dredging beat bridges for RBA). Prefer
-    // exact/prefix fit, 5413 inspection lanes, or an award-buyer hit.
+    // exact/prefix fit, 5413 inspection lanes, award-buyer hits, OR vehicle / sources-sought
+    // notices in the construction sector (JBAB 236210 MACC, Capitol Perimeter 236220 SS —
+    // Claude gold pathways that sector-fit alone used to drop).
     const fits = indexed.filter((x) => {
+      const hay = `${x.p.title} ${x.p.noticeType ?? ''}`;
       const inspection = (x.p.naics ?? '').startsWith('5413') && x.fit >= 40;
-      return x.fit >= 80 || x.buyer >= 30 || inspection || (x.fit >= 40 && x.buyer > 0);
+      const vehicleOrSs = VEHICLE_WORD_RE.test(hay) || SOURCES_SOUGHT_RE.test(hay);
+      const adjacentVehicle = vehicleOrSs && x.fit >= 40;
+      return x.fit >= 80 || x.buyer >= 30 || inspection || adjacentVehicle || (x.fit >= 40 && x.buyer > 0);
     });
     // Fewer than two on-market pathways: show none so the vehicle-token frame renders instead of junk.
     return fits.length < 2 ? [] : fits.slice(0, 6).map((x) => x.p);
@@ -1440,8 +1445,10 @@ export function buildFmpHostDocModel(
   // ── 2. Pathways (first body section after the read) ──
   const directBuyers = [...new Set(awardRows.map((r) => r.buyer).filter((b) => b && b !== 'Not stated'))].slice(0, 3);
   const directPathway = directBuyers.length > 0 || buyerSpend.length > 0;
+  const forecastPathways = allPathways.filter((p) => p.kind === 'forecast');
+  const noticePathways = allPathways.filter((p) => p.kind !== 'forecast');
   const noticeCap = directPathway ? 5 : 6;
-  const shown = allPathways.slice(0, noticeCap);
+  const shown = noticePathways.slice(0, noticeCap);
   const totalPathways = shown.length + (directPathway ? 1 : 0);
   const pathwayHeading = shown.length > 0 && totalPathways >= 6
     ? 'Six pathways, in priority order'
@@ -1595,6 +1602,71 @@ export function buildFmpHostDocModel(
           why: c.why ?? 'Peer in the same market report; check for vehicle seats and teaming fit.',
         })),
       }],
+    });
+  }
+
+  // ── Forecast work (Claude gold §7) — only rows the tools returned ──
+  if (forecastPathways.length) {
+    sections.push({
+      id: 'sec-forecasts',
+      heading: 'Forecast work to position for before a notice posts',
+      blocks: [{
+        type: 'table',
+        id: 't-forecasts',
+        caption: 'Agency forecasts returned this turn. Position before a notice posts.',
+        claim: 'fact',
+        cites: SRC,
+        columns: [
+          { key: 'project', label: 'Project' },
+          { key: 'buyer', label: 'Buyer' },
+          { key: 'listed', label: 'Listed as' },
+          { key: 'range', label: 'Range' },
+        ],
+        rows: forecastPathways.slice(0, 8).map((p) => ({
+          project: p.title,
+          buyer: p.buyer ?? 'Not stated',
+          listed: p.when ?? p.noticeType ?? 'Forecast',
+          range: p.summary ?? (p.naics ? `NAICS ${p.naics}` : 'Not stated'),
+        })),
+      }],
+    });
+  }
+
+  // ── Where the money is moving (Claude gold §8) — only when vehicle evidence exists ──
+  if (evidence.vehicleTokens.length || shown.some((p) => VEHICLE_WORD_RE.test(`${p.title} ${p.noticeType ?? ''}`))) {
+    const firmLabel = firm;
+    sections.push({
+      id: 'sec-shifts',
+      heading: 'Where the money is moving',
+      blocks: [
+        para(
+          'p-shifts-intro',
+          `Three shifts that change how ${firmLabel} gets on contract — grounded in the vehicle and pathway evidence this turn.`,
+          'recommendation',
+        ),
+        {
+          type: 'bullets',
+          id: 'b-shifts',
+          ordered: false,
+          items: [
+            {
+              text: `**From single projects to regional MATOCs.** Vehicle signals in this turn (${listText(evidence.vehicleTokens.map((t) => fullVehicleToken(t, allPathways)).slice(0, 4)) || 'multiple-award vehicles'}) mean seats and task-order pools matter more than one-off bids.`,
+              claim: 'recommendation' as const,
+              cites: SRC,
+            },
+            {
+              text: `**From base offices to highway engineers.** Award buyers in this profile${directBuyers.length ? ` (${listText(directBuyers)})` : ''} are the offices that already know the firm's work — keep them on the vehicle and sources-sought list.`,
+              claim: 'recommendation' as const,
+              cites: SRC,
+            },
+            {
+              text: '**From bid-build to design-build.** When a pathway asks for design capability, name the design partner before the response is due — do not invent a partner that was not self-reported.',
+              claim: 'recommendation' as const,
+              cites: SRC,
+            },
+          ],
+        },
+      ],
     });
   }
 

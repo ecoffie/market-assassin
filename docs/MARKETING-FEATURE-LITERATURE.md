@@ -1,3 +1,12 @@
+### Ask FMP closer to Claude gold (FIND pin + gold sections) — 2026-11-20
+
+**What shipped.** Short name-only FMP asks now pin `find_opportunities` to award geography + civil query + award NAICS (no empty `{}` national sweep). Pathway filter keeps Sources Sought / MACC in adjacent 23x (JBAB / Capitol / Pentagon paving class). Host DocModel adds Forecast work + Where the money is moving when evidence supports.
+
+**Why it matters.** Map report placement was right; content still lagged Claude (generic MATOC frame, missing forecast/shifts, wrong geography on a one-line ask).
+
+**Proof.** Units: `fmp-writeup-grounding` + `current-find` FMP pathway pins + JBAB/Capitol keep. Live after deploy: name-only RBA Ask → pathways not generic-only; report includes forecast/shifts when tools return them.
+
+
 ### Map Ask Mindy blank start (same rule as /app chat) — 2026-11-20
 
 **What shipped.** Opportunity Map Ask drawer opens blank (no starter chips). Follow-up chips only after a report/files outcome or a finished answer. Attach line says “Saved privately” (not “to your Vault”).
