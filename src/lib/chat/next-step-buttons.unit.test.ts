@@ -9,15 +9,15 @@ vi.mock('@/lib/llm/call-llm', () => ({
 }));
 import { generateFollowups } from './followup-suggestions';
 
-// A rules-layer-shaped answer (spec section 8 format), with real-looking items to ground buttons on.
+// A rules-layer-shaped answer (spec section 8 format). All names are synthetic (illustrative), not client data.
 const ANSWER = `Two Tennessee staffing contracts come back in the next year, and the Army small business day on December 9 is your shortest route in.
 
-TOP PICKS (ranked by fit for Superb Staffing Solutions)
-1. Administrative Clerk Support, Fort Campbell, $2.1M, ends Feb. 28, 2027, likely recompete
+TOP PICKS (ranked by fit for Example Staffing Co)
+1. Administrative Clerk Support, Fort Example, $2.1M, ends Feb. 28, 2027, likely recompete
    Why it fits: Matches your clerk staffing work; set aside for small business.
    Pathway: small business set-aside.
-2. Laboratory Staffing Services, Memphis VA Medical Center, 36C24927Q0113, forecast, solicitation expected Q2 2027
-   Why it fits: Same buyer type as your past VA work; in Memphis.
+2. Laboratory Staffing Services, Example VA Medical Center, 36C24927Q0113, forecast, solicitation expected Q2 2027
+   Why it fits: Same buyer type as your past VA work; in the same state.
    Pathway: GSA Schedule.
 
 WHO TO CONTACT
@@ -52,10 +52,10 @@ describe('isGroundedNextStep: the spec examples', () => {
   });
 
   it('never sends the user to another website or asks chat to save or track', () => {
-    expect(isGroundedNextStep('Check SAM.gov for the Fort Campbell notice', ANSWER)).toBe(false);
-    expect(isGroundedNextStep('Visit the Memphis VA website', ANSWER)).toBe(false);
+    expect(isGroundedNextStep('Check SAM.gov for the Fort Example notice', ANSWER)).toBe(false);
+    expect(isGroundedNextStep('Visit the Example VA website', ANSWER)).toBe(false);
     expect(isGroundedNextStep('Save Laboratory Staffing Services to my pipeline', ANSWER)).toBe(false);
-    expect(isGroundedNextStep('Track the Fort Campbell recompete', ANSWER)).toBe(false);
+    expect(isGroundedNextStep('Track the Fort Example recompete', ANSWER)).toBe(false);
   });
 
   it('a name the answer does not contain does not ground a button', () => {
