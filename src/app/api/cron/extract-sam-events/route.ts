@@ -22,7 +22,7 @@ import { readNoticeEvent } from '@/lib/events/event-currency';
 import { loadActiveCandidates, loadFamilyPool, loadListedRows, loadNoticesById, type ListedEventRow } from '@/lib/events/event-currency-live';
 import { buildCandidateSet, familiesToLoad, planEvents, planRetirements, pruneMode } from '@/lib/events/extract-run';
 import { reportCronOutcome } from '@/lib/cron-self-report';
-import { capNewEvents, NEW_SAM_EVENTS_PER_RUN } from '@/lib/events/capture-plan';
+import { capNewEvents, EXPIRE_PER_RUN, NEW_SAM_EVENTS_PER_RUN } from '@/lib/events/capture-plan';
 import { extractCapturedLinks, linkColumns, samNoticeSourceUrl } from '@/lib/events/event-links';
 import { collectSbaEvents } from '@/lib/events/sba-calendar';
 
@@ -340,6 +340,34 @@ export async function GET(request: NextRequest) {
   }
   if (Date.now() > deadline) truncated = true;
 
+  // Past events stay in the table. This writes expired_at only. SAM_EVENTS_PRUNE is not involved.
+  // The column is added by 20261118_sam_events_expired_at.sql, which is not applied until Eric approves it.
+  // If the column is missing, record the error and continue. Do not fail the SAM extract.
+  const todayStr = today.toISOString().slice(0, 10);
+  let expireWouldMark = 0;
+  let expireMarked: number | null = dryRun ? null : 0;
+  let expireError: string | null = null;
+  try {
+    const { data: past, error: pastErr } = await getSupabase()
+      .from('sam_events')
+      .select('id, event_date')
+      .lt('event_date', todayStr)
+      .is('expired_at', null)
+      .order('event_date', { ascending: true })
+      .limit(EXPIRE_PER_RUN);
+    if (pastErr) throw new Error(pastErr.message);
+    const ids = (past || []).map((r: { id?: string }) => r.id).filter((id: string | undefined): id is string => Boolean(id));
+    expireWouldMark = ids.length;
+    if (!dryRun && ids.length) {
+      const { error: markErr } = await getSupabase().from('sam_events').update({ expired_at: runAt }).in('id', ids);
+      if (markErr) throw new Error(markErr.message);
+      expireMarked = ids.length;
+    }
+  } catch (e) {
+    expireError = e instanceof Error ? e.message : String(e);
+    expireMarked = null;
+  }
+
   // Destination watermark AFTER the run.
   const { data: afterRow } = await getSupabase()
     .from('sam_events')
@@ -436,6 +464,7 @@ export async function GET(request: NextRequest) {
         deferred: calendar.deferred,
         error: calendar.error,
       },
+      expire: { wouldMark: expireWouldMark, marked: expireMarked, error: expireError, cap: EXPIRE_PER_RUN },
     },
     eventsByType,
     sampleEvents: events.slice(0, 5).map((e) => ({

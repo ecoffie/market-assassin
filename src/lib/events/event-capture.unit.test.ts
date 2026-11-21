@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { classifyEvent, extractEventDate } from './classify';
-import { capNewEvents, NEW_CALENDAR_EVENTS_PER_RUN, NEW_SAM_EVENTS_PER_RUN } from './capture-plan';
+import { capNewEvents, expireIds, NEW_CALENDAR_EVENTS_PER_RUN, NEW_SAM_EVENTS_PER_RUN } from './capture-plan';
 import { extractCapturedLinks, linkColumns, samNoticeSourceUrl } from './event-links';
 import { collectSbaEvents, parseSbaDetail, parseSbaListing, sbaEventFromParts, sbaNoticeId } from './sba-calendar';
 
@@ -75,6 +75,15 @@ describe('insert cap', () => {
     expect(capNewEvents(events, null, 1).writes).toEqual(events);
   });
 
+  it('past dates are selected for an expired_at mark and nothing is deleted', () => {
+    const ids = expireIds([
+      { id: 'past', event_date: '2026-11-01' },
+      { id: 'today', event_date: '2026-11-18' },
+      { id: 'future', event_date: '2026-12-01' },
+      { id: 'undated', event_date: null },
+    ], '2026-11-18');
+    expect(ids).toEqual(['past']);
+  });
 });
 
 describe('SBA calendar parser', () => {
