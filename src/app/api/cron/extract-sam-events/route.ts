@@ -22,6 +22,9 @@ import { readNoticeEvent } from '@/lib/events/event-currency';
 import { loadActiveCandidates, loadFamilyPool, loadListedRows, loadNoticesById, type ListedEventRow } from '@/lib/events/event-currency-live';
 import { buildCandidateSet, familiesToLoad, planEvents, planRetirements, pruneMode } from '@/lib/events/extract-run';
 import { reportCronOutcome } from '@/lib/cron-self-report';
+import { capNewEvents, NEW_SAM_EVENTS_PER_RUN } from '@/lib/events/capture-plan';
+import { extractCapturedLinks, linkColumns, samNoticeSourceUrl } from '@/lib/events/event-links';
+import { collectSbaEvents } from '@/lib/events/sba-calendar';
 
 export const maxDuration = 300;
 
@@ -143,8 +146,11 @@ export async function GET(request: NextRequest) {
     event_date: string | null;
     event_location: string | null;
     description: string | null;
+    registration_url: string | null;
+    contact_info: string | null;
     source_notice_type: string;
     solicitation_number: string | null;
+    source?: string;
     inferred_dodaac: string | null;
     inferred_office: string | null;
     inferred_subagency: string | null;
@@ -171,7 +177,9 @@ export async function GET(request: NextRequest) {
   for (const { notice, event } of planned) {
     if (event.adoptedFrom) adopted++;
     const fullText = `${notice.title} ${notice.description || ''}`;
-    const location = extractLocation(fullText);
+    const captured = extractCapturedLinks(fullText, samNoticeSourceUrl(notice.notice_id, notice.ui_link));
+    const links = linkColumns(captured);
+    const location = extractLocation(fullText) || captured.location;
     // Resolve the buying office: DoD via the solicitation-number DoDAAC, civilian
     // via SAM's own office/sub_tier columns — so events scope to the real command
     // (GSA/VA/HHS included), not just "DEPT OF DEFENSE" (cached lookup).
@@ -184,8 +192,10 @@ export async function GET(request: NextRequest) {
       agency: notice.department,
       event_date: event.date,
       event_location: location,
-      description: notice.description?.substring(0, 2000) || null,
-      source_notice_type: notice.notice_type,
+    description: notice.description?.substring(0, 2000) || null,
+    registration_url: links.registration_url,
+    contact_info: links.contact_info,
+    source_notice_type: notice.notice_type,
       solicitation_number: notice.solicitation_number || null,
       inferred_dodaac: office.dodaac,
       inferred_office: office.office,
@@ -195,17 +205,61 @@ export async function GET(request: NextRequest) {
     });
   }
 
+  // Official calendar (SBA). A failure here must not fail the SAM extract. No SAM.gov API call.
+  // Already-stored sba: ids are skipped so a later page of new events can use the cap.
+  let knownCalendar = new Set<string>();
+  try {
+    for (let from = 0; ; from += 1000) {
+      const { data, error } = await getSupabase()
+        .from('sam_events')
+        .select('notice_id')
+        .like('notice_id', 'sba:%')
+        .range(from, from + 999);
+      if (error) throw new Error(error.message);
+      for (const row of data || []) knownCalendar.add(String(row.notice_id));
+      if (!data || data.length < 1000) break;
+    }
+  } catch {
+    knownCalendar = new Set();
+  }
+  const calendar = await collectSbaEvents({ today, runAt, existingIds: knownCalendar }).catch((e: unknown) => ({
+    status: 'unavailable' as const,
+    events: [],
+    relevant: null,
+    deferred: null,
+    error: e instanceof Error ? e.message : String(e),
+  }));
+
+  // Cap NEW SAM notice ids. Already-stored rows stay in the write so a date correction still lands.
+  // If we cannot read which ids exist, write the SAM set uncapped rather than drop corrections.
+  let existingIds: Set<string> | null = new Set();
+  try {
+    const samIds = events.map((e) => e.notice_id);
+    for (let i = 0; i < samIds.length; i += 150) {
+      const chunk = samIds.slice(i, i + 150);
+      if (!chunk.length) continue;
+      // truncation-ok: the IN list is at most 150 ids, so the response cannot reach PostgREST's 1,000-row cap
+      const { data, error } = await getSupabase().from('sam_events').select('notice_id').in('notice_id', chunk).limit(150);
+      if (error) throw new Error(error.message);
+      for (const row of data || []) existingIds!.add(String(row.notice_id));
+    }
+  } catch {
+    existingIds = null;
+  }
+  const samCap = capNewEvents(events, existingIds, NEW_SAM_EVENTS_PER_RUN);
+  const writes = [...samCap.writes, ...calendar.events];
+
   // Upsert events in chunks — one statement for thousands of rows is what times out the SAM
-  // full sync (audit 2026-11-09 §2.4).
+  // full sync (audit 2026-11-09 §2.4). Inserts of notice ids we do not already store are capped.
   let upsertedCount = 0;
-  if (!dryRun && events.length > 0) {
-    for (let i = 0; i < events.length; i += UPSERT_CHUNK) {
+  if (!dryRun && writes.length > 0) {
+    for (let i = 0; i < writes.length; i += UPSERT_CHUNK) {
       const { data: upsertData, error: upsertError } = await getSupabase()
         .from('sam_events')
         // The count is only corroborating evidence — the advancement classifier checks it
         // against the destination watermark, so a capped payload cannot fake advancement.
         // truncation-ok: upsert RECEIPT per chunk of UPSERT_CHUNK (500) rows, always < 1,000.
-        .upsert(events.slice(i, i + UPSERT_CHUNK), { onConflict: 'notice_id', ignoreDuplicates: false })
+        .upsert(writes.slice(i, i + UPSERT_CHUNK), { onConflict: 'notice_id', ignoreDuplicates: false })
         .select('id');
 
       if (upsertError) {
@@ -356,6 +410,8 @@ export async function GET(request: NextRequest) {
       evaluatedWithoutDescription,
       eventsFound: events.length,
       eventsUpserted: upsertedCount,
+      samNewInserts: existingIds ? samCap.fresh : null,
+      samDeferred: existingIds ? samCap.deferred : null,
       durationSeconds: duration,
     },
     prune: {
@@ -366,6 +422,20 @@ export async function GET(request: NextRequest) {
       recorded: pruneReportRecorded,
       recordError: pruneReportError,
       proposals: retirement.proposals,
+    },
+    capture: {
+      samNewCap: NEW_SAM_EVENTS_PER_RUN,
+      samNew: existingIds ? samCap.fresh : null,
+      samDeferred: existingIds ? samCap.deferred : null,
+      // A failed SBA read is unavailable or degraded with a null count. It is not zero,
+      // and it does not change the SAM extract's HTTP status.
+      calendar: {
+        status: calendar.status,
+        relevant: calendar.relevant,
+        wouldAdd: calendar.status === 'ok' ? calendar.events.length : null,
+        deferred: calendar.deferred,
+        error: calendar.error,
+      },
     },
     eventsByType,
     sampleEvents: events.slice(0, 5).map((e) => ({

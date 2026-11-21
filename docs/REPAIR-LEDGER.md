@@ -106,6 +106,12 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 |---|---|---|---|---|---|
 | 2026-11-18 | Cron observability | extract-sam-events and refresh-contracts wrote run detail to `cron_logs`, which has 0 production rows and is not what the admin cron page or the watchdog read. The prune proposal and the refresh outcome now go to `cron_job_runs` via a direct insert and `reportCronOutcome`. Prune stays report-only unless `SAM_EVENTS_PRUNE=apply`. A failed prune-report insert still returns 500. | `from('cron_job_runs').insert` → `src/app/api/cron/extract-sam-events/route.ts` · `mode=preview; contract file not written` → `src/app/api/cron/refresh-contracts/route.ts` | extract-sam-events route test (report-only, apply, failed insert) + refresh-contracts source test. `SAM_EVENTS_PRUNE` left unset. | DRAFT PR |
 
+## 2026-11-18 — Government contracting events
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-11-18 | Industry days and SBA events | `extract-sam-events` already reads Special Notices, Presolicitations, and Sources Sought from `sam_opportunities` (no live SAM call). It now also keeps a register link, a virtual-meeting link, and the official notice URL, and it treats a dated sources-sought briefing, pre-solicitation conference, or matchmaking/outreach line as an attendable event. New notice ids are capped (25 SAM, 15 SBA) per run; already-stored rows still update. The same run reads the public SBA events HTML (legacy.sba.gov, no key). A fetch or parse failure is `unavailable` or `degraded` with a null count, not zero, and does not fail the SAM extract. Upserts use existing columns only. `SAM_EVENTS_PRUNE` is unchanged. | `export async function collectSbaEvents` → `src/lib/events/sba-calendar.ts` · `NEW_SAM_EVENTS_PER_RUN` → `src/lib/events/capture-plan.ts` | `event-capture.unit.test.ts`, `extract-sam-events/route.unit.test.ts`. Live SBA dry run writes nothing. | BUILT, NOT MERGED |
+
 ## 2026-11-18 — Collection freshness clocks (DIBBS and grants)
 
 | Date | Area | Fix | Proof anchor | Verified | Status |

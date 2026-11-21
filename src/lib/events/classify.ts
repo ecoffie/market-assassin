@@ -36,9 +36,34 @@ const ATTENDABLE_PHRASES: Record<'industry_day' | 'webinar', string[]> = {
     'small business event',
     'small business forum',
     'matchmaking',
+    'match making',
+    'sources sought briefing',
+    'source sought briefing',
+    'industry briefing',
+    'pre-solicitation briefing',
+    'presolicitation briefing',
+    'capability briefing',
+    'vendor briefing',
+    'outreach session',
+    'small business outreach',
+    'vendor outreach session',
   ],
-  webinar: ['webinar', 'virtual event', 'online session', 'video conference', 'zoom meeting'],
+  webinar: ['webinar', 'virtual event', 'online session', 'video conference', 'zoom meeting', 'virtual briefing'],
 };
+
+/**
+ * Body-only cues. A bare "briefing" in a title is often a slide attachment, so it
+ * counts only when a future date sits next to it in the notice text.
+ */
+const BODY_ONLY_PHRASES: Record<'industry_day' | 'webinar', string[]> = {
+  industry_day: ['briefing'],
+  webinar: [],
+};
+
+function phrasesFor(type: 'industry_day' | 'webinar', includeBody: boolean): string[] {
+  const base = ATTENDABLE_PHRASES[type];
+  return includeBody ? [...base, ...BODY_ONLY_PHRASES[type]] : base;
+}
 
 // Whole words: "rfi" as a substring matched "waRFIghter" and typed food-service notices as RFIs.
 const RFI = /\b(requests? for information|rfis?|sources sought|market survey)\b/i;
@@ -200,8 +225,8 @@ export function classifyEvent(title: string, description: string | null, today: 
     if (phrases.some((p) => t.includes(p))) return { type, evidence: 'title' };
   }
   const body = description || '';
-  for (const [type, phrases] of Object.entries(ATTENDABLE_PHRASES)) {
-    if (nearestDate(body, phrases, today)) return { type, evidence: 'description_dated' };
+  for (const type of ['industry_day', 'webinar'] as const) {
+    if (nearestDate(body, phrasesFor(type, true), today)) return { type, evidence: 'description_dated' };
   }
   const text = `${title} ${body}`;
   if (RFI.test(text)) return { type: 'rfi', evidence: 'keyword' };
@@ -225,7 +250,7 @@ export function extractEventDate(
   if (classification.type === 'rfi' || classification.type === 'forecast') {
     return responseDeadline?.split('T')[0] || null;
   }
-  const phrases = ATTENDABLE_PHRASES[classification.type as keyof typeof ATTENDABLE_PHRASES] || [];
+  const phrases = phrasesFor(classification.type as 'industry_day' | 'webinar', true);
   // Title first, so a title-evidenced event can take a date from the opening of the body.
   return nearestDate(`${title}\n${description || ''}`, phrases, today);
 }

@@ -16,9 +16,10 @@ const db: {
   cron_job_runs: Row[];
   upserts: Row[][];
   deletes: string[][];
+  updates: string[][];
   cronLogInsertError: string | null;
 } = {
-  sam_opportunities: [], sam_events: [], cron_logs: [], cron_job_runs: [], upserts: [], deletes: [],
+  sam_opportunities: [], sam_events: [], cron_logs: [], cron_job_runs: [], upserts: [], deletes: [], updates: [],
   cronLogInsertError: null,
 };
 type Table = 'sam_opportunities' | 'sam_events' | 'cron_logs' | 'cron_job_runs';
@@ -35,6 +36,14 @@ function query(table: Table) {
     select: () => b,
     in: (col: string, vals: unknown[]) => { filters.push((r) => vals.includes(r[col])); return b; },
     eq: (col: string, v: unknown) => { filters.push((r) => r[col] === v); return b; },
+    lt: (col: string, v: unknown) => { filters.push((r) => r[col] != null && String(r[col]) < String(v)); return b; },
+    is: (col: string, v: unknown) => { filters.push((r) => (v === null ? r[col] == null : r[col] === v)); return b; },
+    like: (col: string, pattern: string) => {
+      const prefix = pattern.replace(/%/g, '');
+      filters.push((r) => String(r[col] ?? '').startsWith(prefix));
+      return b;
+    },
+    update: (row: Row) => { op = 'update'; payload = [row]; return b; },
     not: (col: string, o: string, v: string) => {
       const ids = v.replace(/[()]/g, '').split(',');
       filters.push((r) => !ids.includes(String(r[col])));
@@ -73,6 +82,13 @@ function query(table: Table) {
         return resolve({ data: payload.map((_, i) => ({ id: i })), error: null });
       }
       let rows = db[table].filter((r) => filters.every((f) => f(r)));
+      if (op === 'update') {
+        let updated = db[table].filter((r) => filters.every((f) => f(r)));
+        updated = updated.slice(lo, hi === Infinity ? undefined : hi + 1);
+        for (const r of updated) Object.assign(r, payload[0]);
+        db.updates.push(updated.map((r) => String(r.id ?? r.notice_id)));
+        return resolve({ data: updated, error: null, count: updated.length });
+      }
       if (op === 'delete') {
         db.deletes.push(rows.map((r) => String(r.notice_id)));
         db.sam_events = db.sam_events.filter((r) => !rows.includes(r));
@@ -121,11 +137,12 @@ beforeEach(() => {
   process.env.NEXT_PUBLIC_SUPABASE_URL = 'http://fake';
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'fake';
   vi.useFakeTimers({ toFake: ['Date'] });
-  db.sam_opportunities = []; db.sam_events = []; db.cron_logs = []; db.cron_job_runs = []; db.upserts = []; db.deletes = [];
+  db.sam_opportunities = []; db.sam_events = []; db.cron_logs = []; db.cron_job_runs = []; db.upserts = []; db.deletes = []; db.updates = [];
   db.cronLogInsertError = null;
   delete process.env.SAM_EVENTS_PRUNE;
+  vi.stubGlobal('fetch', vi.fn(async () => new Response('no calendar', { status: 503 })));
 });
-afterEach(() => { vi.useRealTimers(); delete process.env.SAM_EVENTS_PRUNE; });
+afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); delete process.env.SAM_EVENTS_PRUNE; });
 
 describe('extract-sam-events route', () => {
   it('T2: a 30-day-old notice behind an upcoming event is re-read past 600 newer notices and corrected', async () => {
@@ -205,6 +222,18 @@ describe('extract-sam-events route', () => {
     expect(db.sam_events.some((r) => r.notice_id === 'ai-1')).toBe(true);
     expect(db.cron_job_runs[0]).toMatchObject({ status: 'applied' });
     expect(db.cron_logs).toHaveLength(0);
+  });
+
+  it('an SBA fetch failure is unavailable, not zero, and the SAM extract still returns 200', async () => {
+    vi.setSystemTime(new Date('2026-11-09T07:00:00Z'));
+    db.sam_opportunities = [opp(TSA_AMD1)];
+    const { status, body } = await run();
+    expect(status).toBe(200);
+    const calendar = (body as unknown as { capture: { calendar: { status: string; wouldAdd: number | null; relevant: number | null } } }).capture.calendar;
+    expect(calendar.status).toBe('unavailable');
+    expect(calendar.wouldAdd).toBeNull();
+    expect(calendar.relevant).toBeNull();
+    expect(written(TSA_AMD1.notice_id).length).toBe(1);
   });
 
   it('fails the job (500) when the durable prune report cannot be recorded', async () => {
