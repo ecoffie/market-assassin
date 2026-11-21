@@ -11,7 +11,7 @@ import { createClient } from '@supabase/supabase-js';
 import PublicShell from '@/components/public-site/PublicShell';
 import { JOB_ROLES } from '@/lib/jobs/categories';
 import { readJobBoard, type JobBoardData, type JobBoardFilters } from '@/lib/jobs/read';
-import { readJobBoardFromUsaJobs } from '@/lib/jobs/usajobs-direct';
+import { customerJobBoardChoice, readJobBoardFromUsaJobs } from '@/lib/jobs/usajobs-direct';
 import { readJobBoardFromFunnels } from '@/lib/jobs/funnels-feed';
 import { normalizeStateCode } from '@/lib/utils/us-states';
 import JobsBoard from './JobsBoard';
@@ -66,12 +66,12 @@ export default async function JobsPage({ searchParams }: { searchParams: SP }) {
   // read is the customer path until the mirror has a positive count.
   const mirrorServing = stored.state === 'ok' && stored.totals.active != null && stored.totals.active > 0;
   const direct = mirrorServing ? null : await readJobBoardFromUsaJobs(filters);
-  const data =
-    mirrorServing
-      ? stored
-      : direct?.state === 'ok'
-        ? direct
-        : await readJobBoardFromFunnels(filters);
+  const choice = customerJobBoardChoice(mirrorServing, direct);
+  const data = choice === 'mirror'
+    ? stored
+    : choice === 'direct'
+      ? direct!
+      : await readJobBoardFromFunnels(filters);
 
   return (
     <PublicShell contentElement="div">

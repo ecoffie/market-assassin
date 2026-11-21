@@ -26,6 +26,12 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## 2026-11-21 — USAJobs empty is not the funnels board
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-11-21 | Data Core / job postings | A confirmed empty USAJobs read stays on USAJobs with a real zero. An API error stays unavailable. Only a missing key falls through to the funnels feed. A missing posted date is not stamped 1970. | `customerJobBoardChoice` → `src/lib/jobs/usajobs-direct.ts` | `usajobs-direct.unit.test.ts` | BUILT, NOT MERGED |
+
 ## 2026-11-20 — Scorecard second slot confirms before it publishes
 
 | Date | Area | Fix | Proof anchor | Verified | Status |
