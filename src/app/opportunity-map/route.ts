@@ -1348,6 +1348,10 @@ const ZLAYOUT_CSS = '<style>'
   +   'body.m-list .mapwrap{visibility:hidden!important;pointer-events:none!important}'
   // Map controls (zoom, legend, attribution) sit above the bottom bar.
   +   '.mapwrap .leaflet-bottom{bottom:86px!important}'
+  // The tile-status notice ("Map tiles blocked by your network…", template.html) is not a Leaflet
+  // control, so the rule above never lifted it: at its 44px it sat under this bar and the attribution
+  // (iPhone SE: 0 of 3 rows visible; iPhone 13 / Pixel 7: 1 of 3). Lift it over both.
+  +   '.mapwrap .tilestatus{bottom:118px!important}'
   // The map's count pill is mirrored into the bottom bar (#mToggleCount, same words, including
   // "N not shown on map"), so it is hidden here rather than shown twice.
   +   '#mapCount{display:none!important}'
