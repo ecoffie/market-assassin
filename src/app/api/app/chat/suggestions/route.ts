@@ -19,6 +19,7 @@ import { loadBidderProfile } from '@/lib/proposal/loaders';
 import type { BidderProfile } from '@/lib/proposal/types';
 import { buildStarterPrompts, DEFAULT_STARTER_PROMPTS } from '@/lib/chat/starter-prompts';
 import { generateFollowups } from '@/lib/chat/followup-suggestions';
+import { askMindyRulesEnabledFor } from '@/lib/chat/ask-mindy-rules';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -93,6 +94,6 @@ export async function POST(request: NextRequest) {
   const answer = (body.answer || '').trim();
   if (!message || !answer) return NextResponse.json({ suggestions: [] });
 
-  const suggestions = await generateFollowups(message, answer, { userEmail: auth.email });
+  const suggestions = await generateFollowups(message, answer, { userEmail: auth.email, rulesLayer: askMindyRulesEnabledFor(auth.email) });
   return NextResponse.json({ suggestions });
 }
