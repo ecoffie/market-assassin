@@ -14,13 +14,16 @@
 import { interpretCapabilityNaics } from '@/lib/market/capability-naics';
 import { impliedStates } from '@/lib/chat/stated-filters';
 import { normalizeStateCode, US_STATE_NAMES } from '@/lib/utils/us-states';
+import { namedRegionsIn, resolveRegionStates, type NamedRegion } from '@/lib/geo/named-regions';
 import { federalToday } from '@/lib/dates/federal-day';
 
 export interface CompiledIntent {
   requestTime: string;
   federalDate: string;
-  /** States the customer named (name or capitalized code) in their own words. */
+  /** States the customer named (name or capitalized code) in their own words, including named regions. */
   explicitStates: string[];
+  /** Named regions the customer used ("New England"), each resolved to its states (src/lib/geo/named-regions.ts). */
+  namedRegions: NamedRegion[];
   /** States the map view supplied (the Opportunity Map "ask about this view" preamble), not the customer's words. */
   viewStates: string[];
   /** Where viewStates came from: the map's state filter, or the states of the pins in view. */
@@ -104,7 +107,10 @@ function viewStatesIn(view: string | null): { states: string[]; source: 'map_fil
 export function compileIntent(text: string, now: Date = new Date(), customerText: string = text): CompiledIntent {
   const src = String(text || '');
   const { view, rest } = splitViewPreamble(src);
-  const explicit = explicitStatesIn(rest);
+  // A named region ("in New England") is the customer naming those states (Agent 4 S3: it was ignored and
+  // FIND searched nationwide).
+  const regions = namedRegionsIn(rest);
+  const explicit = Array.from(new Set([...explicitStatesIn(rest), ...regions.flatMap((r) => r.states)]));
   const fromView = viewStatesIn(view);
   const implied = [...impliedStates(src)].filter((s) => !explicit.includes(s));
   const offices = Array.from(new Set([...src.matchAll(OFFICE_RE)].map((m) => m[1].replace(/\s+/g, ' ').trim())));
@@ -126,6 +132,7 @@ export function compileIntent(text: string, now: Date = new Date(), customerText
     requestTime: now.toISOString(),
     federalDate: federalToday(now),
     explicitStates: explicit,
+    namedRegions: regions,
     viewStates: explicit.length ? [] : fromView.states,
     viewStateSource: explicit.length ? null : fromView.source,
     impliedStates: implied,
@@ -156,6 +163,30 @@ export function isMapScopeNote(note: string): boolean {
   return /^scoped to (the states on your map|your map's state filter):/.test(note) || / from your map's industry filter$/.test(note);
 }
 
+/** "New England (CT, ME, MA, NH, RI, VT) from your request" when a region was named; else the state list. */
+function requestStatesNote(intent: CompiledIntent, states: string[]): string {
+  const regions = intent.namedRegions ?? [];
+  if (!regions.length) return `states ${states.join(', ')} from your request`;
+  const fromRegions = new Set(regions.flatMap((r) => r.states));
+  const others = states.filter((s) => !fromRegions.has(s));
+  return `${regions.map((r) => `${r.name} (${r.states.join(', ')})`).join(' and ')}${others.length ? ` plus ${others.join(', ')}` : ''} from your request`;
+}
+
+/**
+ * FIND takes `location` + `states` (a list). The states the CUSTOMER named, including a named region, are
+ * added to `states` when FIND would not otherwise search them. Map-view states are not applied here (FIND's
+ * map behavior is unchanged); only the customer's own words.
+ */
+function applyFindStates(a: Record<string, unknown>, intent: CompiledIntent, applied: string[]): void {
+  if (!intent.explicitStates.length) return;
+  const have = resolveRegionStates([String(a.location ?? ''), ...listOf(a.states)]);
+  const missing = intent.explicitStates.filter((s) => !have.includes(s));
+  if (!missing.length) return;
+  const existing = listOf(a.states).map((x) => normalizeStateCode(x)).filter((x): x is string => !!x);
+  a.states = Array.from(new Set([...existing, ...intent.explicitStates]));
+  applied.push(requestStatesNote(intent, intent.explicitStates));
+}
+
 function applyStates(a: Record<string, unknown>, intent: CompiledIntent, applied: string[]): void {
   const fromRequest = intent.explicitStates.length > 0;
   const states = fromRequest ? intent.explicitStates : intent.viewStates;
@@ -165,7 +196,7 @@ function applyStates(a: Record<string, unknown>, intent: CompiledIntent, applied
   if (!missing.length) return;
   a.state = Array.from(new Set([...have, ...states])).join(',');
   applied.push(fromRequest
-    ? `states ${states.join(', ')} from your request`
+    ? requestStatesNote(intent, states)
     : intent.viewStateSource === 'map_filter'
       ? `scoped to your map's state filter: ${states.join(', ')}`
       : `scoped to the states on your map: ${states.join(', ')}`);
@@ -242,6 +273,7 @@ export function enforceIntent(toolName: string, rawArgs: string, intent: Compile
   }
 
   if (toolName === 'search_sam_opportunities') applyStates(a, intent, applied);
+  if (toolName === 'find_opportunities') applyFindStates(a, intent, applied);
 
   // A city or metro the customer named, searched through its state on a tool with no city filter:
   // say the search covers the whole state (acc4 R5: "Millington" shown only as "place of performance TN").

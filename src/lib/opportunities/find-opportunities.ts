@@ -70,6 +70,7 @@ import {
 } from '@/lib/opportunities/match-evidence';
 // IMI Workstream C (2026-09-22): region (multi-state) + acquisition-stage intent.
 import { normalizeStateCode } from '@/lib/utils/us-states';
+import { regionForToken } from '@/lib/geo/named-regions';
 import { competitionFactsFor, competitionCounts, orderCompetedFirst, usaspendingCompetitionLookup, type CompetitionLookup, type CompetitionClass, type CompetitionFacts } from './competition-facts';
 import {
   parseStageGroup,
@@ -544,7 +545,10 @@ export function resolveRegion(input: Pick<FindOpportunitiesInput, 'location' | '
   const unresolved: string[] = [];
   for (const t of tokens) {
     const code = normalizeStateCode(t);
+    // A named region ("New England") is its states (src/lib/geo/named-regions.ts), never "not a US state".
+    const region = code ? null : regionForToken(t);
     if (code) { if (!states.includes(code)) states.push(code); }
+    else if (region) { for (const st of region.states) if (!states.includes(st)) states.push(st); }
     else if (!unresolved.includes(t)) unresolved.push(t);
   }
   return { requested: tokens, states, unresolved };
