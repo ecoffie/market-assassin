@@ -26,8 +26,13 @@ import { annotateRecompeteRow } from '@/lib/recompete/annotate';
 import { parseAwardLineage } from '@/lib/recompete/award-lineage';
 
 export const COMING_BACK_CAP = 5;
-export const COMING_BACK_PANEL_PATH = '/app?panel=recompetes';
-export const COMING_BACK_CONFIRM_PATH = '/app?panel=settings';
+/**
+ * Email CTA destinations. Never legacy `/app` — sendEmail()'s legacy-destination guard
+ * forbids it (prod: "[email-migration] daily_alert email links to legacy /app").
+ * Full market = the Map's recompete horizon; confirming the market = alert preferences.
+ */
+export const COMING_BACK_PANEL_PATH = '/opportunity-map?horizon=recompete';
+export const COMING_BACK_CONFIRM_PATH = '/alerts/preferences';
 export const COMING_BACK_HEADING = 'Coming Back to Market';
 export const COMING_BACK_STARTER_HEADING = 'Based on your starter market';
 export const COMING_BACK_EXPLAIN =
