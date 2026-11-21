@@ -21,6 +21,43 @@ import { normalizeAgencyKey } from '@/lib/gov-contacts/agency-key';
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
+/** A cited GAO / Inspector General finding (Ask Mindy Backend Spec, Nov 21 2026). */
+export interface CitedFinding {
+  claim: string;
+  document_number: string | null;
+  published_at: string | null;
+  source_url: string;
+}
+
+type IntelCitation = { claim: string; provenance: string; source_url: string | null; document_number: string | null; published_at: string | null };
+
+/**
+ * The buyer pain points understand_customer may state: ONLY cited findings (SOURCE_FACT with a source
+ * link), each with its report number and date. Legacy static-file claims, uncited interpretations and
+ * legacy GovInfo titles are withheld and counted — "never invent buyer pain points". Same rule as
+ * get_agency_intel.
+ */
+export function citedAgencyFindings(intel: {
+  painPoints?: string[];
+  painPointCitations?: IntelCitation[];
+  gaoReports?: string[];
+}): { pain_points: string[]; cited_findings: CitedFinding[]; withheld_unsourced: number } {
+  const citations = intel.painPointCitations ?? [];
+  const cited: CitedFinding[] = citations
+    .filter((c) => c.provenance === 'SOURCE_FACT' && !!c.source_url && c.claim.trim().length > 0)
+    .map((c) => ({ claim: c.claim, document_number: c.document_number, published_at: c.published_at, source_url: c.source_url as string }));
+  const display = cited.map((c) => {
+    if (c.document_number) return c.claim.includes(c.document_number) ? c.claim : `${c.claim} (Source: ${c.document_number})`;
+    let host = 'source';
+    try { host = new URL(c.source_url).host; } catch { /* keep the generic label */ }
+    return `${c.claim} (Source: ${host})`;
+  });
+  // With citations, painPoints is their display list (same rows); without, every display string is unsourced.
+  const uncitedPainPoints = citations.length ? citations.length - cited.length : (intel.painPoints ?? []).filter((s) => s.trim()).length;
+  const withheld = uncitedPainPoints + (intel.gaoReports ?? []).length;
+  return { pain_points: display, cited_findings: cited, withheld_unsourced: withheld };
+}
+
 export interface UnderstandCustomerInput {
   /** SAM notice UUID from find_opportunities open_now.items[].notice_id */
   notice_id?: string | null;
@@ -81,7 +118,12 @@ export interface UnderstandCustomerResult {
   broader_agency_research_shows: {
     status: 'grounded' | 'empty' | 'unavailable';
     agency_name: string | null;
+    /** Cited GAO / Inspector General findings only (display text). Nothing unsourced. */
     pain_points: string[];
+    /** The same findings, structured: report number, date and link for each. */
+    cited_findings: CitedFinding[];
+    /** Claims NOT returned because they carry no GAO / IG citation (legacy file, uncited interpretations, legacy GovInfo titles). */
+    withheld_unsourced: number;
     priorities: string[];
     gao_reports: string[];
     spending_patterns: string[];
@@ -323,6 +365,8 @@ export async function understandCustomer(
     status: 'empty',
     agency_name: null,
     pain_points: [],
+    cited_findings: [],
+    withheld_unsourced: 0,
     priorities: [],
     gao_reports: [],
     spending_patterns: [],
@@ -355,30 +399,39 @@ export async function understandCustomer(
           `${LEGACY_GAO_MAX_AGE_YEARS} years ago) — not current findings. No current GAO row here does not ` +
           'establish that GAO has no current findings.'
         : '';
-      if (intel && (intel.painPoints.length || intel.priorities.length || intel.gaoReports.length)) {
+      const findings = intel ? citedAgencyFindings(intel) : { pain_points: [], cited_findings: [], withheld_unsourced: 0 };
+      const withheldUnsourcedNote = findings.withheld_unsourced
+        ? ` ${findings.withheld_unsourced} unsourced claim(s) withheld (no GAO or Inspector General citation); do not state them as the buyer's pain points.`
+        : '';
+      if (intel && (findings.cited_findings.length || intel.priorities.length)) {
         agencyBlock = {
           status: 'grounded',
           agency_name: intel.agencyName || researchKey || agencyName,
-          pain_points: (intel.painPoints || []).slice(0, 8),
+          pain_points: findings.pain_points.slice(0, 8),
+          cited_findings: findings.cited_findings.slice(0, 8),
+          withheld_unsourced: findings.withheld_unsourced,
           priorities: (intel.priorities || []).slice(0, 8),
-          gao_reports: (intel.gaoReports || []).slice(0, 5),
+          // Legacy GovInfo titles carry no report link; they are counted in withheld_unsourced instead.
+          gao_reports: [],
           spending_patterns: (intel.spendingPatterns || []).slice(0, 5),
           sources: intel.sources || [],
           note:
             "Mindy curated intel (static + agency_intelligence DB) — research indication, NOT an official agency statement. " +
-            'Do not headline this as what the customer "actually cares about." Confirm material claims against primary sources before client-facing use.' +
-            withheldNote,
+            'Do not headline this as what the customer "actually cares about." Pain points are only cited GAO / Inspector General findings (see cited_findings for report number, date and link).' +
+            withheldUnsourcedNote + withheldNote,
         };
       } else {
         agencyBlock = {
           status: 'empty',
           agency_name: researchKey || agencyName,
           pain_points: [],
+          cited_findings: [],
+          withheld_unsourced: findings.withheld_unsourced,
           priorities: [],
           gao_reports: [],
           spending_patterns: [],
           sources: [],
-          note: `No pain points / priorities / GAO rows on file for "${researchKey || agencyName}".${withheldNote}`,
+          note: `No cited GAO or Inspector General finding and no priorities on file for "${researchKey || agencyName}"; do not state a pain point.${withheldUnsourcedNote}${withheldNote}`,
         };
       }
     } catch (err) {
@@ -388,6 +441,8 @@ export async function understandCustomer(
         status: 'unavailable',
         agency_name: agencyName,
         pain_points: [],
+        cited_findings: [],
+        withheld_unsourced: 0,
         priorities: [],
         gao_reports: [],
         spending_patterns: [],
