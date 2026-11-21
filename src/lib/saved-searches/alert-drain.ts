@@ -22,6 +22,12 @@ export type SavedSearchAlertFailureClass =
   | 'saved_search_query_failed'
   | 'profile_query_failed'
   | 'opportunity_query_failed'
+  /**
+   * The Open query hit Postgres's statement timeout (57014). Split from opportunity_query_failed so the
+   * persisted run summary says WHY a search failed — before this, every Open query error was one
+   * anonymous class and the cause of the intermittent failures (Mortgage Link1, 2026-11) was unrecorded.
+   */
+  | 'opportunity_query_timeout'
   | 'forecast_query_failed'
   | 'email_send_failed'
   /** sendEmail returned false and gave no reason (legacy / unclassified block). A processing failure. */
@@ -74,6 +80,8 @@ export type SavedSearchAlertEvalCounts = {
   skippedConcurrent?: number;
   failed?: number;
   failureClass?: SavedSearchAlertFailureClass;
+  /** The database error code behind failureClass (e.g. PostgREST/Postgres `57014`), when there was one. */
+  errorCode?: string;
   /** Unknown NAICS codes stored on a search that still evaluated (it also has valid codes). Reported, never dropped. */
   invalidNaics?: string[];
   /**
@@ -131,7 +139,7 @@ export type SavedSearchAlertDrainResult = {
    * WHICH searches failed, not just how many — a class count alone made a single malformed customer search
    * indistinguishable from a systemic failure. Capped at SAVED_SEARCH_FAILED_LIST_CAP; failuresByClass is complete.
    */
-  failedSearches: Array<{ id: string; failureClass: SavedSearchAlertFailureClass }>;
+  failedSearches: Array<{ id: string; failureClass: SavedSearchAlertFailureClass; errorCode?: string }>;
   /** Searches that evaluated but carry unknown NAICS codes (mixed valid/invalid). Not failures; never hidden. */
   invalidNaicsSearches: Array<{ id: string; codes: string[] }>;
   /** Canonical Forecast engine only; empty under the legacy engine. */
@@ -325,7 +333,11 @@ export async function runSavedSearchAlertDrain(opts: {
       }
       addCounts(results, counts);
       if (counts.failureClass && results.failedSearches.length < SAVED_SEARCH_FAILED_LIST_CAP) {
-        results.failedSearches.push({ id: row.id, failureClass: counts.failureClass });
+        results.failedSearches.push({
+          id: row.id,
+          failureClass: counts.failureClass,
+          ...(counts.errorCode ? { errorCode: counts.errorCode } : {}),
+        });
       }
       if (counts.invalidNaics?.length && results.invalidNaicsSearches.length < SAVED_SEARCH_FAILED_LIST_CAP) {
         results.invalidNaicsSearches.push({ id: row.id, codes: counts.invalidNaics });
