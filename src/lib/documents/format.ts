@@ -18,11 +18,23 @@ export function formatCell(v: CellValue, format: ColumnFormat = 'text'): string 
     case 'int':
       return Math.round(v).toLocaleString('en-US');
     case 'pct':
-      // Values are fractions (0.284 → 28.4%).
-      return `${(v * 100).toFixed(1)}%`;
+      return formatPct(v);
     default:
       return String(v);
   }
+}
+
+/**
+ * Percent display. The model may store a share either way, so the magnitude decides:
+ *   |v| <= 1  → a FRACTION   (0.284 → 28.4%, 1 → 100%)
+ *   |v| >  1  → PERCENT POINTS (40.93 → 40.9%, 100 → 100%)
+ * Live failure (Koamana Build report): share 40.93 with format 'pct' rendered as "4,093%".
+ * Known ambiguity: a true value under 1 percentage point stored as points (0.5 meaning 0.5%) reads as
+ * 50%; store such values as fractions (0.005). The tool description tells the model so.
+ */
+export function formatPct(v: number): string {
+  const points = Math.abs(v) <= 1 ? v * 100 : v;
+  return `${points.toFixed(1)}%`;
 }
 
 /** Drop a trailing ".0" / ".00" so $30.0M reads $30M and $1.50B reads $1.5B. */
@@ -79,7 +91,7 @@ export function formatColumn(values: CellValue[], format: ColumnFormat = 'text')
 /** A chart value in the chart's declared format; with none, large numbers still get separators. */
 export function formatChartValue(v: number, format?: 'usd' | 'int' | 'pct', usdDecimals?: number): string {
   if (format === 'usd') return formatUsd(v, usdDecimals);
-  if (format === 'pct') return `${trimZeros((v * 100).toFixed(1))}%`;
+  if (format === 'pct') return trimZeros(formatPct(v).slice(0, -1)) + '%';
   if (format === 'int' || Math.abs(v) >= 1e4) return Math.round(v).toLocaleString('en-US');
   return Number.isInteger(v) ? String(v) : v.toFixed(1);
 }
@@ -233,4 +245,14 @@ export function chartShownByAdjacentTable(blocks: Block[], i: number): boolean {
  */
 export function keepDash(text: string): string {
   return text.replace(/[ \t]+([—–])/g, ' $1');
+}
+
+/**
+ * A heading the model already numbered ("1. Executive summary", "2) Market size") loses that prefix
+ * where the renderer numbers top-level sections itself, so the page never reads "1. 1. Executive
+ * summary" and the contents list never disagrees with the body.
+ */
+export function stripHeadingNumber(heading: string): string {
+  const t = heading.replace(/^\s*\d{1,2}[.)]\s+(?=\S)/, '');
+  return t.trim() ? t : heading;
 }

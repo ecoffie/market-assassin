@@ -96,3 +96,20 @@ describe('render-spreadsheet', () => {
     expect(csvBuf.toString('utf-8')).toMatch(/Agency/);
   });
 });
+
+describe('pct columns in spreadsheets', () => {
+  it('percent points (40.93) and fractions (0.2) both render sanely, never 4,093%', () => {
+    const m = model({
+      sections: [{
+        id: 'a', heading: 'Share', blocks: [{
+          type: 'table', id: 't1', claim: 'fact', cites: ['s1'], caption: 'Share of spend',
+          columns: [{ key: 'agency', label: 'Agency' }, { key: 'share', label: 'Share', format: 'pct' }],
+          rows: [{ agency: 'VA', share: 40.93 }, { agency: 'DHS', share: 0.2 }],
+        }],
+      }],
+    } as Partial<DocModel>);
+    const sheet = sheetsFromDocModel(m)[0];
+    expect(sheet.rows).toEqual([['VA', '40.9%'], ['DHS', '20.0%']]);
+    expect(renderCsv(m).toString('utf-8')).not.toMatch(/4,?093/);
+  });
+});
