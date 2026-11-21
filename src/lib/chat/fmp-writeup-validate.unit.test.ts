@@ -3,6 +3,7 @@ import type { DocModel } from '@/lib/documents/model';
 import { DOC_SCHEMA } from '@/lib/documents/model';
 import {
   fmpDefenseBuyersAppear,
+  fmpDefenseBuyersAppearFromEvidence,
   replaceEmDashes,
   validateFmpWriteup,
   validateFmpWriteupMarkdown,
@@ -90,6 +91,16 @@ describe('fmp-writeup-validate', () => {
   it('detects defense buyers on the RBA cold prompt', () => {
     expect(fmpDefenseBuyersAppear(RBA_FEDERAL_MARKET_PROFILE_PROMPT)).toBe(true);
     expect(fmpDefenseBuyersAppear('Build a federal market profile for an IT staffing firm in Texas')).toBe(false);
+  });
+
+  it('detects live SAM defense buyer strings and pathway evidence (name-only Ask)', () => {
+    expect(fmpDefenseBuyersAppear('Buyer: DEPT OF DEFENSE. Notice FA706027RXXX2')).toBe(true);
+    expect(fmpDefenseBuyersAppearFromEvidence({
+      pathways: [{ buyer: 'DEPT OF DEFENSE', title: 'JBAB and Andrews 8(a) MACC' }],
+    })).toBe(true);
+    expect(fmpDefenseBuyersAppearFromEvidence({
+      pathways: [{ buyer: 'TRANSPORTATION, DEPARTMENT OF', title: 'Inspection MATOC' }],
+    })).toBe(false);
   });
 
   it('soft-replaces em dashes', () => {

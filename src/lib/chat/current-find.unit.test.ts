@@ -228,18 +228,19 @@ describe('Federal Market Profile pathways (step 3 — civil + Mid-Atlantic)', ()
     const calls = buildFmpPathwaySupplementalCalls(RBA_NAME_ONLY_PROMPT, {
       awardStates: ['VA', 'MD', 'DC'],
     });
-    expect(calls.map((c) => c.name)).toEqual([
-      'search_sam_opportunities',
-      'search_sam_opportunities',
-      'search_sam_opportunities',
-      'get_agency_forecasts',
-    ]);
+    expect(calls.filter((c) => c.name === 'search_sam_opportunities')).toHaveLength(3);
+    expect(calls.filter((c) => c.name === 'get_agency_forecasts').map((c) => String(c.args.keyword))).toEqual(
+      expect.arrayContaining(['Clara Barton', 'GWMP', 'MD NP GWMP']),
+    );
+    expect(calls.filter((c) => c.name === 'lookup_solicitation').map((c) => String(c.args.query))).toEqual(
+      expect.arrayContaining(['693C73-27-R-000006', 'FA706027RXXX2', 'W912DR27H1CWY']),
+    );
+    expect(calls.some((c) => c.name === 'search_past_contracts')).toBe(true);
     const keywords = calls
       .filter((c) => c.name === 'search_sam_opportunities')
       .map((c) => String(c.args.keyword));
     expect(keywords).toEqual([...FMP_CIVIL_PATHWAY_SUPPLEMENT_KEYWORDS]);
     expect(String(calls[0].args.state).split(',').sort()).toEqual(['DC', 'MD', 'VA']);
-    expect(calls[3].args.keyword).toMatch(/GWMP|parkway/i);
     // Distinctive keywords must survive pathway enforce (not rewritten to civil default).
     for (const kw of keywords) {
       const r = enforceFederalMarketProfilePathwayArgs(

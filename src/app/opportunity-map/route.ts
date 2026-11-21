@@ -10924,7 +10924,7 @@ const ASK_MINDY_CSS =
   + '.amk-rep.show{display:flex}'
   + '@media(max-width:900px){.amk-rep{right:0;width:100vw;z-index:2602}}'
   + '.amk-rep-hd{display:flex;align-items:center;gap:10px;padding:11px 14px;border-bottom:1px solid #eef1f5;flex:none}'
-  + '.amk-rep-tt{flex:1;min-width:0;display:flex;flex-direction:column}.amk-rep-t{font:800 14.5px Inter,system-ui,sans-serif;color:#111c26;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}'
+  + '.amk-rep-tt{flex:1;min-width:0;display:flex;flex-direction:column}.amk-rep-t{font:800 14.5px Inter,system-ui,sans-serif;color:#111c26;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;line-height:1.25}'
   + '.amk-rep-v{font:500 11.5px Inter,system-ui,sans-serif;color:#64748b}'
   + '.amk-rep-back{display:none;border:1px solid #dde3ec;background:#fff;color:#1d4ed8;font:600 12px Inter,system-ui,sans-serif;border-radius:8px;padding:6px 10px;cursor:pointer}'
   + '@media(max-width:900px){.amk-rep-back{display:inline-block}}'
@@ -11225,12 +11225,18 @@ const ASK_MINDY_JS = `<script>(function(){
   function repRead(){ try{ var j=JSON.parse(localStorage.getItem(REP_KEY)||'null');
     if(j&&typeof j==='object'&&j.email&&j.email===email()&&(j.ws||'')===wsKey()&&UUID_RX.test(String(j.id||''))) return j; }catch(e){} return null; }
   function repWrite(){ try{ if(rep) localStorage.setItem(REP_KEY,JSON.stringify(rep)); else localStorage.removeItem(REP_KEY); }catch(e){} }
-  function cleanFiles(list){ var out=[]; (Array.isArray(list)?list:[]).forEach(function(f){
-    if(!f||typeof f!=='object'||out.length>=8) return;
-    var id=String(f.document_id||''), fm=String(f.format||'').toLowerCase();
-    if(!UUID_RX.test(id)||!FMT_LABEL[fm]) return;
-    out.push({format:fm,document_id:id,file_name:String(f.file_name||'').slice(0,160),version:(typeof f.version==='number'?f.version:0)}); });
-    out.sort(function(a,b){ return FMT_ORDER.indexOf(a.format)-FMT_ORDER.indexOf(b.format); }); return out; }
+  // One chip per format (highest version wins). Sibling preview queries + rewrite retries
+  // used to push five "PDF" buttons into the header and crush the title.
+  function cleanFiles(list){ var by={};
+    (Array.isArray(list)?list:[]).forEach(function(f){
+      if(!f||typeof f!=='object') return;
+      var id=String(f.document_id||''), fm=String(f.format||'').toLowerCase();
+      if(!UUID_RX.test(id)||!FMT_LABEL[fm]) return;
+      var ver=(typeof f.version==='number'?f.version:0);
+      var cur=by[fm];
+      if(!cur||ver>=cur.version) by[fm]={format:fm,document_id:id,file_name:String(f.file_name||'').slice(0,160),version:ver};
+    });
+    return FMT_ORDER.filter(function(fm){ return !!by[fm]; }).map(function(fm){ return by[fm]; }); }
   function primaryId(files){ for(var i=0;i<files.length;i++){ if(files[i].format==='docx') return files[i].document_id; } return files.length?files[0].document_id:''; }
   function authHdrs(){ return withWorkspace({'x-mi-auth-token':tok()||'','x-user-email':email()}); }
   // Download one saved file: the existing Vault route mints a 60-second signed URL (attachment).

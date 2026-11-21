@@ -93,7 +93,11 @@ import {
   markFmpWriteupSkippedNoDocTool,
   type FmpPhaseState,
 } from '@/lib/chat/fmp-phase-machine';
-import { fmpDefenseBuyersAppear, type FmpWriteupContext } from '@/lib/chat/fmp-writeup-validate';
+import {
+  fmpDefenseBuyersAppear,
+  fmpDefenseBuyersAppearFromEvidence,
+  type FmpWriteupContext,
+} from '@/lib/chat/fmp-writeup-validate';
 import {
   accumulateFmpEvidence,
   buildFmpCreateDocumentAnswerNote,
@@ -1518,6 +1522,11 @@ export async function POST(request: NextRequest) {
                   fmpEvidence = accumulateFmpEvidence(fmpToolContents, customerFmp);
                   if (fmpWriteupCtx) {
                     fmpWriteupCtx.requiredSnippets = requiredSnippetsForWriteup(fmpEvidence);
+                    // Name-only asks omit "defense"/"PAE"; flip on once pathway buyers show DoD.
+                    if (!fmpWriteupCtx.defenseBuyersAppear
+                      && fmpDefenseBuyersAppearFromEvidence(fmpEvidence)) {
+                      fmpWriteupCtx.defenseBuyersAppear = true;
+                    }
                   }
                   return fmpEvidence;
                 };
@@ -1527,8 +1536,9 @@ export async function POST(request: NextRequest) {
                   const evidence = ensureFmpEvidence(customerFmp);
                   const resolved = resolveFmpCreateDocumentArgs(plannerArgs, evidence, {
                     customerText: customerFmp,
-                    defenseBuyersAppear: fmpWriteupCtx?.defenseBuyersAppear
-                      ?? fmpDefenseBuyersAppear(customerFmp),
+                    defenseBuyersAppear: !!(fmpWriteupCtx?.defenseBuyersAppear)
+                      || fmpDefenseBuyersAppear(customerFmp)
+                      || fmpDefenseBuyersAppearFromEvidence(evidence),
                     requiredSnippets: fmpWriteupCtx?.requiredSnippets,
                   });
                   turnTrace.notices.push(resolved.notice);
@@ -1808,11 +1818,41 @@ export async function POST(request: NextRequest) {
                         })
                         .filter(Boolean),
                     );
-                    const haveForecast = toolCallsF.some((tc) => String(tc.function?.name || '') === 'get_agency_forecasts');
+                    const haveForecastKw = new Set(
+                      toolCallsF
+                        .filter((tc) => String(tc.function?.name || '') === 'get_agency_forecasts')
+                        .map((tc) => {
+                          try {
+                            return String((JSON.parse(String(tc.function?.arguments || '{}')) as { keyword?: string }).keyword || '')
+                              .toLowerCase();
+                          } catch { return ''; }
+                        })
+                        .filter(Boolean),
+                    );
+                    const haveLookupQ = new Set(
+                      toolCallsF
+                        .filter((tc) => String(tc.function?.name || '') === 'lookup_solicitation')
+                        .map((tc) => {
+                          try {
+                            return String((JSON.parse(String(tc.function?.arguments || '{}')) as { query?: string }).query || '')
+                              .toLowerCase();
+                          } catch { return ''; }
+                        })
+                        .filter(Boolean),
+                    );
                     let added = 0;
                     for (let si = 0; si < supplements.length; si++) {
                       const s = supplements[si];
-                      if (s.name === 'get_agency_forecasts' && haveForecast) continue;
+                      if (s.name === 'get_agency_forecasts') {
+                        const kw = String(s.args.keyword || '').toLowerCase();
+                        // Do NOT skip all forecasts when one already ran — "GWMP parkway bridge"
+                        // as a single ILIKE misses "MD NP GWMP 6(2)"; Clara Barton must still fire.
+                        if (kw && haveForecastKw.has(kw)) continue;
+                      }
+                      if (s.name === 'lookup_solicitation') {
+                        const q = String(s.args.query || '').toLowerCase();
+                        if (q && haveLookupQ.has(q)) continue;
+                      }
                       if (s.name === 'search_sam_opportunities') {
                         const kw = String(s.args.keyword || '').toLowerCase();
                         if (kw && haveKw.has(kw)) continue;

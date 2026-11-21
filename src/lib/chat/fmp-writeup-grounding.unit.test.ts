@@ -387,6 +387,7 @@ describe('fmp-writeup-grounding', () => {
         'Set Aside Total', 'Full Open', 'Small Business', 'Woman Owned', 'Veteran Owned', 'Hubzone Set',
         'Not Applicable', 'Unknown Contact', 'None Listed', 'Limited Competition', 'Unrestricted Award',
         'Contract Ceiling', 'Obligations Amount', 'Request Rfq', 'No Contact', 'Notice Tbd',
+        'Firm Fixed Price', 'Weatherproofing Units', 'Asphalt Overlay',
       ]) expect(looksLikePersonContactName(junk), junk).toBe(false);
       for (const person of ['Helson Roman', 'David Bogner', 'Terry Agena', 'Noel Rangel']) {
         expect(looksLikePersonContactName(person), person).toBe(true);
@@ -799,8 +800,9 @@ describe('fmp-writeup-grounding', () => {
             content: find([civilA, civilB]),
           },
         ]);
-        expect(ev.pathways?.some((p) => p.kind === 'forecast' && /GWMP/i.test(p.title))).toBe(true);
-        expect(ev.pathways?.find((p) => p.kind === 'forecast')?.when).toMatch(/2027-09-01/);
+        const fc = ev.pathways?.find((p) => p.kind === 'forecast');
+        expect(fc?.title).toMatch(/Clara Barton Parkway/i);
+        expect(fc?.when).toMatch(/2027-09-01/);
       });
 
       it('keeps a Sources Sought / MACC in adjacent 236210 for a 237310 firm (JBAB-class gold pathway)', () => {

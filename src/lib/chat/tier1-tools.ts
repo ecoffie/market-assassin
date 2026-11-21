@@ -125,6 +125,7 @@ interface SamRow {
   pop_state?: string | null;
   pop_city?: string | null;
   office_address?: { state?: string | null } | null;
+  points_of_contact?: unknown;
 }
 
 const SAM_LIMIT_DEFAULT = 10;
@@ -276,7 +277,7 @@ export function makeTier1Tools(db: Tier1Db) {
     // (websearch = supports quoted phrases / OR).
     const todayIso = new Date().toISOString();
     const SELECT_COLS =
-      'notice_id, title, department, naics_code, set_aside_description, notice_type, response_deadline, ui_link, solicitation_number, pop_state, pop_city, office_address';
+      'notice_id, title, department, naics_code, set_aside_description, notice_type, response_deadline, ui_link, solicitation_number, pop_state, pop_city, office_address, points_of_contact';
 
     // Resolve set-aside BEFORE the fetch so an unrecognized term errors, never
     // returns zero rows (see SET_ASIDE_CODES). "no 8(a) work in Maryland" and "you
@@ -434,6 +435,8 @@ export function makeTier1Tools(db: Tier1Db) {
           pop_city: r.pop_city ?? null,
           office_state: r.office_address?.state ?? null,
         },
+        // FMP who-to-talk rows — search_sam used to omit POCs so contacts never grounded.
+        ...(r.points_of_contact != null ? { points_of_contact: r.points_of_contact } : {}),
       })),
     };
   }

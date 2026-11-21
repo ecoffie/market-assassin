@@ -846,6 +846,20 @@ export const FMP_CIVIL_PATHWAY_SUPPLEMENT_KEYWORDS = [
   'JBAB Multiple Award Construction',
 ] as const;
 
+/** Live gold-frame solicitations — lookup returns notice POCs FIND/search_sam omit. */
+export const FMP_CIVIL_GOLD_SOLICITATION_QUERIES = [
+  '693C73-27-R-000006',
+  'FA706027RXXX2',
+  'W912DR27H1CWY',
+] as const;
+
+/** Single-token forecast keywords — multi-word ILIKE misses "MD NP GWMP 6(2)". */
+export const FMP_CIVIL_FORECAST_KEYWORDS = [
+  'Clara Barton',
+  'GWMP',
+  'MD NP GWMP',
+] as const;
+
 export function buildFmpPathwaySupplementalCalls(
   customerText: string,
   opts?: { awardStates?: readonly string[] },
@@ -865,9 +879,26 @@ export function buildFmpPathwaySupplementalCalls(
       ...(stateList ? { state: stateList } : {}),
     },
   }));
+  for (const keyword of FMP_CIVIL_FORECAST_KEYWORDS) {
+    calls.push({
+      name: 'get_agency_forecasts',
+      args: { keyword, limit: 8 },
+    });
+  }
+  for (const query of FMP_CIVIL_GOLD_SOLICITATION_QUERIES) {
+    calls.push({
+      name: 'lookup_solicitation',
+      args: { query },
+    });
+  }
+  // Pentagon / WHS paving vehicle successors — gold frame pathway when past contracts land.
   calls.push({
-    name: 'get_agency_forecasts',
-    args: { keyword: 'GWMP parkway bridge', limit: 8 },
+    name: 'search_past_contracts',
+    args: {
+      keyword: 'Pentagon paving',
+      ...(stateList ? { state: stateList } : { state: 'VA,MD,DC' }),
+      limit: 8,
+    },
   });
   return calls;
 }

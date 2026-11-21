@@ -53,7 +53,19 @@ export function GeneratedDownloadChips({
 }) {
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const usable = files.filter((f) => f.document_id && f.format);
+  // One chip per format (highest version wins) — duplicate deliverable rows must not stamp five PDFs.
+  const byFormat = new Map<string, GeneratedDownloadFile>();
+  for (const f of files) {
+    if (!f?.document_id || !f.format) continue;
+    const key = f.format.toLowerCase();
+    const prev = byFormat.get(key);
+    if (!prev || (f.version ?? 0) >= (prev.version ?? 0)) byFormat.set(key, f);
+  }
+  const order = ['pdf', 'docx', 'xlsx', 'csv'];
+  const usable = [
+    ...order.map((k) => byFormat.get(k)).filter(Boolean),
+    ...[...byFormat.entries()].filter(([k]) => !order.includes(k)).map(([, f]) => f),
+  ] as GeneratedDownloadFile[];
   if (!usable.length) return null;
 
   const onDownload = async (id: string) => {

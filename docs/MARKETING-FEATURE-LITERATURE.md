@@ -7749,3 +7749,13 @@ the notices. Test: `federal-events-ranking.unit.test.ts`.
 **Honest scope.** The on-screen report is the saved document rendered by the same engine as the PDF and Word files. Older chats keep their older files; ask again to get the current report.
 
 **Proof.** `ChatReportPreview` + `/api/app/vault/documents/preview`; `chat-report-preview.unit.test.tsx`, `mindy-chat-report-preview.unit.test.tsx`, and the rich-model extraction test in `fmp-writeup-grounding.unit.test.ts`.
+
+## Ask Mindy FMP: gold pathways, named POCs, single download chips (2026-11-20)
+
+**What.** Federal Market Profile reports now keep vehicle / sources-sought / Clara Barton forecast pathways ahead of open RFQs, pull named notice points of contact via solicitation lookup, show the PAE section when DoD buyers appear in tool results (not only when the customer typed "defense"), and show one PDF and one Word download chip instead of five duplicates.
+
+**Why it matters.** A name-only Ask for a civil firm was landing open Sacramento bids and "Firm Fixed Price" as contacts while the gold Claude report had Inspection MATOC → JBAB → Capitol → Clara Barton and named POCs. Duplicate download chips also crushed the report title.
+
+**Honest scope.** Host DocModel + pathway supplements + map/preview chip dedupe. Competitor "where it leads" geography still depends on contractor tool fields when present.
+
+**Proof.** `buildFmpPathwaySupplementalCalls` (Clara Barton / GWMP forecasts + `lookup_solicitation` for gold sols); `enrichPathwayTitle` + open-RFQ cap; `fmpDefenseBuyersAppearFromEvidence`; `cleanFiles` / preview sibling dedupe; `fmp-writeup-grounding.unit.test.ts`.

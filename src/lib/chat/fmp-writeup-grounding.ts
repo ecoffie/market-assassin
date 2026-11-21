@@ -10,7 +10,11 @@ import type { Block, DocModel } from '@/lib/documents/model';
 import { DOC_SCHEMA } from '@/lib/documents/model';
 import { validateDocModel } from '@/lib/documents/validate';
 import { RBA_WRITEUP } from './__fixtures__/rba-federal-market-profile';
-import { fmpDefenseBuyersAppear, validateFmpWriteup } from './fmp-writeup-validate';
+import {
+  fmpDefenseBuyersAppear,
+  fmpDefenseBuyersAppearFromEvidence,
+  validateFmpWriteup,
+} from './fmp-writeup-validate';
 import { normalizeStateCode, US_STATE_NAMES } from '@/lib/utils/us-states';
 import {
   extractDominantAwardNaics,
@@ -241,8 +245,12 @@ const PROCUREMENT_WORDS = new Set([
   'open', 'small', 'business', 'woman', 'women', 'owned', 'veteran', 'hubzone', 'competitive', 'competed',
   'award', 'contract', 'naics', 'psc', 'dollars', 'obligations', 'amount', 'ceiling', 'idiq', 'matoc', 'macc',
   'rfq', 'rfi', 'rfp', 'combined', 'limited', 'unrestricted', 'not', 'applicable', 'tbd', 'unknown', 'none',
+  // Pricing / CLIN / commodity labels that walk out of notice JSON as Title Case "people".
+  'firm', 'fixed', 'price', 'pricing', 'unit', 'units', 'type', 'types', 'category', 'categories',
+  'weatherproofing', 'waterproofing', 'overlay', 'asphalt', 'pavement', 'quantity', 'quantities',
+  'clin', 'line', 'item', 'items', 'deliverable', 'deliverables',
 ]);
-const PROCUREMENT_PHRASES = /\bset[-\s]?aside\b|\bn\/a\b/i;
+const PROCUREMENT_PHRASES = /\bset[-\s]?aside\b|\bn\/a\b|\bfirm\s+fixed\s+price\b|\bfixed\s+price\b/i;
 /** Fillers that can never be a name on their own; a string made only of these is not a person. */
 const NON_NAME_TOKENS = new Set(['no', 'yes', 'the', 'of', 'and', 'for', 'to', 'a', 'an', 'in', 'on', 'or', 'by', 'any', 'all']);
 
@@ -448,6 +456,18 @@ function pathwayRank(p: FmpPathway): number {
 /** Prefer JBAB/Andrews naming when the SAM title is a bare MACC (search_sam omits description). */
 function enrichPathwayTitle(title: string, summary?: string, noticeId?: string): string {
   if (/JBAB|Andrews|Anacostia/i.test(title)) return title;
+  if (/Clara Barton/i.test(title)) return title;
+  const hay = `${title} ${summary || ''}`;
+  // Agency forecast codes like "MD NP GWMP 6(2)" — gold frame names the parkway, not the code.
+  if (
+    /MD\s*NP\s*GWMP|\bGWMP\b/i.test(title)
+    && /Clara Barton|retaining wall|cantilever|parkway|bridge|asphalt|overlay|pavement/i.test(hay)
+  ) {
+    return clip('Clara Barton Parkway rehabilitation', 120);
+  }
+  if (/Clara Barton/i.test(summary || '') && /parkway|retaining|cantilever|bridge/i.test(hay)) {
+    return clip('Clara Barton Parkway rehabilitation', 120);
+  }
   const id = (noticeId || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
   // Live Sources Sought FA706027RXXX2 — title is bare "Multiple Award Construction Contract (MACC)".
   if (id.startsWith('FA706027RXXX2') || id === 'FA706027RXXX2') {
@@ -657,7 +677,9 @@ function extractPathways(
     const frame = fits.filter((x) => pathwayRank(x.p) <= 2);
     const open = fits.filter((x) => pathwayRank(x.p) === 3);
     const recompete = fits.filter((x) => pathwayRank(x.p) === 4);
-    const openCap = frame.length >= 2 ? 1 : 2;
+    // With three+ vehicle/SS/forecast rows, drop open RFQs so Clara Barton-class
+    // forecasts keep a numbered slot (HUMBOLT / Sacramento open bids used to fill #4–5).
+    const openCap = frame.length >= 3 ? 0 : frame.length >= 2 ? 1 : 2;
     const merged = [...frame, ...open.slice(0, openCap), ...recompete];
     // Drop Special Notice / Sources Sought twins of the same solicitation.
     const seenKeys = new Set<string>();
@@ -714,34 +736,77 @@ const CONTACT_NAME_KEYS = ['name', 'full_name', 'fullName', 'contact_name', 'poc
 
 function extractStructuredContacts(results: readonly FmpToolContent[]): Map<string, FmpContactRow> {
   const map = new Map<string, FmpContactRow>();
+  const upsert = (
+    name: string,
+    email?: string,
+    agency?: string,
+    role?: string,
+  ) => {
+    if (!name || !looksLikePersonContactName(name)) return;
+    const k = name.toLowerCase();
+    const prior = map.get(k);
+    if (prior) {
+      if (!prior.email && email) prior.email = email;
+      if (!prior.agency && agency) prior.agency = agency;
+      if (!prior.why && role) prior.why = role;
+      return;
+    }
+    map.set(k, {
+      person: name,
+      ...(email ? { email } : {}),
+      ...(agency ? { agency: clip(agency, 80) } : {}),
+      ...(role ? { why: clip(role, 80) } : {}),
+    });
+  };
   for (const r of results) {
     const p = parseJson(String(r.content || ''));
     if (!p) continue;
     walkObjects(p, (o) => {
+      // lookup_solicitation items: { contact: { name, email, phone } }
+      const nested = o.contact;
+      if (nested && typeof nested === 'object' && !Array.isArray(nested)) {
+        const c = nested as Record<string, unknown>;
+        upsert(
+          firstString(c, CONTACT_NAME_KEYS) || '',
+          firstString(c, ['email', 'contact_email']),
+          firstString(o, ['agency', 'department', 'office', 'sub_agency', 'buyer']),
+          firstString(c, ['role', 'title', 'position', 'type']),
+        );
+      }
+      // SAM points_of_contact / pointOfContact arrays: { fullName, email, type }
+      for (const key of ['points_of_contact', 'pointOfContact', 'pocs', 'contacts'] as const) {
+        const list = o[key];
+        if (!Array.isArray(list)) continue;
+        for (const it of list) {
+          if (!it || typeof it !== 'object') continue;
+          const row = it as Record<string, unknown>;
+          let name = firstString(row, CONTACT_NAME_KEYS);
+          if (!name) {
+            const f = firstString(row, ['first_name', 'firstName']);
+            const l = firstString(row, ['last_name', 'lastName']);
+            if (f && l) name = `${f} ${l}`;
+          }
+          upsert(
+            name || '',
+            firstString(row, ['email', 'contact_email']),
+            firstString(o, ['agency', 'department', 'office', 'sub_agency']) || firstString(row, ['agency', 'office']),
+            firstString(row, ['role', 'title', 'position', 'type']),
+          );
+        }
+      }
       let name = firstString(o, CONTACT_NAME_KEYS);
       if (!name) {
         const f = firstString(o, ['first_name', 'firstName']);
         const l = firstString(o, ['last_name', 'lastName']);
         if (f && l) name = `${f} ${l}`;
       }
-      if (!name || !looksLikePersonContactName(name)) return;
-      const k = name.toLowerCase();
-      const email = firstString(o, ['email', 'contact_email']);
-      const agency = firstString(o, ['agency', 'department', 'office', 'office_name', 'organization', 'sub_agency']);
-      const role = firstString(o, ['role', 'title', 'position']);
-      const prior = map.get(k);
-      if (prior) {
-        if (!prior.email && email) prior.email = email;
-        if (!prior.agency && agency) prior.agency = agency;
-        if (!prior.why && role) prior.why = role;
-        return;
-      }
-      map.set(k, {
-        person: name,
-        ...(email ? { email } : {}),
-        ...(agency ? { agency: clip(agency, 80) } : {}),
-        ...(role ? { why: clip(role, 80) } : {}),
-      });
+      if (!name) return;
+      upsert(
+        name,
+        firstString(o, ['email', 'contact_email']),
+        firstString(o, ['agency', 'department', 'office', 'office_name', 'organization', 'sub_agency']),
+        firstString(o, ['role', 'title', 'position']),
+      );
     });
   }
   return map;
@@ -1383,7 +1448,9 @@ export function buildFmpHostDocModel(
   const identity = extractProfileCompanyIdentity(customerText);
   const company = identity.legalName || 'Federal market profile';
   const firm = identity.legalName || 'The firm';
-  const defense = opts.defenseBuyersAppear !== false; // default on for FMP host rescue
+  // Name-only asks omit "defense"/"PAE" in the prompt, but JBAB / Capitol / Army pathways
+  // still need the PAE section. OR evidence so a false prompt flag cannot suppress DoD buyers.
+  const defense = !!opts.defenseBuyersAppear || fmpDefenseBuyersAppearFromEvidence(evidence);
   const date = (opts.today ?? (() => new Date().toISOString().slice(0, 10)))();
   const snippets = requiredSnippetsForWriteup(evidence);
   const naics = evidence.dominantNaics || snippets.find((s) => /^\d{6}$/.test(s)) || null;
@@ -2045,8 +2112,9 @@ export function shouldPreferPlannerFmpDocModel(
   if (!shape.ok) return { prefer: false, reason: `invalid_doc_model:${shape.issues[0]?.path ?? 'unknown'}` };
 
   const v = validateFmpWriteup(planner.model, {
-    defenseBuyersAppear: opts.defenseBuyersAppear
-      ?? fmpDefenseBuyersAppear(opts.customerText || '') ,
+    defenseBuyersAppear: !!opts.defenseBuyersAppear
+      || fmpDefenseBuyersAppear(opts.customerText || '')
+      || fmpDefenseBuyersAppearFromEvidence(evidence),
     requiredSnippets: opts.requiredSnippets ?? requiredSnippetsForWriteup(evidence),
   });
   if (v.issues.some((i) => i.code === 'mid_cta_ban')) return { prefer: false, reason: 'mid_cta_ban' };

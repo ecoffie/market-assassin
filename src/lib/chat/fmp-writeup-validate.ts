@@ -45,7 +45,31 @@ const EM_DASH_RE = /[—–]/g;
 
 export function fmpDefenseBuyersAppear(text: string): boolean {
   const t = text || '';
-  return RBA_WRITEUP.defenseBuyerSignals.some((re) => re.test(t));
+  if (RBA_WRITEUP.defenseBuyerSignals.some((re) => re.test(t))) return true;
+  // Live SAM buyer strings (name-only Ask) — not in the prompt-oriented fixture list.
+  return /\bDEPT(?:ARTMENT)? OF (?:THE )?(?:DEFENSE|ARMY|NAVY|AIR FORCE)\b|\bUSACE\b|\bJBAB\b|\bNAV FAC\b|\bAir Force\b/i.test(t);
+}
+
+/** PAE / defense section from pathway + award buyers when the customer text is name-only. */
+export function fmpDefenseBuyersAppearFromEvidence(evidence: {
+  corpus?: string | null;
+  pathways?: ReadonlyArray<{ buyer?: string; title?: string }> | null;
+  buyerSpend?: ReadonlyArray<{ agency?: string }> | null;
+  awardRows?: ReadonlyArray<{ buyer?: string }> | null;
+}): boolean {
+  const parts: string[] = [];
+  if (evidence.corpus) parts.push(evidence.corpus);
+  for (const p of evidence.pathways || []) {
+    if (p.buyer) parts.push(p.buyer);
+    if (p.title) parts.push(p.title);
+  }
+  for (const b of evidence.buyerSpend || []) {
+    if (b.agency) parts.push(b.agency);
+  }
+  for (const a of evidence.awardRows || []) {
+    if (a.buyer) parts.push(a.buyer);
+  }
+  return fmpDefenseBuyersAppear(parts.join('\n'));
 }
 
 /** Soft repair: em/en dash → hyphen. Does not spend the rewrite round. */

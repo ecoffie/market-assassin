@@ -94,12 +94,18 @@ export async function GET(request: NextRequest) {
     const { data: sibs, error: sibErr } = await q.limit(20);
     if (!sibErr && Array.isArray(sibs)) {
       const base = baseName(row.original_filename);
+      const best = new Map<string, { format: string; document_id: string; file_name: string; version: number }>();
       for (const r of sibs as Row[]) {
         const format = FORMAT_BY_EXT[extOf(r.original_filename)];
-        if (format && baseName(r.original_filename) === base) {
-          files.push({ format, document_id: r.id, file_name: r.original_filename, version: r.version ?? 1 });
+        if (!format || baseName(r.original_filename) !== base) continue;
+        const version = r.version ?? 1;
+        const prev = best.get(format);
+        // One export chip per format — duplicate sibling rows used to stamp five "PDF" buttons.
+        if (!prev || version >= prev.version) {
+          best.set(format, { format, document_id: r.id, file_name: r.original_filename, version });
         }
       }
+      for (const f of best.values()) files.push(f);
     }
   } catch { /* chips only */ }
   const order = ['pdf', 'docx', 'xlsx', 'csv'];
