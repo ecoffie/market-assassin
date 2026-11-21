@@ -18,7 +18,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { verifyUserOwnsEmail } from '@/lib/api-auth';
-import { resolveStripeCustomerByEmail } from '@/lib/stripe/resolve-customer';
+import { hasManageableSubscription, resolveStripeCustomerByEmail } from '@/lib/stripe/resolve-customer';
 import { getLinkedEmails } from '@/lib/mindy/linked-emails';
 
 export const runtime = 'nodejs';
@@ -74,8 +74,8 @@ export async function POST(request: NextRequest) {
     for (const candidate of candidates) {
       const r = await resolveStripeCustomerByEmail(stripe, candidate);
       if (!r.customer) continue;
-      const live = await stripe.subscriptions.list({ customer: r.customer.id, status: 'active', limit: 1 });
-      if (live.data.length) { customer = r.customer; break; }
+      const live = await hasManageableSubscription(stripe, r.customer.id);
+      if (live) { customer = r.customer; break; }
       if (!customer) customer = r.customer;
     }
     if (!customer) {

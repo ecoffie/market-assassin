@@ -15,7 +15,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { verifyUserOwnsEmail } from '@/lib/api-auth';
-import { resolveStripeCustomerByEmail } from '@/lib/stripe/resolve-customer';
+import { hasManageableSubscription, resolveStripeCustomerByEmail } from '@/lib/stripe/resolve-customer';
 import { getLinkedEmails } from '@/lib/mindy/linked-emails';
 
 export const runtime = 'nodejs';
@@ -67,8 +67,8 @@ export async function GET(request: NextRequest) {
       // Prefer a candidate that actually has a LIVE subscription; otherwise remember the first
       // customer found and keep looking, so "has a record but no plan" never masks a real plan
       // sitting on a linked address.
-      const live = await stripe.subscriptions.list({ customer: r.customer.id, status: 'active', limit: 1 });
-      if (live.data.length) { customer = r.customer; resolvedVia = candidate; break; }
+      const live = await hasManageableSubscription(stripe, r.customer.id);
+      if (live) { customer = r.customer; resolvedVia = candidate; break; }
       if (!customer) { customer = r.customer; resolvedVia = candidate; }
     }
     if (!customer) {
