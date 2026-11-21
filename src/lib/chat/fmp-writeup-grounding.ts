@@ -727,9 +727,9 @@ const IRS_BUYER_RE = /\b(Internal Revenue Service|IRS)\b/i;
 /** NAICS fit of a pathway against the firm's dominant award NAICS (0 when it says nothing useful). */
 export function pathwayNaicsFit(p: Pick<FmpPathway, 'naics' | 'title' | 'summary'>, dominantNaics: string): number {
   const hay = `${p.title} ${p.summary ?? ''}`;
-  // Highway/bridge primary: dredging notices share 237xxx but are a different market (RBA Ask→Claude gap).
-  if (/^2373/.test(dominantNaics) && dominantNaics !== '237990' && MARINE_OFF_RE.test(hay)) {
-    return 0;
+  // Highway/bridge primary: dredging / waterfront pier notices share 237xxx but are a different market.
+  if (/^2373/.test(dominantNaics) && dominantNaics !== '237990') {
+    if (MARINE_OFF_RE.test(hay) || WATERFRONT_OFF_RE.test(hay)) return 0;
   }
   const n = p.naics;
   let fit = 0;

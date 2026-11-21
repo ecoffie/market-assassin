@@ -1,10 +1,19 @@
+### Ask forces packaged market research without the word “report” — 2026-11-21
+
+**What shipped.** `isMarketResearchRequest` now matches “comprehensive/full market research …” and “comprehensive MR …” even when the customer omits “report”. That turns on `forceMarketReport` → `generate_market_report` on the first turn.
+
+**Why it matters.** Map Ask acceptance (“comprehensive MR for Koamana Build”) answered in chat until the user insisted on a document — the force gate never fired because the signal required the word “report”.
+
+**Proof.** Unit table in `current-find.unit.test.ts` (`comprehensive market research for Koamana Build`, `comprehensive MR for Koamana Build`, `full market research on roofing` → true; bare “do you offer market research?” → false).
+
+
 ### Ask FMP drops boat-pier / gymnasium forecasts for highway firms — 2026-11-21
 
-**What shipped.** Civil forecast pathway filter no longer treats pier “deck replacement” as highway civil (bare `deck` removed; waterfront titles like Boat Forces Piers are excluded). Clara Barton / GWMP forecasts still qualify.
+**What shipped.** Civil forecast pathway filter no longer treats pier “deck replacement” as highway civil (bare `deck` removed; waterfront titles like Boat Forces Piers are excluded). Clara Barton / GWMP forecasts still qualify. `pathwayNaicsFit` also zeros pier/wharf/boat-forces titles for 2373xx primaries (same class as dredging).
 
 **Why it matters.** A 237310 highway profile was ranking DHS boat-pier forecasts beside Inspection MATOC — wrong market for the speaking/demo story.
 
-**Proof.** Unit: `keeps Clara Barton forecasts and drops gymnasium / boat-pier forecasts for a 237310 firm`.
+**Proof.** Unit: `keeps Clara Barton forecasts and drops gymnasium / boat-pier forecasts for a 237310 firm`; `pathwayNaicsFit` zeros Boat Forces pier titles for 237310.
 
 
 ### Ask report Export in the open pane (Claude/ChatGPT pattern) — 2026-11-21

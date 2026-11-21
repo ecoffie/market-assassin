@@ -110,9 +110,12 @@ export function inheritFindIntent(customerText: string, priorCustomerText: strin
 // different orchestration — that gap is why quality diverged. These helpers close it.
 export const MARKET_REPORT_TOOL = 'generate_market_report';
 
-/** Customer asked for a full / packaged market research report (not a one-line market fact). */
+/** Customer asked for a full / packaged market research report (not a one-line market fact).
+ * "Comprehensive market research for Koamana" / "comprehensive MR …" must match even without
+ * the word "report" — otherwise forceMarketReport never fires and Ask answers in chat only
+ * until the user insists on a document (Map Ask acceptance gap, 2026-11). */
 export const MARKET_RESEARCH_SIGNAL =
-  /\b((?:comprehensive|full|complete|client[- ]ready|one[- ]shot)\s+(?:federal\s+)?(?:market\s+)?(?:research\s+)?report|(?:market\s+research|deep[- ]dive)\s+report|(?:generate|create|build|write|prepare|make)\s+(?:me\s+)?(?:a\s+)?(?:comprehensive\s+|full\s+|federal\s+)?(?:market\s+research\s+)?report|(?:market\s+research)\s+for\s+(?:my|our|the)\s+(?:company|firm|business))\b/i;
+  /\b((?:comprehensive|full|complete|client[- ]ready|one[- ]shot)\s+(?:federal\s+)?market\s+research\b|(?:comprehensive|full|complete)\s+MR\b|(?:comprehensive|full|complete|client[- ]ready|one[- ]shot)\s+(?:federal\s+)?(?:market\s+)?(?:research\s+)?report|(?:market\s+research|deep[- ]dive)\s+report|(?:generate|create|build|write|prepare|make)\s+(?:me\s+)?(?:a\s+)?(?:comprehensive\s+|full\s+|federal\s+)?(?:market\s+research\s+)?report|(?:market\s+research)\s+for\s+(?:my|our|the)\s+(?:company|firm|business))\b/i;
 
 export function isMarketResearchRequest(customerText: string): boolean {
   return MARKET_RESEARCH_SIGNAL.test(String(customerText || ''));

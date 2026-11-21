@@ -661,6 +661,10 @@ describe('fmp-writeup-grounding', () => {
           title: 'St. Lucie South Jetty Repair Industry Day',
           naics: '237990',
         }, '237310')).toBe(0);
+        expect(pathwayNaicsFit({
+          title: 'Repair Boat Forces Center Piers at Training Center Yorktown',
+          naics: '236220',
+        }, '237310')).toBe(0);
         const dredge = recompete('PIID-DREDGE', 'Norfolk Harbor Maintenance Dredging', '237990', 'DEPT OF THE ARMY');
         const jetty = recompete('PIID-JETTY', 'St. Lucie South Jetty Repair', '237990', 'DEPT OF THE ARMY');
         const ev = run([dredge, jetty, civilA, civilB]);

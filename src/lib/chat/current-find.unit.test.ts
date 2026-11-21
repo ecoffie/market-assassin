@@ -83,8 +83,13 @@ describe('isMarketResearchRequest (packaged generate_market_report orchestration
     ['Build a comprehensive federal market research report for my company.', true],
     ['Generate a market research report for RBA Construction in Hawaii', true],
     ['Write a full market report on janitorial services', true],
+    // Without the word "report" — Map Ask still must force generate_market_report.
+    ['comprehensive market research for Koamana Build', true],
+    ['comprehensive MR for Koamana Build', true],
+    ['full market research on roofing', true],
     ['Which agencies buy 541512?', false],
     ['What open opportunities are there for janitorial in Florida?', false],
+    ['do you offer market research?', false],
   ])('%s -> %s', (q, want) => expect(isMarketResearchRequest(q as string)).toBe(want));
 });
 
