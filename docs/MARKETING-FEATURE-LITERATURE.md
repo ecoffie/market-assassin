@@ -1,3 +1,12 @@
+### Ask FMP drops boat-pier / gymnasium forecasts for highway firms — 2026-11-21
+
+**What shipped.** Civil forecast pathway filter no longer treats pier “deck replacement” as highway civil (bare `deck` removed; waterfront titles like Boat Forces Piers are excluded). Clara Barton / GWMP forecasts still qualify.
+
+**Why it matters.** A 237310 highway profile was ranking DHS boat-pier forecasts beside Inspection MATOC — wrong market for the speaking/demo story.
+
+**Proof.** Unit: `keeps Clara Barton forecasts and drops gymnasium / boat-pier forecasts for a 237310 firm`.
+
+
 ### Ask report Export in the open pane (Claude/ChatGPT pattern) — 2026-11-21
 
 **What shipped.** Map Ask “Open report” cards no longer show PDF/Word/Excel/CSV chips under the answer. Formats live behind one **Export** control in the open report pane (map) and in the /app report preview header. Host rewrite strips vault `/api/app/vault/documents/download` paths and fake download hosts from the chat text instead of appending them as bullets.
@@ -45,7 +54,7 @@
 
 ### Ask Mindy Federal Market Profile write-up (host-grounded Vault DocModel) — 2026-11-20
 
-**What shipped.** Company-first FMP phase machine ends in a host-built DocModel (`create_document`) that must pass structure + grounding (237310 / market $ / vehicle / DSBS / Navy PAE), saves Word/PDF/xlsx/csv to Vault, and rewrites invented chat download URLs to real `/api/app/vault/documents/download?id=` paths.
+**What shipped.** Company-first FMP phase machine ends in a host-built DocModel (`create_document`) that must pass structure + grounding (237310 / market $ / vehicle / DSBS / Navy PAE) and saves Word/PDF/xlsx/csv to Vault. Invented chat download URLs are stripped (Export lives in the open report pane — see 2026-11-21 Export entry), not pasted as vault path bullets.
 
 **Why it matters.** The Claude+MCP RBA Federal Market Profile quality bar is now an Ask Mindy deliverable customers can open from Vault, not a chat-only summary that drifts.
 

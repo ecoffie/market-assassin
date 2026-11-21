@@ -808,6 +808,50 @@ describe('fmp-writeup-grounding', () => {
         expect(fc?.when).toMatch(/2027-09-01/);
       });
 
+      it('keeps Clara Barton forecasts and drops gymnasium / boat-pier forecasts for a 237310 firm', () => {
+        const findOpen = (rows: unknown[]) => JSON.stringify({ horizons: { open_now: { items: rows } } });
+        const ev = accumulateFmpEvidence([
+          { tool: 'get_contractor_award_history', content: HISTORY },
+          {
+            tool: 'get_agency_forecasts',
+            content: JSON.stringify({
+              forecasts: [
+                {
+                  id: 'fc-gwmp-1',
+                  title: 'MD NP GWMP 6(2)',
+                  description: 'Rehabilitate retaining wall on Clara Barton Parkway.',
+                  agency: 'Federal Highway Administration',
+                  naics_code: '237310',
+                  award_date: '2027-09-01',
+                },
+                {
+                  id: 'fc-gym-1',
+                  title: 'Gymnasium renovation FY27',
+                  description: 'Interior renovation of fitness center Building 12.',
+                  agency: 'Department of the Air Force',
+                  naics_code: '236220',
+                  award_date: '2027-06-01',
+                },
+                {
+                  id: 'fc-pier-1',
+                  title: 'Repair Boat Forces Center Piers (Building 183) at Training Center Yorktown',
+                  description: 'Pier pile repair and deck replacement for boat forces.',
+                  agency: 'Department of Homeland Security',
+                  naics_code: '236220',
+                  award_date: '2027-04-01',
+                },
+              ],
+              _meta: { grounded: true, count: 3 },
+            }),
+          },
+          { tool: 'find_opportunities', content: findOpen([civilA, civilB]) },
+        ]);
+        const titles = (ev.pathways ?? []).map((p) => p.title);
+        expect(titles.some((t) => /Clara Barton|GWMP/i.test(t))).toBe(true);
+        expect(titles.some((t) => /Gymnasium/i.test(t))).toBe(false);
+        expect(titles.some((t) => /Boat Forces|Piers/i.test(t))).toBe(false);
+      });
+
       it('collapses FIND-uuid + SAM-solicitation twins of the same Inspection MATOC', () => {
         const title = '2027 Construction Inspection Services Multiple Award Task Order Contract (MATOC)';
         const byUuid = {

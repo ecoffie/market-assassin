@@ -684,7 +684,9 @@ function extractPathways(
       const vehicleOrSs = VEHICLE_WORD_RE.test(hay) || SOURCES_SOUGHT_RE.test(hay);
       const adjacentVehicle = vehicleOrSs && x.fit >= 40;
       // Forecasts need civil wording — sector-fit alone lets gymnasium / building forecasts in.
-      const forecastCivil = CIVIL_LEXICAL_RE.test(hay) || /GWMP|Clara Barton|parkway|bridge|highway|roadway|pavement|culvert/i.test(hay);
+      // Bare "deck" used to admit pier/boat-forces forecasts (deck replacement on a pier).
+      const forecastCivil = !WATERFRONT_OFF_RE.test(hay)
+        && (CIVIL_LEXICAL_RE.test(hay) || /GWMP|Clara Barton|parkway|bridge|highway|roadway|pavement|culvert/i.test(hay));
       if (x.p.kind === 'forecast') return forecastCivil;
       return x.fit >= 80 || x.buyer >= 30 || inspection || adjacentVehicle || (x.fit >= 40 && x.buyer > 0);
     });
@@ -712,10 +714,13 @@ function extractPathways(
   return indexed.slice(0, 8).map((x) => x.p);
 }
 
-/** Civil / heavy-construction wording. Bare "BRIDGE" is deliberately absent: it names bridge CONTRACTS (extensions). */
-const CIVIL_LEXICAL_RE = /\b(highway|parkway|pavement|roadway|bridge rehabilitation|bridge replacement|deck|culvert|retaining wall|heavy civil|marine construction|asphalt|concrete paving)\b/i;
+/** Civil / heavy-construction wording. Bare "BRIDGE" is deliberately absent: it names bridge CONTRACTS (extensions).
+ * Bare "deck" is also absent — pier "deck replacement" is waterfront, not highway bridge deck. */
+const CIVIL_LEXICAL_RE = /\b(highway|parkway|pavement|roadway|bridge rehabilitation|bridge replacement|bridge deck|culvert|retaining wall|heavy civil|marine construction|asphalt|concrete paving)\b/i;
 /** Marine dredging / harbor work — adjacent 237xxx, wrong pathway for a highway/bridge primary (237310). */
 const MARINE_OFF_RE = /\b(dredg(?:e|ing)?|jetty|breakwater|harbor\b|channel maintenance|maintenance dredging|inner channel)\b/i;
+/** Waterfront / boat / pier forecasts that share 23x NAICS with highway firms but are the wrong market. */
+const WATERFRONT_OFF_RE = /\b(piers?|wharf|boat forces|marina|boat house|dry[\s-]?dock)\b/i;
 const OFF_MARKET_TITLE_RE = /\b(software|tax|income tax)\b/i;
 const IRS_BUYER_RE = /\b(Internal Revenue Service|IRS)\b/i;
 
