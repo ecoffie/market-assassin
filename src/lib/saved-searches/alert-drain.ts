@@ -1,10 +1,25 @@
 import type { SavedSearchAlertFrequency } from './constants';
+import { CONFIG_ACTION_CLASSES, SUPPRESSION_CLASSES } from '@/lib/cron/watchdog-incidents';
 
 /**
  * Per-fetch bound — not the day's work. One invocation keeps requesting the
  * next oldest-due page until the audience is drained or a safety ceiling hits.
  */
 export const SAVED_SEARCH_ALERT_BATCH_SIZE = 50;
+
+/**
+ * Failure classes that are action items for a recipient or a search owner — never a job outage.
+ * Same sets the watchdog / delivery-readiness classifier uses, so the drain outcome and the
+ * MCP delivery_state cannot disagree about whether suppressions/config made the job "fail".
+ *
+ * Measured 2026-11-21: every daily run since 2026-09-30 self-reported `error` because
+ * `recipient_suppressed` incremented `failed`, the route returned HTTP 500, and MCP told
+ * customers alert delivery was degraded (Sherizan / Mortgage Link1 Claude session).
+ */
+export const ACTION_ITEM_FAILURE_CLASSES: ReadonlySet<string> = new Set([
+  ...SUPPRESSION_CLASSES,
+  ...CONFIG_ACTION_CLASSES,
+]);
 
 /**
  * Hard row ceiling for a single invocation. Must stay well below a
@@ -209,16 +224,29 @@ function summarizeDrain(results: SavedSearchAlertDrainResult): string | undefine
   return parts.length ? parts.join(',') : undefined;
 }
 
+/** Processing failures only — action-item classes stay in failuresByClass but do not red the job. */
+export function processingFailureCount(
+  failuresByClass: Partial<Record<SavedSearchAlertFailureClass, number>>,
+): number {
+  let n = 0;
+  for (const [name, count] of Object.entries(failuresByClass)) {
+    if (!count || ACTION_ITEM_FAILURE_CLASSES.has(name)) continue;
+    n += count;
+  }
+  return n;
+}
+
 function resolveOutcome(results: SavedSearchAlertDrainResult): SavedSearchAlertDrainOutcome {
   if (results.stopReason === 'query_failed') return 'error';
+  const processingFailed = processingFailureCount(results.failuresByClass);
   const leftover = results.remaining === null || results.remaining > 0;
   if (
     leftover
     && (results.stopReason === 'time_budget' || results.stopReason === 'row_ceiling')
   ) {
-    return results.failed > 0 ? 'error' : 'partial';
+    return processingFailed > 0 ? 'error' : 'partial';
   }
-  return results.failed > 0 ? 'error' : 'success';
+  return processingFailed > 0 ? 'error' : 'success';
 }
 
 /**

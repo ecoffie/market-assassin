@@ -10,8 +10,9 @@ const ROUTE = readFileSync(
 describe('saved-search-alerts telemetry and same-invocation drain seams', () => {
   it('self-reports the drain outcome, including partial capacity exhaustion', () => {
     expect(ROUTE).toContain("import { reportCronOutcome } from '@/lib/cron-self-report'");
+    expect(ROUTE).toContain('if (dispatcherRun && !preview)');
     expect(ROUTE).toContain('await reportCronOutcome(JOB_NAME, results.outcome, results.errorSummary)');
-    expect(ROUTE).toContain('{ status: results.success ? 200 : 500 }');
+    expect(ROUTE).toContain("{ status: results.outcome === 'error' ? 500 : 200 }");
     expect(ROUTE).toContain('runSavedSearchAlertDrain');
   });
 

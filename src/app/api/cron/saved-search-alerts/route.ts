@@ -597,7 +597,9 @@ export async function GET(request: NextRequest) {
     },
   });
 
-  if (dispatcherRun) {
+  // Never self-report a preview — measured 2026-11-21: a preview curl with
+  // x-cron-dispatch overwrote the day's real error summary with success.
+  if (dispatcherRun && !preview) {
     await reportCronOutcome(JOB_NAME, results.outcome, results.errorSummary);
   }
 
@@ -616,6 +618,10 @@ export async function GET(request: NextRequest) {
     );
   }
 
+  // HTTP 500 only for a true job error. `partial` (capacity) and `success` (including
+  // action-item-only suppressions/invalid NAICS) must be 2xx — a non-2xx used to make
+  // delivery-readiness treat an otherwise-healthy or partial run as a whole-job outage,
+  // which is what MCP reported to customers as "alert delivery degraded".
   return NextResponse.json(
     {
       success: results.success,
@@ -640,6 +646,6 @@ export async function GET(request: NextRequest) {
       invalidNaicsSearches: results.invalidNaicsSearches,
       ...(preview ? { preview: previewRows } : {}),
     },
-    { status: results.success ? 200 : 500 },
+    { status: results.outcome === 'error' ? 500 : 200 },
   );
 }
