@@ -155,6 +155,9 @@ describe('Data Core inventory truth', () => {
     expect(living.kind).toBe('source_corpus');
     expect(living.stored).toBe(73);
     expect(claims.kind).toBe('derived_intelligence');
+    expect(claims.freshness.basis).toMatch(/last poll/);
+    expect(claims.freshness.basis).not.toMatch(/Same daily collector/);
+    expect(claims.freshness.state).toBe('STALE');
     expect(hist.stored).toBe(445);
     expect(hist.surface.state).toBe('withheld');
     expect(hist.freshness.state).toBe('STATIC');
