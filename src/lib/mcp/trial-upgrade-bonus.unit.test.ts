@@ -1,6 +1,6 @@
 /**
- * "Upgrade now, get +500 credits" — the bonus is granted exactly once per subscription, only
- * from a PAID invoice on a subscription flagged by the early-upgrade endpoint.
+ * The upgrade bonus: 1,000 credits ONCE PER PERSON on their first paid Pro/Team payment
+ * (owner, 2026-11-18). Free member upgrading, trial paying early, trial converting at day 14.
  */
 import { describe, it, expect, vi } from 'vitest';
 import type Stripe from 'stripe';
@@ -9,18 +9,20 @@ vi.mock('./credits', () => ({ applyCreditOnce: vi.fn() }));
 vi.mock('@/lib/stripe', () => ({ getStripe: () => { throw new Error('no live Stripe in unit tests'); } }));
 
 const {
-  handleTrialUpgradeBonusInvoice, hasEarlyUpgradeFlag, trialUpgradeBonusKey, EARLY_UPGRADE_FLAG,
+  handleTrialUpgradeBonusInvoice, hasEarlyUpgradeFlag, upgradeBonusKey, EARLY_UPGRADE_FLAG, UPGRADE_BONUS_REASON,
 } = await import('./trial-upgrade-bonus');
-const { TRIAL_UPGRADE_BONUS_CREDITS } = await import('./packages');
+const { UPGRADE_BONUS_CREDITS, TRIAL_UPGRADE_BONUS_CREDITS } = await import('./packages');
 
 function invoice(over: Record<string, unknown> = {}): Stripe.Invoice {
   return {
     id: 'in_1',
     status: 'paid',
     amount_paid: 14900,
-    billing_reason: 'subscription_update',
+    billing_reason: 'subscription_create',
+    customer: 'cus_1',
     customer_email: 'buyer@x.com',
-    parent: { subscription_details: { subscription: 'sub_123', metadata: { [EARLY_UPGRADE_FLAG]: '500' } } },
+    lines: { data: [{ price: { unit_amount: 14900 } }] },
+    parent: { subscription_details: { subscription: 'sub_123', metadata: {} } },
     ...over,
   } as unknown as Stripe.Invoice;
 }
@@ -38,70 +40,77 @@ function ledger() {
   return { apply, get balance() { return balance; } };
 }
 
-const deps = (apply: ReturnType<typeof ledger>['apply'], meta: Record<string, string> = {}) => ({
+const deps = (apply: ReturnType<typeof ledger>['apply'], opts: { meta?: Record<string, string>; earlier?: boolean } = {}) => ({
   apply,
   resolveEmail: async (inv: Stripe.Invoice) => inv.customer_email ?? null,
-  retrieveSubscriptionMetadata: vi.fn(async () => meta),
+  retrieveSubscriptionMetadata: vi.fn(async () => opts.meta ?? {}),
+  hasEarlierPaidInvoice: vi.fn(async () => opts.earlier ?? false),
 });
 
-describe('handleTrialUpgradeBonusInvoice', () => {
-  it('grants the constant once for a paid, flagged invoice', async () => {
-    const l = ledger();
-    const r = await handleTrialUpgradeBonusInvoice(invoice(), deps(l.apply));
-    expect(r).toMatchObject({ handled: true, applied: true, credits: 500, email: 'buyer@x.com', subscriptionId: 'sub_123' });
-    expect(l.apply).toHaveBeenCalledWith(trialUpgradeBonusKey('sub_123'), 'buyer@x.com', TRIAL_UPGRADE_BONUS_CREDITS, 'trial_upgrade_bonus');
-    expect(TRIAL_UPGRADE_BONUS_CREDITS).toBe(500);
+describe('upgrade bonus', () => {
+  it('is 1,000, and the trial "Upgrade now" offer shows the same number', () => {
+    expect(UPGRADE_BONUS_CREDITS).toBe(1000);
+    expect(TRIAL_UPGRADE_BONUS_CREDITS).toBe(UPGRADE_BONUS_CREDITS);
   });
 
-  it('a redelivery and a later renewal invoice on the same subscription do not grant again', async () => {
+  it.each([
+    ['a free member upgrading (first invoice)', 'subscription_create'],
+    ['a trial paying early', 'subscription_update'],
+    ['a trial converting at day 14', 'subscription_cycle'],
+  ])('grants once on %s', async (_label, reason) => {
+    const l = ledger();
+    const r = await handleTrialUpgradeBonusInvoice(invoice({ billing_reason: reason }), deps(l.apply));
+    expect(r).toMatchObject({ handled: true, applied: true, credits: 1000, email: 'buyer@x.com', subscriptionId: 'sub_123' });
+    expect(l.apply).toHaveBeenCalledWith(upgradeBonusKey('buyer@x.com'), 'buyer@x.com', 1000, UPGRADE_BONUS_REASON);
+  });
+
+  it('never on a renewal: an earlier paid invoice means the first payment already happened', async () => {
+    const l = ledger();
+    const r = await handleTrialUpgradeBonusInvoice(invoice({ billing_reason: 'subscription_cycle' }), deps(l.apply, { earlier: true }));
+    expect(r).toMatchObject({ handled: true, skipped: 'not_first_payment' });
+    expect(l.apply).not.toHaveBeenCalled();
+  });
+
+  it('once per PERSON: a redelivery or a second subscription does not grant again', async () => {
     const l = ledger();
     await handleTrialUpgradeBonusInvoice(invoice(), deps(l.apply));
     const again = await handleTrialUpgradeBonusInvoice(invoice(), deps(l.apply));
-    const renewal = await handleTrialUpgradeBonusInvoice(invoice({ id: 'in_2', billing_reason: 'subscription_cycle' }), deps(l.apply));
+    const otherSub = await handleTrialUpgradeBonusInvoice(
+      invoice({ id: 'in_9', parent: { subscription_details: { subscription: 'sub_999', metadata: {} } } }), deps(l.apply));
     expect(again.applied).toBe(false);
-    expect(renewal.applied).toBe(false);
-    expect(l.balance).toBe(500);
+    expect(otherSub.applied).toBe(false);
+    expect(l.balance).toBe(1000);
+    expect(upgradeBonusKey(' Buyer@X.com ')).toBe(upgradeBonusKey('buyer@x.com'));
   });
 
-  it('never grants on an unflagged subscription (ordinary trial end or renewal)', async () => {
+  it('never on a $0 invoice (the trial-start invoice)', async () => {
     const l = ledger();
-    const d = deps(l.apply, {});
-    const r = await handleTrialUpgradeBonusInvoice(
-      invoice({ billing_reason: 'subscription_cycle', parent: { subscription_details: { subscription: 'sub_9', metadata: {} } } }), d);
-    expect(r.handled).toBe(false);
-    expect(l.apply).not.toHaveBeenCalled();
-    expect(d.retrieveSubscriptionMetadata).not.toHaveBeenCalled(); // no Stripe read for every renewal
-  });
-
-  it('never grants on a $0 invoice (the trial-start invoice)', async () => {
-    const l = ledger();
-    const r = await handleTrialUpgradeBonusInvoice(invoice({ amount_paid: 0, billing_reason: 'subscription_create' }), deps(l.apply));
+    const r = await handleTrialUpgradeBonusInvoice(invoice({ amount_paid: 0 }), deps(l.apply));
     expect(r.handled).toBe(false);
     expect(l.apply).not.toHaveBeenCalled();
   });
 
-  it('never grants on an invoice that is not paid', async () => {
+  it('never on an invoice that is not paid', async () => {
     const l = ledger();
     const r = await handleTrialUpgradeBonusInvoice(invoice({ status: 'open' }), deps(l.apply));
     expect(r.handled).toBe(false);
+  });
+
+  it('never on a non-Pro/Team invoice (e.g. an MCP credits plan)', async () => {
+    const l = ledger();
+    const d = deps(l.apply);
+    const r = await handleTrialUpgradeBonusInvoice(invoice({ amount_paid: 5900, lines: { data: [{ price: { unit_amount: 5900 } }] } }), d);
+    expect(r.handled).toBe(false);
     expect(l.apply).not.toHaveBeenCalled();
   });
 
-  it('reads the subscription when the invoice snapshot lacks the flag on the trial-ending invoice', async () => {
+  it('an early-upgrade invoice with an unusual line still counts via the subscription flag', async () => {
     const l = ledger();
-    const d = deps(l.apply, { [EARLY_UPGRADE_FLAG]: '500' });
+    const d = deps(l.apply, { meta: { [EARLY_UPGRADE_FLAG]: '1000' } });
     const r = await handleTrialUpgradeBonusInvoice(
-      invoice({ parent: { subscription_details: { subscription: 'sub_7', metadata: {} } } }), d);
-    expect(d.retrieveSubscriptionMetadata).toHaveBeenCalledWith('sub_7');
-    expect(r).toMatchObject({ handled: true, applied: true });
-  });
-
-  it('ignores the metadata VALUE: the amount is always the server constant', async () => {
-    const l = ledger();
-    await handleTrialUpgradeBonusInvoice(
-      invoice({ parent: { subscription_details: { subscription: 'sub_8', metadata: { [EARLY_UPGRADE_FLAG]: '999999' } } } }),
-      deps(l.apply));
-    expect(l.balance).toBe(TRIAL_UPGRADE_BONUS_CREDITS);
+      invoice({ amount_paid: 7450, billing_reason: 'subscription_update', lines: { data: [{ price: { unit_amount: null } }] } }), d);
+    expect(d.retrieveSubscriptionMetadata).toHaveBeenCalledWith('sub_123');
+    expect(r).toMatchObject({ handled: true, applied: true, credits: 1000 });
   });
 
   it('a ledger failure throws (so the webhook returns 500 and Stripe retries)', async () => {
