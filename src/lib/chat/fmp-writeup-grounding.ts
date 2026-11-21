@@ -251,6 +251,8 @@ const PROCUREMENT_WORDS = new Set([
   'clin', 'line', 'item', 'items', 'deliverable', 'deliverables',
 ]);
 const PROCUREMENT_PHRASES = /\bset[-\s]?aside\b|\bn\/a\b|\bfirm\s+fixed\s+price\b|\bfixed\s+price\b/i;
+/** Place / facility names that are Title Case person-shaped (forecast descriptions walk them as "contacts"). */
+const PLACE_PERSON_PHRASES = /\bClara Barton\b|\bRock Creek\b|\bAnacostia\b|\bBolling\b/i;
 /** Fillers that can never be a name on their own; a string made only of these is not a person. */
 const NON_NAME_TOKENS = new Set(['no', 'yes', 'the', 'of', 'and', 'for', 'to', 'a', 'an', 'in', 'on', 'or', 'by', 'any', 'all']);
 
@@ -264,6 +266,7 @@ export function looksLikePersonContactName(s: string): boolean {
   if (IRS_LIKE.test(t)) return false;
   if (/^No\b/i.test(t)) return false;
   if (PROCUREMENT_PHRASES.test(t)) return false;
+  if (PLACE_PERSON_PHRASES.test(t)) return false;
   if (!/^[A-Z][a-z]+(?:\s+[A-Z][a-z.'-]+)+$/.test(t)) return false;
   const words = t.split(/\s+/);
   if (words.length > 4) return false;
@@ -483,12 +486,21 @@ function enrichPathwayTitle(title: string, summary?: string, noticeId?: string):
 /** Collapse Special Notice + Sources Sought twins (e.g. W912DR27H1CWY / W912DR27H1CWYPLA). */
 function pathwayDedupeKey(p: FmpPathway): string {
   const sol = (p.noticeId || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
-  if (sol.length >= 10) {
-    // Prefer the shorter stem so PLA/amendment suffixes collapse with the parent notice.
+  // PIID-style solicitation (not a 32-hex notice UUID) — stem collapses PLA/amend twins.
+  if (sol.length >= 10 && !/^[A-F0-9]{32}$/.test(sol)) {
     const stem = sol.replace(/(PLA|AMEND\d*|REV\d*)$/i, '');
     return `sol:${stem.slice(0, 14)}`;
   }
-  return `title:${p.title.toLowerCase().slice(0, 48)}|${p.naics ?? ''}`;
+  // Same vehicle / SS title from FIND (uuid) + search_sam (solicitation) must not double-count.
+  const titleKey = p.title.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().slice(0, 56);
+  if (VEHICLE_WORD_RE.test(p.title) || SOURCES_SOUGHT_RE.test(`${p.title} ${p.noticeType ?? ''}`)) {
+    return `frame:${titleKey}`;
+  }
+  if (sol.length >= 10) {
+    const stem = sol.replace(/(PLA|AMEND\d*|REV\d*)$/i, '');
+    return `sol:${stem.slice(0, 14)}`;
+  }
+  return `title:${titleKey}|${p.naics ?? ''}`;
 }
 
 function dateOnly(s: string): string {
@@ -631,12 +643,17 @@ function extractPathways(
     const hay = `${p.title} ${p.noticeType ?? ''}`;
     return /inspection/i.test(hay) && VEHICLE_WORD_RE.test(hay) ? 35 : 0;
   };
+  /** Claude gold numbers Clara Barton / GWMP as a pathway, not a buried forecast table row. */
+  const claraBoost = (p: FmpPathway): number => {
+    if (p.kind !== 'forecast') return 0;
+    return /Clara Barton|GWMP/i.test(p.title) ? 40 : 0;
+  };
   // Hard drops only apply to a construction / civil firm; other profiles are ranked, never emptied.
   const candidates = civilDominant ? out.filter((p) => !isOffMarketForCivil(p)) : out;
   const indexed = candidates.map((p, i) => {
     const fit = fitFor(p);
     const buyer = pathwayBuyerAffinity(p, awardRows);
-    const boost = inspectionBoost(p);
+    const boost = inspectionBoost(p) + claraBoost(p);
     return { p, i, fit, buyer, score: fit + buyer + boost };
   });
   indexed.sort((a, b) => {

@@ -387,7 +387,7 @@ describe('fmp-writeup-grounding', () => {
         'Set Aside Total', 'Full Open', 'Small Business', 'Woman Owned', 'Veteran Owned', 'Hubzone Set',
         'Not Applicable', 'Unknown Contact', 'None Listed', 'Limited Competition', 'Unrestricted Award',
         'Contract Ceiling', 'Obligations Amount', 'Request Rfq', 'No Contact', 'Notice Tbd',
-        'Firm Fixed Price', 'Weatherproofing Units', 'Asphalt Overlay',
+        'Firm Fixed Price', 'Weatherproofing Units', 'Asphalt Overlay', 'Clara Barton',
       ]) expect(looksLikePersonContactName(junk), junk).toBe(false);
       for (const person of ['Helson Roman', 'David Bogner', 'Terry Agena', 'Noel Rangel']) {
         expect(looksLikePersonContactName(person), person).toBe(true);
