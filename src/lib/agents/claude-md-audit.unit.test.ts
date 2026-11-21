@@ -35,7 +35,8 @@ describe('instruction cleanup: no rule is silently lost', () => {
   it('autonomous-deploy instructions are reworded, not deleted', () => {
     const rules = read('docs/agents/project-rules.md')!;
     expect(rules).not.toContain('Use `npm run deploy` (runs tests first)');
-    expect(rules).toContain('[Release control 2026-11-17]');
+    expect(rules).toContain('[Release control 2026-11-21]');
+    expect(rules).not.toContain('vercel --prod');
     expect(read('docs/agents/release-and-worktrees.md')).toContain('Builders never run it');
   });
 

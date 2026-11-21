@@ -16,15 +16,14 @@ Deployment configuration and procedures for the Market Assassin platform.
 
 ## Quick Deploy
 
+Production deploys only when a pull request merges to `main` and Vercel Git builds that commit. Agents do not deploy production.
+
 ```bash
-# Deploy to production
-vercel --prod
+# Preview only. Refuses --prod, promote, rollback, and redeploy.
+npm run deploy:preview
 
-# Deploy preview
-vercel
-
-# Force redeploy (clears cache)
-vercel --prod --force
+# Same preview
+vercel deploy
 ```
 
 ---
@@ -287,16 +286,7 @@ Check Vercel Dashboard → Deployments → Functions for:
 
 ## Rollback
 
-```bash
-# List deployments
-vercel ls
-
-# Promote previous deployment
-vercel promote [deployment-url]
-
-# Or via Dashboard
-# Deployments → Click deployment → Promote to Production
-```
+Agents do not roll back or promote. Restoring production from a known `main` deployment is the release coordinator only, and only with Eric's explicit written approval. List deployments with `vercel ls` if you are gathering evidence. Do not run `vercel promote`, `vercel rollback`, or `vercel redeploy`.
 
 ---
 

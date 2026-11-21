@@ -1,5 +1,5 @@
 ---
-description: Always commit and deploy after completing a fix or feature in market-assassin
+description: Always commit and open a PR after a fix. Production deploys only when it merges to main.
 alwaysApply: true
 ---
 
@@ -8,11 +8,11 @@ alwaysApply: true
 When you finish a bug fix or feature in **market-assassin**:
 
 1. **Commit + push** before claiming done — do not leave fixes local-only.
-2. **Deploy** with `vercel --prod` from the **same worktree/branch** that has the fix (after push succeeds).
-3. **Verify** prod by grepping the **specific string/element you changed** on the live URL — not a 200, not a green build status.
-4. Before any `vercel --prod` from a linked worktree, confirm **that worktree** has its own `.vercel/project.json`. See below.
+2. **Open a PR** and get `verify` green. Production deploys only when that PR merges to `main` and Vercel Git builds it.
+3. After the merge, verify production by grepping the **specific string/element you changed** on the live URL — not a 200, not a green build status.
+4. A preview is `npm run deploy:preview` (`vercel deploy`, no `--prod`). Never `vercel --prod`, `vercel promote`, `vercel rollback`, `vercel redeploy`, `--skip-domain`, or a production deploy hook. There is no chat-approval exception.
 
-Do not ask "want me to commit/deploy?" — just do it unless the change is explicitly exploratory/draft.
+Do not ask "want me to commit?" — commit and open the PR unless the change is explicitly exploratory/draft. Do not ask to deploy production; merging to `main` is the deploy.
 
 Commit messages end with: `Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>`
 
@@ -35,25 +35,14 @@ Feature pushes: append proof to `docs/MARKETING-FEATURE-LITERATURE.md` in the sa
 - Do all edits, commits, and deploys from that worktree path.
 - After creating the worktree, also run `npm run env:link-worktree -- .claude/worktrees/<slug>` and copy the main checkout's `.vercel/` into the worktree (or `vercel link --yes --project market-assassin` from the worktree). A worktree without its own `.vercel/project.json` is not deploy-ready.
 
-## ⚠️ Vercel CLI from a worktree — link `.vercel` locally or you ship the parent checkout
+## ⚠️ Do not upload production from a worktree
 
-`vercel --prod` uploads the **directory that owns the nearest `.vercel/project.json`**, not "whatever branch your shell thinks it is on."
+A CLI production upload uses the directory that owns the nearest `.vercel/project.json`, not the branch the shell is on. That path has aliased getmindy.ai to the wrong tree (PR #1514, 2026-09-14; an unmerged branch, 2026-11-20). It is closed.
 
-A fresh git worktree under `.claude/worktrees/<slug>` does **not** inherit the main checkout's `.vercel/`. If that file is missing, the CLI walks up to the parent `market-assassin` checkout, uploads **that** tree (often still on `main` / an older branch), aliases production, and reports READY — while the feature branch you just pushed never reached the build. Measured 2026-09-14 on PR #1514: two "successful" prod deploys served the old Confirm UI; only after copying `.vercel/` into the worktree and redeploying did `Edit question` / Ask-collapse ship.
-
-**Before every worktree `vercel --prod`:**
+Preview only, from the worktree that contains the change:
 
 ```bash
-test -f .vercel/project.json || {
-  echo "REFUSED: this worktree has no .vercel link — copy main's .vercel/ or run vercel link"
-  exit 1
-}
-# cwd must be the worktree that contains the fix
-pwd   # must end with .claude/worktrees/<slug>
-# Must be the getmindy.ai project — not a slug-named project vercel auto-created
-node -e 'const p=require("./.vercel/project.json"); if(p.projectName!=="market-assassin"){console.error("REFUSED: .vercel/project.json projectName="+p.projectName+" (need market-assassin)"); process.exit(1)}'
+npm run deploy:preview
 ```
 
-Do **not** treat a green Vercel READY as proof the branch shipped. Grep the live chunk/page for a string that exists only on the feature branch. A READY deploy on a **wrong** Vercel project (e.g. slug-named `cai-language-guardrails`) is **not** production evidence for getmindy.ai.
-
-**Process debt (Eric 2026-09-15 — 2nd wrong-project incident):** worktrees can auto-link/create a non-`market-assassin` project. Manual assertion above is required; a hard abort script is deferred unless it happens a third time — do not divert PATHWAY/TALENT to build that guard now.
+A preview READY is not production. Production evidence is the Vercel deployment Git built from the merge to `main`. A READY deploy on a wrong Vercel project (for example a slug-named project) is not evidence for getmindy.ai.

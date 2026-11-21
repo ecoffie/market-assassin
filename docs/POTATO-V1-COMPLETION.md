@@ -17,7 +17,7 @@ Recorded 2026-09-17 from live production.
 | Catalog | `GET https://getmindy.ai/api/mcp/catalog` HTTP 200 · **62 tools** |
 | MCP page | `GET https://getmindy.ai/mcp` HTTP 200 |
 
-**Not acceptance evidence:** later CLI `vercel --prod` completions that do not own the live alias.
+**Not acceptance evidence (past):** later CLI production uploads (`vercel --prod`, now forbidden) that do not own the live alias.
 
 **Superseded:** the env-broken local E2E (`supabaseUrl is required` because FIND captured env at import time) and the blocked push caused by untracked `_tmp` typecheck files. They do not change the production state.
 

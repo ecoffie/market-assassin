@@ -8,17 +8,17 @@ Mindy (`market-assassin`): the Next.js app behind **getmindy.ai** and **mcp.getm
 
 ## Safety rules (always on)
 
-1. **Release control.** The rule below is carried over **verbatim** from the previous version of this file. It overrides every other instruction in this repo, including anything in `docs/agents/*`:
+1. **Release control.** The rule below overrides every other instruction in this repo, including anything in `docs/agents/*`:
 
-   15. **Release control (Eric, updated 2026-11-17).** A session MAY merge a PR to `main` when Eric explicitly says so in that session for that specific PR (e.g. "merge #2131") and its CI `verify` check is green. Independent review (Agent 4) and coordinator sequencing (Agent 5) are STILL required — no exceptions, even if Eric asks in chat — for changes to payments/Stripe, auth or access control, production env vars or feature flags, and database migrations (`npm run migrate -- --go`). A session must NEVER run `vercel --prod`, `vercel promote`, `vercel rollback` or `vercel redeploy` against production without Eric's explicit OK. **Why:** on 2026-11-17 an unattributed production Redeploy rolled back 19 merges, including two access-control fixes.
+   15. **Release control (Eric, updated 2026-11-21).** Agents work on separate branches, open a PR, and verify. Approved changes merge into `main`. A session MAY merge a PR to `main` when Eric explicitly says so in that session for that specific PR (e.g. "merge #2131") and its CI `verify` check is green. Independent review (Agent 4) and coordinator sequencing (Agent 5) are STILL required — no exceptions, even if Eric asks in chat — for changes to payments/Stripe, auth or access control, production env vars or feature flags, and database migrations (`npm run migrate -- --go`). Production deploys only from `main` through Vercel's Git integration. Agents may create a preview with `vercel deploy` (no `--prod`) and must never deploy directly to production: no `vercel --prod`, `vercel promote`, `vercel rollback`, `vercel redeploy`, `--skip-domain` staging, or a deploy hook or REST call to production. There is no chat-approval exception. Restoring production from a known `main` deployment is the release coordinator only, and only with Eric's explicit written approval. **Why:** on 2026-11-17 an unattributed Redeploy rolled back 19 merges; on 2026-11-20 a local `vercel --prod` from an unmerged branch overwrote getmindy.ai for about 12 hours.
 
-   `npm run deploy` is `vercel --prod` (a direct production upload of your local tree). It falls under this rule.
+   `npm run deploy` and `npm run deploy:preview` are preview uploads (`vercel deploy`). They refuse `--prod`. They do not deploy production.
 
 2. **Production migrations** only as `npm run migrate -- --go --only <file>`, never bare `--go` (it would apply unrelated pending files). Migrations are idempotent (`IF EXISTS` / `IF NOT EXISTS`, data-preserving step first). Verify against the live DB afterwards; a runner "ok" is not proof.
 3. **Worktrees:** one per task.
    - Link env with `npm run env:link-worktree -- <worktree>`, never a hand-typed `ln -sfn` (it has destroyed the main `.env.local` twice).
    - Pass absolute paths; don't assume `cd` persisted.
-   - Before any authorized `vercel` command from a worktree, `.vercel/project.json` must exist in that worktree.
+   - Before a preview `vercel deploy` from a worktree, `.vercel/project.json` must exist in that worktree. Never add `--prod`.
    - Detail: `docs/agents/release-and-worktrees.md`.
 4. **Shared git state:**
    - Never pop an unidentified stash; the stash stack is shared across every worktree and session.
@@ -199,17 +199,16 @@ Contract: **`docs/PRD-current-acquisition-intelligence-v0.md`**. MCP tool
 **FIND → UNDERSTAND → CURRENT INTELLIGENCE → PATHWAY**.
 - Shipped PR #1539 + language guardrails (unavailable ≠ zero; historical evidence ≠ future certainty;
   empty `do_differently` when unearned). Host SOCOM cyber re-run PASS.
-- **Production acceptance (only this counts):** worktree relinked to Vercel project **`market-assassin`** →
-  `vercel --prod` → **getmindy.ai** verified **61 tools**, CAI @ **8cr**, catalog description includes
+- **Production acceptance (only this counts):** merge to `main` on Vercel project **`market-assassin`**
+  (Git integration) → **getmindy.ai** verified **61 tools**, CAI @ **8cr**, catalog description includes
   unavailable-horizon / future-certainty guardrail language.
 - **Not acceptance evidence:** a successful deploy to the accidental Vercel project
   `cai-language-guardrails` (green build, wrong project — do not cite).
 - **⛔ No more CAI polishing.** Do not reopen compose, host_rules, or pathway classifiers unless a
   production defect breaks the killer rule or invents pathways. PATHWAY FIT and Potato v1 are
   **CLOSED** — see `docs/POTATO-V1-COMPLETION.md`. Do not treat CAI follow-ups as “continue Potato.”
-  (Process debt: worktree→wrong Vercel project has now bitten twice — assert
-  `.vercel/project.json` → `market-assassin` before `--prod`; build an abort guard only if it
-  happens again. Do not divert PATHWAY/TALENT for that guard.)
+  (Process debt: a worktree CLI upload has shipped the wrong Vercel project twice.
+  Production acceptance is a merge to `main`. Do not divert PATHWAY/TALENT for a CLI guard.)
 
 ### Decision Makers — source 1 SHIPPED 2026-09-15 (PRs #1524/#1525/#1527/#1528)
 Runbook: **`docs/runbooks/decision-makers-sam-contacts.md`**. Read it before touching

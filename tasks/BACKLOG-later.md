@@ -568,7 +568,7 @@ holds the stale-token guard that keys off these names.
 - **This DB has no in-app DDL** — every migration is hand-run in the Supabase
   SQL editor. After CREATE TABLE, run `NOTIFY pgrst, 'reload schema';` or writes
   fail with "table not in schema cache."
-- **Always commit + push BEFORE `vercel --prod`.**
+- **Always commit + push, then open a PR.** Production deploys only from `main` through Vercel Git. `vercel --prod` is forbidden.
 - **Re-run periodically:** `node scripts/populate-dodaac-directory.mjs` is now
   cron'd — no manual run needed unless verifying.
 
