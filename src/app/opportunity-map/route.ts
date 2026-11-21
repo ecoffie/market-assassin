@@ -11140,18 +11140,9 @@ const ASK_MINDY_JS = `<script>(function(){
     if(pendingTurn){ var pd=pendingTurn; ask(pd.q,{turnId:pd.turnId,replay:true}); }
   };
   function greet(){
-    // Ask Mindy is independent of the map viewport (2026-11-19). Chips are general federal questions.
-    var chips=[
-      ['Who buys 541512 work?','Which agencies buy the most NAICS 541512 (custom computer programming) work?'],
-      ['Find the incumbent','How do I find who currently holds a contract before it recompetes?'],
-      ['Write a capability statement','What should my capability statement include for federal buyers?'],
-      ['Market research report','Build a comprehensive federal market research report for my company.']
-    ];
-    var h='<div class="amk-empty"><b>Ask Mindy</b><div class="lead">Agencies, incumbents, set-asides, teaming, and market research \\u2014 from live federal data. The map filters do not scope this chat.</div><div class="amk-chips">';
-    chips.forEach(function(ch){ h+='<button data-q="'+esc(ch[1])+'">'+esc(ch[0])+'</button>'; });
-    h+='</div></div>';
-    body.innerHTML=h;
-    Array.prototype.forEach.call(body.querySelectorAll('.amk-chips button'),function(b){ b.onclick=function(){ ask(b.getAttribute('data-q')); }; });
+    // Blank start (2026-11-20): no starter prompt ideas. The input is the product.
+    // Opportunity-card opens still use greetCard() (scoped shortcuts for that notice).
+    body.innerHTML='<div class="amk-empty" data-testid="amk-blank" aria-hidden="true"></div>';
   }
   // Public opener (does NOT auto-send). An explicit question (typed in the search bar, then "Ask") goes into the
   // box as the customer's own words. What is sent = what is in the box (map filters are not injected).
@@ -11189,7 +11180,7 @@ const ASK_MINDY_JS = `<script>(function(){
   function buildAttach(){
     var foot=drawer.querySelector('.amk-foot'); if(!foot)return;
     var row=document.createElement('div'); row.className='amk-attach'; row.setAttribute('data-testid','amk-attach');
-    row.innerHTML='<div class="amk-docs"></div><div class="amk-attach-bar"><input type="file" accept=".pdf,.docx,.txt,.xlsx,.xls,.csv" hidden><button type="button" class="amk-clip">Attach</button><span class="amk-priv">Saved privately to your Vault</span></div><div class="amk-attach-err" role="alert"></div>';
+    row.innerHTML='<div class="amk-docs"></div><div class="amk-attach-bar"><input type="file" accept=".pdf,.docx,.txt,.xlsx,.xls,.csv" hidden><button type="button" class="amk-clip">Attach</button><span class="amk-priv">Saved privately</span></div><div class="amk-attach-err" role="alert"></div>';
     foot.insertBefore(row, foot.firstChild);
     var fileIn=row.querySelector('input'), clip=row.querySelector('.amk-clip'), docsEl=row.querySelector('.amk-docs'), errEl=row.querySelector('.amk-attach-err');
     function uuid(){ try{ if(window.crypto&&crypto.randomUUID) return crypto.randomUUID(); }catch(e){} var h='0123456789abcdef',x=''; for(var i=0;i<32;i++){ x+=h.charAt(Math.floor(Math.random()*16)); } return x.slice(0,8)+'-'+x.slice(8,12)+'-4'+x.slice(13,16)+'-8'+x.slice(17,20)+'-'+x.slice(20,32); }
@@ -11434,7 +11425,10 @@ const ASK_MINDY_JS = `<script>(function(){
           if(turnId&&oppCtx===cardAtSend){ pendingTurn=null; }
           if(!started&&!acc&&!gotError)bub.textContent='Mindy had no answer for that \\u2014 try rephrasing.';
           if(!(turnId&&gotError&&!acc)){ history.push({role:'user',content:q}); history.push(ledger?{role:'assistant',content:acc,sources:ledger}:{role:'assistant',content:acc}); }
-          saveCard(); if(acc)paint(bub,acc); if(acc&&!oppCtx)followups(aEl,q,acc); busy=false; if(send)send.disabled=false; body.scrollTop=body.scrollHeight; }
+          saveCard(); if(acc)paint(bub,acc);
+          // Follow-ups only after a real outcome (report/files) or a finished Q&A answer — never mid-gather.
+          if(acc&&!oppCtx&&(turnDoc||String(acc).trim().length>=80))followups(aEl,q,acc);
+          busy=false; if(send)send.disabled=false; body.scrollTop=body.scrollHeight; }
         return pump().catch(function(){ if(turnId){ if(oppCtx===cardAtSend)offerRetry('The connection dropped before the answer finished.'); release(); return; } bub.textContent='Connection failed. Check your network and try again.'; release(); });
       })
       .catch(function(){ if(turnId){ offerRetry('Connection failed before the answer arrived.'); release(); return; } bub.textContent='Connection failed. Check your network and try again.'; busy=false; if(send)send.disabled=false; });

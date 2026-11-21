@@ -121,11 +121,10 @@ describe('Ask Mindy sends exactly what is in the box (D7)', () => {
     expect(t.box().value).toBe('');
     expect(t.box().placeholder).toBe('Ask Mindy\u2026');
   });
-  it('the greeting has no how-to chip dressed as an action', () => {
+  it('the greeting is blank — no starter prompt chips', () => {
     const t = boot(VIEW);
     (t.w.openAskMindy as (s?: string) => void)();
-    const labels = Array.from(t.w.document.querySelectorAll('.amk-chips button')).map((b) => b.textContent);
-    expect(labels).not.toContain('Add a target to my pipeline');
-    expect(labels.length).toBeGreaterThan(0);
+    expect(t.w.document.querySelectorAll('.amk-chips button').length).toBe(0);
+    expect(t.w.document.querySelector('[data-testid="amk-blank"]')).toBeTruthy();
   });
 });

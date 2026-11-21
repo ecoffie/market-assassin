@@ -1,3 +1,12 @@
+### Map Ask Mindy blank start (same rule as /app chat) — 2026-11-20
+
+**What shipped.** Opportunity Map Ask drawer opens blank (no starter chips). Follow-up chips only after a report/files outcome or a finished answer. Attach line says “Saved privately” (not “to your Vault”).
+
+**Why it matters.** The map sidebar was still coaching prompts and Vault language after /app chat went blank.
+
+**Proof.** `ask-input-prefill` + `card-chat-drawer` unit 23/23. Live: open Ask on the map → empty body, `amk-blank`; no “Who buys 541512” chips.
+
+
 ### Ask Mindy blank start + pathway fit (no prompt ideas, no dredging false leads) — 2026-11-20
 
 **What shipped.** New Ask chats open blank (no starter prompt chips / how-to). Follow-up chips only after a real outcome (files, report, citations, or a finished answer). FMP pathway ranking zeros marine dredging/jetty for highway/bridge firms (237310) and prefers award-buyer affinity over sibling-NAICS noise.
