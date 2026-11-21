@@ -119,6 +119,8 @@ export async function GET(request: NextRequest) {
     tableCounts,
     vaultCounts,               // the 5 vault tables (previously silently skipped)
     vaultStorageFiles: vaultFiles.paths.length,
+    ...(vaultFiles.incomplete ? { vaultStorageFilesIncomplete: vaultFiles.incomplete } : {}),
+    ...(vaultFiles.error ? { vaultStorageFilesError: vaultFiles.error } : {}),
     totalRows,
     note: 'POST to this endpoint with the same email to actually delete. Vault tables + Storage files ARE now included.',
   });
