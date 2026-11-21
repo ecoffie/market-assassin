@@ -946,7 +946,6 @@ async function queryOpenNow(
         sub_agency: (r.sub_tier as string) || null,
         // Structured fields for the shared fit scorer (#2252). Raw values; null = not published / unknown.
         place_of_performance_state: (r.pop_state as string) || null,
-        office_state: office?.state || null,
         set_aside_code: (r.set_aside_code as string) || null,
         set_aside_description: (r.set_aside_description as string) || null,
       };

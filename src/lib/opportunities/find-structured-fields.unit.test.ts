@@ -1,6 +1,6 @@
 /**
  * find_opportunities rows carry the structured fields the shared fit scorer maps from (#2252 / #2274 contract):
- *   - place_of_performance_state on every horizon (office_state too on Open), null = not recorded;
+ *   - place_of_performance_state on every horizon, null = not recorded;
  *   - Open: raw set_aside_code / set_aside_description, null = not published (never '' or a guess);
  *   - Coming soon: estimated_value_min / estimated_value_max as numbers, null when absent (never 0);
  *   - each horizon: window_size = rows ranked before the page cut, to compare with matched_count.
@@ -75,23 +75,23 @@ describe('find_opportunities structured fields for the fit scorer', () => {
     }, []),
   });
 
-  it('Open rows: place of performance, office state and the raw set-aside fields (null = not published)', async () => {
+  it('Open rows: place of performance and the raw set-aside fields (null = not published)', async () => {
     const res = await run();
     const byId = new Map(res.horizons.open_now.items.map((i) => [String(i.notice_id), i]));
     const all = [...byId.values()];
     expect(all.length).toBeGreaterThan(0);
     for (const it of all) {
       expect(it).toHaveProperty('place_of_performance_state');
-      expect(it).toHaveProperty('office_state');
+      expect(it).not.toHaveProperty('office_state'); // not a place-of-work signal; the scorer does not use it
       expect(it).toHaveProperty('set_aside_code');
       expect(it).toHaveProperty('set_aside_description');
     }
     const sdvosb = byId.get(SET_ASIDE.notice_id as string);
     expect(sdvosb).toBeDefined();
-    expect(sdvosb).toMatchObject({ set_aside_code: 'SDVOSBC', place_of_performance_state: 'FL', office_state: 'FL' });
+    expect(sdvosb).toMatchObject({ set_aside_code: 'SDVOSBC', place_of_performance_state: 'FL' });
     const noPop = byId.get(NO_POP.notice_id as string);
     expect(noPop).toBeDefined();
-    expect(noPop).toMatchObject({ place_of_performance_state: null, office_state: 'FL', set_aside_code: null, set_aside_description: null });
+    expect(noPop).toMatchObject({ place_of_performance_state: null, set_aside_code: null, set_aside_description: null });
   });
 
   it('Coming back rows: structured place of performance, null when USASpending reported none', async () => {
