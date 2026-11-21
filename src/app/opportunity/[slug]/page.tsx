@@ -25,6 +25,7 @@ import {
   getRelatedOpenOpportunities,
   type SeoOpportunity,
 } from '@/lib/seo/opportunities';
+import { opportunityCta } from '@/lib/seo/opportunity-cta';
 
 /** The row facts the status banner is built from (shared by metadata and the page). */
 function statusOf(opp: SeoOpportunity) {
@@ -147,6 +148,7 @@ export default async function OpportunityPage({
   const agency = opp.department || opp.subTier || null;
   const { status, label: statusLabel } = statusOf(opp);
   const isOpen = status === 'open';
+  const cta = opportunityCta(opp, isOpen);
   const body = (opp.sowText && opp.sowText.length > opp.description.length ? opp.sowText : opp.description) || '';
 
   return (
@@ -243,15 +245,15 @@ export default async function OpportunityPage({
           </h2>
           <p className="text-sm text-(--mp-muted) mt-1">
             Mindy watches SAM.gov every day and emails you new notices that match what you sell
-            {opp.naicsCode ? ` — like NAICS ${opp.naicsCode}` : ''}. Free daily alerts.
+            {opp.naicsCode ? ` — like NAICS ${opp.naicsCode}` : ''}. {cta.offerLine}
           </p>
           <div className="mt-4">
             <MemberAwareCta appearance="public" memberHref="/app?panel=alerts" memberLabel="Set up alerts in Mindy →">
               <Link
-                href="/app/signup"
+                href={cta.primaryHref}
                 className="inline-block bg-(--mp-navy) hover:bg-(--mp-navy-hover) text-white font-semibold rounded-lg px-5 py-2.5 text-sm"
               >
-                Get free alerts →
+                {cta.primaryLabel}
               </Link>
             </MemberAwareCta>
           </div>
@@ -270,12 +272,19 @@ export default async function OpportunityPage({
           </p>
           <div className="mt-4">
             <MemberAwareCta appearance="public" memberHref="/app" memberLabel="Open in Mindy →">
-              <Link
-                href="/app"
-                className="inline-block bg-(--mp-navy) hover:bg-(--mp-navy-hover) text-white font-semibold rounded-lg px-5 py-2.5 text-sm"
-              >
-                Track this free in Mindy →
-              </Link>
+              <>
+                <Link
+                  href={cta.primaryHref}
+                  className="inline-block bg-(--mp-navy) hover:bg-(--mp-navy-hover) text-white font-semibold rounded-lg px-5 py-2.5 text-sm"
+                >
+                  {cta.primaryLabel}
+                </Link>
+                {cta.secondaryHref && (
+                  <Link href={cta.secondaryHref} className="block text-sm text-(--mp-navy) hover:underline mt-3">
+                    {cta.secondaryLabel}
+                  </Link>
+                )}
+              </>
             </MemberAwareCta>
           </div>
           {opp.uiLink && (
