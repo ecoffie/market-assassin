@@ -178,11 +178,18 @@ function non2xx(run: CronRunRow): boolean {
   return typeof run.http_status === 'number' && (run.http_status < 200 || run.http_status >= 300);
 }
 
-/** A run with no processing failure: success, or failures that are ONLY action items. */
+/**
+ * A run with no processing failure: success, or failures that are ONLY action items.
+ *
+ * Action-item-only runs used to return HTTP 500 (suppressions counted as `failed`), and
+ * `non2xx` then permanently hid them from "clean" — MCP kept saying delivery was degraded
+ * with "last success September 29" while the job was evaluating searches daily. Action items
+ * win over a non-2xx here; a true crash still fails the success+500 / unclassified paths below.
+ */
 function isCleanRun(run: CronRunRow): boolean {
-  if (non2xx(run)) return false;
-  if (run.status === 'success') return true;
-  return run.status === 'error' && classifyRunFailures(run.status, run.error).actionItemsOnly;
+  if (run.status === 'success') return !non2xx(run);
+  if (run.status !== 'error') return false;
+  return classifyRunFailures(run.status, run.error).actionItemsOnly;
 }
 
 function runWindow(run: CronRunRow): { start: string; end: string } | null {
@@ -417,7 +424,12 @@ export async function getSavedSearchDeliveryReadiness(
 
   const runLevel = Object.keys(cls.processing).filter((k) => RUN_LEVEL_CLASSES.has(k));
   const unattributed = judged.status === 'error' && !Object.keys(cls.processing).length && !cls.actionItemsOnly;
-  if (non2xx(judged) || judged.status === 'timeout' || judged.status === 'failed' || cls.unclassified || unattributed || runLevel.length) {
+  // The drain decides partial vs error ONCE (alert-drain resolveOutcome): attributed per-search
+  // failures are `partial`, run-level failures are `error`. So a non-2xx `error` run is always a
+  // whole-job failure — no second-guessing here. A `partial` run carries cronOutcomeHttpStatus's
+  // 503 by contract and is judged below as partial.
+  const wholeJobNon2xx = non2xx(judged) && judged.status !== 'partial';
+  if (wholeJobNon2xx || judged.status === 'timeout' || judged.status === 'failed' || cls.unclassified || unattributed || runLevel.length) {
     const why = runLevel.length ? counts(Object.fromEntries(runLevel.map((k) => [k, cls.processing[k]])))
       : cls.unclassified ? (judged.error || '').slice(0, 120) : unattributed ? 'run error with no failure detail' : `run ${judged.status}${judged.http_status ? ` (HTTP ${judged.http_status})` : ''}`;
     return finish('job_failure', 'latest_failed', `latest run failed as a whole (${why})`, evidence);

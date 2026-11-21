@@ -108,7 +108,11 @@ vi.mock('@supabase/supabase-js', () => ({
     },
   }),
 }));
-vi.mock('@/lib/cron-self-report', () => ({ reportCronOutcome: vi.fn(async () => {}) }));
+vi.mock('@/lib/cron-self-report', async (importOriginal) => ({
+  // The real HTTP mapping the route answers with (200 / 503 partial / 500).
+  cronOutcomeHttpStatus: (await importOriginal<typeof import('@/lib/cron-self-report')>()).cronOutcomeHttpStatus,
+  reportCronOutcome: vi.fn(async () => {}),
+}));
 vi.mock('@/lib/send-email', () => ({
   sendEmail: vi.fn(async (m: { to: string; subject: string; html: string; text: string }) => { if (state.sendGate) await state.sendGate; state.sends.push(m); return true; }),
 }));
