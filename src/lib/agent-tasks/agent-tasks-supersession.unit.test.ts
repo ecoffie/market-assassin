@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { testProvenance } from './test-registry-fixture';
-import { mkdtempSync, rmSync, existsSync, chmodSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, rmSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createLease } from './lease';
@@ -554,19 +554,42 @@ describe('supersede — atomicity', () => {
   it('a registry WRITE failure leaves neither half', () => {
     writeRegistryFile(reg, registry([task()], 10));
     const before = readFileSync(reg, 'utf8');
-    // Make the containing directory read-only so the atomic write cannot land.
-    chmodSync(dir, 0o500);
+    // Root-proof write failure: a directory sits where writeRegistryFile puts its temp file, so
+    // the atomic write fails with EISDIR for every user (a read-only directory does not stop
+    // root). The lock is taken first, so this exercises the registry write itself.
+    mkdirSync(`${reg}.tmp.${process.pid}`);
+    let threw: NodeJS.ErrnoException | null = null;
+    let r: ReturnType<typeof supersedeTask> | null = null;
     try {
-      const r = supersedeTask(reg, input());
-      expect(r.ok).toBe(false);
-    } finally {
-      chmodSync(dir, 0o700);
+      r = supersedeTask(reg, input());
+    } catch (e) {
+      threw = e as NodeJS.ErrnoException;
     }
+    // The operation failed AT THE INJECTED WRITE (thrown, or reported) — not by some other refusal.
+    const failedAtWrite = threw?.code === 'EISDIR' || (r !== null && !r.ok && /EISDIR/.test(r.message));
+    expect(failedAtWrite).toBe(true);
     expect(readFileSync(reg, 'utf8')).toBe(before);
     const after = readRegistryFile(reg);
     expect(after.ok && after.value.revision).toBe(10);
     expect(after.ok && after.value.tasks['TASK-SRC-002']).toBeUndefined();
     expect(existsSync(lockDirForRegistry(reg))).toBe(false);
+  });
+
+  it('a lock ACQUISITION failure (not a busy lock) refuses cleanly and writes nothing', () => {
+    // Root-proof lock failure: a 251-byte registry name is legal, but its lock directory
+    // `<name>.lock` is 256 bytes, over NAME_MAX (255 on Linux and macOS), so mkdir fails with
+    // ENAMETOOLONG for every user. Seeded with writeFileSync because writeRegistryFile's temp
+    // name would be too long as well.
+    const longReg = join(dir, `${'r'.repeat(246)}.json`);
+    const before = `${JSON.stringify(registry([task()], 10), null, 2)}\n`;
+    writeFileSync(longReg, before);
+    const r = supersedeTask(longReg, input());
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.code).toBe('lock_conflict');
+    expect(r.message).toContain('ENAMETOOLONG');
+    expect(readFileSync(longReg, 'utf8')).toBe(before);
+    expect(existsSync(lockDirForRegistry(longReg))).toBe(false);
   });
 
   it('releases the registry lock after both success and failure', () => {

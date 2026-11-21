@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync, readFileSync, existsSync, chmodSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, rmSync, readFileSync, existsSync, chmodSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createHash } from 'node:crypto';
@@ -579,10 +579,20 @@ describe('3A.6 — rejections still fail closed (registry byte-identical)', () =
   it('is ATOMIC under an injected write failure — nothing partially applied', () => {
     writeRegistryFile(reg, liveShaped());
     const before = sha256(reg);
-    chmodSync(dir, 0o555); // registry dir read-only: the atomic temp write cannot land
-    const r = supersedeTask(reg, input());
-    chmodSync(dir, 0o755);
-    expect(r.ok).toBe(false);
+    // Root-proof write failure: a directory sits where writeRegistryFile puts its temp file, so
+    // the temp write fails with EISDIR for every user (a read-only directory does not stop root).
+    // The lock is taken first, so this exercises the registry write itself.
+    mkdirSync(`${reg}.tmp.${process.pid}`);
+    let threw: NodeJS.ErrnoException | null = null;
+    let r: ReturnType<typeof supersedeTask> | null = null;
+    try {
+      r = supersedeTask(reg, input());
+    } catch (e) {
+      threw = e as NodeJS.ErrnoException;
+    }
+    // The operation failed AT THE INJECTED WRITE (thrown, or reported) — not by some other refusal.
+    const failedAtWrite = threw?.code === 'EISDIR' || (r !== null && !r.ok && /EISDIR/.test(r.message));
+    expect(failedAtWrite).toBe(true);
     expect(sha256(reg)).toBe(before);
     const after = readRegistryFile(reg);
     expect(after.ok).toBe(true);
