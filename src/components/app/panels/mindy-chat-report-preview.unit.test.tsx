@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 /**
  * Ask Mindy (/app chat): a create_document / generate_market_report turn shows the REPORT in the chat,
- * above the answer, and the download chips are the secondary action. Cold-ask root cause this pins: the
- * answer used to end in Vault download chips only, so the customer never saw the data and kept
- * re-downloading whichever file the chips pointed at.
+ * above the answer. Export (PDF/Word/…) lives in the report header — Claude/ChatGPT pattern — not as
+ * chips under the answer. Cold-ask root cause this pins: the answer used to end in Vault download
+ * chips only, so the customer never saw the data.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { act } from 'react';
@@ -51,7 +51,7 @@ async function ask(): Promise<HTMLElement> {
 beforeEach(() => { urls.length = 0; sessionStorage.clear(); document.body.innerHTML = ''; Element.prototype.scrollIntoView = () => {}; });
 
 describe('MindyChatPanel report preview', () => {
-  it('create_document turn: the report opens in the chat before the answer, from THIS turn\'s document, and the chips follow', async () => {
+  it('create_document turn: the report opens in the chat before the answer, with Export in the pane header', async () => {
     sse = [
       JSON.stringify({ type: 'token', content: 'Here is the read on RBA.' }),
       JSON.stringify({ type: 'deliverables', files: [{ format: 'pdf', document_id: PDF }, { format: 'docx', document_id: DOCX }] }),
@@ -65,10 +65,12 @@ describe('MindyChatPanel report preview', () => {
 
     const pane = el.querySelector('[data-testid="chat-report-preview"]')!;
     const answer = Array.from(el.querySelectorAll('div')).find((d) => d.textContent === 'Here is the read on RBA.')!;
-    const chips = el.querySelector('[data-testid="generated-downloads"]')!;
-    // DOM order: report, then the answer text, then the download chips.
+    const exportToggle = pane.querySelector('[data-testid="export-toggle"]')!;
+    // DOM order: report (with Export in its header), then the answer. No download chips under the answer.
     expect(pane.compareDocumentPosition(answer) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(answer.compareDocumentPosition(chips) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(exportToggle.textContent).toMatch(/Export/);
+    expect(answer.contains(exportToggle)).toBe(false);
+    expect(el.querySelectorAll('[data-testid="generated-downloads"]').length).toBe(1);
   });
 
   it('market_report turn: the packaged report renders inline with no Vault fetch', async () => {
