@@ -5,6 +5,12 @@
  * `buildCompanyProfile` is PURE: it maps records the existing loaders already return. `loadCompanyProfile`
  * only calls those two loaders (loadBidderProfile, loadVaultContext); it adds no query and writes nothing.
  *
+ * Owner resolution (Agent 4, YELLOW): `loadCompanyProfile` takes a ChatActingScope from the existing strict
+ * resolver (resolveChatActingScope, called with the VERIFIED session email), never a raw email. It reads the
+ * Vault owner that `vaultEmailFor` returns: the caller's own, or a client workspace the resolver authorized
+ * server-side. An unconfirmed or failed workspace resolution (`unavailable`) is refused: nothing is read, so a
+ * coach acting for a client can never get their own profile in its place.
+ *
  * Rules (spec section 3 and CLAUDE.md rule 5):
  *   - A field nothing filled is ABSENT, never guessed, never an empty array standing in for "none". The
  *     absent fields are listed in `unknown` so the profile page can show them once.
@@ -20,6 +26,7 @@
  */
 import { loadBidderProfile, loadVaultContext, ALL_VAULT_SECTIONS } from '@/lib/proposal/loaders';
 import type { BidderProfile, VaultContext } from '@/lib/proposal/types';
+import { vaultEmailFor, type ChatActingScope } from '@/lib/chat/chat-acting-scope';
 
 export interface CompanyCertification {
   name: string;
@@ -137,11 +144,20 @@ export function buildCompanyProfile(input: { bidder: BidderProfile; vault: Vault
   return { ...clean, unknown: FIELDS.filter((f) => clean[f] === undefined) };
 }
 
-/** Reads through the existing loaders only (no new query, no write), then maps. */
-export async function loadCompanyProfile(email: string): Promise<CompanyProfile> {
+export type CompanyProfileLoad =
+  | { status: 'ok'; profile: CompanyProfile; workspace: 'own' | 'client' }
+  | { status: 'refused'; reason: 'workspace_unconfirmed' };
+
+/**
+ * Reads the acting scope's Vault through the existing loaders only (no new query, no write), then maps.
+ * `scope` must come from resolveChatActingScope(verifiedEmail, request).
+ */
+export async function loadCompanyProfile(scope: ChatActingScope): Promise<CompanyProfileLoad> {
+  const owner = vaultEmailFor(scope);
+  if (!owner || scope.kind === 'unavailable') return { status: 'refused', reason: 'workspace_unconfirmed' };
   const [bidder, vault] = await Promise.all([
-    loadBidderProfile(email),
-    loadVaultContext(email, 'exec_summary', { sections: ALL_VAULT_SECTIONS }),
+    loadBidderProfile(owner),
+    loadVaultContext(owner, 'exec_summary', { sections: ALL_VAULT_SECTIONS }),
   ]);
-  return buildCompanyProfile({ bidder, vault });
+  return { status: 'ok', profile: buildCompanyProfile({ bidder, vault }), workspace: scope.kind };
 }

@@ -12,6 +12,7 @@ vi.mock('@/lib/proposal/loaders', () => ({
 }));
 
 import { buildCompanyProfile, loadCompanyProfile, parseMoney } from './company-profile';
+import { resolveChatActingScope, vaultEmailFor } from '@/lib/chat/chat-acting-scope';
 
 // Test values only (no real customer): shaped like the existing loaders' output.
 const VAULT = {
@@ -92,12 +93,42 @@ describe('parseMoney', () => {
   });
 });
 
-describe('loadCompanyProfile', () => {
-  it('reads only through the two existing loaders, all Vault sections, and maps the result', async () => {
-    loaders.bidder = BIDDER; loaders.vault = VAULT; loaders.calls = [];
-    const p = await loadCompanyProfile('x@example.com');
+describe('loadCompanyProfile: owner resolution through the strict acting-scope resolver', () => {
+  const req = (workspace?: string) => ({ headers: { get: (k: string) => (k === 'x-active-workspace' ? workspace ?? null : null) } });
+  const readOwners = () => [...new Set(loaders.calls.map((c) => c.args[0]))];
+  const reset = () => { loaders.bidder = BIDDER; loaders.vault = VAULT; loaders.calls = []; };
+
+  it('own scope: reads only the verified caller\'s Vault, all sections, through the two existing loaders', async () => {
+    reset();
+    const scope = await resolveChatActingScope('Me@Example.com', req());
+    const r = await loadCompanyProfile(scope);
+    expect(r).toMatchObject({ status: 'ok', workspace: 'own', profile: { companyName: 'Example Staffing LLC' } });
     expect(loaders.calls.map((c) => c.fn).sort()).toEqual(['loadBidderProfile', 'loadVaultContext']);
     expect(loaders.calls.find((c) => c.fn === 'loadVaultContext')?.args[2]).toEqual({ sections: ['identity', 'past_performance', 'capabilities', 'team'] });
-    expect(p.companyName).toBe('Example Staffing LLC');
+    expect(readOwners()).toEqual(['me@example.com']);
+  });
+
+  it('authorized client workspace: reads the client\'s Vault owner, never the coach\'s', async () => {
+    reset();
+    const scope = await resolveChatActingScope('coach@example.com', req('ws-1'), async () => ({ workspaceId: 'ws-1', asClient: true }) as never);
+    const r = await loadCompanyProfile(scope);
+    expect(r).toMatchObject({ status: 'ok', workspace: 'client' });
+    expect(readOwners()).toEqual([vaultEmailFor(scope)]);
+    expect(readOwners()).not.toContain('coach@example.com');
+  });
+
+  it('cross-account: a workspace the resolver does not authorize reads only the caller, never that account', async () => {
+    reset();
+    const scope = await resolveChatActingScope('me@example.com', req('someone-elses-ws'), async () => ({ workspaceId: null, asClient: false }) as never);
+    await loadCompanyProfile(scope);
+    expect(readOwners()).toEqual(['me@example.com']);
+  });
+
+  it('unconfirmed workspace (resolution failed): refused, and nothing is read', async () => {
+    reset();
+    const scope = await resolveChatActingScope('coach@example.com', req('ws-1'), async () => { throw new Error('db down'); });
+    expect(scope.kind).toBe('unavailable');
+    expect(await loadCompanyProfile(scope)).toEqual({ status: 'refused', reason: 'workspace_unconfirmed' });
+    expect(loaders.calls).toEqual([]);
   });
 });
