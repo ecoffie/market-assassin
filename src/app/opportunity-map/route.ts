@@ -1305,6 +1305,11 @@ const ZLAYOUT_CSS = '<style>'
   // elements (#mHam/#mToggle/#mDrawer) render on every viewport but are display:none
   // above 640px (see the base rules just below, gated by the same breakpoint).
   + '#mHam,#mToggle,#mDrawer,#mScrim,#mCard{display:none}'
+  // A phone turned sideways is 568–930px wide, so the ≤640px block below misses it, and the event
+  // banner (hidden on the map on phones, Eric 2026-11-12, because it covered the map) came back:
+  // 123px of a 342–380px-tall screen, leaving 92–130px of map (iPhone 13 / 15 Pro Max / Pixel 7
+  // landscape). Same rule for short touch screens only — desktop windows and tablets keep the banner.
+  + '@media(max-height:500px) and (pointer:coarse){.zhead .mp-evb-band{display:none!important}}'
   + '@media(max-width:640px){'
   // 1) Grid → single column. zmap + zcards share ONE cell (row 3); we toggle which is
   //    visible. Header row stays; the ztop (search+filters) row stays full-width.
@@ -1355,6 +1360,10 @@ const ZLAYOUT_CSS = '<style>'
   +   'body.m-list .mapwrap{visibility:hidden!important;pointer-events:none!important}'
   // Map controls (zoom, legend, attribution) sit above the bottom bar.
   +   '.mapwrap .leaflet-bottom{bottom:86px!important}'
+  // The tile-status notice ("Map tiles blocked by your network…", template.html) is not a Leaflet
+  // control, so the rule above never lifted it: at its 44px it sat under this bar and the attribution
+  // (iPhone SE: 0 of 3 rows visible; iPhone 13 / Pixel 7: 1 of 3). Lift it over both.
+  +   '.mapwrap .tilestatus{bottom:118px!important}'
   // The map's count pill is mirrored into the bottom bar (#mToggleCount, same words, including
   // "N not shown on map"), so it is hidden here rather than shown twice.
   +   '#mapCount{display:none!important}'
