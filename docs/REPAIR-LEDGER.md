@@ -26,6 +26,12 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## 2026-11-21 — Sourced claims use the collector poll
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-11-21 | Data Core / pain points | Source-backed claims are fresh from the GAO collector poll, not from `last_evidence_at` on a 24-hour cadence. A quiet day stays current. A missing poll is unknown. A failed run is unreachable. | `classifySourcedClaimsFreshness` → `src/lib/data-core/inventory-model.ts` | `inventory-model.unit.test.ts` | BUILT, NOT MERGED |
+
 ## 2026-11-20 — Scorecard second slot confirms before it publishes
 
 | Date | Area | Fix | Proof anchor | Verified | Status |

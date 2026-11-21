@@ -45,6 +45,7 @@ import {
   summarizeStates,
   classifyJobPostingHealth,
   classifyDodSbirHealth,
+  classifySourcedClaimsFreshness,
   timestampState,
   worstState,
   type Freshness,
@@ -55,6 +56,7 @@ import {
   type ScheduledRun,
 } from '@/lib/data-core/inventory-model';
 import { reportedCollectionFreshness } from '@/lib/data-core/collection-clocks';
+import { decodeGaoClocks, type GaoClocks } from '@/lib/institute/source-clocks';
 import painPointsData from '@/data/agency-pain-points.json';
 import budgetData from '@/data/agency-budget-data.json';
 
@@ -462,6 +464,27 @@ export async function GET(request: NextRequest) {
   const legSchedule = schedule('institute-legislation-sync', legInst?.last_poll ?? null);
 
   const gaoInst = instance('institute_gao');
+  const gaoRun = latestRun('institute-gao-sync');
+  const gaoPollFailed = gaoRun != null && (
+    gaoRun.status === 'error'
+    || gaoRun.status === 'partial'
+    || (gaoRun.httpStatus != null && gaoRun.httpStatus >= 500)
+  );
+  const gaoNotes = controlPlane.sources?.find((s) => s.key === 'institute_gao')?.notes ?? null;
+  const gaoDecoded = decodeGaoClocks(gaoNotes);
+  const gaoClocks: GaoClocks | null = gaoDecoded ?? (gaoInst?.last_poll
+    ? {
+        lastPoll: gaoInst.last_poll,
+        lastSourceAdvance: gaoInst.last_data_advance,
+        lastIntelligenceChange: e.claimsEvidence,
+      }
+    : null);
+  const claimsFresh = classifySourcedClaimsFreshness({
+    clocks: gaoClocks,
+    pollFailed: gaoPollFailed,
+    evidenceAt: e.claimsEvidence,
+    now,
+  });
   const budgetAsOf = (budgetData as { lastUpdated?: string }).lastUpdated ?? null;
   const budgetAgencies = Object.keys((budgetData as { agencies?: Record<string, unknown> }).agencies || {}).length;
   const budgetFys = (budgetData as { fiscalYears?: number[] }).fiscalYears ?? [];
@@ -812,9 +835,10 @@ export async function GET(request: NextRequest) {
       ],
       headlineContribution: 0,
       freshness: {
-        state: timestampState(e.claimsEvidence, 24, now),
-        asOf: e.claimsEvidence,
-        basis: 'MAX(agency_pain_points_db.last_evidence_at). Same daily collector as institute-gao-sync. A missing clock is unknown, not stale and not zero.',
+        state: claimsFresh.state,
+        asOf: claimsFresh.asOf,
+        basis: claimsFresh.basis,
+        detail: claimsFresh.detail,
         schedules: schedules(CRON_JOBS.gao),
       },
       surface: { state: 'customer_readable', tools: ['get_agency_intel', 'understand_customer'], note: 'preferred over legacy claims; public pages show finding, report number, date, and .gov/.mil link. Recommendations stay signed-in.' },
