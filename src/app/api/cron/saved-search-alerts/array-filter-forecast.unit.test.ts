@@ -74,7 +74,9 @@ function builder(table: string) {
 
 vi.mock('@supabase/supabase-js', () => ({ createClient: () => ({ from: (t: string) => builder(t) }) }));
 const reported: Array<{ job: string; outcome: string; summary?: string }> = [];
-vi.mock('@/lib/cron-self-report', () => ({
+vi.mock('@/lib/cron-self-report', async (importOriginal) => ({
+  // The real HTTP mapping the route answers with (200 / 503 partial / 500).
+  cronOutcomeHttpStatus: (await importOriginal<typeof import('@/lib/cron-self-report')>()).cronOutcomeHttpStatus,
   reportCronOutcome: vi.fn(async (job: string, outcome: string, summary?: string) => { reported.push({ job, outcome, summary }); }),
 }));
 vi.mock('@/lib/send-email', () => ({
