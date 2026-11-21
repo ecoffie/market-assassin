@@ -335,8 +335,8 @@
     letter-spacing:-.01em}
   .mapcount[hidden]{display:none!important}
 
-  /* tile load status */
-  .tilestatus{position:absolute;bottom:16px;left:50%;transform:translateX(-50%);z-index:520;
+  /* tile load status: above the legend + attribution strip (at 16px it covered both) */
+  .tilestatus{position:absolute;bottom:44px;left:50%;transform:translateX(-50%);z-index:520;
     background:#fff;border:1px solid var(--line);border-radius:9px;padding:8px 14px;
     font-size:12.5px;font-weight:500;color:var(--sub);box-shadow:var(--sh2);max-width:78%;
     text-align:center;display:none}
@@ -897,7 +897,7 @@ function mountTiles(i){
   let idx=i;
   while(idx<PROVIDERS.length && !PROVIDERS[idx].keyless) idx++;
   if(idx>=PROVIDERS.length){
-    setTileStatus('Map tiles unavailable. Pins still work — try the basemap button.','err');
+    setTileStatus('Map tiles unavailable. Pins still work.','err');
     return;
   }
   if(idx!==i) provIdx=idx;
@@ -912,7 +912,7 @@ function mountTiles(i){
     errs++;
     if(errs>=6 && okTiles===0){
       if(idx+1<PROVIDERS.length){provIdx=idx+1;mountTiles(provIdx);}
-      else setTileStatus('Map tiles blocked by your network. Pins still work — try the basemap button.','err');
+      else setTileStatus('Map tiles blocked by your network. Pins still work.','err');
     }
   });
   tiles.addTo(map);
