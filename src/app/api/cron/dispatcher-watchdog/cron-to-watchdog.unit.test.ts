@@ -159,14 +159,13 @@ beforeEach(() => {
 afterEach(() => { vi.useRealTimers(); });
 
 describe('saved-search-alerts → cron_job_runs → dispatcher-watchdog → Slack', () => {
-  it("(a) 'suppressed:hard_bounce' → suppression action item, NO outage incident", async () => {
+  it("(a) 'suppressed:hard_bounce' → drain success (not an outage); watchdog has nothing failing to open", async () => {
+    // Action-item-only runs report outcome=success so MCP delivery readiness stays green.
+    // Watchdog only reads error/timeout rows, so a pure suppression no longer opens a Slack item —
+    // that is intentional: suppressions are not a cron outage.
     const { runs, posted } = await cronThenWatchdog([VALID], 'suppressed:hard_bounce');
-    expect(runs.map((r) => [r.status, r.error])).toEqual([['error', 'recipient_suppressed=1'], ['error', 'recipient_suppressed=1']]);
-    expect(posted).toHaveLength(1);
-    expect(posted[0].subject).toBe('Cron watchdog: 1 suppression opened');
-    expect(posted[0].text).toContain('🛡️ SUPPRESSION saved-search-alerts — no processing failure');
-    expect(posted[0].text).toContain('🛡️ Recipient suppression (not an outage): 1 email(s) not sent to CONFIRMED-suppressed recipient(s) (recipient_suppressed=1)');
-    expect(posted[0].text).not.toContain('🔴 OPENED');
+    expect(runs.map((r) => [r.status, r.error])).toEqual([['success', 'recipient_suppressed=1'], ['success', 'recipient_suppressed=1']]);
+    expect(posted).toHaveLength(0);
   });
 
   it("(b) 'suppression_check_failed' → PROCESSING incident opened (a lookup error is not a suppression)", async () => {

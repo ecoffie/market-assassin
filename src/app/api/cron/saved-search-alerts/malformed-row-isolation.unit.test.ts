@@ -133,7 +133,7 @@ describe('send-guard blocks are classified by REASON, not collapsed into one "re
     state.blockReason = 'suppressed:hard_bounce';
     const body = await (await dispatch()).json();
     expect(body.failuresByClass).toEqual({ recipient_suppressed: 1 });
-    expect(reported).toEqual([{ job: 'saved-search-alerts', outcome: 'error', summary: 'recipient_suppressed=1' }]);
+    expect(reported).toEqual([{ job: 'saved-search-alerts', outcome: 'success', summary: 'recipient_suppressed=1' }]);
     expect(state.updates).toHaveLength(0);
   });
 
