@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync, readFileSync, writeFileSync, chmodSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, rmSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createHash } from 'node:crypto';
@@ -14,6 +14,7 @@ import {
 import { supersessionChain } from './supersession';
 import { assertRegistryInvariants } from './validate';
 import { createLease } from './lease';
+import { lockDirForRegistry } from './lock';
 import { testProvenance } from './test-registry-fixture';
 import type { AgentTaskRegistry, TaskAuditEntry, TaskRecord } from './types';
 
@@ -613,18 +614,28 @@ describe('3A.5 A — atomicity: a failed write leaves the registry byte-identica
     const before = sha(reg);
     const beforeText = readFileSync(reg, 'utf8');
 
-    // Make the containing directory read-only so the tmp+rename write cannot land.
-    chmodSync(dir, 0o500);
-    let r: ReturnType<typeof repairSupersessionLink>;
+    // Root-proof write failure: a directory sits where writeRegistryFile puts its temp file, so
+    // the tmp+rename write fails with EISDIR for every user (a read-only directory does not stop
+    // root). The lock is taken first, so this exercises the registry write itself.
+    mkdirSync(`${reg}.tmp.${process.pid}`);
+    let threw: NodeJS.ErrnoException | null = null;
+    let r: ReturnType<typeof repairSupersessionLink> | null = null;
     try {
       r = repairSupersessionLink(reg, input());
-    } finally {
-      chmodSync(dir, 0o700);
+    } catch (e) {
+      threw = e as NodeJS.ErrnoException;
     }
 
-    expect(r.ok).toBe(false);
+    // The operation failed AT THE INJECTED WRITE (thrown, or reported) — not by some other refusal.
+    const failedAtWrite = threw?.code === 'EISDIR' || (r !== null && !r.ok && /EISDIR/.test(r.message));
+    expect(failedAtWrite).toBe(true);
     expect(sha(reg)).toBe(before);
     expect(readFileSync(reg, 'utf8')).toBe(beforeText);
+    const after = readRegistryFile(reg);
+    expect(after.ok).toBe(true);
+    if (!after.ok) return;
+    expect(after.value.revision).toBe(JSON.parse(beforeText).revision); // no revision bump, no partial link
+    expect(existsSync(lockDirForRegistry(reg))).toBe(false); // the lock is released
   });
 
   it('a refusal mid-validation leaves the registry byte-identical', () => {

@@ -90,7 +90,8 @@ describe('the embed ships the pin runtime', () => {
     // explanatory comment here, so a substring check passes even with the injection deleted.
     // (Caught by inject-red: removing the injection left this test green.)
     const withComments = embedBranch.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/^\s*\/\/.*$/gm, ' ');
-    expect(withComments).toContain("</script>' + PIN_JS)");
+    // The anchor is the shared self-hosted tag (leaflet-assets.ts), not a hand-typed CDN URL.
+    expect(withComments).toContain('LEAFLET_JS_TAG + PIN_JS)');
   });
 
   it('injects VTAG_CSS — the divIcons PIN_JS builds need those classes to be visible', () => {
