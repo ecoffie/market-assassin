@@ -8,7 +8,7 @@
  *   3. success → atomic debit; failure → debit 0
  * Every outcome writes a mcp_call_log row. Free tools (get_balance) skip billing.
  */
-import { isApprovedAmbassador } from '@/lib/ambassadors/store';
+import { ambassadorCoversCall, recordAmbassadorUsage } from '@/lib/ambassadors/store';
 import { creditsFor, isMcpTool, isProprietaryTool, PROPRIETARY_TOOLS, runMcpTool, type McpToolContext } from './tool-registry';
 import { getBalance, debitCredits, logCall, type CallStatus } from './credits';
 import { isFreeDocumentContinuation } from './doc-continuation';
@@ -74,11 +74,15 @@ export async function runMeteredTool(
 
   // Per-call price, decided before anything runs: equal to the tool's credit price except
   //   - a verified get_solicitation_documents continuation, which is free (doc-continuation.ts), and
-  //   - an APPROVED Mindy Ambassador (owner decision 2026-11-12: "free Pro, truly unlimited").
-  //     Their calls run and are logged like anyone's, with 0 credits charged. Approval lives in the
-  //     `ambassadors` table (src/lib/ambassadors/store.ts); a read error bills normally.
-  const ambassador = await isApprovedAmbassador(ctx.userEmail);
-  const cost = ambassador || isFreeDocumentContinuation(name, args, ctx.userEmail) ? 0 : creditsFor(name);
+  //   - an APPROVED Mindy Ambassador within their monthly cap (owner decisions 2026-11-12 "free
+  //     Pro" and 2026-11-16 "max at 5,000"). Their covered calls run and are logged like anyone's,
+  //     with 0 credits charged; past the cap they bill normally. Approval and the usage counter live
+  //     in Vercel KV (src/lib/ambassadors/store.ts); any read error bills normally.
+  const listPrice = creditsFor(name);
+  const freeContinuation = isFreeDocumentContinuation(name, args, ctx.userEmail);
+  // A call that is already free never counts against an ambassador's cap.
+  const ambassadorCovered = !freeContinuation && (await ambassadorCoversCall(ctx.userEmail, listPrice));
+  const cost = ambassadorCovered || freeContinuation ? 0 : listPrice;
 
   // Credit integrity — refuse a call that cannot perform its paid job BEFORE anything
   // else (tier gate, paywall capture, payer lookup): an invalid request is not a sale.
@@ -281,6 +285,7 @@ export async function runMeteredTool(
 
   // 3) Free tool → success, no billing. (Free tools never trip auto-recharge.)
   if (cost <= 0) {
+    if (ambassadorCovered && ctx.userEmail) await recordAmbassadorUsage(ctx.userEmail, listPrice);
     await logCall({ userEmail: ctx.userEmail, toolName: name, status: 'success', creditsCharged: 0, latencyMs, apiKeyId: ctx.apiKeyId, channel: ctx.channel, outcome: telemetry });
     return { ok: true, result, creditsCharged: 0, balance: null, needsRecharge: false };
   }

@@ -10,6 +10,8 @@ vi.mock('@vercel/kv', () => ({
     sadd: vi.fn(async (k: string, v: string) => { if (!sets.has(k)) sets.set(k, new Set()); sets.get(k)!.add(v); return 1; }),
     smembers: vi.fn(async (k: string) => [...(sets.get(k) ?? [])]),
     mget: vi.fn(async (...ks: string[]) => ks.map((k) => mem.get(k) ?? null)),
+    incrby: vi.fn(async (k: string, n: number) => { const v = Number(mem.get(k) ?? 0) + n; mem.set(k, v); return v; }),
+    expire: vi.fn(async () => 1),
   },
 }));
 
@@ -34,16 +36,16 @@ describe('ambassador store (KV)', () => {
   it('approval makes MCP calls free; removal turns it off', async () => {
     await store.saveApplication(app('ann@example.com'));
     expect(await store.isApprovedAmbassador('ann@example.com')).toBe(false);
-    await store.setDecision('ann@example.com', 'approved', 'admin', null, 'abc123');
+    await store.setDecision('ann@example.com', 'approved', 'admin', null);
     expect(await store.isApprovedAmbassador('ANN@example.com')).toBe(true);
-    expect((await store.getAmbassador('ann@example.com'))?.referral_code).toBe('abc123');
+    expect((await store.getAmbassador('ann@example.com'))?.referral_code).toBeNull();
     await store.setDecision('ann@example.com', 'removed', 'admin', 'left');
     expect(await store.isApprovedAmbassador('ann@example.com')).toBe(false);
   });
 
   it('re-applying never downgrades an approved ambassador', async () => {
     await store.saveApplication(app('ann@example.com'));
-    await store.setDecision('ann@example.com', 'approved', 'admin', null, 'abc123');
+    await store.setDecision('ann@example.com', 'approved', 'admin', null);
     expect(await store.saveApplication(app('ann@example.com'))).toEqual({ status: 'already_ambassador' });
     expect((await store.getAmbassador('ann@example.com'))?.status).toBe('approved');
   });
@@ -61,7 +63,80 @@ describe('ambassador store (KV)', () => {
     expect(await store.isApprovedAmbassador('old@example.com')).toBe(true);
   });
 
-  it('builds the shared referral link to /pricing', () => {
-    expect(store.ambassadorReferralLink('a b')).toBe('https://getmindy.ai/pricing?ref=a%20b');
+  it('an ended term stops the free calls', async () => {
+    await store.saveApplication(app('ann@example.com'));
+    await store.setDecision('ann@example.com', 'approved', 'admin', null);
+    await store.setDecision('ann@example.com', 'ended', 'job', 'Twelve-month term ended');
+    expect(await store.isApprovedAmbassador('ann@example.com')).toBe(false);
+  });
+});
+
+describe('monthly cap (5,000 credits)', () => {
+  const now = new Date('2026-11-16T12:00:00Z');
+  const approve = async () => {
+    await store.saveApplication(app('ann@example.com'));
+    await store.setDecision('ann@example.com', 'approved', 'admin', null);
+  };
+
+  it('defaults to 5,000', () => {
+    expect(store.AMBASSADOR_MONTHLY_CREDIT_CAP).toBe(5000);
+  });
+
+  it('covers calls until the next one would pass the cap, then bills', async () => {
+    await approve();
+    await store.recordAmbassadorUsage('ann@example.com', 4950, now);
+    expect(await store.ambassadorCoversCall('ann@example.com', 50, now)).toBe(true);   // lands exactly on 5,000
+    await store.recordAmbassadorUsage('ann@example.com', 50, now);
+    expect(await store.ambassadorMonthUsage('ann@example.com', now)).toBe(5000);
+    expect(await store.ambassadorCoversCall('ann@example.com', 1, now)).toBe(false);
+  });
+
+  it('starts fresh each UTC month', async () => {
+    await approve();
+    await store.recordAmbassadorUsage('ann@example.com', 5000, now);
+    expect(await store.ambassadorCoversCall('ann@example.com', 10, new Date('2026-12-01T00:00:01Z'))).toBe(true);
+  });
+
+  it('never covers someone who is not approved', async () => {
+    await store.saveApplication(app('ann@example.com'));
+    expect(await store.ambassadorCoversCall('ann@example.com', 10, now)).toBe(false);
+  });
+
+  it('a usage read error bills normally', async () => {
+    await approve();
+    await store.isApprovedAmbassador('ann@example.com'); // warm the approval cache
+    const { kv } = await import('@vercel/kv');
+    vi.mocked(kv.get).mockRejectedValueOnce(new Error('quota'));
+    expect(await store.ambassadorCoversCall('ann@example.com', 10, now)).toBe(false);
+  });
+});
+
+describe('twelve-month term', () => {
+  const start = '2026-01-01T00:00:00Z';
+  const at = (days: number) => new Date(Date.parse(start) + days * 86_400_000);
+
+  it('nothing due before day 335', () => {
+    expect(store.termStatus(start, at(334))?.due).toBe('none');
+  });
+  it('notice from day 335', () => {
+    expect(store.termStatus(start, at(335))?.due).toBe('notice');
+    expect(store.termStatus(start, at(364))?.due).toBe('notice');
+  });
+  it('ends at day 365, on the anniversary', () => {
+    const t = store.termStatus(start, at(365));
+    expect(t?.due).toBe('end');
+    expect(t?.endsAt.toISOString()).toBe('2027-01-01T00:00:00.000Z');
+  });
+  it('no approval date means no term', () => {
+    expect(store.termStatus(null)).toBeNull();
+  });
+  it('re-approval clears the old term notice', async () => {
+    await store.saveApplication(app('ann@example.com'));
+    await store.setDecision('ann@example.com', 'approved', 'admin', null);
+    await store.markTermNoticeSent('ann@example.com');
+    expect((await store.getAmbassador('ann@example.com'))?.term_notice_sent_at).toBeTruthy();
+    await store.setDecision('ann@example.com', 'ended', 'job', null);
+    await store.setDecision('ann@example.com', 'approved', 'admin', null);
+    expect((await store.getAmbassador('ann@example.com'))?.term_notice_sent_at).toBeNull();
   });
 });
