@@ -1706,7 +1706,7 @@ const COMPANY_KEYWORDS_TOOL_DEF = {
         capabilities: { type: 'array', items: { type: 'string' }, description: 'Capability / service descriptions.' },
         code_titles: { type: 'array', items: { type: 'string' }, description: 'NAICS/PSC title text the caller already knows (optional).' },
         limit: { type: 'number', description: 'Max keywords (default 12, max 25).' },
-        brand_exclude: { type: 'array', items: { type: 'string' }, description: "The company's own name / brand / other proper nouns to keep out of the keywords (e.g. [\"Superb Staffing\"]). Only brand-distinctive words are removed; capability words like \"staffing\" stay." },
+        brand_exclude: { type: 'array', items: { type: 'string' }, description: "The company's own name / brand / other proper nouns to keep out of the keywords (e.g. [\"Example Staffing\"]). Only brand-distinctive words are removed; capability words like \"staffing\" stay." },
         naics: { type: 'array', items: { type: 'string' }, description: 'Optional 6-digit NAICS codes for the market sources. Inferred from the description when omitted (naics_used says how).' },
         include_market_terms: { type: 'boolean', description: 'Add grounded market terms (vocabulary, CALC labor categories, solicitation text). Default true.' },
       },
