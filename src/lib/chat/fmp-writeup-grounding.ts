@@ -679,15 +679,14 @@ function extractPathways(
     // notices in the construction sector (JBAB 236210 MACC, Capitol Perimeter 236220 SS —
     // Claude gold pathways that sector-fit alone used to drop).
     const fits = indexed.filter((x) => {
-      const hay = `${x.p.title} ${x.p.noticeType ?? ''}`;
+      const hay = `${x.p.title} ${x.p.summary ?? ''} ${x.p.noticeType ?? ''}`;
       const inspection = (x.p.naics ?? '').startsWith('5413') && x.fit >= 40;
       const vehicleOrSs = VEHICLE_WORD_RE.test(hay) || SOURCES_SOUGHT_RE.test(hay);
       const adjacentVehicle = vehicleOrSs && x.fit >= 40;
       // Forecasts need civil wording — sector-fit alone lets gymnasium / building forecasts in.
-      const forecastOk = x.p.kind === 'forecast' && (
-        CIVIL_LEXICAL_RE.test(hay) || /GWMP|parkway|bridge|highway|roadway|pavement|culvert/i.test(hay)
-      );
-      return x.fit >= 80 || x.buyer >= 30 || inspection || adjacentVehicle || forecastOk || (x.fit >= 40 && x.buyer > 0);
+      const forecastCivil = CIVIL_LEXICAL_RE.test(hay) || /GWMP|Clara Barton|parkway|bridge|highway|roadway|pavement|culvert/i.test(hay);
+      if (x.p.kind === 'forecast') return forecastCivil;
+      return x.fit >= 80 || x.buyer >= 30 || inspection || adjacentVehicle || (x.fit >= 40 && x.buyer > 0);
     });
     // Fewer than two on-market pathways: show none so the vehicle-token frame renders instead of junk.
     if (fits.length < 2) return [];
