@@ -99,13 +99,14 @@ interface ReportLike {
     top_agencies: Array<{ name: string; amount: number }>;
     top_agencies_total?: number;
     competition: { contractors: unknown[] };
-    recompetes: { contracts: unknown[] };
+    recompetes: { contracts: unknown[]; basis?: { kind: 'description_terms'; terms: string[] } | { kind: 'naics'; codes: string[] } | { kind: 'none' } };
     forecasts: { forecasts: unknown[] };
     contacts?: {
       agency: string;
       office: string | null;
-      people: Array<{ name: string; role: string; email: string; office: string | null }>;
+      people: Array<{ name: string; role: string; email: string; office: string | null; notices?: number }>;
       total: number;
+      basis?: { kind: 'keyword_notices'; terms: string[]; notices_scanned: number } | { kind: 'agency_roster' };
     } | null;
     agency_detail: unknown;
     set_aside_gap: unknown;
@@ -256,19 +257,25 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
   // WHO TO CALL — the market's #1 buyer's office + real, emailable POCs. Only rendered
   // when the roster returned people (grounded); the email is a live mailto.
   const contacts = sections.contacts;
+  const keywordContactsBasis = contacts?.basis?.kind === 'keyword_notices' ? contacts.basis : null;
   const contactsHtml = contacts && contacts.people.length
     ? section(
         'Who to call',
-        `Real points of contact at ${esc(contacts.agency)}${contacts.office ? ` · ${esc(contacts.office)}` : ''} — the buyer's small-business and contracting people${
-          contacts.total > contacts.people.length ? `. Showing ${contacts.people.length} of ${num(contacts.total)}.` : '.'
-        }`,
+        keywordContactsBasis
+          ? `People listed as points of contact on recent SAM notices that mention ${keywordContactsBasis.terms.map((t) => `"${t}"`).join(' or ')} (${num(keywordContactsBasis.notices_scanned)} notices checked), most-listed first${
+              contacts.total > contacts.people.length ? `. Showing ${contacts.people.length} of ${num(contacts.total)}.` : '.'
+            }`
+          : `Real points of contact at ${esc(contacts.agency)}${contacts.office ? ` · ${esc(contacts.office)}` : ''} — the buyer's small-business and contracting people${
+              contacts.total > contacts.people.length ? `. Showing ${contacts.people.length} of ${num(contacts.total)}.` : '.'
+            }`,
         table(
-          ['Name', 'Role', 'Office', 'Email'],
+          keywordContactsBasis ? ['Name', 'Role', 'Office', 'Email', 'Notices'] : ['Name', 'Role', 'Office', 'Email'],
           contacts.people.map((p) => [
             esc(p.name),
             esc(p.role || '—'),
             esc(p.office || '—'),
             p.email ? `<a href="mailto:${esc(p.email)}">${esc(p.email)}</a>` : '—',
+            ...(keywordContactsBasis ? [esc(String(p.notices ?? '—'))] : []),
           ])
         )
       )
@@ -390,7 +397,11 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
     section('Competitive landscape', `Leading contractors by obligated dollars${basisNote} — the incumbents you would be up against. Showing the top ${vendorRows.length}.`,
       (vendorRows.length ? '' : phraseEmptyNote) + table(['Contractor', 'UEI', 'Obligated'], vendorRows)),
     section('Recompetes on the horizon',
-      `Contracts whose current period of performance ends soonest — soonest first. "Ends" is the period-of-performance end date.${
+      `${
+        sections.recompetes.basis?.kind === 'description_terms'
+          ? `Contracts whose description mentions ${sections.recompetes.basis.terms.map((t) => `"${t}"`).join(' or ')}, ending soonest first. Contracts that do this work under other wording are not shown.`
+          : 'Contracts whose current period of performance ends soonest — soonest first.'
+      } "Ends" is the period-of-performance end date.${
         summary.recompetes_total != null && summary.recompetes_total > recompeteRows.length
           ? ` Showing ${num(recompeteRows.length)} of ${num(summary.recompetes_total)} found.`
           : ''

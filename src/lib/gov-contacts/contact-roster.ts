@@ -70,7 +70,7 @@ function cleanRawOffice(raw: string): string | null {
   if (!/\s/.test(s) && s === s.toUpperCase()) return null;
   return expandOfficeAcronyms(s);
 }
-function classifyRole(t: string): string | null {
+export function classifyRole(t: string): string | null {
   if (/contracting officer|\bKO\b|\bACO\b|\bPCO\b/i.test(t)) return 'Contracting Officer';
   if (/small business|osbp|sblo|sadbu|disadvantaged business/i.test(t)) return 'Small Business';
   if (/contract specialist|contracting specialist|procurement|buyer|purchasing/i.test(t)) return 'Contract Specialist';
@@ -83,7 +83,7 @@ function classifyRole(t: string): string | null {
 // returns null — but the row's role_category (e.g. "contracting") is real signal we were DISCARDING,
 // leaving role_category_label null on every record. Map it to a human label so the field is never
 // needlessly empty. Coarse ("Contracting") but honest — better than null when the record IS a buyer POC.
-function roleCategoryLabel(cat: string | null | undefined): string | null {
+export function roleCategoryLabel(cat: string | null | undefined): string | null {
   const c = (cat || '').toLowerCase().trim();
   if (!c) return null;
   if (c.includes('contract')) return 'Contracting';
