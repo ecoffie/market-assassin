@@ -104,7 +104,9 @@ export function formatProfileForPrompt(profile: BidderProfile): string {
   if (profile.companyName) parts.push(`Company: ${profile.companyName}`);
   if (profile.businessType) parts.push(`Business type: ${profile.businessType}`);
   if (profile.naicsCodes?.length) parts.push(`NAICS: ${profile.naicsCodes.slice(0, 8).join(', ')}`);
-  if (profile.setAsides?.length) parts.push(`Set-aside certs: ${profile.setAsides.join(', ')}`);
+  // set_aside_preferences are what the user wants to TARGET, not certifications the company holds. Labelling
+  // them "certs" let the model claim certifications the company may not have (CLAUDE.md rule 5 class).
+  if (profile.setAsides?.length) parts.push(`Target set-asides (preferences, not certifications): ${profile.setAsides.join(', ')}`);
   if (profile.agencies?.length) parts.push(`Target agencies: ${profile.agencies.slice(0, 6).join(', ')}`);
   if (profile.locationStates?.length) parts.push(`Locations: ${profile.locationStates.join(', ')}`);
   return parts.length > 0
