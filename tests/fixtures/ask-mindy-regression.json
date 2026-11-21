@@ -55,7 +55,7 @@
       "prompt": "Keywords for a light industrial, clerical and warehouse staffing firm in Memphis",
       "require_tool": true,
       "min_matches": { "terms": ["material handl", "order filler", "forklift", "general clerk", "warehouse worker", "laborer"], "min": 2 },
-      "list_items_forbid": ["memphis", "superb"]
+      "list_items_forbid": ["memphis", "example"]
     },
     {
       "id": "R7",

@@ -65,7 +65,7 @@
     "src/app/api/admin/upgrade-intent/route.ts:68 (stripe_subscriptions)",
     "src/app/api/admin/upgrade-intent/route.ts:77 (stripe_customers)",
     "src/app/api/admin/user-health-scores/route.ts:135 (user_engagement)",
-    "src/app/api/app/chat/suggestions/route.ts:55 (user_pipeline) [count-null]",
+    "src/app/api/app/chat/suggestions/route.ts:56 (user_pipeline) [count-null]",
     "src/app/api/app/naics-search/route.ts:59 (sam_opportunities) [count-null]",
     "src/app/api/cron/backfill-event-offices/route.ts:68 (sam_opportunities)",
     "src/app/api/cron/indexnow-submit/route.ts:26 (sam_opportunities)",
