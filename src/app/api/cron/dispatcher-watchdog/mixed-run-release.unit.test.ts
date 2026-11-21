@@ -104,6 +104,7 @@ function tableBuilder(table: string) {
     select: (_c?: string, o?: { head?: boolean }) => { if (o?.head) head = true; return b; },
     eq: (c: string, v: unknown) => { filters.push((r) => r[c] === v || String(r[c]) === String(v)); return b; },
     in: (c: string, vs: unknown[]) => { filters.push((r) => vs.includes(r[c])); return b; },
+    not: (c: string, o: string, v: unknown) => { filters.push((r) => !(o === 'is' && v === null && (r[c] ?? null) === null)); return b; },
     gte: (c: string, v: string) => { filters.push((r) => r[c] != null && t(r[c]) >= t(v)); return b; },
     lte: (c: string, v: string) => { filters.push((r) => r[c] != null && t(r[c]) <= t(v)); return b; },
     ilike: (c: string, p: string) => { const re = new RegExp('^' + p.split('%').map((x) => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('.*') + '$', 'i'); filters.push((r) => re.test(String(r[c] ?? ''))); return b; },
@@ -124,7 +125,9 @@ vi.mock('@supabase/supabase-js', () => ({
 // The status probes read through getAppSupabase — the same captured state, generic query semantics.
 vi.mock('@/lib/app/workspace', () => ({ getAppSupabase: () => ({ from: (t: string) => tableBuilder(t) }) }));
 // reportCronOutcome → the cron_job_runs row exactly as src/lib/cron-self-report.ts writes it.
-vi.mock('@/lib/cron-self-report', () => ({
+vi.mock('@/lib/cron-self-report', async (importOriginal) => ({
+  // The real HTTP mapping the route answers with (200 / 503 partial / 500).
+  cronOutcomeHttpStatus: (await importOriginal<typeof import('@/lib/cron-self-report')>()).cronOutcomeHttpStatus,
   reportCronOutcome: vi.fn(async (job: string, outcome: string, summary?: string) => {
     (tables.cron_job_runs ||= []).push({
       job_name: job, started_at: clock, finished_at: new Date(Date.parse(clock) + 70_000).toISOString(),
@@ -201,7 +204,8 @@ describe('mixed run: successful send + malformed search + suppressed recipient +
   it('the job self-reports every class, by name', () => {
     expect(out.runs).toHaveLength(2);
     const last = out.runs.at(-1)!;
-    expect(last.status).toBe('error');
+    // Attributed per-search failures with the rest evaluated (one search really sent) → partial.
+    expect(last.status).toBe('partial');
     expect(String(last.error).split(',').sort()).toEqual(['invalid_saved_filters=1', 'recipient_suppressed=1', 'suppression_lookup_failed=1']);
     // and the valid search really sent on the judged run, through the provider ledger
     expect((tables.email_provider_sends || []).filter((r) => String(r.sent_at).startsWith('2026-10-04')).map((r) => r.user_email)).toEqual(['person@example.com']);
