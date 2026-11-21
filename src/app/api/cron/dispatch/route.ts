@@ -15,6 +15,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { isDue, isMissed } from '@/lib/cron/cron-expr';
+import { resolveDispatchFinal, type RunRowSnapshot } from '@/lib/cron/dispatch-final-status';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -180,6 +181,7 @@ async function fireJob(
   let status = 'success';
   let httpStatus: number | null = null;
   let errorMsg: string | null = null;
+  let responseOk = false;
 
   // Long jobs can't be fully awaited without timing out the dispatcher itself,
   // so we fire-and-forget them (see LONG_JOB_ACK_MS): the route keeps running on
@@ -198,6 +200,7 @@ async function fireJob(
       signal: controller.signal,
     }).finally(() => clearTimeout(timer));
     httpStatus = res.status;
+    responseOk = res.ok;
     if (!res.ok) {
       status = 'error';
       errorMsg = `route returned ${res.status}`;
@@ -224,14 +227,38 @@ async function fireJob(
 
   const duration = Date.now() - start;
 
-  // Release lock + record final status.
-  await supabase.from('cron_jobs').update({ locked_at: null, last_status: status }).eq('id', job.id);
+  // A route that finished inside the ack window may already have self-reported a terminal
+  // status on this row (reportCronOutcome). Never replace it with a cleaner/less specific one:
+  // see src/lib/cron/dispatch-final-status.ts.
+  let selfReport: RunRowSnapshot = null;
   if (runRow?.id) {
-    await supabase
+    const { data: current, error: currentErr } = await supabase
       .from('cron_job_runs')
-      .update({ finished_at: new Date().toISOString(), status, duration_ms: duration, http_status: httpStatus, error: errorMsg })
-      .eq('id', runRow.id);
+      .select('status, http_status, error')
+      .eq('id', runRow.id)
+      .maybeSingle();
+    // Unreadable → treat as no self-report: the dispatcher's own observation is recorded, as before.
+    if (currentErr) console.error(`[dispatch] ${job.job_name}: could not read run row for self-report:`, currentErr.message);
+    else selfReport = (current as RunRowSnapshot) ?? null;
+  }
+  const final = resolveDispatchFinal({ status, httpStatus, errorMsg, responseOk }, selfReport);
+
+  // Release lock + record final status.
+  await supabase.from('cron_jobs').update({ locked_at: null, last_status: final.status }).eq('id', job.id);
+  if (runRow?.id) {
+    if (final.keptSelfReport) {
+      // The route's report stands; only add the dispatcher's own timing.
+      await supabase.from('cron_job_runs').update({ duration_ms: duration }).eq('id', runRow.id);
+    } else {
+      let q = supabase
+        .from('cron_job_runs')
+        .update({ finished_at: new Date().toISOString(), status: final.status, duration_ms: duration, http_status: final.httpStatus, error: final.errorMsg })
+        .eq('id', runRow.id);
+      // A long job still running can self-report AFTER our read; `dispatched` must not clobber it.
+      if (final.status === 'dispatched') q = q.eq('status', 'running');
+      await q;
+    }
   }
 
-  return { job_name: job.job_name, fired: true, status, error: errorMsg || undefined };
+  return { job_name: job.job_name, fired: true, status: final.status, error: final.errorMsg || undefined };
 }

@@ -53,6 +53,7 @@ import { customerErrorMessage } from '@/lib/chat/customer-errors';
 import { boundToolResult, perResultBudget } from '@/lib/chat/bound-tool-result';
 import { filterToolsForTurn, enforceFindArgs, SAM_ONLY_TOOL, restrictWritesWhenDocumentText } from '@/lib/chat/tool-selection';
 import { CURRENT_FIND_CHAT_CONTRACT } from '@/lib/mcp/potato-journey';
+import { askMindyRulesEnabledFor, askMindyRulesPromptBlock, rulesLayerFindContract } from '@/lib/chat/ask-mindy-rules';
 import { findCompletionFooter, comingBackListLeadsWithNotCompeted, type FindResultWithItems } from '@/lib/chat/find-completeness';
 import { inferredCodeDisclosure } from '@/lib/chat/code-disclosure';
 import { getNaics } from '@/lib/codes/lookup';
@@ -632,8 +633,13 @@ export async function POST(request: NextRequest) {
         const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
         // F1: the CURRENT_FIND contract (shared with the MCP host's P2 rule). Not for card chat, which answers
         // about one opportunity with its own tool allowlist.
+        // Ask Mindy rules layer (src/lib/chat/ask-mindy-rules.ts): OFF unless ASK_MINDY_RULES_LAYER says so for
+        // this verified email. Off → the prompt is exactly the pre-existing one.
+        const rulesLayer = askMindyRulesEnabledFor(auth.email);
+        const findContract = rulesLayer ? rulesLayerFindContract() : CURRENT_FIND_CHAT_CONTRACT;
         const systemPrompt = SYSTEM_PROMPT_TEMPLATE.replace('{today}', today).replace('{userProfile}', userProfileBlock)
-          + (cardCtx ? '' : `\n\n${CURRENT_FIND_CHAT_CONTRACT}`);
+          + (cardCtx ? '' : `\n\n${findContract}`)
+          + (rulesLayer ? `\n\n${askMindyRulesPromptBlock()}` : '');
 
         // Presentation hint from the asking surface (src/lib/chat/display-hint.ts): answer prompt only.
         const displayNote = displayHintNote(parseDisplayHint(body.display));
