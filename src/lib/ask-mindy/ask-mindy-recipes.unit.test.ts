@@ -43,7 +43,7 @@ describe('recipe contracts', () => {
 });
 
 describe('orchestrator', () => {
-  const profile = { companyName: 'Superb Staffing Solutions', naicsCodes: ['561320'], states: ['TN'], keywords: ['staffing'] };
+  const profile = { companyName: 'Example Staffing Co', naicsCodes: ['561320'], states: ['TN'], keywords: ['staffing'] };
 
   it('Where to start: independent calls run in the first wave together; dependent ones wait', async () => {
     const calls: Array<{ tool: string; args: Record<string, unknown>; at: number }> = [];
@@ -86,7 +86,7 @@ describe('orchestrator', () => {
   });
 
   it('Profile setup records the missing SBA tool as a Data Core requirement and still runs the rest', async () => {
-    const exec: ToolExecutor = async (tool) => (tool === 'lookup_sam_entity' ? { ok: true, entity: { uei: 'ABCDEFGH1234', legal_business_name: 'Superb Staffing Solutions' } } : { ok: true });
+    const exec: ToolExecutor = async (tool) => (tool === 'lookup_sam_entity' ? { ok: true, entity: { uei: 'ABCDEFGH1234', legal_business_name: 'Example Staffing Co' } } : { ok: true });
     const run = await runRecipe('profile_setup', { question: 'ABCDEFGH1234', profile: {}, identifiers: { uei: 'ABCDEFGH1234' } }, exec);
     if (run.status !== 'ran') throw new Error('expected ran');
     expect(run.results.sba_profile.state).toBe('missing_tool');
@@ -158,7 +158,7 @@ describe('intent classification', () => {
 
   it('extracts identifiers from inside a sentence', () => {
     expect(extractIdentifiers('Tell me about 36C25027R5412, please')).toEqual({ solicitation: '36C25027R5412' });
-    expect(extractIdentifiers("Here's my website: superbstaffing.example.com")).toEqual({ url: 'superbstaffing.example.com' });
+    expect(extractIdentifiers("Here's my website: examplestaffing.example.com")).toEqual({ url: 'examplestaffing.example.com' });
   });
 
   it('the prompt lists every recipe and asks for meaning over words', () => {
@@ -206,7 +206,7 @@ describe('regression set v1', () => {
   });
 
   it('profiles keep unknown fields absent (never guessed)', () => {
-    const p = profileFor(REGRESSION_CASES.find((c) => c.profile === 'superb_staffing_spec')!);
+    const p = profileFor(REGRESSION_CASES.find((c) => c.profile === 'staffing_illustrative')!);
     expect(p.uei).toBeUndefined();
     expect(p.setAsides).toBeUndefined();
     expect(Object.keys(p).some((k) => k.startsWith('_'))).toBe(false);
@@ -215,6 +215,6 @@ describe('regression set v1', () => {
   it('prohibitedHits flags the banned answer patterns and passes a clean answer', () => {
     const bad = 'There are 719 matches — ask me to list them. Check SAM.gov for updates. Upgrade to Mindy Pro for more. Fit score: 82.';
     expect(prohibitedHits(bad).map((h) => h.id).sort()).toEqual(['ask_to_list', 'em_dash', 'fit_score_number', 'go_check_sam', 'mindy_pricing']);
-    expect(prohibitedHits('Two Tennessee staffing contracts come back next year. Start with the Fort Campbell clerks.')).toEqual([]);
+    expect(prohibitedHits('Two Tennessee staffing contracts come back next year. Start with the Fort Example clerks.')).toEqual([]);
   });
 });

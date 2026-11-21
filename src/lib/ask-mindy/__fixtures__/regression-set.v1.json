@@ -1,16 +1,16 @@
 {
   "version": 1,
-  "source": "Ask Mindy Backend Spec, Nov 21 2026 (sections 5, 8 and 9). Questions are the spec's own examples. The only company profile is the one the spec gives in section 9; no customer data or gold answers are invented. Expected answer CONTENT is described as behaviors for a human grader, not as a gold answer.",
+  "source": "Ask Mindy Backend Spec, Nov 21 2026 (sections 5, 8 and 9). Questions are the spec's own examples. The one company profile is ILLUSTRATIVE: modeled on the spec's section 9 example with the client's identifying details replaced (redacted). No customer data or gold answers are included or invented. Expected answer CONTENT is described as behaviors for a human grader, not as a gold answer.",
   "profiles": {
     "none": {},
-    "superb_staffing_spec": {
-      "_source": "spec section 9 example row",
-      "companyName": "Superb Staffing Solutions",
+    "staffing_illustrative": {
+      "_source": "illustrative profile modeled on the spec section 9 example; client name and locations redacted",
+      "companyName": "Example Staffing Co",
       "naicsCodes": ["561320"],
       "states": ["TN"],
       "keywords": ["staffing"],
       "_unknown": ["uei", "setAsides", "agencies", "website"],
-      "_note": "Spec says: Memphis, GSA offer in process. Vehicle status is not a profile field yet."
+      "_note": "Illustrative: a staffing company with a GSA Schedule offer in process. Vehicle status is not a profile field yet."
     }
   },
   "globalProhibited": [
@@ -23,7 +23,7 @@
   ],
   "cases": [
     {
-      "id": "wts-01", "question": "What should we go after?", "profile": "superb_staffing_spec",
+      "id": "wts-01", "question": "What should we go after?", "profile": "staffing_illustrative",
       "expectedRecipe": "where_to_start",
       "graderMustInclude": [
         "First sentence is the answer",
@@ -35,7 +35,7 @@
       "graderMustNotInclude": ["Construction notices", "Unsourced claims"]
     },
     {
-      "id": "wts-02", "question": "Where's the money for us?", "profile": "superb_staffing_spec",
+      "id": "wts-02", "question": "Where's the money for us?", "profile": "staffing_illustrative",
       "expectedRecipe": "where_to_start",
       "graderMustInclude": ["Picks ranked by fit to the profile", "One single best next move"],
       "graderMustNotInclude": ["A count without the top results"]
@@ -47,7 +47,7 @@
       "graderMustNotInclude": ["Asking for UEI, NAICS or certifications before showing any value (value first, Eric 2026-11-21)", "Invented profile fields"]
     },
     {
-      "id": "odd-01", "question": "Tell me about 36C25027R5412", "profile": "superb_staffing_spec",
+      "id": "odd-01", "question": "Tell me about 36C25027R5412", "profile": "staffing_illustrative",
       "expectedRecipe": "opportunity_deep_dive", "expectedIdentifiers": { "solicitation": "36C25027R5412" },
       "graderMustInclude": ["Pursue or pass, with conditions", "Incumbent and price history if the tools return them", "The question to ask the contracting officer"],
       "graderMustNotInclude": ["'There is no incumbent' unless a record says so"]
@@ -57,34 +57,34 @@
       "expectedRecipe": "opportunity_deep_dive", "expectedVia": "rule"
     },
     {
-      "id": "ps-01", "question": "Here's my website: superbstaffing.example.com", "profile": "none",
-      "expectedRecipe": "profile_setup", "expectedIdentifiers": { "url": "superbstaffing.example.com" },
+      "id": "ps-01", "question": "Here's my website: examplestaffing.example.com", "profile": "none",
+      "expectedRecipe": "profile_setup", "expectedIdentifiers": { "url": "examplestaffing.example.com" },
       "graderMustInclude": ["A readiness checklist: contacts, SBA keywords, service codes, website", "Missing fields shown as unknown"],
       "graderMustNotInclude": ["Guessed values for fields no tool returned"]
     },
     {
-      "id": "ps-02", "question": "superbstaffing.example.com", "profile": "none",
+      "id": "ps-02", "question": "examplestaffing.example.com", "profile": "none",
       "expectedRecipe": "profile_setup", "expectedVia": "rule"
     },
     {
-      "id": "ev-01", "question": "I'm going to NVSBE", "profile": "superb_staffing_spec",
+      "id": "ev-01", "question": "I'm going to NVSBE", "profile": "staffing_illustrative",
       "expectedRecipe": "event_plan", "notImplementedYet": true
     },
     {
-      "id": "bb-01", "question": "Tell me about the Coast Guard", "profile": "superb_staffing_spec",
+      "id": "bb-01", "question": "Tell me about the Coast Guard", "profile": "staffing_illustrative",
       "expectedRecipe": "buyer_brief", "notImplementedYet": true
     },
     {
-      "id": "tf-01", "question": "Who should I team with on this?", "profile": "superb_staffing_spec",
+      "id": "tf-01", "question": "Who should I team with on this?", "profile": "staffing_illustrative",
       "expectedRecipe": "teaming_finder", "notImplementedYet": true
     },
     {
-      "id": "pc-01", "question": "What should I charge for a General Clerk II?", "profile": "superb_staffing_spec",
+      "id": "pc-01", "question": "What should I charge for a General Clerk II?", "profile": "staffing_illustrative",
       "expectedRecipe": "price_check", "notImplementedYet": true,
       "graderMustNotInclude": ["Mindy subscription pricing (government labor rates are the subject)"]
     },
     {
-      "id": "od-01", "question": "Draft an email to the small business office", "profile": "superb_staffing_spec",
+      "id": "od-01", "question": "Draft an email to the small business office", "profile": "staffing_illustrative",
       "expectedRecipe": "outreach_draft", "notImplementedYet": true,
       "graderMustInclude": ["Names the specific buy", "Never sent automatically"]
     }
