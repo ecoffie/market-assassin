@@ -7,6 +7,7 @@
 import { isCardChatEnabled } from '@/lib/chat/card-chat';
 import { SAFE_MARKDOWN_SCRIPT } from '@/lib/chat/safe-markdown';
 import { NextRequest, NextResponse } from 'next/server';
+import { LEAFLET_JS_TAG } from './leaflet-assets';
 import { PLAYERS_HEADER_TEXT_JS, PROVEN_PLAYERS_LABEL, PROVEN_PLAYERS_DESCRIPTION } from '@/lib/players/copy';
 import { getMapOpportunities, SET_GROUPS } from '@/lib/opportunities/map-data';
 import { STATE_CENTROIDS } from '@/lib/geo/state-centroids';
@@ -11495,8 +11496,8 @@ export async function GET(request: NextRequest) {
     // of them stacked on one pixel over Columbus OH) while every `typeof` guard quietly passed.
     // A guard that degrades silently hides a missing dependency instead of surfacing it.
     // VTAG_CSS ships too — mkPin/cluster bubbles render divIcons that need those classes.
-    html = repl(html, '<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>',
-      '<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>' + PIN_JS);
+    html = repl(html, LEAFLET_JS_TAG,
+      LEAFLET_JS_TAG + PIN_JS);
     html = repl(html, '</head>', VTAG_CSS + '</head>');
     // ⚠️ BOOT_VIEW_JS MUST ship in the embed too (Eric 2026-08-15: "I thought zoom uses geo
     // location to find the people location"). It does — the map already has a four-tier cascade:
@@ -11544,8 +11545,8 @@ export async function GET(request: NextRequest) {
     // MF_TIMING.BOOT_REVEAL, so a fast entry never sees it and a slow parse cannot delay it.
     html = repl(html, '<div class="app">', MARKET_BOOT_APP_OPEN + zheadHtml() + ZRAIL_HTML + ZTOP_HTML + MARKET_BOOT_HTML);
     // Load setColorFor right after leaflet.js (before the template's map script).
-    html = repl(html, '<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>',
-      '<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>' + EARLY_INJECT + PIN_JS);
+    html = repl(html, LEAFLET_JS_TAG,
+      LEAFLET_JS_TAG + EARLY_INJECT + PIN_JS);
     // Color pins by SET-ASIDE eligibility (fixes the all-gray category mismatch).
     html = html.split('catColor(o.cat)').join('setColorFor(o)');
     // Office-vs-PoP location honesty is disclosed ONLY in the detail DRAWER now (Eric 2026-07-26:
