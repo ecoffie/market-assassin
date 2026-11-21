@@ -53,18 +53,18 @@ describe('redactToolArgs — strict allowlist (meaning validated, not just chara
 
   it('never stores free text, documents, narratives, contacts or credentials', () => {
     const args = {
-      description: 'Superb Staffing Solutions, a Memphis light industrial staffing firm',
+      description: 'Example Staffing Co, a Memphis light industrial staffing firm',
       draft_text: 'Our team will deliver', rfp_text: 'SECTION L: offerors shall', text: 'vault narrative', draft: 'proposal draft',
       past_performance: ['Managed 40 temp staff for VA Memphis'], capabilities: ['forklift certified crews'],
       requirement: 'L.3.2 page limit', requirements: [{ requirement: 'L.3.2' }], cai: { what: 'drones' },
-      client_name: 'Acme Holdings', query: 'our secret pricing strategy', keyword: 'superb staffing', q: 'free text',
+      client_name: 'Acme Holdings', query: 'our secret pricing strategy', keyword: 'example staffing', q: 'free text',
       first_name: 'Geoff', last_name: 'Haas', email: 'a@b.com', phone: '901-555-0100',
       contacts: [{ first_name: 'Ambreen', email: 'x@y.com' }], company: 'Concord Professional Services',
       api_key: 'sk-live-123', token: 'pit-abc', location: 'Memphis, TN',
     };
     const out = redactToolArgs(args);
     for (const [k, v] of Object.entries(out)) expect(isRedacted(v), k).toBe(true);
-    for (const s of ['Superb', 'Memphis', 'SECTION L', 'vault narrative', 'forklift', 'Geoff', 'Haas', 'a@b.com', '901-555', 'Ambreen', 'sk-live', 'pit-abc', 'Acme', 'secret pricing', 'Concord']) {
+    for (const s of ['Example', 'Memphis', 'SECTION L', 'vault narrative', 'forklift', 'Geoff', 'Haas', 'a@b.com', '901-555', 'Ambreen', 'sk-live', 'pit-abc', 'Acme', 'secret pricing', 'Concord']) {
       expect(leaks(out, s), s).toBe(false);
     }
   });

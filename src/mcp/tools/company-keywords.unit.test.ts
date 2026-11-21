@@ -21,7 +21,7 @@ function fakeVec(text: string): number[] {
   return v;
 }
 
-const DESC = 'Superb Staffing is a light industrial, clerical and warehouse staffing firm in Memphis';
+const DESC = 'Example Staffing is a light industrial, clerical and warehouse staffing firm in Memphis';
 
 function deps(over: Partial<CompanyKeywordsDeps> = {}): Partial<CompanyKeywordsDeps> {
   return {
@@ -44,13 +44,13 @@ function deps(over: Partial<CompanyKeywordsDeps> = {}): Partial<CompanyKeywordsD
 
 describe('derive_company_keywords — grounded path (R6)', () => {
   it('never returns the city or the brand word, and keeps the capability word in the brand', async () => {
-    const r = await deriveCompanyKeywords({ description: DESC, brand_exclude: ['Superb Staffing'], include_market_terms: true }, deps());
+    const r = await deriveCompanyKeywords({ description: DESC, brand_exclude: ['Example Staffing'], include_market_terms: true }, deps());
     expect(r.keywords.length).toBeGreaterThan(0);
     for (const k of r.keywords) {
       expect(k).not.toMatch(/memphis/);
-      expect(k).not.toMatch(/superb/);
+      expect(k).not.toMatch(/example/);
     }
-    expect(r.excluded_terms).toEqual({ locations: ['memphis'], brand: ['superb'] });
+    expect(r.excluded_terms).toEqual({ locations: ['memphis'], brand: ['example'] });
     // "memphis depot" came from a market source and is still blocked.
     expect(r.keyword_sources!.some((k) => k.keyword.includes('memphis'))).toBe(false);
     expect(r.keywords.some((k) => k.includes('staffing'))).toBe(true);
@@ -59,7 +59,7 @@ describe('derive_company_keywords — grounded path (R6)', () => {
   it('surfaces occupational titles from CALC and solicitation text, each with a named source', async () => {
     // Flat embedding: every candidate equally relevant, so this test checks provenance, not ranking.
     const r = await deriveCompanyKeywords(
-      { description: DESC, brand_exclude: ['Superb Staffing'], include_market_terms: true, limit: 25 },
+      { description: DESC, brand_exclude: ['Example Staffing'], include_market_terms: true, limit: 25 },
       deps({ embed: async (texts) => texts.map(() => [1, 0, 0]) }),
     );
     const occ = r.occupational_titles!.map((o) => o.keyword);
@@ -105,10 +105,10 @@ describe('derive_company_keywords — grounded path (R6)', () => {
 
 describe('derive_company_keywords — input-only path (library callers)', () => {
   it('strips the city and only brand-distinctive words; sources are input_text', async () => {
-    const r = await deriveCompanyKeywords({ description: DESC, brand_exclude: ['Superb Staffing'] });
+    const r = await deriveCompanyKeywords({ description: DESC, brand_exclude: ['Example Staffing'] });
     expect(r.keywords.length).toBeGreaterThan(0);
     for (const k of r.keywords) {
-      expect(k).not.toMatch(/memphis|superb/);
+      expect(k).not.toMatch(/memphis|example/);
     }
     expect(r.keywords.some((k) => k.includes('staffing'))).toBe(true);
     expect(r.keyword_sources!.every((k) => k.sources[0].type === 'input_text')).toBe(true);

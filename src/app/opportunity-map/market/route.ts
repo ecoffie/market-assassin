@@ -166,8 +166,11 @@ const PAGE = `<!DOCTYPE html><html lang="en" class="mindy-map"><head>
   .hubhd{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:12px}
   .hubhd h2{font:800 18px Inter,sans-serif;letter-spacing:-.01em}
   .hubhd a{font:700 13px Inter,sans-serif;color:var(--jan);text-decoration:none}.hubhd a:hover{text-decoration:underline}
-  .hubgrid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
-  @media(max-width:640px){.hubgrid{grid-template-columns:1fr}}
+  /* minmax(0,1fr), not 1fr: a plain 1fr track can't shrink below its min-content, and each row's
+     title is nowrap, so the longest agency / industry name set the column width and pushed the page
+     to 1046px on a 390px phone (amounts off-screen). With 0 as the floor the existing ellipsis works. */
+  .hubgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+  @media(max-width:640px){.hubgrid{grid-template-columns:minmax(0,1fr)}}
   .hubrow{display:flex;align-items:center;justify-content:space-between;gap:12px;border:1px solid var(--line);border-radius:11px;background:#fff;padding:13px 15px;text-decoration:none;transition:border-color .14s,box-shadow .14s}
   .hubrow:hover{border-color:#c4cfda;box-shadow:0 3px 12px -5px rgba(16,24,40,.16)}
   .hubrow .l{min-width:0}

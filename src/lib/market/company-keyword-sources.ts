@@ -3,7 +3,7 @@
  *
  * The defect this closes (Ask Mindy R6): keywords were n-grams of the INPUT ranked by
  * similarity to the SAME input, so the company name and the city scored highest
- * ("superb staffing", "memphis") and nothing the buyer actually writes (the job titles a
+ * ("example staffing", "memphis") and nothing the buyer actually writes (the job titles a
  * staffing contract prices) could ever appear, because the input never contained it.
  *
  * Now:
@@ -147,8 +147,8 @@ export function cleanInputText(text: string, brandPhrases: string[], locations: 
 /**
  * Brand tokens that must not appear in ANY keyword. A token is stripped only when it is
  * distinctive to the brand: it does not appear anywhere in the input outside the brand
- * phrase, and it is not a term the external market sources use (so "Superb Staffing"
- * strips "superb" but keeps "staffing", which is market vocabulary). The old behaviour
+ * phrase, and it is not a term the external market sources use (so "Example Staffing"
+ * strips "example" but keeps "staffing", which is market vocabulary). The old behaviour
  * stripped every brand token, so a brand containing a capability word erased that
  * capability from every keyword.
  */
