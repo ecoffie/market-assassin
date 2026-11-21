@@ -485,16 +485,17 @@ function enrichPathwayTitle(title: string, summary?: string, noticeId?: string):
 
 /** Collapse Special Notice + Sources Sought twins (e.g. W912DR27H1CWY / W912DR27H1CWYPLA). */
 function pathwayDedupeKey(p: FmpPathway): string {
+  const titleKey = p.title.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().slice(0, 56);
+  // Title first for vehicles / SS — FIND returns a notice UUID while search_sam returns the
+  // solicitation PIID for the same MATOC; sol-first keys never collapsed those twins.
+  if (VEHICLE_WORD_RE.test(p.title) || SOURCES_SOUGHT_RE.test(`${p.title} ${p.noticeType ?? ''}`)) {
+    return `frame:${titleKey}`;
+  }
   const sol = (p.noticeId || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
   // PIID-style solicitation (not a 32-hex notice UUID) — stem collapses PLA/amend twins.
   if (sol.length >= 10 && !/^[A-F0-9]{32}$/.test(sol)) {
     const stem = sol.replace(/(PLA|AMEND\d*|REV\d*)$/i, '');
     return `sol:${stem.slice(0, 14)}`;
-  }
-  // Same vehicle / SS title from FIND (uuid) + search_sam (solicitation) must not double-count.
-  const titleKey = p.title.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().slice(0, 56);
-  if (VEHICLE_WORD_RE.test(p.title) || SOURCES_SOUGHT_RE.test(`${p.title} ${p.noticeType ?? ''}`)) {
-    return `frame:${titleKey}`;
   }
   if (sol.length >= 10) {
     const stem = sol.replace(/(PLA|AMEND\d*|REV\d*)$/i, '');

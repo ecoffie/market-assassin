@@ -805,6 +805,34 @@ describe('fmp-writeup-grounding', () => {
         expect(fc?.when).toMatch(/2027-09-01/);
       });
 
+      it('collapses FIND-uuid + SAM-solicitation twins of the same Inspection MATOC', () => {
+        const title = '2027 Construction Inspection Services Multiple Award Task Order Contract (MATOC)';
+        const byUuid = {
+          notice_id: 'a4f43443294c4da39c86b1b87ce8267a',
+          title,
+          department: '693C73 EASTERN FED LANDS DIVISION',
+          naics_code: '541330',
+          response_deadline: '2027-01-04T21:00:00Z',
+          notice_type: 'Presolicitation',
+        };
+        const bySol = {
+          notice_id: 'b4f43443294c4da39c86b1b87ce8267b',
+          solicitation_number: '693C73-27-R-000006',
+          title,
+          department: 'TRANSPORTATION, DEPARTMENT OF',
+          naics_code: '541330',
+          response_deadline: '2027-01-04T21:00:00Z',
+          notice_type: 'Presolicitation',
+        };
+        const ev = accumulateFmpEvidence([
+          { tool: 'get_contractor_award_history', content: HISTORY },
+          { tool: 'find_opportunities', content: find([byUuid, civilA, civilB]) },
+          { tool: 'search_sam_opportunities', content: JSON.stringify({ items: [bySol] }) },
+        ]);
+        const matocs = (ev.pathways || []).filter((p) => /Inspection Services Multiple Award/i.test(p.title));
+        expect(matocs).toHaveLength(1);
+      });
+
       it('keeps a Sources Sought / MACC in adjacent 236210 for a 237310 firm (JBAB-class gold pathway)', () => {
         const jbab = {
           notice_id: 'jbab0001jbab0001jbab0001jbab0001',
