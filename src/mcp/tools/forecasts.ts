@@ -7,6 +7,31 @@
  */
 import { queryForecastsWithFallback, type ForecastRow, type ForecastSourceFreshness } from '@/lib/forecasts/query';
 import { mcpFlags } from '@/lib/mcp/flags';
+import { resolveForecastAgencies } from '@/lib/forecasts/agency-identity';
+import type { ForecastCoverage, ForecastCoverageGap } from '@/lib/discovery/plan';
+
+/**
+ * Forecast publisher coverage for the requested agency — the same rule find_opportunities' Coming soon
+ * horizon uses (discovery plan). Ask Mindy Backend Spec (Nov 21 2026): "state plainly that coverage
+ * doesn't exist" rather than answer "no forecasts matched".
+ *   ok            — no agency asked, or every recognised agency resolves to forecast rows we hold.
+ *   partial       — some requested agencies are covered, some are not (named in gaps).
+ *   unestablished — none is covered: the answer is UNAVAILABLE, never a zero.
+ * A recognised agency with no feed (DLA, FAA …) carries the parent that does publish and why.
+ */
+export function forecastAgencyCoverage(agency: string | undefined): { coverage: ForecastCoverage; gaps: ForecastCoverageGap[] } {
+  const r = resolveForecastAgencies(agency ?? '');
+  if (r.empty) return { coverage: 'ok', gaps: [] };
+  const gaps: ForecastCoverageGap[] = [
+    ...r.identities.filter((id) => id.codes.length === 0).map((id) => ({
+      requested: id.label, reason: 'publisher_without_forecasts' as const, label: id.label,
+      ...(id.parentWithData ? { parentWithData: id.parentWithData } : {}), ...(id.note ? { note: id.note } : {}),
+    })),
+    ...r.unresolved.map((u) => ({ requested: u, reason: 'unresolved_publisher' as const })),
+  ];
+  const covered = r.codes.length > 0 || r.children.length > 0;
+  return { coverage: !gaps.length ? 'ok' : covered ? 'partial' : 'unestablished', gaps };
+}
 
 export interface ForecastsToolInput {
   naics?: string;
@@ -26,7 +51,13 @@ export interface ForecastsToolResult {
     grounded: boolean;
     degraded: boolean;
     count: number;
-    total: number;
+    /** Matching forecasts. null = not measured (the requested agency has no forecast coverage). */
+    total: number | null;
+    /** Whether the requested agency is a forecast publisher we hold (see forecastAgencyCoverage). */
+    coverage: ForecastCoverage;
+    /** Every requested agency the forecast data cannot answer for, with the reason. Never counted as zero. */
+    coverage_gaps?: ForecastCoverageGap[];
+    result_state?: 'unavailable';
     /** Freshness per agency among the returned rows (stalest first). Each row also carries as_of + source_url. */
     sources: ForecastSourceFreshness[];
     /** Agencies whose newest returned row is older than 45 days (or of unknown age). */
@@ -40,6 +71,31 @@ export interface ForecastsToolResult {
 }
 
 export async function agencyForecasts(input: ForecastsToolInput): Promise<ForecastsToolResult> {
+  const queried: Record<string, string> = {};
+  for (const [k, v] of Object.entries({ naics: input.naics, agency: input.agency, state: input.state, set_aside: input.set_aside, fiscal_year: input.fiscal_year, keyword: input.keyword })) {
+    if (v) queried[k] = v;
+  }
+  const { coverage, gaps } = forecastAgencyCoverage(input.agency);
+  if (coverage === 'unestablished') {
+    // No requested agency publishes forecasts we hold. Running the query could only return a zero that
+    // measures nothing (or another publisher's rows via the text fallback), so it is not run.
+    const result: ForecastsToolResult = {
+      queried,
+      forecasts: [],
+      _meta: {
+        grounded: false, degraded: false, count: 0, total: null, sources: [], stale_sources: [],
+        served_from: 'live', snapshot_at: null, coverage, coverage_gaps: gaps, result_state: 'unavailable',
+      },
+    };
+    if (mcpFlags.aiHint) {
+      result._ai_hint = {
+        summary: `Mindy holds no agency forecast data for ${gaps.map((g) => g.label ?? g.requested).join(', ')}. This is a coverage gap, not "no planned buys".`,
+        how_to_use: 'Say plainly that forecast coverage does not exist for this agency. Where a gap names parentWithData, offer that parent\'s forecasts; where its note names another dataset (e.g. DIBBS for DLA), offer that instead.',
+        key_caveats: gaps.map((g) => g.note ?? `${g.requested}: no matching forecast publisher.`),
+      };
+    }
+    return result;
+  }
   const res = await queryForecastsWithFallback({
     naics: input.naics,
     agency: input.agency,
@@ -50,10 +106,6 @@ export async function agencyForecasts(input: ForecastsToolInput): Promise<Foreca
     limit: input.limit,
   });
   const grounded = res.forecasts.length > 0;
-  const queried: Record<string, string> = {};
-  for (const [k, v] of Object.entries({ naics: input.naics, agency: input.agency, state: input.state, set_aside: input.set_aside, fiscal_year: input.fiscal_year, keyword: input.keyword })) {
-    if (v) queried[k] = v;
-  }
   const result: ForecastsToolResult = {
     queried,
     forecasts: res.forecasts,
@@ -66,6 +118,8 @@ export async function agencyForecasts(input: ForecastsToolInput): Promise<Foreca
       stale_sources: (res.sources ?? []).filter((s) => s.stale).map((s) => s.agency),
       served_from: res.served_from ?? (res.degraded ? 'error' : 'live'),
       snapshot_at: res.snapshot_at ?? null,
+      coverage,
+      ...(gaps.length ? { coverage_gaps: gaps } : {}),
       ...(res.served_from === 'last_good' ? { billing_outcome: 'nonbillable_system_failure' as const } : {}),
     },
   };
