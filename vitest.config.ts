@@ -18,6 +18,9 @@ export default defineConfig({
       // (isApprovedAmbassador → kv.get on every runMeteredTool). Resolve-time
       // alias — vi.mock in setupFiles did not intercept the live client.
       '@vercel/kv': fileURLToPath(new URL('./tests/setup/vercel-kv-stub-module.ts', import.meta.url)),
+      // Same class for Supabase: createClient + undici hang under no-network
+      // (agency sync, last-good setCached, opportunities/save past Pro gate).
+      '@supabase/supabase-js': fileURLToPath(new URL('./tests/setup/supabase-js-stub-module.ts', import.meta.url)),
     },
   },
   test: {
