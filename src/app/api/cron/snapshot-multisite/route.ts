@@ -46,6 +46,7 @@ import type {
   SourceId,
 } from '@/lib/scrapers/types';
 import { reportCronOutcome } from '@/lib/cron-self-report';
+import { researchInstancePatch } from '@/lib/scrapers/research-instance-stamp';
 
 // ============================================================================
 // CONFIGURATION
@@ -200,6 +201,8 @@ export async function GET(request: NextRequest) {
       totalUpdated += result.updatedCount;
       totalUnchanged += result.unchangedCount;
 
+      if (!dryRun) await stampResearchInstance(sourceId, result);
+
       // Log completion
       await logScrapeComplete(logId, {
         status: result.success ? 'success' : 'failed',
@@ -223,6 +226,20 @@ export async function GET(request: NextRequest) {
       results[sourceId] = {
         error: message
       };
+
+      if (!dryRun) {
+        await stampResearchInstance(sourceId, {
+          success: false,
+          source: sourceId,
+          opportunities: [],
+          totalFound: 0,
+          newCount: 0,
+          updatedCount: 0,
+          unchangedCount: 0,
+          durationMs: Date.now() - sourceStartTime,
+          scrapedAt: new Date().toISOString(),
+        });
+      }
 
       // Update source health for failure
       await updateSourceHealth(sourceId, false, 0, Date.now() - sourceStartTime, message);
@@ -250,9 +267,11 @@ export async function GET(request: NextRequest) {
   if (!dryRun && sourcesToScrape.length === 1) {
     const jobName = CRON_JOB_BY_SOURCE[sourcesToScrape[0]];
     if (jobName) {
-      const r = results[sourcesToScrape[0]] as { error?: string; totalFound?: number } | undefined;
-      if (r?.error) {
-        await reportCronOutcome(jobName, 'error', r.error).catch(() => {});
+      const r = results[sourcesToScrape[0]] as {
+        error?: string; totalFound?: number; success?: boolean; errors?: Array<{ message?: string }>;
+      } | undefined;
+      if (r?.error || r?.success === false) {
+        await reportCronOutcome(jobName, 'error', r.error || r.errors?.[0]?.message || 'scrape failed').catch(() => {});
       } else if (!r || !r.totalFound) {
         await reportCronOutcome(
           jobName,
@@ -397,6 +416,28 @@ async function upsertOpportunities(
 /**
  * Generate content hash for change detection
  */
+const RESEARCH_INSTANCE: Record<string, string> = {
+  nih_reporter: 'research_nih_reporter',
+  darpa_baa: 'research_darpa_baa',
+  nsf_sbir: 'research_nsf_sbir',
+};
+
+/** A failed or empty research fetch is unreachable. A landed fetch stamps a real clock. */
+async function stampResearchInstance(sourceId: string, result: ScrapeResult): Promise<void> {
+  const key = RESEARCH_INSTANCE[sourceId];
+  if (!key) return;
+  const patch = researchInstancePatch({
+    success: result.success,
+    totalFound: result.totalFound,
+    newCount: result.newCount,
+    updatedCount: result.updatedCount,
+    unchangedCount: result.unchangedCount,
+    now: new Date().toISOString(),
+  });
+  const { error } = await getSupabase().from('data_source_instances').update(patch).eq('source_key', key);
+  if (error) console.error(`[Multisite] instance stamp ${key} failed:`, error.message);
+}
+
 function generateContentHash(opp: ScrapedOpportunity): string {
   const content = JSON.stringify({
     title: opp.title,

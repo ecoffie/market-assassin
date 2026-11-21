@@ -50,7 +50,7 @@ describe('Maps account chip is an identity avatar, not help', () => {
   });
 
   it('signed-out paints Start for free, not a fake avatar', () => {
-    expect(src).toContain('btn.innerHTML="Start for free"');
+    expect(src).toContain('btn.innerHTML="Start 14-day free trial"');
     expect(src).toContain('function paintSignedOut()');
   });
 

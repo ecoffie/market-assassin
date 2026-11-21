@@ -3,6 +3,8 @@
  * The July 2026 XLSX still returns HTTP 200, so a parser that only knows that
  * file misses the 2026-11-16 edition (869 rows, measured that day).
  */
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { parseMoneyRange, parseNaics, parseSetAside } from './usace-district-parse';
 import {
@@ -25,6 +27,28 @@ const CSV = [
   '11/16/2026,1/15/2027,1/15/2027,238320,Painting and Wall Covering Contractors,Office of Management,"JB CONTRACTING, INC.",No,N/A,89303025DMA000037,89303025DMA000037,"Painting services for the Forrestal building, option year 1.",2053499.2,Small Business,Unavailable,8(a) Sole Source,8(a) Sole Source,Contract,DC,naomi.robinson@hq.doe.gov,138,Management,sirron.scott@hq.doe.gov,R2 – $250K–$7.5M',
   '11/16/2026,3/1/2027,3/1/2027,541512,Custom Computer Programming,Office of the CIO,Unavailable,No,N/A,Unavailable,Unavailable,"New cloud hosting requirement for the science network.",,Small Business,Unavailable,Small Business Set-Aside,Small Business Set-Aside,Contract,Unavailable,sb@hq.doe.gov,100,CIO,buyer@hq.doe.gov,$1M to $5M',
 ].join('\r\n');
+
+describe('live 2026-11-16 CSV slice', () => {
+  const text = readFileSync(join(__dirname, '__fixtures__/doe-2026-11-16-slice.csv'), 'utf8');
+
+  it('parses real rows as DOE forecasts with the contract number as identity', () => {
+    const parsed = parseDoeCsv(text, HELPERS);
+    expect(parsed.headerRow).toBe(0);
+    expect(parsed.rows).toHaveLength(2);
+    const painting = parsed.rows[0];
+    expect(painting.title).toMatch(/Forrestal/);
+    expect(painting.naicsCode).toBe('238320');
+    expect(painting.incumbentName).toBe('JB CONTRACTING, INC.');
+    expect(painting.incumbentContractNumber).toBe('89303025DMA000037');
+    expect(painting.editionDate).toBe('2026-11-16');
+    expect(painting.popState).toBeUndefined();
+    expect(doeExternalId(painting)).toBe('DOE-C:89303025DMA000037');
+    const netl = parsed.rows[1];
+    expect(netl.programOffice).toMatch(/Fossil Energy/);
+    expect(netl.popState).toBe('PENNSYLVANIA');
+    expect(netl.naicsCode).toBe('333248');
+  });
+});
 
 describe('extractDoeForecastDocuments', () => {
   it('picks the newest dated CSV and ignores the readme', () => {

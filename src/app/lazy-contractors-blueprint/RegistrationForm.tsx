@@ -1,19 +1,21 @@
 'use client';
 
 /**
- * Mindy Day registration: the original one-step form (restored 2026-11-13 at Eric's request) —
- * first/last name, email, phone (required), text-reminder consent and two qualifying questions.
+ * Mindy Day registration, in three short steps (2026-11-19, from the Hormozi landing-page Short:
+ * ask the least first, split a long form into steps): 1 name · 2 email, phone, text consent ·
+ * 3 two qualifying questions. Same fields and the same /register payload as the one-step form.
  * After it saves: add-to-calendar and share buttons.
  * Someone who types a name and a valid email but leaves without submitting is recorded once as
  * "started" (GHL tag lcb-started-not-registered) so a GHL email workflow can nudge them; the tag is
  * removed when they register. Never texted: no consent was given.
  */
-import { useRef, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Button, Field, Input, Select } from '@/components/public-site/ui';
 import { LAZY_CONTRACTORS_BLUEPRINT as EVENT } from '@/lib/events/lazy-contractors-blueprint';
 
 const API = '/api/events/lazy-contractors-blueprint';
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const STEP_NAMES = ['Your name', 'Your contact', 'Save your seat'] as const;
 const PAGE_URL = `https://getmindy.ai${EVENT.path}`;
 
 function readAttribution(): unknown {
@@ -47,6 +49,24 @@ export default function RegistrationForm() {
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
     const startedSent = useRef(false);
+  const [formStep, setFormStep] = useState<1 | 2 | 3>(1);
+  const stepRefs = [useRef<HTMLDivElement>(null), useRef<HTMLDivElement>(null), useRef<HTMLDivElement>(null)];
+
+  /** Checks only the current step's inputs; shows the browser's own message on the first bad one. */
+  function currentStepValid(): boolean {
+    const box = stepRefs[formStep - 1].current;
+    if (!box) return true;
+    for (const el of Array.from(box.querySelectorAll<HTMLInputElement | HTMLSelectElement>('input, select'))) {
+      if (!el.checkValidity()) { el.reportValidity(); return false; }
+    }
+    return true;
+  }
+
+  // Focus the first field of each new step.
+  useEffect(() => {
+    stepRefs[formStep - 1].current?.querySelector<HTMLElement>('input, select')?.focus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- refs are stable
+  }, [formStep]);
 
   function noteStarted(form: HTMLFormElement | null) {
     if (!form || startedSent.current) return;
@@ -63,6 +83,12 @@ export default function RegistrationForm() {
 
   async function onRegister(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (!currentStepValid()) return;
+    if (formStep < 3) {
+      if (formStep === 2) noteStarted(e.currentTarget);
+      setFormStep((formStep + 1) as 2 | 3);
+      return;
+    }
     const fd = new FormData(e.currentTarget);
     setSending(true);
     setError('');
@@ -112,29 +138,53 @@ export default function RegistrationForm() {
     );
   }
 
+  const stepFields = (n: 1 | 2 | 3) => (
+    <div className="lcb-step-meta">
+      <ol className="lcb-steps" aria-label="Steps">
+        {STEP_NAMES.map((name, i) => (
+          <li key={name} aria-current={i + 1 === n ? 'step' : undefined} className={i + 1 <= n ? 'on' : ''}>{name}</li>
+        ))}
+      </ol>
+      <p className="mp-meta" style={{ margin: 0 }}>Step {n} of 3</p>
+    </div>
+  );
+
   return (
-    <form className="mp-panel" id="register" onSubmit={onRegister} style={{ display: 'grid', gap: 16 }}
+    <form className="mp-panel" id="register" onSubmit={onRegister} noValidate
+      style={{ display: 'grid', gap: 16 }}
       onBlur={(e) => { if ((e.target as HTMLElement).id === 'lcb-email') noteStarted(e.currentTarget); }}>
-      <p className="mp-label">Save your free seat</p>
-      <div style={{ display: 'grid', gap: 16, gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))' }}>
-        <Field label="First name" htmlFor="lcb-first">
-          <Input id="lcb-first" name="firstName" autoComplete="given-name" required maxLength={80} />
-        </Field>
-        <Field label="Last name" htmlFor="lcb-last">
-          <Input id="lcb-last" name="lastName" autoComplete="family-name" maxLength={80} />
-        </Field>
+      {stepFields(formStep)}
+
+      {/* noValidate: the browser would block on a later, hidden step; each step is checked on Continue. */}
+      {/* All three steps stay mounted (hidden when not current) so one FormData submit carries every field. */}
+      <div ref={stepRefs[0]} hidden={formStep !== 1} style={{ display: formStep === 1 ? 'grid' : 'none', gap: 16 }}>
+        <p className="lcb-step-q">What&apos;s your name?</p>
+        <div style={{ display: 'grid', gap: 16, gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))' }}>
+          <Field label="First name" htmlFor="lcb-first">
+            <Input id="lcb-first" name="firstName" autoComplete="given-name" required maxLength={80} />
+          </Field>
+          <Field label="Last name" htmlFor="lcb-last">
+            <Input id="lcb-last" name="lastName" autoComplete="family-name" maxLength={80} />
+          </Field>
+        </div>
       </div>
-      <Field label="Email" htmlFor="lcb-email">
-        <Input id="lcb-email" name="email" type="email" autoComplete="email" required maxLength={254} />
-      </Field>
-      <Field label="Phone" htmlFor="lcb-phone">
-        <Input id="lcb-phone" name="phone" type="tel" autoComplete="tel" required maxLength={30} />
-      </Field>
-      <label className="mp-meta" style={{ display: 'flex', gap: 10, alignItems: 'flex-start', lineHeight: 1.5 }}>
-        <input type="checkbox" name="smsConsent" style={{ marginTop: 3 }} />
-        <span>Text me event reminders. Message and data rates may apply. Reply STOP to opt out.</span>
-      </label>
-      <div style={{ display: 'grid', gap: 16, gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))' }}>
+
+      <div ref={stepRefs[1]} hidden={formStep !== 2} style={{ display: formStep === 2 ? 'grid' : 'none', gap: 16 }}>
+        <p className="lcb-step-q">Where should we send your join link?</p>
+        <Field label="Email" htmlFor="lcb-email">
+          <Input id="lcb-email" name="email" type="email" autoComplete="email" required maxLength={254} />
+        </Field>
+        <Field label="Phone" htmlFor="lcb-phone">
+          <Input id="lcb-phone" name="phone" type="tel" autoComplete="tel" required maxLength={30} />
+        </Field>
+        <label className="mp-meta" style={{ display: 'flex', gap: 10, alignItems: 'flex-start', lineHeight: 1.5 }}>
+          <input type="checkbox" name="smsConsent" style={{ marginTop: 3 }} />
+          <span>Text me event reminders. Message and data rates may apply. Reply STOP to opt out.</span>
+        </label>
+      </div>
+
+      <div ref={stepRefs[2]} hidden={formStep !== 3} style={{ display: formStep === 3 ? 'grid' : 'none', gap: 16 }}>
+        <p className="lcb-step-q">Last step: two quick questions.</p>
         <Field label="Do you own a business?" htmlFor="lcb-owns">
           <Select id="lcb-owns" name="ownsBusiness" defaultValue="">
             <option value="" disabled>Choose one</option>
@@ -152,12 +202,20 @@ export default function RegistrationForm() {
           </Select>
         </Field>
       </div>
+
       {/* Honeypot — hidden from people, filled by bots. */}
       <input type="text" name="website" tabIndex={-1} autoComplete="off" aria-hidden="true"
         style={{ position: 'absolute', left: '-9999px', width: 1, height: 1, opacity: 0 }} />
       {error && <p className="mp-meta" role="alert" style={{ color: 'var(--mp-crit)' }}>{error}</p>}
-      <Button type="submit" disabled={sending}>{sending ? 'Saving your seat…' : 'Save My Free Seat'}</Button>
-      <p className="mp-meta">Free to attend. No credit card.</p>
+      <div style={{ display: 'flex', gap: 10 }}>
+        {formStep > 1 && (
+          <button type="button" className="mp-btn mp-btn--secondary" onClick={() => setFormStep((formStep - 1) as 1 | 2)}>Back</button>
+        )}
+        <Button type="submit" disabled={sending} style={{ flex: 1 }}>
+          {formStep < 3 ? 'Continue' : sending ? 'Saving your seat…' : 'Save My Free Seat'}
+        </Button>
+      </div>
+      <p className="mp-meta" style={{ margin: 0 }}>Free to attend. No credit card. We never share your details.</p>
     </form>
   );
 }

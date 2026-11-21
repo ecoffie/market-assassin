@@ -7,6 +7,7 @@
 import { isCardChatEnabled } from '@/lib/chat/card-chat';
 import { SAFE_MARKDOWN_SCRIPT } from '@/lib/chat/safe-markdown';
 import { NextRequest, NextResponse } from 'next/server';
+import { LEAFLET_JS_TAG } from './leaflet-assets';
 import { PLAYERS_HEADER_TEXT_JS, PROVEN_PLAYERS_LABEL, PROVEN_PLAYERS_DESCRIPTION } from '@/lib/players/copy';
 import { getMapOpportunities, SET_GROUPS } from '@/lib/opportunities/map-data';
 import { STATE_CENTROIDS } from '@/lib/geo/state-centroids';
@@ -1106,6 +1107,13 @@ const ZLAYOUT_CSS = '<style>'
   // filter bar below (.ztop, z 1001) covered its top items on desktop (Eric 2026-11-13: "when i
   // click my icon on the top right i cant see the entire menu"). Phone already used 1100.
   + '.zhead{grid-area:zhead;position:relative;display:flex;flex-direction:column;background:#fff;z-index:1100;' + mpTokenDeclarations() + '}'
+  // The homepage ☰ menu (.mp-menu, site-nav.ts) opens INSIDE this header, so its own z-index is capped
+  // by the header's 1100. On a phone the map's bottom results sheet (#mToggle 1400), the selected-pin
+  // card (#mCard 1300) and Save search (1200) sat over the open menu and covered its last item, the
+  // "Start 14-day free trial" button (a tap hit the sheet instead). While that menu is open the header
+  // rises above the map's own chrome (incl. the listing drawer 1500 and map drawer 1600), and stays
+  // under user-opened overlays: Ask Mindy (2600) and the filter pop-overs (3000).
+  + 'html.mp-menu-open .zhead{z-index:1700!important}'
   // The phone-only row under the homepage bar that holds the map menu button. Hidden on desktop.
   + '.zh-maprow{display:none;align-items:center;gap:14px;border-bottom:1px solid var(--line);background:#fff}'
   // far-left icon rail — PINNED (position:fixed) so grid/overflow can never push it off-screen.
@@ -1347,6 +1355,10 @@ const ZLAYOUT_CSS = '<style>'
   +   'body.m-list .mapwrap{visibility:hidden!important;pointer-events:none!important}'
   // Map controls (zoom, legend, attribution) sit above the bottom bar.
   +   '.mapwrap .leaflet-bottom{bottom:86px!important}'
+  // The tile-status notice ("Map tiles blocked by your network…", template.html) is not a Leaflet
+  // control, so the rule above never lifted it: at its 44px it sat under this bar and the attribution
+  // (iPhone SE: 0 of 3 rows visible; iPhone 13 / Pixel 7: 1 of 3). Lift it over both.
+  +   '.mapwrap .tilestatus{bottom:118px!important}'
   // The map's count pill is mirrored into the bottom bar (#mToggleCount, same words, including
   // "N not shown on map"), so it is hidden here rather than shown twice.
   +   '#mapCount{display:none!important}'
@@ -11646,8 +11658,8 @@ export async function GET(request: NextRequest) {
     // of them stacked on one pixel over Columbus OH) while every `typeof` guard quietly passed.
     // A guard that degrades silently hides a missing dependency instead of surfacing it.
     // VTAG_CSS ships too — mkPin/cluster bubbles render divIcons that need those classes.
-    html = repl(html, '<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>',
-      '<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>' + PIN_JS);
+    html = repl(html, LEAFLET_JS_TAG,
+      LEAFLET_JS_TAG + PIN_JS);
     html = repl(html, '</head>', VTAG_CSS + '</head>');
     // ⚠️ BOOT_VIEW_JS MUST ship in the embed too (Eric 2026-08-15: "I thought zoom uses geo
     // location to find the people location"). It does — the map already has a four-tier cascade:
@@ -11695,8 +11707,8 @@ export async function GET(request: NextRequest) {
     // MF_TIMING.BOOT_REVEAL, so a fast entry never sees it and a slow parse cannot delay it.
     html = repl(html, '<div class="app">', MARKET_BOOT_APP_OPEN + zheadHtml() + ZRAIL_HTML + ZTOP_HTML + MARKET_BOOT_HTML);
     // Load setColorFor right after leaflet.js (before the template's map script).
-    html = repl(html, '<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>',
-      '<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>' + EARLY_INJECT + PIN_JS);
+    html = repl(html, LEAFLET_JS_TAG,
+      LEAFLET_JS_TAG + EARLY_INJECT + PIN_JS);
     // Color pins by SET-ASIDE eligibility (fixes the all-gray category mismatch).
     html = html.split('catColor(o.cat)').join('setColorFor(o)');
     // Office-vs-PoP location honesty is disclosed ONLY in the detail DRAWER now (Eric 2026-07-26:

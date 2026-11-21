@@ -52,6 +52,6 @@ export function trackSignUp(method: 'email' | 'google' | 'microsoft' = 'email'):
  * which link; `placement` is where on the page. /api/admin/conversions counts the people who fire it
  * on /pricing as the pricing → trial-click rate.
  */
-export function trackTrialClick(plan: 'pro' | 'team', billing: 'monthly' | 'annual', placement: 'card' | 'table' | 'hero'): void {
+export function trackTrialClick(plan: 'pro' | 'team', billing: 'monthly' | 'annual', placement: 'card' | 'table' | 'hero' | string): void {
   trackGA4Event('trial_click', { plan, billing, placement });
 }

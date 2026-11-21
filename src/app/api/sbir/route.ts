@@ -13,8 +13,10 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { isManufacturedDarpaRow } from '@/lib/scrapers/manufactured-darpa';
 import { createClient } from '@supabase/supabase-js';
 import { saveSnapshot, readSnapshot, freshMeta, degradedMeta, isUpstreamOutage } from '@/lib/resilience/last-good';
+import { finishedSbirBody, planSbirAgency, unavailableSbirBody } from '@/lib/sbir/agency-availability';
 
 interface NihProject {
   project_num: string;
@@ -123,6 +125,13 @@ export async function GET(request: NextRequest) {
     });
   }
 
+  const plan = planSbirAgency({ agency, source });
+  if (plan.kind === 'unavailable') {
+    return NextResponse.json(unavailableSbirBody({
+      keyword, agency, phase, limit, source: plan.source, reason: plan.reason,
+    }));
+  }
+
   const results: {
     id: string;
     title: string;
@@ -142,6 +151,7 @@ export async function GET(request: NextRequest) {
   // inner handlers swallow errors and continue with partial results, so we
   // remember whether an outage occurred to decide on last-good fallback below.
   let upstreamOutage = false;
+  let nihHttpStatus: number | null = null;
 
   // Fetch from NIH if requested
   if (source === 'nih' || source === 'all') {
@@ -178,7 +188,10 @@ export async function GET(request: NextRequest) {
         body: JSON.stringify(nihPayload),
       });
 
-      if (nihResponse.ok) {
+      if (!nihResponse.ok) {
+        nihHttpStatus = nihResponse.status;
+        upstreamOutage = true;
+      } else {
         const nihData: NihResponse = await nihResponse.json();
 
         for (const proj of nihData.results || []) {
@@ -207,7 +220,7 @@ export async function GET(request: NextRequest) {
       }
     } catch (error) {
       console.error('[SBIR API] NIH error:', error);
-      if (isUpstreamOutage(error)) upstreamOutage = true;
+      upstreamOutage = true;
     }
   }
 
@@ -234,6 +247,7 @@ export async function GET(request: NextRequest) {
       if (error && isUpstreamOutage(error)) upstreamOutage = true;
       if (!error && data) {
         for (const opp of data) {
+          if (isManufacturedDarpaRow(opp)) continue;
           results.push({
             id: opp.id,
             title: opp.title,
@@ -263,21 +277,33 @@ export async function GET(request: NextRequest) {
     return true;
   });
 
-  const response = {
-    success: true,
-    count: dedupedResults.length,
-    opportunities: dedupedResults.slice(0, limit),
-    searchCriteria: { keyword, agency, phase, source, limit },
-  };
+  const response = finishedSbirBody({
+    keyword,
+    agency,
+    phase,
+    requestedSource: source,
+    answeredSource: plan.source,
+    opportunities: dedupedResults,
+    limit,
+  });
 
   // If every requested upstream (NIH / Supabase) was down and we produced
   // nothing, serve the last-good snapshot with an "as of {time}" banner instead
-  // of an empty panel. Otherwise snapshot this success as the new last-good.
+  // of an empty panel. No snapshot → unavailable, never a fresh count of 0.
   if (upstreamOutage && dedupedResults.length === 0) {
     const snap = await readSnapshot<Record<string, unknown>>(sbirSnapshotKey(searchParams));
     if (snap) {
       return NextResponse.json({ ...snap.data, ...degradedMeta(snap.savedAt) });
     }
+    const statusBit = nihHttpStatus ? ` HTTP ${nihHttpStatus}` : '';
+    return NextResponse.json(unavailableSbirBody({
+      keyword,
+      agency,
+      phase,
+      limit,
+      source: plan.source,
+      reason: `The queried source did not answer${statusBit}. The row count is unavailable, not zero.`,
+    }));
   }
 
   saveSnapshot(sbirSnapshotKey(searchParams), response as Record<string, unknown>).catch(() => {});

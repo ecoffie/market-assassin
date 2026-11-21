@@ -109,6 +109,7 @@ import {
   type FmpWriteupEvidence,
 } from '@/lib/chat/fmp-writeup-grounding';
 import { CURRENT_FIND_CHAT_CONTRACT } from '@/lib/mcp/potato-journey';
+import { ASK_MINDY_RULES_LAYER, askMindyRulesEnabledFor, askMindyRulesPromptBlock, rulesLayerFindContract } from '@/lib/chat/ask-mindy-rules';
 import { findCompletionFooter, comingBackListLeadsWithNotCompeted, type FindResultWithItems } from '@/lib/chat/find-completeness';
 import { inferredCodeDisclosure } from '@/lib/chat/code-disclosure';
 import { getNaics } from '@/lib/codes/lookup';
@@ -694,15 +695,23 @@ export async function POST(request: NextRequest) {
         // F1: CURRENT_FIND contract (shared with MCP P2). Federal Market Profile replaces it for that
         // ask — "sources sought" in a pathway profile must not flip into FIND-first open-bid framing.
         // Not for card chat (one-opportunity allowlist).
+        // Ask Mindy rules layer (src/lib/chat/ask-mindy-rules.ts): OFF unless ASK_MINDY_RULES_LAYER says so for
+        // this verified email. Off → the prompt is exactly the pre-existing one. On: non-FMP asks get the
+        // top-picks FIND contract plus the rules and answer format; an FMP ask keeps its own contract and
+        // layout and gets only the rules (truth, writing), never the top-picks answer format.
+        const rulesLayer = askMindyRulesEnabledFor(auth.email);
         const customerAskForContract = splitViewPreamble(message).rest || message;
         const federalMarketProfileAsk = !cardCtx && isFederalMarketProfileRequest(customerAskForContract);
+        const findContract = rulesLayer ? rulesLayerFindContract() : CURRENT_FIND_CHAT_CONTRACT;
         const hostContract = cardCtx
           ? ''
           : federalMarketProfileAsk
             ? `\n\n${FEDERAL_MARKET_PROFILE_CHAT_CONTRACT}`
-            : `\n\n${CURRENT_FIND_CHAT_CONTRACT}`;
+            : `\n\n${findContract}`;
+        const rulesBlock = !rulesLayer ? '' : federalMarketProfileAsk ? `\n\n${ASK_MINDY_RULES_LAYER}` : `\n\n${askMindyRulesPromptBlock()}`;
         const systemPrompt = SYSTEM_PROMPT_TEMPLATE.replace('{today}', today).replace('{userProfile}', userProfileBlock)
-          + hostContract;
+          + hostContract
+          + rulesBlock;
         // Step 2–8: self-report → pathways → vehicles → market size → contacts → web gap → write-up.
         const selfReportNote = federalMarketProfileSelfReportNote(customerAskForContract);
         const pathwayNote = federalMarketProfilePathwayNote(customerAskForContract);
@@ -1010,7 +1019,11 @@ export async function POST(request: NextRequest) {
                 : {}),
             })
             : null;
-          const searchWeb = makeSearchWebTool();
+          // Server-side web-search controls (per-turn cap, privacy guard, usage log): search-web-tool.ts.
+          const searchWeb = makeSearchWebTool({
+            forbidden: { emails: [auth.email, vaultEmailFor(actingScope)] },
+            documentText: documentContext?.block ?? null,
+          });
           const privateDefs = [...TIER0_TOOL_DEFS, SEARCH_WEB_TOOL_DEF, ...(myDocs ? [MY_DOCUMENTS_TOOL_DEF] : []), ...(genDoc ? [CREATE_DOCUMENT_TOOL_DEF] : [])];
           const privateNames = new Set([...TIER0_TOOL_NAMES, SEARCH_WEB, ...(myDocs ? [FIND_MY_DOCUMENTS] : []), ...(genDoc ? [CREATE_DOCUMENT] : [])]);
           const executor = createChatToolExecutor({

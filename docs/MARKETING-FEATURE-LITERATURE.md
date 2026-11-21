@@ -78,6 +78,24 @@
 
 ---
 
+## MCP watch alerts tell the truth about delivery (Nov 2026)
+
+**What:** When Claude (or any MCP host) creates a weekly/daily watch via
+`schedule_market_search`, Mindy no longer reports the whole alert system as
+"degraded" just because a few recipients are on a bounce/complaint suppression
+list. Those are action items for those addresses — the job itself is healthy.
+A single bad saved search still shows as a partial issue, not "alerts are down
+since September."
+
+**Why it matters:** A customer using Mindy inside Claude was told not to trust
+their new glazing watch because "last success was September 29." The watches
+were evaluating; the status was lying.
+
+**Proof:** Saved-search alert cron + MCP schedule delivery meta
+(`delivery_ready` / `saved_search_alerts_job_status`).
+
+---
+
 ## The one-line positioning
 
 **Mindy is the AI BD analyst for federal small businesses — she reads the

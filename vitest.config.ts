@@ -14,13 +14,6 @@ export default defineConfig({
     // which left route-integration tests unable to import route handlers.
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
-      // Real KV_* in .env.local must not hang MCP metering units on Upstash
-      // (isApprovedAmbassador → kv.get on every runMeteredTool). Resolve-time
-      // alias — vi.mock in setupFiles did not intercept the live client.
-      '@vercel/kv': fileURLToPath(new URL('./tests/setup/vercel-kv-stub-module.ts', import.meta.url)),
-      // Same class for Supabase: createClient + undici hang under no-network
-      // (agency sync, last-good setCached, opportunities/save past Pro gate).
-      '@supabase/supabase-js': fileURLToPath(new URL('./tests/setup/supabase-js-stub-module.ts', import.meta.url)),
     },
   },
   test: {

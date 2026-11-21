@@ -21,7 +21,14 @@ export interface SbirToolResult {
   queried: { keyword?: string; agency?: string; phase: string; source: string };
   opportunities: SbirOpportunity[];
   _ai_hint?: { summary: string; how_to_use: string; key_caveats: string[] };
-  _meta: { grounded: boolean; degraded: boolean; count: number };
+  _meta: {
+    grounded: boolean;
+    degraded: boolean;
+    /** Null when the source was unavailable. Zero is only a real empty result. */
+    count: number | null;
+    /** What this answer does not cover. Absence is not a count of zero. */
+    coverage_note: string;
+  };
 }
 
 export async function sbirSearch(input: SbirToolInput): Promise<SbirToolResult> {
@@ -37,12 +44,20 @@ export async function sbirSearch(input: SbirToolInput): Promise<SbirToolResult> 
       source,
     },
     opportunities: res.opportunities,
-    _meta: { grounded, degraded: res.degraded, count: res.opportunities.length },
+    _meta: {
+      grounded,
+      degraded: res.degraded,
+      count: res.result_state === 'unavailable' ? null : res.opportunities.length,
+      coverage_note:
+        'NIH rows are awarded RePORTER projects. DARPA rows are included only after the Grants.gov collector has landed them (source darpa_baa). Six stored ids from the 2026-04-05 hardcoded list are withheld while their NAICS is still the collector-written 541715; that is not zero DARPA opportunities. NSF SBIR is not in this answer: api.www.sbir.gov returned HTTP 403 and that collector stays parked. That is not zero NSF opportunities.',
+    },
   };
   if (mcpFlags.aiHint) {
     const top = res.opportunities[0];
     result._ai_hint = {
-      summary: res.degraded
+      summary: res.result_state === 'unavailable'
+        ? (res.unavailable_reason || 'This SBIR source is unavailable. That is not zero opportunities.')
+        : res.degraded
         ? 'An SBIR source (NIH RePORTER or multisite) errored — retry; partial results may be shown.'
         : grounded
         ? `${res.opportunities.length} SBIR/STTR result(s). Top: ${top.title} (${top.agency}${top.phase ? `, ${top.phase}` : ''}).`

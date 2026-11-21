@@ -53,6 +53,7 @@ function builder(table: string) {
     select: () => b,
     eq: (c: string, v: unknown) => { filters.push((r) => r[c] === v || String(r[c]) === String(v)); return b; },
     in: (c: string, vs: unknown[]) => { filters.push((r) => vs.includes(r[c])); return b; },
+    not: (c: string, o: string, v: unknown) => { filters.push((r) => !(o === 'is' && v === null && (r[c] ?? null) === null)); return b; },
     gte: (c: string, v: string) => { filters.push((r) => String(r[c]) >= v); return b; },
     order: (col: string, o?: { ascending?: boolean }) => { order = { col, asc: !!o?.ascending }; return b; },
     limit: (n: number) => { limit = n; return b; },
