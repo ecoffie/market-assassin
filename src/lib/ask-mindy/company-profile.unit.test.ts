@@ -23,8 +23,8 @@ const VAULT = {
     service_states: ['TN', 'MS', 'Tennessee'], contract_vehicles: ['GSA MAS'],
   },
   past_performance: [
-    { agency: 'Department of Veterans Affairs', office: 'Memphis VA Medical Center', contract_value: '$1,200,000', role: 'Prime', naics_codes: ['561320'], relevance_keywords: ['lab staffing'] },
-    { agency: 'Department of the Army', sub_agency: 'Fort Campbell', contract_value: '450K', role: 'Subcontractor', naics_codes: ['561320'], relevance_keywords: ['clerical'] },
+    { agency: 'Department of Veterans Affairs', office: 'Example VA Medical Center', contract_value: '$1,200,000', role: 'Prime', naics_codes: ['561320'], relevance_keywords: ['lab staffing'] },
+    { agency: 'Department of the Army', sub_agency: 'Fort Example', contract_value: '450K', role: 'Subcontractor', naics_codes: ['561320'], relevance_keywords: ['clerical'] },
     { agency: 'Shelby County', contract_value: 'TBD', role: '' },
   ],
   capabilities: [{ capability_name: 'Clerical staffing' }, { capability_name: 'clerical staffing' }],
@@ -56,8 +56,8 @@ describe('buildCompanyProfile', () => {
 
   it('keeps prime and subcontract work apart; unparseable values are not zero', () => {
     expect(p.pastPerformance).toEqual({
-      buyerAgencies: ['Department of Veterans Affairs', 'Department of the Army', 'Fort Campbell', 'Shelby County'],
-      buyerOffices: ['Memphis VA Medical Center'],
+      buyerAgencies: ['Department of Veterans Affairs', 'Department of the Army', 'Fort Example', 'Shelby County'],
+      buyerOffices: ['Example VA Medical Center'],
       naicsCodes: ['561320'],
       largestAward: 1_200_000,
       primeCount: 1, subCount: 1, otherRoleCount: 1,
