@@ -14,10 +14,12 @@
  *     chat turn. Past the cap the tool returns limit_reached:true and does not search.
  *   - Privacy guard: a query containing the caller's or acting workspace's email, a known UEI, or 8+ consecutive
  *     words copied from this turn's document excerpts is refused (refused:true) and never sent out.
- *   - Usage log: one structured line per call (outcome, query length, result count). Never the raw query, and
- *     no credit charge.
+ *   - Usage log: one structured line per call (outcome, query length, result count) attributed by a non-PII
+ *     caller key (hash of the verified email) and the chat session id. Never the raw email or query, no credits.
+ *   - The guard's document text is read per call, so excerpts find_my_documents returns DURING the turn count.
  *   - Web findings are unverified; other GovCon data platforms are never cited (rules layer WRITING).
  */
+import { createHash } from 'node:crypto';
 import { isSerperConfigured, searchWeb } from '@/lib/briefings/web-intel/serper';
 
 export const SEARCH_WEB = 'search_web';
@@ -74,6 +76,15 @@ export interface SearchWebUsage {
   queryLength: number;
   resultCount: number;
   refusedBecause?: 'email' | 'uei' | 'document_text';
+  /** Non-PII caller key (callerKeyFor) for per-customer cost accounting. */
+  callerKey?: string;
+  sessionId?: string | null;
+}
+
+/** Stable, non-reversible caller key: never log the raw email. */
+export function callerKeyFor(email: string | null | undefined): string | undefined {
+  const e = (email || '').trim().toLowerCase();
+  return e ? `u_${createHash('sha256').update(e).digest('hex').slice(0, 16)}` : undefined;
 }
 
 export interface SearchWebOptions {
@@ -81,8 +92,13 @@ export interface SearchWebOptions {
   maxCallsPerTurn?: number;
   /** Identifiers that must never leave in a query: caller and acting-workspace emails, known UEIs. */
   forbidden?: { emails?: Array<string | null | undefined>; ueis?: Array<string | null | undefined> };
-  /** This turn's document excerpts (the fenced block the model sees). */
-  documentText?: string | null;
+  /**
+   * This turn's document excerpts. A function is read on every call, so text added during the turn (for example
+   * find_my_documents results) is guarded too.
+   */
+  documentText?: string | null | (() => string | null);
+  /** Attribution added to every usage record (no PII). */
+  attribution?: { callerKey?: string; sessionId?: string | null };
   onUsage?: (u: SearchWebUsage) => void;
 }
 
@@ -101,7 +117,7 @@ export function copiesDocumentText(query: string, documentText: string | null | 
 }
 
 /** Why a query must not leave the server, or null. */
-export function privacyRefusal(query: string, opts: Pick<SearchWebOptions, 'forbidden' | 'documentText'>): SearchWebUsage['refusedBecause'] | null {
+export function privacyRefusal(query: string, opts: { forbidden?: SearchWebOptions['forbidden']; documentText?: string | null }): SearchWebUsage['refusedBecause'] | null {
   const low = query.toLowerCase();
   for (const e of opts.forbidden?.emails ?? []) if (e && e.trim() && low.includes(e.trim().toLowerCase())) return 'email';
   const upper = query.toUpperCase();
@@ -118,7 +134,15 @@ export function makeSearchWebTool(opts: SearchWebOptions | SearchWebDeps = {}) {
   const log = o.onUsage ?? defaultUsageLog;
   let calls = 0;
   const record = (outcome: SearchWebOutcome, queryLength: number, resultCount = 0, refusedBecause?: SearchWebUsage['refusedBecause']) => {
-    try { log({ tool: SEARCH_WEB, outcome, call: calls, queryLength, resultCount, ...(refusedBecause ? { refusedBecause } : {}) }); } catch { /* logging never breaks a turn */ }
+    const attr = o.attribution ?? {};
+    try {
+      log({
+        tool: SEARCH_WEB, outcome, call: calls, queryLength, resultCount,
+        ...(refusedBecause ? { refusedBecause } : {}),
+        ...(attr.callerKey ? { callerKey: attr.callerKey } : {}),
+        ...(attr.sessionId !== undefined ? { sessionId: attr.sessionId } : {}),
+      });
+    } catch { /* logging never breaks a turn */ }
   };
   return {
     async execute(args: Record<string, unknown>): Promise<Record<string, unknown>> {
@@ -132,7 +156,8 @@ export function makeSearchWebTool(opts: SearchWebOptions | SearchWebDeps = {}) {
         };
       }
       if (raw) {
-        const why = privacyRefusal(raw, o);
+        const documentText = typeof o.documentText === 'function' ? o.documentText() : o.documentText;
+        const why = privacyRefusal(raw, { forbidden: o.forbidden, documentText });
         if (why) {
           record('refused', raw.length, 0, why);
           return {

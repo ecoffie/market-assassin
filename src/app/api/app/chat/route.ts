@@ -39,7 +39,7 @@ import { loadBidderProfile, formatProfileForPrompt } from '@/lib/proposal/loader
 import { isUserOverBudget, recordLlmUsage } from '@/lib/llm/usage-cost';
 import { makeTier0Tools, TIER0_TOOL_DEFS, TIER0_TOOL_NAMES } from '@/lib/chat/tier0-tools';
 import { makeMyDocumentsTool, MY_DOCUMENTS_TOOL_DEF, FIND_MY_DOCUMENTS } from '@/lib/chat/my-documents-tool';
-import { makeSearchWebTool, SEARCH_WEB_TOOL_DEF, SEARCH_WEB } from '@/lib/chat/search-web-tool';
+import { makeSearchWebTool, SEARCH_WEB_TOOL_DEF, SEARCH_WEB, callerKeyFor } from '@/lib/chat/search-web-tool';
 import { makeGenerateDocumentTool, CREATE_DOCUMENT_TOOL_DEF, CREATE_DOCUMENT, isDocumentCreationRequest, parseCreateDocumentDeliverables, type CreateDocumentDeliverable } from '@/lib/chat/generate-document-tool';
 import { vaultDocEnabledFor } from '@/lib/vault/flags';
 // Tools run ONLY through the chat tool executor (policy check at offer AND execution,
@@ -1020,9 +1020,12 @@ export async function POST(request: NextRequest) {
             })
             : null;
           // Server-side web-search controls (per-turn cap, privacy guard, usage log): search-web-tool.ts.
+          // Every document excerpt this turn has seen: the attached block plus each find_my_documents result.
+          const turnDocumentTexts: string[] = documentContext?.block ? [documentContext.block] : [];
           const searchWeb = makeSearchWebTool({
             forbidden: { emails: [auth.email, vaultEmailFor(actingScope)] },
-            documentText: documentContext?.block ?? null,
+            documentText: () => turnDocumentTexts.join('\n'),
+            attribution: { callerKey: callerKeyFor(auth.email), sessionId: turnSessionId },
           });
           const privateDefs = [...TIER0_TOOL_DEFS, SEARCH_WEB_TOOL_DEF, ...(myDocs ? [MY_DOCUMENTS_TOOL_DEF] : []), ...(genDoc ? [CREATE_DOCUMENT_TOOL_DEF] : [])];
           const privateNames = new Set([...TIER0_TOOL_NAMES, SEARCH_WEB, ...(myDocs ? [FIND_MY_DOCUMENTS] : []), ...(genDoc ? [CREATE_DOCUMENT] : [])]);
@@ -1036,7 +1039,12 @@ export async function POST(request: NextRequest) {
               names: privateNames,
               execute: (n, a) => {
                 if (n === SEARCH_WEB) return searchWeb.execute(a);
-                if (myDocs && n === FIND_MY_DOCUMENTS) return myDocs.execute(a);
+                if (myDocs && n === FIND_MY_DOCUMENTS) {
+                  return myDocs.execute(a).then((r) => {
+                    try { turnDocumentTexts.push(JSON.stringify(r)); } catch { /* unserializable result: nothing to guard */ }
+                    return r;
+                  });
+                }
                 if (genDoc && n === CREATE_DOCUMENT) return genDoc.execute(a);
                 return tier0Runtime.execute(n, a);
               },

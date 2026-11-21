@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
-import { makeSearchWebTool, SEARCH_WEB, SEARCH_WEB_TOOL_DEF, DEFAULT_MAX_SEARCHES_PER_TURN, copiesDocumentText, privacyRefusal } from './search-web-tool';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { makeSearchWebTool, SEARCH_WEB, SEARCH_WEB_TOOL_DEF, DEFAULT_MAX_SEARCHES_PER_TURN, copiesDocumentText, privacyRefusal, callerKeyFor } from './search-web-tool';
 
 describe('search_web tool', () => {
   it('exports the Ask tool name and a query-required schema', () => {
@@ -114,5 +116,54 @@ describe('search_web server-side controls (Agent 4 review)', () => {
     expect(privacyRefusal('plain query', {})).toBeNull();
     const { tool } = mk();
     expect(String((await tool.execute({ query: 'GAO' })).note)).toMatch(/unverified open-web results.*Never cite other GovCon data platforms/);
+  });
+});
+
+describe('search_web corrections (Agent 4 re-review of #2204)', () => {
+  const hits = [{ title: 'GAO-25-1', url: 'https://www.gao.gov/x', snippet: 's' }];
+
+  it('guards text that find_my_documents returns DURING the turn (per-turn accumulator, read per call)', async () => {
+    // Mirrors the chat route: the guard reads an accumulator the find_my_documents wrapper appends to.
+    const turnDocumentTexts: string[] = [];
+    const search = vi.fn(async () => hits);
+    const tool = makeSearchWebTool({ deps: { isConfigured: () => true, search }, documentText: () => turnDocumentTexts.join('\n'), onUsage: () => {} });
+    const q = 'contractor shall maintain a minimum staffing level of twelve licensed technicians';
+    expect((await tool.execute({ query: q })).grounded).toBe(true); // nothing retrieved yet
+    turnDocumentTexts.push(JSON.stringify({ ok: true, results: [{ excerpt: 'The contractor shall maintain a minimum staffing level of twelve licensed technicians on site.' }] }));
+    expect(await tool.execute({ query: q })).toMatchObject({ refused: true, error: 'query_refused' });
+    expect(search).toHaveBeenCalledTimes(1);
+  });
+
+  it('attributes each usage record by a hashed caller key and session id, never the raw email or query', async () => {
+    const usage: Array<Record<string, unknown>> = [];
+    const email = 'Owner@Example.com';
+    const tool = makeSearchWebTool({
+      deps: { isConfigured: () => true, search: async () => hits },
+      attribution: { callerKey: callerKeyFor(email), sessionId: '11111111-2222-4333-8444-555555555555' },
+      onUsage: (u) => usage.push(u as unknown as Record<string, unknown>),
+    });
+    await tool.execute({ query: 'Legacy Restoration Fund bill status' });
+    expect(usage[0]).toMatchObject({ outcome: 'ok', callerKey: callerKeyFor('owner@example.com'), sessionId: '11111111-2222-4333-8444-555555555555' });
+    expect(String(usage[0].callerKey)).toMatch(/^u_[0-9a-f]{16}$/);
+    const serialized = JSON.stringify(usage);
+    expect(serialized).not.toMatch(/owner@example\.com/i);
+    expect(serialized).not.toMatch(/Legacy|Restoration/);
+  });
+
+  it('callerKeyFor is stable, case-insensitive and empty for no email', () => {
+    expect(callerKeyFor(' A@B.com ')).toBe(callerKeyFor('a@b.com'));
+    expect(callerKeyFor('a@b.com')).not.toBe(callerKeyFor('c@d.com'));
+    expect(callerKeyFor('')).toBeUndefined();
+    expect(callerKeyFor(null)).toBeUndefined();
+  });
+});
+
+describe('chat route wiring for the search_web guard', () => {
+  const route = readFileSync(join(__dirname, '../../app/api/app/chat/route.ts'), 'utf8');
+  it('feeds the attached documents and every find_my_documents result into the guard, with attribution', () => {
+    expect(route).toMatch(/const turnDocumentTexts: string\[\] = documentContext\?\.block \? \[documentContext\.block\] : \[\];/);
+    expect(route).toMatch(/documentText: \(\) => turnDocumentTexts\.join\('\\n'\),/);
+    expect(route).toMatch(/attribution: \{ callerKey: callerKeyFor\(auth\.email\), sessionId: turnSessionId \},/);
+    expect(route).toMatch(/return myDocs\.execute\(a\)\.then\(\(r\) => \{\n\s+try \{ turnDocumentTexts\.push\(JSON\.stringify\(r\)\); \}/);
   });
 });
