@@ -221,7 +221,7 @@ describe('action-item failures do not red the job', () => {
     expect(result.errorSummary).toContain('recipient_suppressed=1');
   });
 
-  it('a real processing failure beside action items still → error', async () => {
+  it('an attributed per-search processing failure beside action items → partial (the rest evaluated)', async () => {
     const rows = [dueRow(1), dueRow(2)];
     const store = productionShapedStore(rows);
     const result = await runSavedSearchAlertDrain({
@@ -235,11 +235,35 @@ describe('action-item failures do not red the job', () => {
       },
       countRemaining: store.countRemaining,
     });
-    expect(result.outcome).toBe('error');
+    expect(result.outcome).toBe('partial');
     expect(result.success).toBe(false);
     expect(result.failuresByClass).toEqual({
       recipient_suppressed: 1,
       opportunity_query_failed: 1,
     });
+  });
+
+  it('EVERY evaluated search failing processing → error (nothing was delivered)', async () => {
+    const rows = [dueRow(1), dueRow(2)];
+    const store = productionShapedStore(rows);
+    const result = await runSavedSearchAlertDrain({
+      dueFrequencies: ['daily'],
+      fetchDueBatch: store.fetchDueBatch,
+      evaluate: async (row) => { store.evaluated.push(row.id); return { failureClass: 'opportunity_query_failed' }; },
+      countRemaining: store.countRemaining,
+    });
+    expect(result.outcome).toBe('error');
+    expect(result.failuresByClass).toEqual({ opportunity_query_failed: 2 });
+  });
+
+  it('a run-level failure (the due-search read failed) → error', async () => {
+    const result = await runSavedSearchAlertDrain({
+      dueFrequencies: ['daily'],
+      fetchDueBatch: async () => ({ rows: [], error: { message: 'boom' } }),
+      evaluate: async () => ({}),
+      countRemaining: async () => 0,
+    });
+    expect(result.outcome).toBe('error');
+    expect(result.failuresByClass).toHaveProperty('saved_search_query_failed');
   });
 });

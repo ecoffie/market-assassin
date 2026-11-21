@@ -236,17 +236,32 @@ export function processingFailureCount(
   return n;
 }
 
+/**
+ * Run-level failure classes: the job could not read its own work. Always a whole-job `error`.
+ * Same set delivery-readiness treats as run-level (RUN_LEVEL_CLASSES).
+ */
+export const RUN_LEVEL_FAILURE_CLASSES: ReadonlySet<string> = new Set(['saved_search_query_failed']);
+
+/**
+ * The run's outcome, decided ONCE here so cron_job_runs and MCP delivery readiness cannot disagree
+ * (Agent 4 review of #2234):
+ *   - error   — a run-level failure (the due-search read failed), or EVERY evaluated search failed
+ *               processing (nothing was delivered; a per-search label would understate it).
+ *   - partial — some searches failed processing (attributed, per-search) while the rest were
+ *               evaluated, and/or capacity ran out with searches still due.
+ *   - success — every due search evaluated without a processing failure. Action items
+ *               (suppressions, invalid saved NAICS) do not count against it.
+ */
 function resolveOutcome(results: SavedSearchAlertDrainResult): SavedSearchAlertDrainOutcome {
   if (results.stopReason === 'query_failed') return 'error';
+  if (Object.keys(results.failuresByClass).some((k) => RUN_LEVEL_FAILURE_CLASSES.has(k))) return 'error';
   const processingFailed = processingFailureCount(results.failuresByClass);
+  if (processingFailed > 0 && processingFailed >= results.processed) return 'error';
   const leftover = results.remaining === null || results.remaining > 0;
-  if (
-    leftover
-    && (results.stopReason === 'time_budget' || results.stopReason === 'row_ceiling')
-  ) {
-    return processingFailed > 0 ? 'error' : 'partial';
-  }
-  return processingFailed > 0 ? 'error' : 'success';
+  const capacityStop = leftover
+    && (results.stopReason === 'time_budget' || results.stopReason === 'row_ceiling');
+  if (processingFailed > 0 || capacityStop) return 'partial';
+  return 'success';
 }
 
 /**

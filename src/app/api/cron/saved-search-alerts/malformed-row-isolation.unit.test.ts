@@ -112,7 +112,8 @@ describe('saved-search-alerts — one malformed stored search', () => {
     // Reported by id + a specific class, not an anonymous unexpected_schedule_error.
     expect(body.failuresByClass).toEqual({ invalid_saved_filters: 1 });
     expect(body.failedSearches).toEqual([{ id: MALFORMED_ID, failureClass: 'invalid_saved_filters' }]);
-    expect(body.outcome).toBe('error');
+    expect(body.outcome).toBe('partial');
+    expect(res.status).toBe(503);
     expect(body.processed).toBe(2);
 
     // The valid search still sent and stamped.

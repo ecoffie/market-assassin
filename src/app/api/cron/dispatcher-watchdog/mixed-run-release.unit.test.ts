@@ -204,7 +204,8 @@ describe('mixed run: successful send + malformed search + suppressed recipient +
   it('the job self-reports every class, by name', () => {
     expect(out.runs).toHaveLength(2);
     const last = out.runs.at(-1)!;
-    expect(last.status).toBe('error');
+    // Attributed per-search failures with the rest evaluated (one search really sent) → partial.
+    expect(last.status).toBe('partial');
     expect(String(last.error).split(',').sort()).toEqual(['invalid_saved_filters=1', 'recipient_suppressed=1', 'suppression_lookup_failed=1']);
     // and the valid search really sent on the judged run, through the provider ledger
     expect((tables.email_provider_sends || []).filter((r) => String(r.sent_at).startsWith('2026-10-04')).map((r) => r.user_email)).toEqual(['person@example.com']);

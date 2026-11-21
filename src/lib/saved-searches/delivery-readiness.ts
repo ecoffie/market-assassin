@@ -424,12 +424,11 @@ export async function getSavedSearchDeliveryReadiness(
 
   const runLevel = Object.keys(cls.processing).filter((k) => RUN_LEVEL_CLASSES.has(k));
   const unattributed = judged.status === 'error' && !Object.keys(cls.processing).length && !cls.actionItemsOnly;
-  // Per-search processing classes (opportunity_query_failed, …) used to ride an HTTP 500 because
-  // the route treated any `failed > 0` as success:false. That 500 must not upgrade an attributed
-  // partial into a whole-job outage — otherwise MCP reports delivery_degraded for one bad search.
-  const wholeJobNon2xx = non2xx(judged)
-    && !Object.keys(cls.processing).length
-    && !cls.actionItemsOnly;
+  // The drain decides partial vs error ONCE (alert-drain resolveOutcome): attributed per-search
+  // failures are `partial`, run-level failures are `error`. So a non-2xx `error` run is always a
+  // whole-job failure — no second-guessing here. A `partial` run carries cronOutcomeHttpStatus's
+  // 503 by contract and is judged below as partial.
+  const wholeJobNon2xx = non2xx(judged) && judged.status !== 'partial';
   if (wholeJobNon2xx || judged.status === 'timeout' || judged.status === 'failed' || cls.unclassified || unattributed || runLevel.length) {
     const why = runLevel.length ? counts(Object.fromEntries(runLevel.map((k) => [k, cls.processing[k]])))
       : cls.unclassified ? (judged.error || '').slice(0, 120) : unattributed ? 'run error with no failure detail' : `run ${judged.status}${judged.http_status ? ` (HTTP ${judged.http_status})` : ''}`;

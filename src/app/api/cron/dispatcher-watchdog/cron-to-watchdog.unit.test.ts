@@ -168,7 +168,7 @@ describe('saved-search-alerts → cron_job_runs → dispatcher-watchdog → Slac
     const { runs, posted, body } = await cronThenWatchdog([VALID], 'suppressed:hard_bounce');
     expect(runs.map((r) => [r.status, r.error])).toEqual([['success', 'recipient_suppressed=1'], ['success', 'recipient_suppressed=1']]);
     expect(body.failing).toEqual([]);
-    expect(body.actionItems).toEqual(['saved-search-alerts']);
+    expect(body.attributedRuns).toEqual(['saved-search-alerts']);
     expect(posted).toHaveLength(1);
     expect(posted[0].subject).toBe('Cron watchdog: 1 suppression opened');
     expect(posted[0].text).toContain('🛡️ SUPPRESSION saved-search-alerts — no processing failure');
@@ -185,7 +185,7 @@ describe('saved-search-alerts → cron_job_runs → dispatcher-watchdog → Slac
     await savedSearchAlerts(new NextRequest('https://x/api/cron/saved-search-alerts?limit=50', { headers: { 'x-cron-dispatch': '1' } }));
     vi.setSystemTime(new Date('2026-10-05T06:00:29Z'));
     const body = await (await watchdog(new NextRequest('http://localhost/api/cron/dispatcher-watchdog?password=pw'))).json();
-    expect(body.actionItems).toEqual([]);
+    expect(body.attributedRuns).toEqual([]);
     expect(slack).toHaveLength(0);
   });
 

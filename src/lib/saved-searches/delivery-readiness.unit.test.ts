@@ -166,10 +166,10 @@ describe('job status — the named saved-search alerts job', () => {
     expect(r.job_status_reason).toMatch(/action item: recipient_suppressed=3/);
   });
 
-  it('opportunity_query_failed beside suppressions with HTTP 500 → partial, not whole-job outage', async () => {
+  it('a PARTIAL run with opportunity_query_failed beside suppressions (503) → partial, not whole-job outage', async () => {
     setup({
       cron: [cron],
-      runs: [run('error', 'opportunity_query_failed=1,recipient_suppressed=3', '2026-08-30T11:01:00Z', 500)],
+      runs: [run('partial', 'opportunity_query_failed=1,recipient_suppressed=3', '2026-08-30T11:01:00Z', 503)],
       acceptedDuringRun: 12,
       evaluatedDuringRun: 134,
     });
@@ -178,6 +178,18 @@ describe('job status — the named saved-search alerts job', () => {
     expect(r.delivery_state).toBe('delivery_partial');
     expect(r.latest_run_processing_failures).toEqual({ opportunity_query_failed: 1 });
     expect(r.suppression_action_items).toEqual({ recipient_suppressed: 3 });
+  });
+
+  it('a non-2xx ERROR run is always a whole-job failure — no second-guessing (Agent 4)', async () => {
+    setup({
+      cron: [cron],
+      runs: [run('error', 'opportunity_query_failed=2', '2026-08-30T11:01:00Z', 500)],
+      acceptedDuringRun: 0,
+      evaluatedDuringRun: 2,
+    });
+    const r = await getSavedSearchDeliveryReadiness(NOW);
+    expect(r.job_status).toBe('job_failure');
+    expect(r.delivery_ready).toBe(false);
   });
 
   it('today\'s real run (only recipient_suppressed + invalid_saved_naics) → healthy, clean, and the two lists stay apart', async () => {

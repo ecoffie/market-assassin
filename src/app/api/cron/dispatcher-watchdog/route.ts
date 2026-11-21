@@ -213,29 +213,35 @@ export async function GET(request: NextRequest) {
   }
   const notRecoveredSet = new Set(notRecovered);
 
-  // ACTION ITEMS ON A SUCCESSFUL RUN (PR #2234). Confirmed recipient suppressions / invalid saved
-  // searches are not an outage, so saved-search-alerts now records them on a `success` run — which
-  // the failure query above never reads. Without this, the "🛡️ suppression opened" Slack item went
-  // silent. Read only success rows that CARRY a class list, keep the newest per enabled job, and
-  // raise it only when it is still that job's newest run and it holds action items alone. It uses
-  // the same `failing:<job>` incident key, so an already-open suppression incident continues.
-  // A read failure here is logged, never fatal: action items must not block outage monitoring.
+  // ATTRIBUTED PER-SEARCH CLASSES ON A NON-ERROR RUN (PR #2234). saved-search-alerts now records
+  //   - confirmed suppressions / invalid saved searches (action items) on a `success` run, and
+  //   - attributed per-search processing failures (opportunity_query_failed, …) on a `partial` run,
+  // and the failure query above reads only error/timeout. Without this both went silent in Slack.
+  // Read success/partial rows that CARRY a class list (free-text summaries are skipped), keep the
+  // newest per enabled job, and raise it only while it is still that job's newest run. The incident
+  // layer classifies it exactly as before: action items alone → "🛡️ suppression opened"; any
+  // processing class → a processing incident. Same `failing:<job>` key, so open incidents continue.
+  // A read failure here is logged, never fatal: it must not block outage monitoring.
   const enabledNames = new Set(enabledJobs.map((j) => j.job_name));
-  const actionItemRuns = new Map<string, FailedRun>();
+  const attributedRuns = new Map<string, FailedRun>();
   const { data: notedRuns, error: notedErr } = await supabase
     .from('cron_job_runs')
     .select('job_name, started_at, status, error')
-    .eq('status', 'success')
+    .in('status', ['success', 'partial'])
     .not('error', 'is', null)
     .gte('started_at', lookbackFrom)
     .order('started_at', { ascending: false });
-  if (notedErr) console.error('[dispatcher-watchdog] action-item read failed:', notedErr.message);
+  if (notedErr) console.error('[dispatcher-watchdog] attributed-run read failed:', notedErr.message);
+  const seen = new Set<string>();
   for (const r of (notedRuns || []) as FailedRun[]) {
-    if (actionItemRuns.has(r.job_name) || notRecoveredSet.has(r.job_name) || !enabledNames.has(r.job_name)) continue;
-    if (!classifyObservation({ key: `failing:${r.job_name}`, kind: 'failing', status: r.status, error: r.error }).actionItemsOnly) continue;
-    actionItemRuns.set(r.job_name, r);
+    if (seen.has(r.job_name) || notRecoveredSet.has(r.job_name) || !enabledNames.has(r.job_name)) continue;
+    seen.add(r.job_name);
+    const c = classifyObservation({ key: `failing:${r.job_name}`, kind: 'failing', status: r.status, error: r.error });
+    if (c.signature.includes('|msg:')) continue; // free text, not a class list
+    const raise = c.actionItemsOnly || (r.status === 'partial' && Object.keys(c.processing).length > 0);
+    if (raise) attributedRuns.set(r.job_name, r);
   }
-  for (const [jobName, r] of [...actionItemRuns]) {
+  for (const [jobName, r] of [...attributedRuns]) {
     const { data: newest, error: newestErr } = await supabase
       .from('cron_job_runs')
       .select('started_at')
@@ -244,7 +250,7 @@ export async function GET(request: NextRequest) {
       .order('started_at', { ascending: false })
       .limit(1)
       .maybeSingle();
-    if (newestErr || !newest || newest.started_at !== r.started_at) actionItemRuns.delete(jobName);
+    if (newestErr || !newest || newest.started_at !== r.started_at) attributedRuns.delete(jobName);
   }
 
   const lastRunAt = lastRun?.started_at ? new Date(lastRun.started_at) : null;
@@ -305,10 +311,10 @@ export async function GET(request: NextRequest) {
       detail: f ? `last failed run ${f.started_at.slice(0, 16)}Z (${f.status})` : null,
     });
   }
-  for (const [j, r] of actionItemRuns) {
+  for (const [j, r] of attributedRuns) {
     observations.push({
       key: `failing:${j}`, kind: 'failing', jobName: j, status: r.status, error: r.error,
-      detail: `last run ${r.started_at.slice(0, 16)}Z (success with action items)`,
+      detail: `last run ${r.started_at.slice(0, 16)}Z (${r.status}, attributed per-search classes)`,
     });
   }
   for (const j of stuck) observations.push({ key: `stuck:${j}`, kind: 'stuck', jobName: j });
@@ -358,7 +364,7 @@ export async function GET(request: NextRequest) {
     dispatcherLikelyDown,
     poked,
     failing,
-    actionItems: [...actionItemRuns.keys()],
+    attributedRuns: [...attributedRuns.keys()],
     stuck,
     overdue,
     incidents: {
