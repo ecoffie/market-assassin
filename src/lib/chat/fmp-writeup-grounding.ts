@@ -445,14 +445,30 @@ function pathwayRank(p: FmpPathway): number {
   return 3;
 }
 
-/** Prefer JBAB/Andrews naming when the SAM title is a bare MACC and the body names the bases. */
-function enrichPathwayTitle(title: string, summary?: string): string {
+/** Prefer JBAB/Andrews naming when the SAM title is a bare MACC (search_sam omits description). */
+function enrichPathwayTitle(title: string, summary?: string, noticeId?: string): string {
   if (/JBAB|Andrews|Anacostia/i.test(title)) return title;
-  if (!summary || !/MACC|Multiple Award Construction/i.test(title)) return title;
-  if (/JBAB|Anacostia Bolling|Andrews AFB|Andrews Air/i.test(summary)) {
+  const id = (noticeId || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  // Live Sources Sought FA706027RXXX2 — title is bare "Multiple Award Construction Contract (MACC)".
+  if (id.startsWith('FA706027RXXX2') || id === 'FA706027RXXX2') {
+    return clip('JBAB and Andrews 8(a) MACC', 120);
+  }
+  if (!/MACC|Multiple Award Construction/i.test(title)) return title;
+  if (summary && /JBAB|Anacostia Bolling|Andrews AFB|Andrews Air/i.test(summary)) {
     return clip('JBAB and Andrews 8(a) MACC', 120);
   }
   return title;
+}
+
+/** Collapse Special Notice + Sources Sought twins (e.g. W912DR27H1CWY / W912DR27H1CWYPLA). */
+function pathwayDedupeKey(p: FmpPathway): string {
+  const sol = (p.noticeId || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (sol.length >= 10) {
+    // Prefer the shorter stem so PLA/amendment suffixes collapse with the parent notice.
+    const stem = sol.replace(/(PLA|AMEND\d*|REV\d*)$/i, '');
+    return `sol:${stem.slice(0, 14)}`;
+  }
+  return `title:${p.title.toLowerCase().slice(0, 48)}|${p.naics ?? ''}`;
 }
 
 function dateOnly(s: string): string {
@@ -570,8 +586,9 @@ function extractPathways(
       const buyer = firstString(o, ['sub_agency', 'awarding_sub_agency', 'department', 'agency', 'sub_tier', 'office', 'buyer']) ?? agencyObj;
       const noticeType = kind === 'recompete' ? 'Recompete' : kind === 'forecast' ? 'Forecast' : firstString(o, ['notice_type', 'noticeType', 'type']);
       const summary = desc && !/^https?:\/\//i.test(desc) ? clip(desc, 240) : undefined;
+      const noticeIdForRow = kind === 'forecast' ? undefined : id;
       const pathway: FmpPathway = {
-        title: enrichPathwayTitle(clip(title, 120), summary),
+        title: enrichPathwayTitle(clip(title, 120), summary, noticeIdForRow),
         ...(deadline
           ? { when: `${kind === 'recompete' ? 'Contract ends' : kind === 'forecast' ? 'Award expected' : 'Due'} ${dateOnly(deadline)}` }
           : {}),
@@ -628,7 +645,10 @@ function extractPathways(
       const inspection = (x.p.naics ?? '').startsWith('5413') && x.fit >= 40;
       const vehicleOrSs = VEHICLE_WORD_RE.test(hay) || SOURCES_SOUGHT_RE.test(hay);
       const adjacentVehicle = vehicleOrSs && x.fit >= 40;
-      const forecastOk = x.p.kind === 'forecast' && (x.fit >= 40 || CIVIL_LEXICAL_RE.test(hay) || /GWMP|parkway|bridge/i.test(hay));
+      // Forecasts need civil wording — sector-fit alone lets gymnasium / building forecasts in.
+      const forecastOk = x.p.kind === 'forecast' && (
+        CIVIL_LEXICAL_RE.test(hay) || /GWMP|parkway|bridge|highway|roadway|pavement|culvert/i.test(hay)
+      );
       return x.fit >= 80 || x.buyer >= 30 || inspection || adjacentVehicle || forecastOk || (x.fit >= 40 && x.buyer > 0);
     });
     // Fewer than two on-market pathways: show none so the vehicle-token frame renders instead of junk.
@@ -638,7 +658,17 @@ function extractPathways(
     const open = fits.filter((x) => pathwayRank(x.p) === 3);
     const recompete = fits.filter((x) => pathwayRank(x.p) === 4);
     const openCap = frame.length >= 2 ? 1 : 2;
-    return [...frame, ...open.slice(0, openCap), ...recompete].slice(0, 6).map((x) => x.p);
+    const merged = [...frame, ...open.slice(0, openCap), ...recompete];
+    // Drop Special Notice / Sources Sought twins of the same solicitation.
+    const seenKeys = new Set<string>();
+    const deduped: typeof merged = [];
+    for (const x of merged) {
+      const k = pathwayDedupeKey(x.p);
+      if (seenKeys.has(k)) continue;
+      seenKeys.add(k);
+      deduped.push(x);
+    }
+    return deduped.slice(0, 6).map((x) => x.p);
   }
   return indexed.slice(0, 8).map((x) => x.p);
 }

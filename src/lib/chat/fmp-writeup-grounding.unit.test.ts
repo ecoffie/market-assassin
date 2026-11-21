@@ -753,6 +753,26 @@ describe('fmp-writeup-grounding', () => {
         expect(ev.pathways?.some((p) => /JBAB and Andrews/i.test(p.title))).toBe(true);
         const openCount = (ev.pathways ?? []).filter((p) => /HUMBOLT/i.test(p.title)).length;
         expect(openCount).toBeLessThanOrEqual(1);
+        // Special Notice twin of Capitol must not consume a second slot.
+        expect((ev.pathways ?? []).filter((p) => /Capitol Perimeter/i.test(p.title)).length).toBe(1);
+      });
+
+      it('renames bare FA706027RXXX2 MACC to JBAB even when description is omitted (search_sam shape)', () => {
+        const bare = {
+          notice_id: 'jbab0001jbab0001jbab0001jbab0001',
+          solicitation_number: 'FA706027RXXX2',
+          title: 'Multiple Award Construction Contract (MACC)',
+          department: 'DEPT OF DEFENSE',
+          naics_code: '236210',
+          response_deadline: '2026-11-30T21:00:00Z',
+          notice_type: 'Sources Sought',
+        };
+        const findOpen = (rows: unknown[]) => JSON.stringify({ horizons: { open_now: { items: rows } } });
+        const ev = accumulateFmpEvidence([
+          { tool: 'get_contractor_award_history', content: HISTORY },
+          { tool: 'find_opportunities', content: findOpen([bare, civilA, civilB]) },
+        ]);
+        expect(ev.pathways?.find((p) => p.noticeId === 'FA706027RXXX2')?.title).toMatch(/JBAB and Andrews/i);
       });
 
       it('parses get_agency_forecasts rows into forecast pathways (GWMP / Clara Barton class)', () => {
