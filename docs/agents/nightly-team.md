@@ -25,7 +25,7 @@ Root `CLAUDE.md` overrides everything here. In particular: the team is a **build
 3. **Pick up to 3** candidates. Skip L size. Skip anything in a FROZEN, PARKED or BLOCKED entry of `CLAUDE.md` "In-flight work". Mark `risk: review` on any fix that touches payments/Stripe, auth or access control, env vars or flags, or migrations; those can still get a draft PR but the report must say they need Agent 4 review.
 4. **Fix** (one `team-fixer` per candidate, `isolation: worktree`, run in parallel). Rules: reproduce first; write a failing test; fix at the real layer (data before cache before render); mirror app fixes into the matching MCP tool/shared lib (`CLAUDE.md` rule 9); run `npx tsc --noEmit` and the related vitest files.
 5. **Verify** (one `team-verifier` per fix). Give it only the branch/diff, the original symptom and evidence, and the test command. Not the fixer's explanation.
-6. **Open draft PRs** only for fixes the verifier passed. Push through the pre-push gate (never `--no-verify`). PR body: symptom, cause in one sentence, evidence before/after, tests run, verifier verdict, risk flag. If the session may push to only one branch, put each fix in its own commit on that branch and open one draft PR listing them.
+6. **Open draft PRs** only for fixes the verifier passed. Push through the pre-push gate (never `--no-verify`). PR body starts with an **"In plain English"** section: what a user saw before, what they see now, and what did not change, written for a non-engineer with no file names or jargon. Then the technical part: symptom, cause in one sentence, evidence before/after, tests run, verifier verdict, risk flag. If the session may push to only one branch, put each fix in its own commit on that branch and open one draft PR listing them.
 7. **Learn.** For each failure or surprise, write a lesson only if it is a checked fact that would change what a future run does. Reword it as a general rule. No customer data, emails, secrets or private notes in lessons.
 8. **Report.** Write the run, fix and lesson records to the dashboard store, then send a short push notification: found / built / passed / waiting on Eric.
 
@@ -42,7 +42,9 @@ Collection `data/team/runs`, doc id = run date `YYYY-MM-DD`:
 `{date, found, prs, passed, failed, summary, next}`
 
 Collection `data/team/fixes`, doc id = `YYYY-MM-DD-<slug>`:
-`{id, date, title, area: "prod-error"|"data"|"issue"|"improvement", verdict: "pass"|"fail"|"pending", state: "open"|"merged"|"closed"|"not built", pr_url, risk: "normal"|"review", notes}`
+`{id, date, title, plain, area: "prod-error"|"data"|"issue"|"improvement", verdict: "pass"|"fail"|"pending", state: "open"|"merged"|"closed"|"not built", pr_url, risk: "normal"|"review", notes}`
+
+`plain` is 2–3 sentences in plain English (no file names or jargon) saying what was wrong and what changed for users. The dashboard shows it under the title.
 
 Each night also refreshes `state` on older open fixes from GitHub (merged/closed).
 
