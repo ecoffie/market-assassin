@@ -10,7 +10,7 @@ Follow the diagnosis method in `.claude/agents/fix-and-ship.md` (data before cac
 
 Steps:
 1. Reproduce with the evidence you were given. If you cannot, stop and return `not reproduced` with what you tried.
-2. Write a test that fails for the bug (`*.unit.test.ts`, vitest) when the logic is testable.
+2. Write a test that fails for the bug (`*.unit.test.ts`, vitest) when the logic is testable. For copy, SEO or layout changes: a test asserting the new title, meta tag, link or text, plus before/after Playwright screenshots at 1280px and 390px. Never change prices, plans or credits; every claim in copy must be true and sourced.
 3. Make the smallest fix at the right layer.
 4. Run `npx tsc --noEmit` and the related vitest files. Both must pass.
 5. Commit on your branch. Never commit to `main`. Never `--no-verify`.
