@@ -26,6 +26,12 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ---
 
+## 2026-11-21 — Directory refresh does not call a code a name
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-11-21 | Data Core / buying offices | A directory value that is only the office code stays unnamed. A thrown SAM current-name pass is a partial failure, not `success: true`. | `directoryRefreshOutcome` → `src/lib/gov-contacts/directory-office-name.ts` | `directory-office-name.unit.test.ts` | BUILT, NOT MERGED |
+
 ## 2026-11-20 — Scorecard second slot confirms before it publishes
 
 | Date | Area | Fix | Proof anchor | Verified | Status |

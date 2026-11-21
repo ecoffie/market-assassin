@@ -12,6 +12,8 @@ import {
   refreshSamOfficeNames,
   refreshOfficeEarlySignal,
 } from '@/lib/gov-contacts/refresh-dodaac-directory';
+import { directoryRefreshOutcome } from '@/lib/gov-contacts/directory-office-name';
+import { reportCronOutcome } from '@/lib/cron-self-report';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 120;
@@ -72,10 +74,16 @@ export async function GET(request: NextRequest) {
       console.error('[refresh-dodaac-directory] early-signal pass failed:', earlySignalError);
     }
 
+    const outcome = directoryRefreshOutcome({ samNamesError });
+    if (!dryRun) {
+      await reportCronOutcome('refresh-dodaac-directory', outcome.cronOutcome, outcome.disclosure || undefined);
+    }
     return NextResponse.json({
-      success: true, dryRun, refresh, samNames, samNamesError, earlySignal, earlySignalError,
-    });
+      success: outcome.success, dryRun, refresh, samNames, samNamesError, earlySignal, earlySignalError,
+    }, { status: outcome.httpStatus });
   } catch (e) {
-    return NextResponse.json({ success: false, error: (e as Error).message }, { status: 500 });
+    const message = (e as Error).message;
+    if (!dryRun) await reportCronOutcome('refresh-dodaac-directory', 'error', message);
+    return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
 }

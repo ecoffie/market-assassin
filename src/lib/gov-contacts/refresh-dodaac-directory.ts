@@ -18,6 +18,7 @@
  * Do NOT "simplify" this into an upsert — see the never-overwrite guard below.
  */
 import { createClient } from '@supabase/supabase-js';
+import { nameThatIsNotTheCode } from '@/lib/gov-contacts/directory-office-name';
 import { bqQuery, BQ_TABLES } from '@/lib/bigquery/client';
 
 // Strip a leading copy of the code from FPDS names ("FA7000  10 CONS LGC").
@@ -31,7 +32,7 @@ function cleanName(code: string, raw: string): string {
   // 4-6 chars that contains a digit — but only when real words follow.
   const m = /^([A-Z0-9]{4,6})\s+(.+)$/.exec(n);
   if (m && /\d/.test(m[1]) && /[A-Z]{3,}/.test(m[2])) n = m[2].trim();
-  return n || raw || code;
+  return nameThatIsNotTheCode(code, n || raw);
 }
 
 export async function refreshDodaacDirectory(): Promise<{ offices: number; written: number }> {
@@ -57,16 +58,20 @@ export async function refreshDodaacDirectory(): Promise<{ offices: number; writt
     maximumBytesBilled: String(20 * 1024 * 1024 * 1024),
   });
 
-  const records = rows.map(r => ({
+  const records = rows.flatMap(r => {
+    const office_name = cleanName(r.dodaac, r.office_name);
+    if (!office_name) return [];
+    return [{
     dodaac: r.dodaac,
-    office_name: cleanName(r.dodaac, r.office_name),
+    office_name,
     agency: r.agency || null,
     sub_agency: r.sub_agency || null,
     award_count: Number(r.award_count || 0),
     total_obligated: Number(r.total_obligated || 0),
     source: 'fpds_awards',
     updated_at: new Date().toISOString(),
-  }));
+  }];
+  });
 
   const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
   let written = 0;
