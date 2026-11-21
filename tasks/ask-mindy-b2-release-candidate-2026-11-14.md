@@ -176,7 +176,7 @@ Unchanged: `LLM_OPENAI_MODEL` (shared), `CHAT_CLAUDE_*` (Claude planner stays di
 ### 9.6 Order (two steps, so code and model changes can be rolled back separately)
 1. **Merge #2053, then the production deploy reaches READY.** No env change yet. Production then runs the B2 code with today's models: gpt-4o, with gpt-4o-mini as answer fallback. Staging validated this as `current` and `fallback-mini`.
 2. Verify it live (§9.7 A).
-3. **Add the three env vars (Production), then redeploy the current production deployment.** Use `vercel redeploy` or the dashboard Redeploy; no empty commit. Env vars only bind on a new build. Wait for READY.
+3. **Add the three env vars (Production).** Env vars bind on the next build. Do not run `vercel redeploy` or the dashboard Redeploy. The next production build is the merge to `main` through Vercel Git. Wait for that deployment to be READY.
 4. Verify it live (§9.7 B).
 
 ### 9.7 Live re-verification

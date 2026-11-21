@@ -3,7 +3,7 @@
 Two unrelated problems surfaced while shipping P0-2. Recorded here so they do not ride
 along with P0-3.
 
-## 1. `vercel --prod` from the CLI is broken
+## 1. Past: a CLI production upload failed, and that command is now forbidden
 
 ```
 Error: Request body too large. Limit: 10mb
@@ -23,9 +23,9 @@ The tracked tree carries large binaries:
 Pre-existing. `src/mcp/decision-chain` fixtures add 2.5 MB (Census taxonomy) and are a
 smaller contributor.
 
-**Impact:** the CLI deploy route is unusable. It did NOT block P0-2 — Vercel's git
-integration deploys merges to main automatically and worked correctly — but anyone who
-needs a manual CLI deploy (hotfix, rollback) will hit this.
+**Impact (past):** the CLI production upload was unusable. It did NOT block P0-2 — Vercel's git
+integration deploys merges to main automatically and worked correctly. `vercel --prod`,
+promote, rollback, and redeploy are forbidden. Production is that Git integration.
 
 **Candidate fixes, not chosen:** a `.vercelignore` for `presentations/`, `tmp/`,
 `projects/`, and demo media; or move the binaries out of the repo entirely. Either is a

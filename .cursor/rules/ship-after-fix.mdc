@@ -1,5 +1,5 @@
 ---
-description: Always commit and deploy after completing a fix or feature in market-assassin
+description: Always commit and open a PR after a fix. Production deploys only when it merges to main.
 alwaysApply: true
 ---
 

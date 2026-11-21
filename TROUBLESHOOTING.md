@@ -253,15 +253,14 @@ npx madge --circular src/
 
 ### Vercel deployment not updating
 
-**Force redeploy:**
+Production updates only when a pull request merges to `main` and Vercel Git builds that commit. Do not force a production upload.
+
+**Preview (not production):**
 ```bash
-vercel --prod --force
+npm run deploy:preview
 ```
 
-**Clear cache:**
-```bash
-vercel build --prod
-```
+A stale getmindy.ai page is the Git deployment of `main`, not a local cache clear. `vercel --prod`, `vercel build --prod`, promote, rollback, and redeploy are forbidden.
 
 ---
 

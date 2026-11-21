@@ -172,7 +172,7 @@ These have full PRDs (phasing/risks/success criteria worked out) — "open the d
 - **Hand-run DDL + NOTIFY pgrst quirk** — this DB has no in-app DDL; after a schema
   change you may need to reload the PostgREST schema cache (`NOTIFY pgrst, 'reload schema'`)
   for new columns to be queryable.
-- **Commit + push BEFORE `vercel --prod`** (Process Non-Negotiable).
+- **Commit + push, then open a PR.** Production deploys only when that PR merges to `main`. `vercel --prod` is forbidden.
 - **DoDAAC directory refresh is auto-cron'd** (dispatcher) — not a manual task anymore.
 - **Public tier rename — AFTER migration** (Eric, June 10): an ADDITIVE ladder (each
   tier = prior + more), named by WHO buys. `free`→**"Mindy"** (curious-about-GovCon

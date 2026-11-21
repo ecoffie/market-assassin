@@ -60,6 +60,6 @@ npx vitest run \
 ## Explicit non-goals this PR
 
 - Merge to `main`
-- `vercel --prod`
+- A production CLI upload (`vercel --prod` is forbidden; production is the merge to `main`)
 - Production DB writes / backfills
 - Reopening Potato / CAI / Family backfill tracks

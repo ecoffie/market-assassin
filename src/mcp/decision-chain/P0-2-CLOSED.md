@@ -46,9 +46,8 @@ should be tuned separately — explicitly not by bypassing the guard.
 
 ## Note on the deploy
 
-`vercel --prod` from the CLI failed with `Request body too large. Limit: 10mb`. This is
+Past: a CLI production upload failed with `Request body too large. Limit: 10mb`. This is
 pre-existing repo bloat (a 39MB .pptx, an 8MB .pptx, PDFs and videos in the tracked tree),
 not caused by this branch, though the 2.5MB of decision-chain fixtures contribute. **Vercel's
-git integration deployed the merge automatically and successfully** — the CLI path was
-unnecessary. Worth a separate cleanup: the CLI deploy route is currently broken for anyone
-who needs it.
+git integration deployed the merge automatically and successfully.** That CLI command
+(`vercel --prod`) is forbidden. Production is the merge to `main`.

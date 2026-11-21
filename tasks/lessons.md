@@ -65,7 +65,7 @@ The industry picker offers broad short prefixes (`Professional Services` = `['54
 
 ## Ship After Fix (Jun 2026)
 
-**Always commit, push, and `vercel --prod` after completing a fix or feature.** Eric should never need to ask — local-only changes that "look done" aren't done. Verify prod before claiming fixed.
+**Always commit, push, and open a PR after completing a fix or feature.** Eric should never need to ask — local-only changes that "look done" aren't done. Production deploys when the PR merges to `main`. `vercel --prod` is forbidden. After that merge, verify production before claiming fixed.
 
 ---
 
@@ -367,8 +367,8 @@ const userNaics = userSettings?.naics_codes || [];
 # Run pre-deploy tests (required before deploy)
 npm run test:pre-deploy
 
-# Safe deploy (runs tests first, blocks if failures)
-npm run deploy
+# Preview only. Refuses --prod. Production is the merge to main.
+npm run deploy:preview
 
 # Run all test suites
 npm test
@@ -610,8 +610,8 @@ curl "$next_url"
 
 **Why this happens:**
 - Vercel deploys from git HEAD
-- Local changes to `vercel.json` deploy when you run `vercel --prod`
-- But if you don't commit, next team deploy or CI deploy uses git version
+- Past: an uncommitted `vercel.json` could ship if someone ran `vercel --prod` (now forbidden)
+- If you don't commit, the next Git deploy of `main` uses the committed file
 
 **Prevention:**
 ```bash
@@ -625,7 +625,7 @@ git show HEAD:vercel.json | grep "your-cron-path"
 
 **Checklist for cron changes:**
 1. [ ] Edit vercel.json locally
-2. [ ] Deploy and test: `vercel --prod`
+2. [ ] Open a PR. Production updates when it merges to `main`. Do not run `vercel --prod`.
 3. [ ] **COMMIT THE CHANGE**: `git add vercel.json && git commit -m "..."`
 4. [ ] Verify: `git show HEAD:vercel.json | grep cron`
 5. [ ] Push to remote if using CI
@@ -887,7 +887,7 @@ ADD COLUMN excluded_sources TEXT[] DEFAULT ARRAY[]::TEXT[];
 
 **Prevention:**
 1. Schema sync test added: `npm run test:schema`
-2. Runs automatically before deploy: `npm run deploy`
+2. Run it with `npm run test:schema`. `npm run deploy` is a preview and does not deploy production.
 3. Update `tests/test-schema-sync.js` when adding new columns
 
 **Pattern:**
