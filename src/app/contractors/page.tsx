@@ -263,7 +263,7 @@ export default async function ContractorsIndexPage() {
                   {/* Grid of contractor links. Compact list-style
                       so each tier fits a few hundred without
                       overwhelming the page. */}
-                  <ul className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3 text-sm">
+                  <ul className="grid grid-cols-1 gap-1.5 sm:grid-cols-2 lg:grid-cols-3 text-sm">
                     {visible.map(({ c, target }) => {
                       return (
                         <li key={target}>

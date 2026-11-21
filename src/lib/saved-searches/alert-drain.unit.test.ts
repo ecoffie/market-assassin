@@ -4,6 +4,7 @@ import {
   SAVED_SEARCH_ALERT_ROUTE_TIMEOUT_MS,
   SAVED_SEARCH_ALERT_ROW_CEILING,
   SAVED_SEARCH_ALERT_TIME_BUDGET_MS,
+  processingFailureCount,
   runSavedSearchAlertDrain,
   shouldContinueSavedSearchDrain,
   type SavedSearchAlertDueRow,
@@ -175,5 +176,94 @@ describe('larger backlog stays bounded and honest', () => {
     expect(result.remaining).toBe(5);
     expect(result.errorSummary).toContain('backlog=5');
     expect(store.evaluated).toHaveLength(50);
+  });
+});
+
+describe('action-item failures do not red the job', () => {
+  it('processingFailureCount ignores suppressions and invalid_saved_naics', () => {
+    expect(processingFailureCount({
+      recipient_suppressed: 3,
+      invalid_saved_naics: 2,
+      opportunity_query_failed: 1,
+    })).toBe(1);
+    expect(processingFailureCount({
+      recipient_suppressed: 3,
+      invalid_saved_naics: 2,
+    })).toBe(0);
+  });
+
+  it('recipient_suppressed / invalid_saved_naics alone → success (still listed in failuresByClass)', async () => {
+    const rows = [dueRow(1), dueRow(2), dueRow(3)];
+    const byId: Record<string, 'suppressed' | 'invalid' | 'ok'> = {
+      'search-001': 'suppressed',
+      'search-002': 'invalid',
+      'search-003': 'ok',
+    };
+    const store = productionShapedStore(rows);
+    const result = await runSavedSearchAlertDrain({
+      dueFrequencies: ['daily'],
+      fetchDueBatch: store.fetchDueBatch,
+      evaluate: async (row) => {
+        store.evaluated.push(row.id);
+        const kind = byId[row.id];
+        if (kind === 'suppressed') return { failureClass: 'recipient_suppressed' };
+        if (kind === 'invalid') return { failureClass: 'invalid_saved_naics', invalidNaics: ['999999'] };
+        return { noMatches: 1 };
+      },
+      countRemaining: store.countRemaining,
+    });
+    expect(result.outcome).toBe('success');
+    expect(result.success).toBe(true);
+    expect(result.failuresByClass).toEqual({
+      recipient_suppressed: 1,
+      invalid_saved_naics: 1,
+    });
+    expect(result.errorSummary).toContain('recipient_suppressed=1');
+  });
+
+  it('an attributed per-search processing failure beside action items → partial (the rest evaluated)', async () => {
+    const rows = [dueRow(1), dueRow(2)];
+    const store = productionShapedStore(rows);
+    const result = await runSavedSearchAlertDrain({
+      dueFrequencies: ['daily'],
+      fetchDueBatch: store.fetchDueBatch,
+      evaluate: async (row) => {
+        store.evaluated.push(row.id);
+        return row.id === 'search-001'
+          ? { failureClass: 'recipient_suppressed' }
+          : { failureClass: 'opportunity_query_failed' };
+      },
+      countRemaining: store.countRemaining,
+    });
+    expect(result.outcome).toBe('partial');
+    expect(result.success).toBe(false);
+    expect(result.failuresByClass).toEqual({
+      recipient_suppressed: 1,
+      opportunity_query_failed: 1,
+    });
+  });
+
+  it('EVERY evaluated search failing processing → error (nothing was delivered)', async () => {
+    const rows = [dueRow(1), dueRow(2)];
+    const store = productionShapedStore(rows);
+    const result = await runSavedSearchAlertDrain({
+      dueFrequencies: ['daily'],
+      fetchDueBatch: store.fetchDueBatch,
+      evaluate: async (row) => { store.evaluated.push(row.id); return { failureClass: 'opportunity_query_failed' }; },
+      countRemaining: store.countRemaining,
+    });
+    expect(result.outcome).toBe('error');
+    expect(result.failuresByClass).toEqual({ opportunity_query_failed: 2 });
+  });
+
+  it('a run-level failure (the due-search read failed) → error', async () => {
+    const result = await runSavedSearchAlertDrain({
+      dueFrequencies: ['daily'],
+      fetchDueBatch: async () => ({ rows: [], error: { message: 'boom' } }),
+      evaluate: async () => ({}),
+      countRemaining: async () => 0,
+    });
+    expect(result.outcome).toBe('error');
+    expect(result.failuresByClass).toHaveProperty('saved_search_query_failed');
   });
 });

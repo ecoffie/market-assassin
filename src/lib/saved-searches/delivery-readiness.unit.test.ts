@@ -128,6 +128,70 @@ describe('job status — the named saved-search alerts job', () => {
     expect(r.job_status_reason).toMatch(/action item: recipient_suppressed=3/);
   });
 
+  it('suppression-only with HTTP 500 (legacy route) is still healthy — non2xx must not hide action items', async () => {
+    // Prod recorded http_status=500 on every suppression-only day once the route finished
+    // inside the dispatcher window; that made MCP keep saying "last success September 29".
+    setup({
+      cron: [cron],
+      runs: [run('error', 'recipient_suppressed=3', '2026-08-30T11:01:00Z', 500)],
+      acceptedDuringRun: 5,
+      evaluatedDuringRun: 9,
+    });
+    const r = await getSavedSearchDeliveryReadiness(NOW);
+    expect(r.job_status).toBe('healthy');
+    expect(r.delivery_state).toBe('delivery_ready');
+    expect(r.last_clean_run_at).toBe('2026-08-30T11:01:00Z');
+  });
+
+  it('a PARTIAL run (capacity backlog, HTTP 503) is visibly partial — never clean, never a whole-job outage', async () => {
+    setup({
+      cron: [cron],
+      runs: [run('partial', 'capacity_exhausted=1,backlog=37,recipient_suppressed=2', '2026-08-30T11:01:00Z', 503)],
+      acceptedDuringRun: 12,
+      evaluatedDuringRun: 400,
+    });
+    const r = await getSavedSearchDeliveryReadiness(NOW);
+    expect(r.job_status).toBe('partial_failure');
+    expect(r.delivery_state).toBe('delivery_partial');
+    expect(r.last_clean_run_at).toBeNull();
+    expect(r.suppression_action_items).toEqual({ recipient_suppressed: 2 });
+  });
+
+  it('a suppression-only SUCCESS run keeps the customer-visible action items', async () => {
+    setup({ cron: [cron], runs: [run('success', 'recipient_suppressed=3,invalid_saved_naics=2', '2026-08-30T11:01:00Z', 200)], acceptedDuringRun: 5, evaluatedDuringRun: 9 });
+    const r = await getSavedSearchDeliveryReadiness(NOW);
+    expect(r.job_status).toBe('healthy');
+    expect(r.suppression_action_items).toEqual({ recipient_suppressed: 3 });
+    expect(r.config_action_items).toEqual({ invalid_saved_naics: 2 });
+    expect(r.job_status_reason).toMatch(/action item: recipient_suppressed=3/);
+  });
+
+  it('a PARTIAL run with opportunity_query_failed beside suppressions (503) → partial, not whole-job outage', async () => {
+    setup({
+      cron: [cron],
+      runs: [run('partial', 'opportunity_query_failed=1,recipient_suppressed=3', '2026-08-30T11:01:00Z', 503)],
+      acceptedDuringRun: 12,
+      evaluatedDuringRun: 134,
+    });
+    const r = await getSavedSearchDeliveryReadiness(NOW);
+    expect(r.job_status).toBe('partial_failure');
+    expect(r.delivery_state).toBe('delivery_partial');
+    expect(r.latest_run_processing_failures).toEqual({ opportunity_query_failed: 1 });
+    expect(r.suppression_action_items).toEqual({ recipient_suppressed: 3 });
+  });
+
+  it('a non-2xx ERROR run is always a whole-job failure — no second-guessing (Agent 4)', async () => {
+    setup({
+      cron: [cron],
+      runs: [run('error', 'opportunity_query_failed=2', '2026-08-30T11:01:00Z', 500)],
+      acceptedDuringRun: 0,
+      evaluatedDuringRun: 2,
+    });
+    const r = await getSavedSearchDeliveryReadiness(NOW);
+    expect(r.job_status).toBe('job_failure');
+    expect(r.delivery_ready).toBe(false);
+  });
+
   it('today\'s real run (only recipient_suppressed + invalid_saved_naics) → healthy, clean, and the two lists stay apart', async () => {
     const at = '2026-08-30T11:01:00Z';
     setup({ cron: [cron], runs: [run('error', 'invalid_saved_naics=2,recipient_suppressed=3', at)], acceptedDuringRun: 12, evaluatedDuringRun: 134 });

@@ -1107,6 +1107,13 @@ const ZLAYOUT_CSS = '<style>'
   // filter bar below (.ztop, z 1001) covered its top items on desktop (Eric 2026-11-13: "when i
   // click my icon on the top right i cant see the entire menu"). Phone already used 1100.
   + '.zhead{grid-area:zhead;position:relative;display:flex;flex-direction:column;background:#fff;z-index:1100;' + mpTokenDeclarations() + '}'
+  // The homepage ☰ menu (.mp-menu, site-nav.ts) opens INSIDE this header, so its own z-index is capped
+  // by the header's 1100. On a phone the map's bottom results sheet (#mToggle 1400), the selected-pin
+  // card (#mCard 1300) and Save search (1200) sat over the open menu and covered its last item, the
+  // "Start 14-day free trial" button (a tap hit the sheet instead). While that menu is open the header
+  // rises above the map's own chrome (incl. the listing drawer 1500 and map drawer 1600), and stays
+  // under user-opened overlays: Ask Mindy (2600) and the filter pop-overs (3000).
+  + 'html.mp-menu-open .zhead{z-index:1700!important}'
   // The phone-only row under the homepage bar that holds the map menu button. Hidden on desktop.
   + '.zh-maprow{display:none;align-items:center;gap:14px;border-bottom:1px solid var(--line);background:#fff}'
   // far-left icon rail — PINNED (position:fixed) so grid/overflow can never push it off-screen.
@@ -1348,6 +1355,10 @@ const ZLAYOUT_CSS = '<style>'
   +   'body.m-list .mapwrap{visibility:hidden!important;pointer-events:none!important}'
   // Map controls (zoom, legend, attribution) sit above the bottom bar.
   +   '.mapwrap .leaflet-bottom{bottom:86px!important}'
+  // The tile-status notice ("Map tiles blocked by your network…", template.html) is not a Leaflet
+  // control, so the rule above never lifted it: at its 44px it sat under this bar and the attribution
+  // (iPhone SE: 0 of 3 rows visible; iPhone 13 / Pixel 7: 1 of 3). Lift it over both.
+  +   '.mapwrap .tilestatus{bottom:118px!important}'
   // The map's count pill is mirrored into the bottom bar (#mToggleCount, same words, including
   // "N not shown on map"), so it is hidden here rather than shown twice.
   +   '#mapCount{display:none!important}'
