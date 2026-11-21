@@ -11,7 +11,7 @@
 import { useEffect, useState } from 'react';
 import { LoaderCircle, Maximize2, Minimize2 } from 'lucide-react';
 import { authedFetch } from '@/components/app/authHeaders';
-import type { GeneratedDownloadFile } from './GeneratedDownloadChips';
+import { GeneratedDownloadChips, type GeneratedDownloadFile } from './GeneratedDownloadChips';
 
 export type ChatInlineReport = { html: string; title: string; url?: string | null };
 
@@ -63,10 +63,13 @@ export function ChatReportPreview({
   email,
   files,
   inline,
+  pdfNote,
 }: {
   email: string;
   files?: readonly GeneratedDownloadFile[];
   inline?: ChatInlineReport | null;
+  /** Shown under Export when PDF could not be produced. */
+  pdfNote?: string | null;
 }) {
   const [state, setState] = useState<PreviewState>(
     inline?.html
@@ -108,6 +111,9 @@ export function ChatReportPreview({
             Open hosted link
           </a>
         ) : null}
+        {!!files?.length && (
+          <GeneratedDownloadChips email={email} files={[...files]} pdfNote={pdfNote} />
+        )}
         {state.kind === 'ready' && (
           <button
             type="button"

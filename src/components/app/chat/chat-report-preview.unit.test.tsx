@@ -50,6 +50,9 @@ describe('ChatReportPreview', () => {
     expect(frame.getAttribute('sandbox')).toBe('');
     expect(frame.getAttribute('srcdoc')).toContain('The read');
     expect(el.querySelector('[data-testid="chat-report-title"]')?.textContent).toBe('RBA Federal Market Profile');
+    // Claude/ChatGPT: one Export control in the pane header — formats are not listed under the answer.
+    expect(el.querySelector('[data-testid="export-toggle"]')?.textContent).toMatch(/Export/);
+    expect(el.querySelector('[data-testid="download-pdf"]')).toBeNull();
   });
 
   it('falls through to the next saved format when the first row is gone', async () => {

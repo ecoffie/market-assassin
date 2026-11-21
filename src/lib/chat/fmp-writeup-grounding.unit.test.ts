@@ -199,7 +199,7 @@ describe('fmp-writeup-grounding', () => {
     expect(fmpPlannerMaxTokensForCreateDocument(false)).toBeNull();
   });
 
-  it('answer note after create_document cites real download_path values only', () => {
+  it('answer note after create_document forbids paste of download URLs', () => {
     const evidence = accumulateFmpEvidence(
       [{ tool: 'get_contractor_award_history', content: AWARD_JSON }],
       '',
@@ -209,8 +209,9 @@ describe('fmp-writeup-grounding', () => {
       downloadPaths: ['/api/app/vault/documents/download?id=abc'],
       title: 'RBA Federal Market Profile',
     });
-    expect(note).toContain('/api/app/vault/documents/download?id=abc');
-    expect(note).toMatch(/Never invent URLs/i);
+    expect(note).not.toContain('/api/app/vault/documents/download?id=abc');
+    expect(note).toMatch(/Do NOT paste download URLs/i);
+    expect(note).toMatch(/Export.*open report pane/i);
     expect(note).toMatch(/Summarize the federal market profile/i);
     expect(note).not.toMatch(/—/);
   });
@@ -221,7 +222,7 @@ describe('fmp-writeup-grounding', () => {
     const docId2 = '11111111-2222-3333-4444-555555555555';
     const realPath2 = `/api/app/vault/documents/download?id=${docId2}`;
 
-    it('rewrites your-link-to-download.com/<uuid> markdown links to the matching real path', () => {
+    it('strips fake-host markdown links instead of rewriting them into the chat', () => {
       const before = [
         'Your federal market profile is ready.',
         '',
@@ -229,12 +230,13 @@ describe('fmp-writeup-grounding', () => {
         `- [PDF](https://your-link-to-download.com/${docId2})`,
       ].join('\n');
       const after = rewriteFmpAnswerDownloadLinks(before, [realPath, realPath2]);
-      expect(after).toContain(`[Word](${realPath})`);
-      expect(after).toContain(`[PDF](${realPath2})`);
+      expect(after).toContain('Your federal market profile is ready.');
       expect(after).not.toMatch(/your-link-to-download\.com/i);
+      expect(after).not.toContain(realPath);
+      expect(after).not.toContain(realPath2);
     });
 
-    it('replaces invent-only link lists with a short bullet list of real paths', () => {
+    it('strips invent-only link lists and never appends vault download paths', () => {
       const before = [
         'Downloads:',
         `- [file](https://your-link-to-download.com/not-a-real-id)`,
@@ -242,22 +244,23 @@ describe('fmp-writeup-grounding', () => {
       ].join('\n');
       const after = rewriteFmpAnswerDownloadLinks(before, [realPath]);
       expect(after).not.toMatch(/your-link-to-download\.com/i);
-      expect(after).toContain(realPath);
-      expect(after).toMatch(/Downloads:/);
-      expect(after).toContain(`- ${realPath}`);
+      expect(after).not.toContain(realPath);
+      expect(after).not.toMatch(/\/api\/app\/vault\/documents\/download/);
     });
 
-    it('preserves already-allowlisted vault download paths', () => {
+    it('strips already-allowlisted vault download paths from the answer', () => {
       const before = `Open [the profile](${realPath}) from Vault.`;
       const after = rewriteFmpAnswerDownloadLinks(before, [realPath]);
-      expect(after).toBe(before);
+      expect(after).not.toContain(realPath);
+      expect(after).toMatch(/Open\s+from Vault|from Vault/);
     });
 
     it('strips bare fake-host URLs and never leaves your-link-to-download.com', () => {
       const before = `Grab it at https://your-link-to-download.com/${docId} thanks.`;
       const after = rewriteFmpAnswerDownloadLinks(before, [realPath]);
-      expect(after).toContain(realPath);
+      expect(after).not.toContain(realPath);
       expect(after).not.toMatch(/your-link-to-download\.com/i);
+      expect(after).toMatch(/Grab it at\s+thanks/);
     });
   });
 
@@ -559,7 +562,7 @@ describe('fmp-writeup-grounding', () => {
         downloadPaths: ['/api/app/vault/documents/download?id=11111111-1111-4111-8111-111111111111'],
         title: 'RBA Federal Market Profile',
       });
-      expect(note).toMatch(/already open in the chat/i);
+      expect(note).toMatch(/already open beside the chat/i);
       expect(note).toMatch(/do not tell the customer to go to the Vault/i);
     });
 

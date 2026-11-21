@@ -444,7 +444,7 @@ export function makeGenerateDocumentTool(deps: GenerateDocumentDeps) {
       ...(repeats.length ? { repeated_sentences: repeats.length } : {}),
       ...(fmpWarnings.length ? { fmp_warnings: fmpWarnings } : {}),
       diagnostics,
-      note: 'Saved privately to the Vault (Documents → Generated). Under this answer the user gets an "Open report" card (on the Map the report also opens in a reading pane beside the chat) plus Download buttons — tell the user the file names, that they can read it there and ask you for changes (a new version is saved, the old one is kept), and that they can download from those buttons or from Documents → Generated; do not paste download links.'
+      note: 'Saved privately to the Vault (Documents → Generated). Under this answer the user gets an "Open report" card (on the Map the report also opens in a reading pane beside the chat). Tell them they can read it there, open Export in the report for PDF/Word/Excel/CSV, ask you for changes (a new version is saved, the old one is kept), or find it under Documents → Generated. Do not paste download links or list format buttons in the chat text.'
         + (unverified.length ? ` ${unverified.length} statement(s) are labeled "Unverified — no source"; say so.` : '')
         + (omitted.length ? ` ${omitted.length} decision-critical statement(s) without a source were left out; say so.` : '')
         + (uncitedSources.some((s) => s.kind === 'upload')

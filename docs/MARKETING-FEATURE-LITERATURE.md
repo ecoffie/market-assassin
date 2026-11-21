@@ -1,3 +1,12 @@
+### Ask report Export in the open pane (Claude/ChatGPT pattern) — 2026-11-21
+
+**What shipped.** Map Ask “Open report” cards no longer show PDF/Word/Excel/CSV chips under the answer. Formats live behind one **Export** control in the open report pane (map) and in the /app report preview header. Host rewrite strips vault `/api/app/vault/documents/download` paths and fake download hosts from the chat text instead of appending them as bullets.
+
+**Why it matters.** Customers expect Claude/ChatGPT: open the document, then choose how to download — not four format buttons in the stream.
+
+**Proof.** Units: `ask-report-pane`, `generated-download-chips`, `chat-report-preview`, `rewriteFmpAnswerDownloadLinks`. Live after deploy: create_document → card has Open report only; pane/header Export → PDF/Word; answer text has no vault download URLs.
+
+
 ### Ask FMP closer to Claude gold (named pathway lookups) — 2026-11-20
 
 **What shipped.** Pathways phase host-injects named SAM lookups (Inspection MATOC, Capitol Perimeter, JBAB MACC) plus GWMP/parkway forecasts alongside the civil FIND. Ranking is vehicle → sources sought → forecasts → at most one open RFQ. Bare MACC titles that name JBAB/Andrews in the body render as “JBAB and Andrews 8(a) MACC.”

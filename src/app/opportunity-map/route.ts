@@ -10919,7 +10919,7 @@ const ASK_MINDY_CSS =
   + '.amk-send:disabled{opacity:.45;cursor:default}.amk-send svg{width:18px;height:18px}'
   // ── In-chat REPORT PANE (create_document → read it here, no download). Sits beside the chat drawer on wide
   // screens and over it on narrow ones. The report itself is the shared document engine's HTML in a
-  // script-less sandboxed iframe; export chips are secondary.
+  // script-less sandboxed iframe; Export menu lives in the open pane header.
   + '.amk-rep{position:fixed;top:0;right:min(440px,94vw);height:100dvh;width:min(880px,calc(100vw - min(440px,94vw)));background:#fff;border-right:1px solid #e3e8ef;box-shadow:-10px 0 36px rgba(16,24,40,.14);z-index:2601;display:none;flex-direction:column}'
   + '.amk-rep.show{display:flex}'
   + '@media(max-width:900px){.amk-rep{right:0;width:100vw;z-index:2602}}'
@@ -10928,8 +10928,10 @@ const ASK_MINDY_CSS =
   + '.amk-rep-v{font:500 11.5px Inter,system-ui,sans-serif;color:#64748b}'
   + '.amk-rep-back{display:none;border:1px solid #dde3ec;background:#fff;color:#1d4ed8;font:600 12px Inter,system-ui,sans-serif;border-radius:8px;padding:6px 10px;cursor:pointer}'
   + '@media(max-width:900px){.amk-rep-back{display:inline-block}}'
-  + '.amk-rep-exp{display:flex;align-items:center;gap:6px;flex:none}.amk-rep-exp:empty{display:none}.amk-rep-exp .lb{font:500 11px Inter,system-ui,sans-serif;color:#64748b}'
-  + '.amk-rep-exp button,.amk-repcard-exp button{border:1px solid #dde3ec;background:#fff;color:#334155;font:600 11px Inter,system-ui,sans-serif;border-radius:7px;padding:3px 8px;cursor:pointer}.amk-rep-exp button:hover,.amk-repcard-exp button:hover{background:#f1f5f9}.amk-rep-exp button:disabled,.amk-repcard-exp button:disabled{opacity:.6;cursor:default}'
+  + '.amk-rep-exp{display:flex;align-items:center;gap:6px;flex:none;position:relative}.amk-rep-exp:empty{display:none}'
+  + '.amk-exp-menu{position:relative}.amk-exp-toggle{border:1px solid #dde3ec;background:#fff;color:#334155;font:600 12px Inter,system-ui,sans-serif;border-radius:8px;padding:5px 12px;cursor:pointer}.amk-exp-toggle:hover{background:#f1f5f9}.amk-exp-toggle[aria-expanded="true"]{background:#f1f5f9}'
+  + '.amk-exp-panel{position:absolute;right:0;top:calc(100% + 4px);z-index:5;min-width:160px;padding:6px;border:1px solid #dde3ec;border-radius:10px;background:#fff;box-shadow:0 8px 24px rgba(15,23,42,.12);display:flex;flex-direction:column;gap:2px}'
+  + '.amk-exp-panel[hidden]{display:none!important}.amk-exp-panel button{border:0;background:transparent;color:#334155;font:600 12px Inter,system-ui,sans-serif;border-radius:7px;padding:8px 10px;cursor:pointer;text-align:left}.amk-exp-panel button:hover{background:#f1f5f9}.amk-exp-panel button:disabled{opacity:.6;cursor:default}'
   + '.amk-rep-x{border:0;background:none;color:#8595a6;cursor:pointer;font:400 24px/1 Inter,system-ui,sans-serif;padding:0 4px}'
   + '.amk-rep-body{position:relative;flex:1;min-height:0;background:#f4f6fa}.amk-rep-f{position:absolute;inset:0;width:100%;height:100%;border:0;background:#fff}'
   + '.amk-rep-msg{position:absolute;inset:0;display:none;align-items:center;justify-content:center;flex-direction:column;gap:10px;text-align:center;padding:24px;font:500 13.5px Inter,system-ui,sans-serif;color:#475569;background:#fff}'
@@ -10938,7 +10940,6 @@ const ASK_MINDY_CSS =
   + '.amk-repcard{margin-top:9px;border:1px solid #d3e2fc;background:#f5f9ff;border-radius:10px;padding:10px 12px;display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px}'
   + '.amk-repcard-t{flex:1;min-width:150px;display:flex;flex-direction:column}.amk-repcard-t b{font:700 13px Inter,system-ui,sans-serif;color:#111c26;overflow-wrap:anywhere}.amk-repcard-t span{font:500 11.5px Inter,system-ui,sans-serif;color:#64748b}'
   + '.amk-repcard-open{flex:none;border:0;background:#2563eb;color:#fff;font:700 12px Inter,system-ui,sans-serif;border-radius:8px;padding:7px 12px;cursor:pointer}'
-  + '.amk-repcard-exp{flex-basis:100%;display:flex;flex-wrap:wrap;align-items:center;gap:6px}.amk-repcard-exp .lb{font:500 11px Inter,system-ui,sans-serif;color:#64748b}'
   + '@media(prefers-color-scheme:dark){.amk-repcard{background:#0d141d;border-color:#202b39}.amk-repcard-t b{color:#eaf1f8}}'
   + '.amk-up{text-align:center;padding:30px 20px}.amk-up h4{font:800 16px Inter;margin:0 0 6px;color:#111c26}.amk-up p{font:500 13px Inter;color:#6b7787;margin:0 0 14px}'
   + '.amk-up a{display:inline-block;background:#0a8f57;color:#fff;text-decoration:none;border-radius:10px;padding:10px 20px;font:700 13px Inter}'
@@ -11214,8 +11215,8 @@ const ASK_MINDY_JS = `<script>(function(){
   }
   // ── REPORT PANE. A document Mindy just saved (create_document) opens HERE, in the chat, as a readable page:
   // no download needed. Reuses the Vault: GET /api/app/vault/documents/preview renders the stored DocModel with
-  // the same engine that made the PDF/Word, owner-scoped. Exports (PDF/Word/Excel/CSV) are secondary chips that
-  // use the existing download route. A revision is a NEW Vault row (the old version stays); its deliverables
+  // the same engine that made the PDF/Word, owner-scoped. Export (PDF/Word/Excel/CSV) is a menu in the open pane.
+  // A revision is a NEW Vault row (the old version stays); its deliverables
   // event simply replaces what the pane shows. The open document (and the signed source ledger that lets the
   // next "revise it" resolve it) is kept in localStorage per account + workspace, so it is still there tomorrow.
   var REP_KEY='mindy_map_report', rep=null, repEls=null, repSeq=0, repBtn=null;
@@ -11240,6 +11241,7 @@ const ASK_MINDY_JS = `<script>(function(){
   function primaryId(files){ for(var i=0;i<files.length;i++){ if(files[i].format==='docx') return files[i].document_id; } return files.length?files[0].document_id:''; }
   function authHdrs(){ return withWorkspace({'x-mi-auth-token':tok()||'','x-user-email':email()}); }
   // Download one saved file: the existing Vault route mints a 60-second signed URL (attachment).
+  // Claude/ChatGPT pattern: formats live behind Export in the OPEN report pane — never on the chat card.
   function exportFile(file,btn){
     var label=btn.textContent; btn.disabled=true; btn.textContent='Preparing...';
     fetch('/api/app/vault/documents/download?email='+encodeURIComponent(email())+'&id='+encodeURIComponent(file.document_id),{headers:authHdrs()})
@@ -11247,10 +11249,18 @@ const ASK_MINDY_JS = `<script>(function(){
       .then(function(d){ if(d&&d.url){ try{ if(window.__track) window.__track('tool_use','map_report_export',{format:file.format}); }catch(e){} location.href=d.url; } else btn.textContent='Try again'; },function(){ btn.textContent='Try again'; })
       .then(function(){ btn.disabled=false; if(btn.textContent==='Preparing...') btn.textContent=label; });
   }
-  function exportRow(files,host,withLabel){
+  function exportMenu(files,host){
     host.innerHTML=''; if(!files.length) return;
-    if(withLabel){ var lb=document.createElement('span'); lb.className='lb'; lb.textContent='Download'; host.appendChild(lb); }
-    files.forEach(function(f){ var b=document.createElement('button'); b.type='button'; b.setAttribute('data-fmt',f.format); b.textContent=FMT_LABEL[f.format]; b.onclick=function(){ exportFile(f,b); }; host.appendChild(b); });
+    var wrap=document.createElement('div'); wrap.className='amk-exp-menu'; wrap.setAttribute('data-testid','amk-export-menu');
+    var toggle=document.createElement('button'); toggle.type='button'; toggle.className='amk-exp-toggle'; toggle.setAttribute('data-testid','amk-export-toggle'); toggle.setAttribute('aria-expanded','false'); toggle.textContent='Export';
+    var panel=document.createElement('div'); panel.className='amk-exp-panel'; panel.hidden=true; panel.setAttribute('role','menu');
+    files.forEach(function(f){
+      var b=document.createElement('button'); b.type='button'; b.setAttribute('data-fmt',f.format); b.setAttribute('role','menuitem'); b.textContent=FMT_LABEL[f.format];
+      b.onclick=function(){ exportFile(f,b); panel.hidden=true; toggle.setAttribute('aria-expanded','false'); };
+      panel.appendChild(b);
+    });
+    toggle.onclick=function(){ var open=panel.hidden; panel.hidden=!open; toggle.setAttribute('aria-expanded',open?'true':'false'); };
+    wrap.appendChild(toggle); wrap.appendChild(panel); host.appendChild(wrap);
   }
   function ensurePane(){
     if(repEls) return repEls;
@@ -11296,7 +11306,7 @@ const ASK_MINDY_JS = `<script>(function(){
         E.f.srcdoc=j.html; E.f.style.visibility='visible'; E.msg.style.display='none';
         E.t.textContent=String(j.title||'Report'); E.v.textContent='Version '+(j.version||1)+' - saved in your Vault';
         var files=cleanFiles(j.files); if(!files.length&&rep) files=cleanFiles(rep.files);
-        exportRow(files,E.exp,true);
+        exportMenu(files,E.exp);
         rep=Object.assign({},rep||{},{email:em,ws:wsKey(),id:id,title:String(j.title||''),version:j.version||1,files:files,open:true}); repWrite();
         try{ if(window.__track) window.__track('tool_use','map_report_open',{version:j.version||1}); }catch(e){}
       })
@@ -11309,11 +11319,10 @@ const ASK_MINDY_JS = `<script>(function(){
     var ver=0; files.forEach(function(f){ if(f.version>ver) ver=f.version; });
     rep={email:email(),ws:wsKey(),id:id,title:'',version:ver||1,files:files,ledger:(rep&&rep.ledger)||null,open:true}; repWrite();
     var w=document.createElement('div'); w.className='amk-repcard'; w.setAttribute('data-testid','amk-report-card');
-    w.innerHTML='<div class="amk-repcard-t"><b></b><span></span></div><button type="button" class="amk-repcard-open">Open report</button><div class="amk-repcard-exp"></div>';
+    w.innerHTML='<div class="amk-repcard-t"><b></b><span></span></div><button type="button" class="amk-repcard-open">Open report</button>';
     w.querySelector('b').textContent=(prim.file_name||'Your report').replace(/[.](pdf|docx|xlsx|csv)$/i,'');
     w.querySelector('span').textContent='Version '+(ver||1)+' - saved to your Vault';
     w.querySelector('.amk-repcard-open').onclick=function(){ repOpen(id); };
-    exportRow(files,w.querySelector('.amk-repcard-exp'),true);
     aEl.appendChild(w); body.scrollTop=body.scrollHeight;
     repOpen(id);
   }

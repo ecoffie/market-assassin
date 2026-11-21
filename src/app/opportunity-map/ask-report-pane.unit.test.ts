@@ -1,8 +1,8 @@
 /**
  * Map Ask Mindy — in-chat REPORT PANE (the REAL drawer script, ASK_MINDY_JS, in jsdom).
- * A create_document turn ends with a `deliverables` event: the answer gets an "Open report" card with
- * secondary export chips, and the report opens in a pane BESIDE the chat, read from the owner-scoped
- * preview route inside a script-less sandboxed iframe. A revision (new ids) replaces what the pane shows.
+ * A create_document turn ends with a `deliverables` event: the answer gets an "Open report" card (no
+ * format chips), and the report opens in a pane BESIDE the chat with an Export menu, read from the
+ * owner-scoped preview route inside a script-less sandboxed iframe. A revision replaces what the pane shows.
  * The open report survives a reload (and brings the signed ledger back so "revise it" resolves), is
  * dropped when the server says it is gone, and never shows in card chat.
  */
@@ -74,7 +74,7 @@ const V1 = [{ format: 'docx', document_id: DOCX, file_name: 'Koamana-Build-repor
 const V2 = [{ format: 'docx', document_id: DOCX2, file_name: 'Koamana-Build-report.docx', version: 2 }, { format: 'pdf', document_id: PDF2, file_name: 'Koamana-Build-report.pdf', version: 2 }];
 
 describe('Map Ask Mindy report pane', () => {
-  it('create_document → card under the answer + pane opens beside the chat with the previewed report; exports are secondary chips', async () => {
+  it('create_document → Open report card only (no format chips) + pane with Export menu', async () => {
     const t = boot({ chat: createTurn(V1) });
     (t.w as unknown as { openAskMindy: () => void }).openAskMindy();
     await t.ask('Write a comprehensive market research report');
@@ -82,9 +82,12 @@ describe('Map Ask Mindy report pane', () => {
     expect(card).toBeTruthy();
     expect(card.textContent).toContain('Koamana-Build-report');
     expect(card.textContent).toContain('Version 1');
-    expect([...card.querySelectorAll('.amk-repcard-exp button')].map((b) => b.textContent)).toEqual(['PDF', 'Word']);
+    expect(card.querySelector('.amk-repcard-exp')).toBeNull();
+    expect(card.querySelector('[data-fmt="pdf"]')).toBeNull();
     const pane = t.doc.querySelector('[data-testid="amk-report-pane"]') as HTMLElement;
     expect(pane.classList.contains('show')).toBe(true);
+    expect(pane.querySelector('[data-testid="amk-export-toggle"]')?.textContent).toBe('Export');
+    expect(pane.querySelector('.amk-exp-panel')?.hidden).toBe(true);
     const prev = t.calls.find((c) => c.url.startsWith('/api/app/vault/documents/preview'))!;
     expect(prev.url).toContain(`id=${DOCX}`); // the Word row is the primary id
     expect(prev.headers['x-mi-auth-token']).toBeTruthy();
@@ -95,12 +98,16 @@ describe('Map Ask Mindy report pane', () => {
     expect(pane.querySelector('.amk-rep-v')!.textContent).toContain('Version 1');
   });
 
-  it('export chip uses the existing download route and navigates to its signed URL', async () => {
+  it('Export menu opens formats and uses the existing download route', async () => {
     const t = boot({ chat: createTurn(V1) });
     (t.w as unknown as { openAskMindy: () => void }).openAskMindy();
     await t.ask('report');
+    const toggle = t.doc.querySelector('[data-testid="amk-export-toggle"]') as HTMLButtonElement;
+    toggle.click();
+    expect(t.doc.querySelector('.amk-exp-panel')?.hidden).toBe(false);
+    expect([...t.doc.querySelectorAll('.amk-exp-panel button')].map((b) => b.textContent)).toEqual(['PDF', 'Word']);
     const before = t.calls.length;
-    (t.doc.querySelector('.amk-rep-exp button[data-fmt="pdf"]') as HTMLButtonElement).click();
+    (t.doc.querySelector('.amk-exp-panel button[data-fmt="pdf"]') as HTMLButtonElement).click();
     await t.settle();
     const dl = t.calls.slice(before).find((c) => c.url.startsWith('/api/app/vault/documents/download'))!;
     expect(dl.url).toContain(`id=${PDF}`);

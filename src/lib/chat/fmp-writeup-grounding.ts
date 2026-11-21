@@ -1215,15 +1215,13 @@ export function buildFmpCreateDocumentAnswerNote(opts: {
   const paths = opts.downloadPaths.filter(Boolean);
   const lines: string[] = [
     'FMP ANSWER AFTER create_document (host rule):',
-    'The full report is already open in the chat above your answer (the customer reads it there; no download needed). Summarize the federal market profile from the grounding facts below in plain English. Do not answer with download links alone, and do not tell the customer to go to the Vault to read it.',
-    'Only cite download_path values that appear in the create_document tool JSON (listed next). Never invent URLs such as your-link-to-download.com or placeholder links.',
+    'The full report is already open beside the chat (the customer reads it there). Summarize the federal market profile from the grounding facts below in plain English.',
+    'Do NOT paste download URLs, download_path values, or a list of /api/app/vault/documents/download links into the answer. Export (PDF / Word / Excel / CSV) lives inside the open report pane, never in the chat text.',
+    'Never invent URLs such as your-link-to-download.com or placeholder links. Do not tell the customer to go to the Vault to read the report.',
   ];
   if (opts.title) lines.push(`Document title: ${opts.title}.`);
-  if (paths.length) {
-    lines.push('Real download_path values from the tool result:');
-    for (const p of paths) lines.push(`- ${p}`);
-  } else {
-    lines.push('No download_path values were returned. Tell the user the report is open above and the download buttons are under it; do not invent a URL.');
+  if (!paths.length) {
+    lines.push('No files were returned for Export. Say the report is open above; do not invent a URL.');
   }
   const facts: string[] = [];
   if (opts.evidence.dominantNaics) facts.push(`NAICS ${opts.evidence.dominantNaics}`);
@@ -1239,7 +1237,6 @@ export function buildFmpCreateDocumentAnswerNote(opts: {
 const REAL_DOWNLOAD_PATH_RE = /^\/api\/app\/vault\/documents\/download\?id=([0-9a-f-]{36})$/i;
 const MD_LINK_RE = /\[([^\]]*)\]\(([^)]+)\)/g;
 const FAKE_DOWNLOAD_HOST_RE = /your-link-to-download\.com|example\.com\/download|placeholder.*download|bit\.ly\/|tinyurl\.com\//i;
-const UUID_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
 
 function normalizeDownloadPath(p: string): string | null {
   const raw = String(p || '').trim();
@@ -1258,94 +1255,34 @@ function normalizeDownloadPath(p: string): string | null {
   return m ? `/api/app/vault/documents/download?id=${m[1]}` : null;
 }
 
-function pathByDocumentId(downloadPaths: readonly string[]): Map<string, string> {
-  const map = new Map<string, string>();
-  for (const p of downloadPaths) {
-    const norm = normalizeDownloadPath(p);
-    if (!norm) continue;
-    const id = norm.match(REAL_DOWNLOAD_PATH_RE)?.[1];
-    if (id) map.set(id.toLowerCase(), norm);
-  }
-  return map;
-}
-
-function realDownloadBulletList(downloadPaths: readonly string[]): string {
-  const paths = [...pathByDocumentId(downloadPaths).values()];
-  if (!paths.length) return 'Download files from the buttons under the report.';
-  return ['Downloads:', ...paths.map((p) => `- ${p}`)].join('\n');
-}
 
 /**
- * Host post-process: never leave invented download URLs in the chat answer.
- * Allowlists only `/api/app/vault/documents/download?id=<uuid>` (relative OK).
- * Fake hosts (your-link-to-download.com, etc.) are rewritten to the matching real
- * path when the fake URL ends with that document uuid; otherwise the fake link
- * list is replaced with a short bullet list of real download_path values.
+ * Host post-process: never leave download URLs in the chat answer (Claude/ChatGPT pattern —
+ * Export lives in the open report pane, not as chat bullets).
+ * Fake hosts and vault download_path links are stripped; the reader uses Export on the report.
  */
 export function rewriteFmpAnswerDownloadLinks(
   answer: string,
-  downloadPaths: readonly string[],
+  _downloadPaths: readonly string[] = [],
 ): string {
   const text = String(answer || '');
   if (!text) return text;
-  const byId = pathByDocumentId(downloadPaths);
-  const allow = new Set([...byId.values()]);
-  let invented = false;
   let out = text.replace(MD_LINK_RE, (full, label: string, url: string) => {
     const trimmed = String(url || '').trim();
-    const asReal = normalizeDownloadPath(trimmed);
-    if (asReal && (allow.size === 0 || allow.has(asReal))) {
-      return `[${label}](${asReal})`;
-    }
-    if (asReal) {
-      // Vault-shaped but not in this turn's allowlist — treat as invent.
-      invented = true;
-      const id = asReal.match(REAL_DOWNLOAD_PATH_RE)?.[1];
-      if (id && byId.has(id.toLowerCase())) {
-        return `[${label}](${byId.get(id.toLowerCase())})`;
-      }
-      return label || 'download';
-    }
+    if (normalizeDownloadPath(trimmed)) return '';
     const looksFake =
       FAKE_DOWNLOAD_HOST_RE.test(trimmed)
-      || /^https?:\/\//i.test(trimmed)
-      || (/download/i.test(trimmed) && !trimmed.startsWith('/api/app/vault/'));
-    if (!looksFake) {
-      // Relative non-download links (anchors, app paths) left alone.
-      return full;
-    }
-    invented = true;
-    const uuid = trimmed.match(UUID_RE)?.[0];
-    if (uuid && byId.has(uuid.toLowerCase())) {
-      return `[${label}](${byId.get(uuid.toLowerCase())})`;
-    }
-    // Drop this fake link; a list of real paths is appended once below if needed.
-    return label || 'download';
+      || (/download/i.test(trimmed) && /^https?:\/\//i.test(trimmed));
+    if (looksFake) return label && !/download/i.test(label) ? label : '';
+    return full;
   });
 
-  // Bare fake URLs not in markdown.
-  out = out.replace(
-    /https?:\/\/[^\s)]*your-link-to-download\.com[^\s)]*/gi,
-    (url) => {
-      invented = true;
-      const uuid = url.match(UUID_RE)?.[0];
-      if (uuid && byId.has(uuid.toLowerCase())) return byId.get(uuid.toLowerCase())!;
-      return '';
-    },
-  );
-
-  if (invented) {
-    // If no real path remained in the answer as a markdown link, append the allowlisted list.
-    const stillHasReal = [...allow].some((p) => out.includes(p));
-    if (!stillHasReal && allow.size) {
-      out = `${out.replace(/\n{3,}/g, '\n\n').trimEnd()}\n\n${realDownloadBulletList([...allow])}`;
-    } else if (!stillHasReal && !allow.size) {
-      out = `${out.replace(/\n{3,}/g, '\n\n').trimEnd()}\n\nUse the download buttons under the report.`;
-    }
-  }
-
-  // Absolute last pass: never leave the fake domain.
+  // Bare vault download paths / absolute vault URLs (often listed as bullets).
+  out = out.replace(/^\s*[-*•]\s*(?:https?:\/\/[^\s)]+)?\/?api\/app\/vault\/documents\/download\?[^\n]*$/gim, '');
+  out = out.replace(/(?:https?:\/\/[^\s)]+)?\/api\/app\/vault\/documents\/download\?[^\s)]+/gi, '');
   out = out.replace(/https?:\/\/[^\s)]*your-link-to-download\.com[^\s)]*/gi, '');
+  out = out.replace(/https?:\/\/[^\s)]*(?:example\.com\/download|placeholder[^\s)]*download)[^\s)]*/gi, '');
+
   return out.replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trimEnd();
 }
 

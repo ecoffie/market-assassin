@@ -1,12 +1,12 @@
 'use client';
 
 /**
- * In-chat download chips for Ask Mindy create_document results.
- * Gold master: Market Research emerald chip row + VaultPanel signed-download flow.
- * Mint a short-lived URL on click — never paste vault links into the answer.
+ * Export menu for Ask Mindy create_document results (Claude / ChatGPT pattern).
+ * Formats live behind one Export control in the open report pane — never as a
+ * multi-chip row under the chat answer. Mint a short-lived URL on click.
  */
-import { useState } from 'react';
-import { Download, LoaderCircle } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { ChevronDown, Download, LoaderCircle } from 'lucide-react';
 import { authedFetch } from '@/components/app/authHeaders';
 
 export type GeneratedDownloadFile = {
@@ -18,11 +18,11 @@ export type GeneratedDownloadFile = {
 
 export function labelForFormat(format: string): string {
   const f = format.toLowerCase();
-  if (f === 'pdf') return 'Download PDF';
-  if (f === 'docx') return 'Download Word';
-  if (f === 'xlsx') return 'Download Excel';
-  if (f === 'csv') return 'Download CSV';
-  return `Download ${format.toUpperCase()}`;
+  if (f === 'pdf') return 'PDF';
+  if (f === 'docx') return 'Word';
+  if (f === 'xlsx') return 'Excel';
+  if (f === 'csv') return 'CSV';
+  return format.toUpperCase();
 }
 
 export async function downloadVaultDocument(email: string, documentId: string): Promise<{ ok: true } | { ok: false; message: string }> {
@@ -42,6 +42,22 @@ export async function downloadVaultDocument(email: string, documentId: string): 
   }
 }
 
+function usableFiles(files: GeneratedDownloadFile[]): GeneratedDownloadFile[] {
+  const byFormat = new Map<string, GeneratedDownloadFile>();
+  for (const f of files) {
+    if (!f?.document_id || !f.format) continue;
+    const key = f.format.toLowerCase();
+    const prev = byFormat.get(key);
+    if (!prev || (f.version ?? 0) >= (prev.version ?? 0)) byFormat.set(key, f);
+  }
+  const order = ['pdf', 'docx', 'xlsx', 'csv'];
+  return [
+    ...order.map((k) => byFormat.get(k)).filter(Boolean),
+    ...[...byFormat.entries()].filter(([k]) => !order.includes(k)).map(([, f]) => f),
+  ] as GeneratedDownloadFile[];
+}
+
+/** Export control for the open report header — one button, formats in a menu. */
 export function GeneratedDownloadChips({
   email,
   files,
@@ -51,21 +67,21 @@ export function GeneratedDownloadChips({
   files: GeneratedDownloadFile[];
   pdfNote?: string | null;
 }) {
+  const [open, setOpen] = useState(false);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  // One chip per format (highest version wins) — duplicate deliverable rows must not stamp five PDFs.
-  const byFormat = new Map<string, GeneratedDownloadFile>();
-  for (const f of files) {
-    if (!f?.document_id || !f.format) continue;
-    const key = f.format.toLowerCase();
-    const prev = byFormat.get(key);
-    if (!prev || (f.version ?? 0) >= (prev.version ?? 0)) byFormat.set(key, f);
-  }
-  const order = ['pdf', 'docx', 'xlsx', 'csv'];
-  const usable = [
-    ...order.map((k) => byFormat.get(k)).filter(Boolean),
-    ...[...byFormat.entries()].filter(([k]) => !order.includes(k)).map(([, f]) => f),
-  ] as GeneratedDownloadFile[];
+  const rootRef = useRef<HTMLDivElement>(null);
+  const usable = usableFiles(files);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', onDoc);
+    return () => document.removeEventListener('mousedown', onDoc);
+  }, [open]);
+
   if (!usable.length) return null;
 
   const onDownload = async (id: string) => {
@@ -74,35 +90,52 @@ export function GeneratedDownloadChips({
     const r = await downloadVaultDocument(email, id);
     if (!r.ok) setError(r.message);
     setDownloadingId(null);
+    setOpen(false);
   };
 
   return (
-    <div className="mt-3 pt-3 border-t border-surface/50" data-testid="generated-downloads">
-      <div className="text-[10px] font-semibold tracking-wider text-faint mb-1.5">YOUR FILES — click to download</div>
-      <div className="flex flex-wrap gap-2">
-        {usable.map((f) => (
-          <button
-            key={f.document_id}
-            type="button"
-            data-testid={`download-${f.format}`}
-            onClick={() => onDownload(f.document_id)}
-            disabled={downloadingId !== null}
-            title={f.file_name || labelForFormat(f.format)}
-            className="inline-flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs font-semibold text-emerald-200 hover:bg-emerald-500/15 disabled:opacity-50"
-          >
-            {downloadingId === f.document_id
-              ? <LoaderCircle className="h-4 w-4 animate-spin" />
-              : <Download className="h-4 w-4" />}
-            {downloadingId === f.document_id ? 'Preparing…' : labelForFormat(f.format)}
-          </button>
-        ))}
-      </div>
-      <p className="mt-2 text-[11px] text-faint">Also saved under Documents → Generated. Reopen this chat anytime — these buttons come back.</p>
+    <div className="relative" ref={rootRef} data-testid="generated-downloads">
+      <button
+        type="button"
+        data-testid="export-toggle"
+        aria-expanded={open}
+        aria-haspopup="menu"
+        onClick={() => setOpen((v) => !v)}
+        disabled={downloadingId !== null}
+        className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-200 hover:bg-emerald-500/15 disabled:opacity-50"
+      >
+        {downloadingId ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+        Export
+        <ChevronDown className={`h-3.5 w-3.5 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open ? (
+        <div
+          role="menu"
+          className="absolute right-0 top-full z-20 mt-1.5 min-w-[11rem] rounded-xl border border-surface bg-ground py-1 shadow-lg"
+          data-testid="export-menu"
+        >
+          {usable.map((f) => (
+            <button
+              key={f.document_id}
+              type="button"
+              role="menuitem"
+              data-testid={`download-${f.format}`}
+              onClick={() => onDownload(f.document_id)}
+              disabled={downloadingId !== null}
+              title={f.file_name || labelForFormat(f.format)}
+              className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-slate-100 hover:bg-white/5 disabled:opacity-50"
+            >
+              {downloadingId === f.document_id ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : null}
+              {downloadingId === f.document_id ? 'Preparing…' : labelForFormat(f.format)}
+            </button>
+          ))}
+        </div>
+      ) : null}
       {pdfNote ? (
-        <p className="mt-2 text-[12px] text-amber-300/90" role="status">{pdfNote}</p>
+        <p className="mt-2 text-[11px] text-amber-300/90" role="status">{pdfNote}</p>
       ) : null}
       {error ? (
-        <p className="mt-2 text-[12px] text-red-300" role="alert">{error}</p>
+        <p className="mt-2 text-[11px] text-red-300" role="alert">{error}</p>
       ) : null}
     </div>
   );

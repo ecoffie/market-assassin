@@ -21,7 +21,7 @@ import { Menu, MessageCircle, BookOpen, Lock, FileText, X } from 'lucide-react';
 import type { AppTier, AppPanel } from '../UnifiedSidebar';
 import { authedFetch } from '../authHeaders';
 import { ChatAttachments } from '../chat/ChatAttachments';
-import { GeneratedDownloadChips, type GeneratedDownloadFile } from '../chat/GeneratedDownloadChips';
+import type { GeneratedDownloadFile } from '../chat/GeneratedDownloadChips';
 import { ChatReportPreview, type ChatInlineReport } from '../chat/ChatReportPreview';
 import { useVaultCapabilities } from '../chat/useVaultCapabilities';
 import { UpgradeModal } from '../UpgradeModal';
@@ -92,10 +92,15 @@ interface ChatMessage {
 // chat history readable without a backfill migration. Also collapses
 // any trailing space or double-space the strip leaves behind.
 export function renderMessageContent(content: string, asMarkdown = false) {
+  // Export lives in the open report pane — never show vault download paths as chat bullets.
   const cleaned = content
     .replace(/\s*\[→\s*[^\]]+\]\s*/g, ' ')
+    .replace(/^\s*[-*•]\s*(?:\[[^\]]*\]\()?\/?api\/app\/vault\/documents\/download[^\n)]*\)?\s*$/gim, '')
+    .replace(/(?:https?:\/\/[^\s)]+)?\/api\/app\/vault\/documents\/download\?[^\s)]+/gi, '')
     .replace(/ {2,}/g, ' ')
-    .replace(/ ([.,;:!?])/g, '$1');
+    .replace(/ ([.,;:!?])/g, '$1')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
   if (!asMarkdown) return <span className="whitespace-pre-wrap [overflow-wrap:anywhere]">{cleaned}</span>;
   // Assistant answers: the shared SAFE renderer (src/lib/chat/safe-markdown.ts) HTML-escapes the model text
   // first and only then writes its own markup for a small markdown subset (http(s) links only), so this
@@ -695,12 +700,12 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
                       )}
                     </div>
                   )}
-                  {/* The report leads: read it here, no download needed. Files are the secondary action below. */}
+                  {/* Report first; Export lives in the open pane header (Claude/ChatGPT), not under the answer. */}
                   {msg.role === 'assistant' && !msg.isStreaming && !msg.errored && email && msg.report && (
-                    <ChatReportPreview email={email} inline={msg.report} />
+                    <ChatReportPreview email={email} inline={msg.report} files={msg.deliverables} pdfNote={msg.deliverablePdfNote} />
                   )}
                   {msg.role === 'assistant' && !msg.isStreaming && !msg.errored && email && !msg.report && !!msg.deliverables?.length && (
-                    <ChatReportPreview email={email} files={msg.deliverables} />
+                    <ChatReportPreview email={email} files={msg.deliverables} pdfNote={msg.deliverablePdfNote} />
                   )}
                   <div className={`text-[14.5px] leading-relaxed ${msg.errored ? 'text-red-300' : msg.role === 'user' ? 'text-slate-100' : 'text-slate-200'}`}>
                     {msg.content
@@ -711,13 +716,6 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
                         ? <span className="text-faint italic">Thinking…</span>
                         : null}
                   </div>
-                  {msg.role === 'assistant' && !!msg.deliverables?.length && !msg.isStreaming && email && (
-                    <GeneratedDownloadChips
-                      email={email}
-                      files={msg.deliverables}
-                      pdfNote={msg.deliverablePdfNote}
-                    />
-                  )}
                   {msg.role === 'assistant' && !!msg.citations?.length && !msg.isStreaming && (
                     <div className="mt-3 pt-3 border-t border-surface/50">
                       <div className="text-[10px] font-semibold tracking-wider text-faint mb-1.5">SOURCES</div>
