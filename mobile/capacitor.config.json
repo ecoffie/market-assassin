@@ -1,0 +1,43 @@
+{
+  "appId": "ai.getmindy.app",
+  "appName": "Mindy",
+  "webDir": "www",
+  "server": {
+    "url": "https://getmindy.ai/app",
+    "cleartext": false,
+    "errorPath": "offline.html",
+    "allowNavigation": [
+      "getmindy.ai",
+      "*.getmindy.ai",
+      "mi.govcongiants.com"
+    ]
+  },
+  "appendUserAgent": "MindyApp",
+  "backgroundColor": "#1e3a8a",
+  "ios": {
+    "contentInset": "always",
+    "limitsNavigationsToAppBoundDomains": false
+  },
+  "android": {
+    "allowMixedContent": false
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 1200,
+      "backgroundColor": "#1e3a8a",
+      "showSpinner": false,
+      "androidScaleType": "CENTER_CROP"
+    },
+    "StatusBar": {
+      "style": "DARK",
+      "backgroundColor": "#1e3a8a"
+    },
+    "PushNotifications": {
+      "presentationOptions": [
+        "badge",
+        "sound",
+        "alert"
+      ]
+    }
+  }
+}

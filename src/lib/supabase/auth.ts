@@ -1,6 +1,7 @@
 'use client';
 
 import { getSupabase } from './client';
+import { isNativeApp, openInSystemBrowser, withNativeFlag } from '@/lib/native/platform';
 import type { User, Session } from '@supabase/supabase-js';
 
 export interface AuthResult {
@@ -181,10 +182,16 @@ export async function signInWithGoogle(redirectTo?: string): Promise<{ success: 
   }
 
   try {
-    const { error } = await supabase.auth.signInWithOAuth({
+    // Inside the Mindy iOS/Android app, Google refuses WebView sign-in, so the
+    // provider page opens in the system browser and /app/auth/callback?native=1
+    // deep-links the session back into the app (src/lib/native/platform.ts).
+    const native = isNativeApp();
+    const baseRedirect = redirectTo || `${window.location.origin}/app/auth/callback`;
+    const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: redirectTo || `${window.location.origin}/app/auth/callback`,
+        redirectTo: native ? withNativeFlag(baseRedirect) : baseRedirect,
+        skipBrowserRedirect: native,
         queryParams: {
           access_type: 'offline',
           prompt: 'consent',
@@ -194,6 +201,10 @@ export async function signInWithGoogle(redirectTo?: string): Promise<{ success: 
 
     if (error) {
       return { success: false, error: error.message };
+    }
+
+    if (native && data?.url) {
+      await openInSystemBrowser(data.url);
     }
 
     return { success: true };
@@ -213,10 +224,16 @@ export async function signInWithMicrosoft(redirectTo?: string): Promise<{ succes
   }
 
   try {
-    const { error } = await supabase.auth.signInWithOAuth({
+    // Inside the Mindy iOS/Android app, Google refuses WebView sign-in, so the
+    // provider page opens in the system browser and /app/auth/callback?native=1
+    // deep-links the session back into the app (src/lib/native/platform.ts).
+    const native = isNativeApp();
+    const baseRedirect = redirectTo || `${window.location.origin}/app/auth/callback`;
+    const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'azure',
       options: {
-        redirectTo: redirectTo || `${window.location.origin}/app/auth/callback`,
+        redirectTo: native ? withNativeFlag(baseRedirect) : baseRedirect,
+        skipBrowserRedirect: native,
         scopes: 'email profile openid',
         // Force Microsoft to show the account picker EVERY time. Without this,
         // Microsoft silently reuses whichever account is already active in the
@@ -231,6 +248,10 @@ export async function signInWithMicrosoft(redirectTo?: string): Promise<{ succes
 
     if (error) {
       return { success: false, error: error.message };
+    }
+
+    if (native && data?.url) {
+      await openInSystemBrowser(data.url);
     }
 
     return { success: true };
@@ -250,10 +271,16 @@ export async function signInWithApple(redirectTo?: string): Promise<{ success: b
   }
 
   try {
-    const { error } = await supabase.auth.signInWithOAuth({
+    // Inside the Mindy iOS/Android app, Google refuses WebView sign-in, so the
+    // provider page opens in the system browser and /app/auth/callback?native=1
+    // deep-links the session back into the app (src/lib/native/platform.ts).
+    const native = isNativeApp();
+    const baseRedirect = redirectTo || `${window.location.origin}/app/auth/callback`;
+    const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'apple',
       options: {
-        redirectTo: redirectTo || `${window.location.origin}/app/auth/callback`,
+        redirectTo: native ? withNativeFlag(baseRedirect) : baseRedirect,
+        skipBrowserRedirect: native,
         // Apple only returns name on the FIRST authorization; email is always
         // present (may be a private relay address the user chose to share).
         scopes: 'name email',
@@ -262,6 +289,10 @@ export async function signInWithApple(redirectTo?: string): Promise<{ success: b
 
     if (error) {
       return { success: false, error: error.message };
+    }
+
+    if (native && data?.url) {
+      await openInSystemBrowser(data.url);
     }
 
     return { success: true };
