@@ -63,7 +63,9 @@ function builder(table: string) {
 
 vi.mock('@supabase/supabase-js', () => ({ createClient: () => ({ from: (t: string) => builder(t) }) }));
 const reported: Array<{ job: string; outcome: string; summary?: string }> = [];
-vi.mock('@/lib/cron-self-report', () => ({
+vi.mock('@/lib/cron-self-report', async (importOriginal) => ({
+  // The real HTTP mapping the route answers with (200 / 503 partial / 500).
+  cronOutcomeHttpStatus: (await importOriginal<typeof import('@/lib/cron-self-report')>()).cronOutcomeHttpStatus,
   // The exact (job, outcome, errorSummary) the dispatcher-watchdog later reads from cron_job_runs.
   reportCronOutcome: vi.fn(async (job: string, outcome: string, summary?: string) => { reported.push({ job, outcome, summary }); }),
 }));
@@ -110,7 +112,8 @@ describe('saved-search-alerts — one malformed stored search', () => {
     // Reported by id + a specific class, not an anonymous unexpected_schedule_error.
     expect(body.failuresByClass).toEqual({ invalid_saved_filters: 1 });
     expect(body.failedSearches).toEqual([{ id: MALFORMED_ID, failureClass: 'invalid_saved_filters' }]);
-    expect(body.outcome).toBe('error');
+    expect(body.outcome).toBe('partial');
+    expect(res.status).toBe(503);
     expect(body.processed).toBe(2);
 
     // The valid search still sent and stamped.
@@ -133,7 +136,7 @@ describe('send-guard blocks are classified by REASON, not collapsed into one "re
     state.blockReason = 'suppressed:hard_bounce';
     const body = await (await dispatch()).json();
     expect(body.failuresByClass).toEqual({ recipient_suppressed: 1 });
-    expect(reported).toEqual([{ job: 'saved-search-alerts', outcome: 'error', summary: 'recipient_suppressed=1' }]);
+    expect(reported).toEqual([{ job: 'saved-search-alerts', outcome: 'success', summary: 'recipient_suppressed=1' }]);
     expect(state.updates).toHaveLength(0);
   });
 
