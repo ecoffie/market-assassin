@@ -36,6 +36,12 @@ export interface SbloContactToolResult {
     grounded: boolean;
     degraded: boolean;
     match_type: 'exact' | 'contains' | 'none';
+    /**
+     * Set when the name resembled records but NO contact was returned (they are in candidates[]):
+     * `ambiguous` = a shortened name that starts several companies' names; `different_legal_name` =
+     * the records differ by extra words, so they are other legal entities. Ask which company was meant.
+     */
+    no_match_reason?: 'ambiguous' | 'different_legal_name';
     matched_from: SbloSource | null;
     has_named_sblo: boolean;
     has_email: boolean;
@@ -117,6 +123,7 @@ export async function getSbloContact(input: SbloContactToolInput): Promise<SbloC
       // bq_degraded + incomplete_reason instead of turning the whole result into "unavailable".
       degraded: bqDegraded && !hasRegisteredPoc,
       match_type: res.matchType,
+      ...(res.noMatchReason ? { no_match_reason: res.noMatchReason } : {}),
       matched_from: c?.matched_from ?? null,
       has_named_sblo: hasNamedSblo,
       has_email: hasEmail,
@@ -146,6 +153,8 @@ export async function getSbloContact(input: SbloContactToolInput): Promise<SbloC
     result._ai_hint = {
       summary: hasRegisteredPoc && !hasNamedSblo
         ? `No curated SBLO for "${company}". ${registered!.company} lists these people on its SAM registration (${REGISTERED_POC_LABEL}): ${registered!.contacts.map((p) => `${p.name}${p.title ? `, ${p.title}` : ''}`).join('; ')}. As of ${registered!.as_of ?? 'unknown date'}.`
+        : res.noMatchReason
+        ? `No contact returned for "${company}": ${res.noMatchReason === 'ambiguous' ? 'the name starts several companies\' names' : 'the closest records are differently named legal entities'} (${res.candidates.map((x) => x.company).join('; ')}). Ask which company was meant; do not use another company's contact.`
         : res.bqDegraded
         ? `No curated SBLO for "${company}", and the live award-context lookup was unavailable — treat as temporarily down, not as "no such prime". Retry shortly.`
         : !grounded

@@ -58,8 +58,58 @@ export interface SbloLookupResult {
   /** Other close name matches, so the caller can disambiguate. */
   candidates: Array<{ company: string; matched_from: SbloSource }>;
   matchType: 'exact' | 'contains' | 'none';
+  /**
+   * Why a name that resembled a record returned NO contact (candidates[] lists them):
+   *   ambiguous            — a shortened name that starts several different companies' names;
+   *   different_legal_name — the records differ from the name asked about by extra words: a record's
+   *                          name is only the start of it ("Leidos Health" vs "Leidos"), or a FULL
+   *                          legal name (with LLC / Inc / Corp) is only the start of a record's name
+   *                          ("Eagle Integrated LLC" vs "Eagle Integrated Services, LLC"). A different
+   *                          legal entity is never assumed to be the same one.
+   */
+  noMatchReason?: 'ambiguous' | 'different_legal_name';
   /** Set by the enriched lookup when the BigQuery fallback errored (surface as degraded). */
   bqDegraded?: boolean;
+}
+
+/**
+ * How a normalized company name relates to a record's normalized name, by whole WORDS.
+ *   exact         — same words.
+ *   query_prefix  — the name asked about is the record's first words ("NORTHROP" → "NORTHROP GRUMMAN"):
+ *                   a shortened name for that company.
+ *   record_prefix — the record's words are only the start of the name asked about ("LEIDOS" vs
+ *                   "LEIDOS HEALTH"): a different legal entity.
+ * Never a character substring: that matched "CA INC." inside "ATLAS TECHNICAL" and "NOVA GROUP" inside
+ * "INNOVATIONS" — 246 of 1,200 realistic small-firm names returned another company (2026-11-21).
+ */
+export function companyNameRelation(target: string, record: string): 'exact' | 'query_prefix' | 'record_prefix' | null {
+  if (!target || !record) return null;
+  if (target === record) return 'exact';
+  const t = target.split(' ');
+  const r = record.split(' ');
+  const startsWith = (long: string[], short: string[]) => short.length < long.length && short.every((w, i) => long[i] === w);
+  if (startsWith(r, t)) return 'query_prefix';
+  if (startsWith(t, r)) return 'record_prefix';
+  return null;
+}
+
+/** Legal-entity words: a name that carries one is a FULL legal name, so only an exact match is that company. */
+const LEGAL_ENTITY_WORDS = new Set(['INC', 'INCORPORATED', 'LLC', 'LLP', 'LP', 'CORP', 'CORPORATION', 'CO', 'COMPANY', 'LTD', 'LIMITED']);
+export function hasLegalEntityWord(raw: string): boolean {
+  return (raw || '').toUpperCase().replace(/[^A-Z0-9\s]/g, ' ').split(/\s+/).some((t) => LEGAL_ENTITY_WORDS.has(t));
+}
+
+/**
+ * The one record a shortened name stands for, or none. Roster rows (the canonical 200) win when exactly
+ * one roster company starts with the name; otherwise exactly one distinct company must.
+ */
+function pickUniquePrefix<T extends { norm: string; source: SbloSource }>(matches: T[]): T | null {
+  const distinct = (xs: T[]) => [...new Map(xs.map((x) => [x.norm, x])).values()];
+  const roster = distinct(matches.filter((x) => x.source === 'roster'));
+  if (roster.length === 1) return roster[0];
+  if (roster.length > 1) return null;
+  const all = distinct(matches);
+  return all.length === 1 ? all[0] : null;
 }
 
 interface RosterRow extends SbloProvenanceFields {
@@ -162,20 +212,32 @@ export function lookupSbloContact(companyName: string): SbloLookupResult {
     return { contact: exact.contact, candidates, matchType: 'exact' };
   }
 
-  // 2. Contains match either direction (guard against 1-token over-match).
-  const contains = indexed.filter(
-    (x) => target.length >= 4 && (x.norm.includes(target) || target.includes(x.norm)),
-  );
-  if (contains.length > 0) {
-    // Best = shortest normalized name (closest to the query), roster preferred by order.
-    contains.sort((a, b) => a.norm.length - b.norm.length);
-    const best = contains[0];
-    const candidates = contains
-      .slice(1, 6)
-      .map((x) => ({ company: x.contact.company, matched_from: x.contact.matched_from }));
+  // 2. A shortened name ("Northrop") stands for a company only when it is that company's first WORDS and
+  //    picks exactly one company. Ambiguous or longer-than-record names return NO contact, with the
+  //    resembling records listed so the caller can ask — never another company's liaison.
+  if (target.length < 4) return { contact: null, candidates: [], matchType: 'none' };
+  const related = indexed
+    .map((x) => ({ ...x, source: x.contact.matched_from, rel: companyNameRelation(target, x.norm) }))
+    .filter((x) => x.rel === 'query_prefix' || x.rel === 'record_prefix');
+  const toCandidate = (x: Indexed) => ({ company: x.contact.company, matched_from: x.contact.matched_from });
+  const prefixed = related.filter((x) => x.rel === 'query_prefix').sort((a, b) => a.norm.length - b.norm.length);
+  // A shortened name only when the user gave no legal-entity word; "X LLC" names one exact entity.
+  const legalName = hasLegalEntityWord(companyName);
+  const best = legalName ? null : pickUniquePrefix(prefixed);
+  if (best) {
+    const candidates = prefixed.filter((x) => x.norm !== best.norm).slice(0, 5).map(toCandidate);
     return { contact: best.contact, candidates, matchType: 'contains' };
   }
-
+  if (prefixed.length) {
+    return {
+      contact: null, candidates: prefixed.slice(0, 5).map(toCandidate), matchType: 'none',
+      noMatchReason: legalName ? 'different_legal_name' : 'ambiguous',
+    };
+  }
+  const shorter = related.filter((x) => x.rel === 'record_prefix');
+  if (shorter.length) {
+    return { contact: null, candidates: shorter.slice(0, 5).map(toCandidate), matchType: 'none', noMatchReason: 'different_legal_name' };
+  }
   return { contact: null, candidates: [], matchType: 'none' };
 }
 
@@ -192,8 +254,10 @@ export function lookupSbloContact(companyName: string): SbloLookupResult {
  */
 export async function lookupSbloContactEnriched(companyName: string): Promise<SbloLookupResult> {
   const curated = lookupSbloContact(companyName);
-  // Curated SBLO wins — the hand-verified name/email is the moat, BQ can't reproduce it.
-  if (curated.matchType !== 'none') return curated;
+  // Curated SBLO wins — the hand-verified name/email is the moat, BQ can't reproduce it. A curated name
+  // that only RESEMBLED records (ambiguous / longer than a record) is not passed to BigQuery either: the
+  // same resemblance there would pick a company the user did not name.
+  if (curated.matchType !== 'none' || curated.noMatchReason) return curated;
 
   const target = normalizeCompany(companyName);
   if (!target || target.length < 4) return curated; // too short to name-match a prime safely
@@ -202,18 +266,18 @@ export async function lookupSbloContactEnriched(companyName: string): Promise<Sb
     const { rows } = await searchRecipients({ search: companyName, liveBq: true, sortBy: 'total_obligated', limit: 8 });
     if (!rows.length) return curated;
 
-    // BQ search is a substring LIKE — pick the closest by normalized name, same rule as
-    // the static contains tier (exact, else shortest name that contains/is-contained).
+    // BQ search is a substring LIKE — keep only an exact name, else ONE company whose name starts with
+    // the words asked about (same whole-word rule as the curated tier). Anything else is a miss.
     const scored = rows
-      .map((r) => ({ r, norm: normalizeCompany(r.recipient_name) }))
+      .map((r) => ({ r, norm: normalizeCompany(r.recipient_name), source: 'bigquery' as const }))
       .filter((x) => x.norm);
     const exact = scored.find((x) => x.norm === target);
-    const near = exact
-      ? [exact]
-      : scored
-          .filter((x) => x.norm.includes(target) || target.includes(x.norm))
-          .sort((a, b) => a.norm.length - b.norm.length);
-    if (near.length === 0) return curated; // only loosely-related primes — honest miss
+    const prefixed = scored
+      .filter((x) => companyNameRelation(target, x.norm) === 'query_prefix')
+      .sort((a, b) => a.norm.length - b.norm.length);
+    const unique = exact ?? (hasLegalEntityWord(companyName) ? null : pickUniquePrefix(prefixed));
+    const near = unique ? [unique, ...prefixed.filter((x) => x.norm !== unique.norm)] : [];
+    if (near.length === 0) return curated; // only loosely-related or ambiguous recipients — honest miss
 
     const best = near[0];
     const contact: SbloContact = {
