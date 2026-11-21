@@ -2,12 +2,18 @@ import { describe, expect, it, vi } from 'vitest';
 
 const loaders = vi.hoisted(() => ({
   bidder: {} as Record<string, unknown>,
+  settingsStatus: 'ok' as 'ok' | 'empty' | 'unavailable',
   vault: { has_any: false } as Record<string, unknown>,
   calls: [] as Array<{ fn: string; args: unknown[] }>,
 }));
 vi.mock('@/lib/proposal/loaders', () => ({
   ALL_VAULT_SECTIONS: ['identity', 'past_performance', 'capabilities', 'team'],
-  loadBidderProfile: async (...args: unknown[]) => { loaders.calls.push({ fn: 'loadBidderProfile', args }); return loaders.bidder; },
+  loadBidderProfileResult: async (...args: unknown[]) => {
+    loaders.calls.push({ fn: 'loadBidderProfileResult', args });
+    return loaders.settingsStatus === 'unavailable'
+      ? { status: 'unavailable', profile: {}, error: 'query error' }
+      : { status: loaders.settingsStatus, profile: loaders.bidder };
+  },
   loadVaultContext: async (...args: unknown[]) => { loaders.calls.push({ fn: 'loadVaultContext', args }); return loaders.vault; },
 }));
 
@@ -96,14 +102,14 @@ describe('parseMoney', () => {
 describe('loadCompanyProfile: owner resolution through the strict acting-scope resolver', () => {
   const req = (workspace?: string) => ({ headers: { get: (k: string) => (k === 'x-active-workspace' ? workspace ?? null : null) } });
   const readOwners = () => [...new Set(loaders.calls.map((c) => c.args[0]))];
-  const reset = () => { loaders.bidder = BIDDER; loaders.vault = VAULT; loaders.calls = []; };
+  const reset = () => { loaders.bidder = BIDDER; loaders.vault = VAULT; loaders.calls = []; loaders.settingsStatus = 'ok'; };
 
   it('own scope: reads only the verified caller\'s Vault, all sections, through the two existing loaders', async () => {
     reset();
     const scope = await resolveChatActingScope('Me@Example.com', req());
     const r = await loadCompanyProfile(scope);
     expect(r).toMatchObject({ status: 'ok', workspace: 'own', profile: { companyName: 'Example Staffing LLC' } });
-    expect(loaders.calls.map((c) => c.fn).sort()).toEqual(['loadBidderProfile', 'loadVaultContext']);
+    expect(loaders.calls.map((c) => c.fn).sort()).toEqual(['loadBidderProfileResult', 'loadVaultContext']);
     expect(loaders.calls.find((c) => c.fn === 'loadVaultContext')?.args[2]).toEqual({ sections: ['identity', 'past_performance', 'capabilities', 'team'] });
     expect(readOwners()).toEqual(['me@example.com']);
   });
@@ -130,5 +136,37 @@ describe('loadCompanyProfile: owner resolution through the strict acting-scope r
     expect(scope.kind).toBe('unavailable');
     expect(await loadCompanyProfile(scope)).toEqual({ status: 'refused', reason: 'workspace_unconfirmed' });
     expect(loaders.calls).toEqual([]);
+  });
+});
+
+describe('failed reads are unavailable, not unknown (#2265)', () => {
+  it('a failed Vault section marks only its absent fields unavailable; other absent fields stay unknown', () => {
+    const p = buildCompanyProfile({ bidder: {}, vault: { has_any: true, identity: { legal_name: 'Example Staffing Co' }, unavailable: ['past_performance'] } });
+    expect(p.unavailable).toEqual(['keywords', 'pastPerformance']);
+    expect(p.unknown).not.toContain('pastPerformance');
+    expect(p.unknown).not.toContain('keywords');
+    expect(p.unknown).toContain('uei'); // identity was read fine; it just has no UEI
+  });
+
+  it('a field with a surviving source that filled it is not unavailable', () => {
+    // settings failed, but identity supplied NAICS: naicsCodes is known; target agencies (settings-only) are unavailable.
+    const p = buildCompanyProfile({ bidder: {}, vault: { has_any: true, identity: { primary_naics: ['561320'] } }, settingsUnavailable: true });
+    expect(p.naicsCodes).toEqual(['561320']);
+    expect(p.unavailable).toEqual(['states', 'targetAgencies', 'targetSetAsides']);
+    expect(p.unknown).not.toContain('targetAgencies');
+  });
+
+  it('nothing failed: no unavailable field at all', () => {
+    const p = buildCompanyProfile({ bidder: {}, vault: { has_any: false } });
+    expect(p).not.toHaveProperty('unavailable');
+  });
+
+  it('loadCompanyProfile marks settings-only fields unavailable when the settings read fails', async () => {
+    loaders.bidder = {}; loaders.vault = { has_any: false }; loaders.calls = []; loaders.settingsStatus = 'unavailable';
+    const scope = await resolveChatActingScope('me@example.com', { headers: { get: () => null } });
+    const r = await loadCompanyProfile(scope);
+    if (r.status !== 'ok') throw new Error('expected ok');
+    expect(r.profile.unavailable).toEqual(['naicsCodes', 'states', 'targetAgencies', 'targetSetAsides']);
+    loaders.settingsStatus = 'ok';
   });
 });
