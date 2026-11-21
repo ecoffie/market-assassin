@@ -2,6 +2,12 @@
 
 Nov 21, 2026 · @Eric
 
+> **Redactions (this repository is public).** Client-identifying details in the original were replaced; requirements, scoring weights, skills, tools, build order and acceptance criteria are unchanged.
+> - Section 9 test-set example: the client company name, city and two client contract examples are replaced with an illustrative staffing company and illustrative contracts.
+> - Section 3 user-profile table: an engagement nickname for a past-performance rule is replaced with a plain description of the rule (the same rule as section 2, RULES OF THE TRADE: low federal prime totals do not mean a small company).
+> - Section 5 Event plan: a format named after a specific event engagement is replaced with "the standard one-page format"; the listed contents are unchanged.
+> - Section 6: a link to a private internal document is replaced with a note that it is internal.
+
 ## Goal and how a question flows
 
 A user types one plain sentence into Ask Mindy and gets a finished answer about their own company: the top picks, why each fits, who to contact and the next move. They should never need to know which tool to call, what a NAICS code is, or to ask a follow-up to see the results.
@@ -56,6 +62,7 @@ WRITING
 - Plain words. Spell out names before abbreviations. No em dashes. Short sentences.
 - No filler, no restating the question, no "here's what I found."
 - Never mention other GovCon data platforms. Cite primary sources (SAM.gov, USASpending, GAO, agency pages).
+- Never mention Mindy plans, prices, seats or upgrades in an answer. Pricing lives on the pricing page, not in market intelligence.
 ```
 
 ## User profile: loaded before every answer
@@ -70,7 +77,7 @@ The profile is built once at signup from a UEI or website and refreshed weekly. 
 | Certifications: 8(a), HUBZone, WOSB, SDVOSB, VOSB, with dates and self-reported vs SBA-certified | SAM.gov plus SBA certification search | Set-aside eligibility |
 | Owner and contacts | SAM.gov and SBA profile | Drafts and outreach |
 | Capabilities narrative and keywords | SBA Small Business Search profile | Keyword matching, readiness check |
-| Past performance (prime, sub, commercial, state and local) | Federal award data, SBA profile, user uploads to the Vault | Relevance, "Lunacon rule" |
+| Past performance (prime, sub, commercial, state and local) | Federal award data, SBA profile, user uploads to the Vault | Relevance, and judging size by subcontract, joint venture and commercial work, not prime totals alone (illustrative wording; see Redactions) |
 | Contract vehicles held (GSA Schedule, OASIS+, IDIQs) | Federal award data, user entry | Pathway scoring |
 | Target buyers and regions | User entry, inferred from past work | Ranking, alerts |
 | Pursuits and watchlist | User actions in the app | Avoid repeats, track status |
@@ -107,7 +114,7 @@ Each skill is a fixed recipe: the backend recognizes the kind of question, runs 
 | 1 | Where to start (market map) | "What should I go after?" · "Where's the money for us?" | profile → find_opportunities (UEI-anchored) + get_expiring_contracts (profile NAICS, region) + get_agency_forecasts → get_agency_intel (sourced items only) → search_contractors → fit score | Top 5 pathways, each with a pick, why it fits, the buyer's pain point and the next move. Report button = full market map PDF | High |
 | 2 | Profile setup and readiness | "Here's my website" · a UEI · first login | lookup_sam_entity → SBA profile lookup (NEW) → get_contractor_award_history → derive_company_keywords | Saved profile plus a readiness checklist: contacts, SBA keywords, service codes, website | High |
 | 3 | Opportunity deep dive | "Tell me about 36C25027R5412" · clicks a map pin | lookup_solicitation → get_solicitation_documents → get_solicitation_incumbent or find_predecessor_award → understand_customer → evaluate_bid_decision | Pursue or pass with conditions, incumbent and price history, what the buyer cares about, the question to ask the contracting officer | High |
-| 4 | Event plan | "I'm going to NVSBE" · an event link | event agenda reader (NEW) → search_federal_events → find_opportunities for each attending agency → lookup_federal_osbp + get_sblo_contact | Gold Coast-format plan: deadline box, pitch, named people with titles and the question for each, labeled Report by Mindy AI | High |
+| 4 | Event plan | "I'm going to NVSBE" · an event link | event agenda reader (NEW) → search_federal_events → find_opportunities for each attending agency → lookup_federal_osbp + get_sblo_contact | Event plan in the standard one-page format (illustrative wording; see Redactions): deadline box, pitch, named people with titles and the question for each, labeled Report by Mindy AI | High |
 | 5 | Buyer brief | "Tell me about the Coast Guard" | get_agency_intel (sourced only) → get_agency_spending_detail → get_agency_forecasts → lookup_federal_osbp → PAE structure feed (NEW, Department of War only) | Pain points with citations, who buys what, set-aside share, small business office contact, PAE owner | High |
 | 6 | Teaming finder | "Who should I team with on this?" | get_solicitation_incumbent → find_capable_contractors → search_contractors → get_sblo_contact (UEI-matched) | Ranked partners: incumbent, likely primes, complementary small firms, each with the question to ask | Medium |
 | 7 | Sources sought response | "Help me answer this RFI" | lookup_solicitation → get_solicitation_documents → extract_compliance_matrix → profile past performance → draft_proposal_section | A draft response mapped to each question, for the user to review | Medium |
@@ -119,7 +126,7 @@ Each skill is a fixed recipe: the backend recognizes the kind of question, runs 
 
 ## Tools: what to add or fix
 
-The recipes are only as good as the tools under them. The full list of 21 fixes, with evidence, is in the [Mindy MCP Fix List](https://claude.ai/artifact/7UbFPzuVaXtLq4QVCxGbR8). These are the ones the recipes depend on.
+The recipes are only as good as the tools under them. The full list of 21 fixes, with evidence, is in the Mindy MCP Fix List (an internal document, not available to repo readers). These are the ones the recipes depend on.
 
 | Tool | Add or fix | What it must do | Recipes it unblocks | Priority |
 | --- | --- | --- | --- | --- |
@@ -195,8 +202,8 @@ The right column shows the pattern. The backend fills it with real items from ea
 | Field | Example |
 | --- | --- |
 | Question | "What should we go after?" |
-| Company profile | Superb Staffing Solutions, Memphis, NAICS 561320, GSA offer in process |
-| Must include | Tennessee staffing contracts coming back (Fort Campbell clerks, Memphis VA lab staffing); GSA Schedule as the pathway; a sourced pain point |
+| Company profile | A staffing company in Tennessee, NAICS 561320, GSA Schedule offer in process (illustrative) |
+| Must include | Tennessee staffing contracts coming back (for example an Army installation clerk contract and a VA medical center lab staffing contract, illustrative); GSA Schedule as the pathway; a sourced pain point |
 | Must not include | Construction notices; unsourced claims; "ask me to list them" |
 | Score | Pass or fail on each line, plus a 1 to 5 grade for usefulness |
 

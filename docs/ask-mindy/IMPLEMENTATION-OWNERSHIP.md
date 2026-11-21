@@ -28,6 +28,14 @@ The calendar is an ordering guide, not a promise of release dates. Ship in narro
 - PR #2234: MCP saved-search alert delivery; shared scheduler impact is YELLOW, not automatic GREEN.
 - Each builder retains its own branch/PR; Agent 4 sequences merge/deployment one by one. No manual production deployments.
 
+## Binding constraints not in the spec (CLAUDE.md and Eric's decisions, 2026-11-21)
+These bind implementation even where the spec lists the item.
+1. **PAE freeze.** The spec lists a PAE structure feed. CLAUDE.md says "PAE later. Do not start." No PAE work until Eric lifts that in writing. Until then, answers name a Portfolio Acquisition Executive only when a tool result names one.
+2. **Agents never contact customers without approval.** The spec's agents (weekly brief, event prep, profile-change notes, pursuit watcher) reach customers. CLAUDE.md rule 8 forbids contacting customers without Eric's explicit instruction. Each agent ships flag-off; activation is RED (Agent 4 plus Eric). Agents draft; users send.
+3. **One shared fit scorer.** The fit scorer is a shared library usable by MCP tools and Ask Mindy chat (CLAUDE.md rule 9). Data Core must not build a second relevance or scoring layer, and chat must not add a second relevance filter.
+4. **Paging must not cut before ranking.** Data Core's result-size limits (summary plus top 25, page the rest) must not drop candidates before the fit scorer ranks them (rank-then-filter). The contract is either the full candidate set or server-side scoring before the cut, then paging by score.
+5. **Price check ownership.** The Price check recipe (spec skill 8) is owned by Ask Mindy; the wage determination lookup tool is owned by Data Core. The section 2 rule against mentioning Mindy plans or prices covers Mindy's own subscription, credits and billing only; it does not limit helping customers estimate government contract pricing.
+
 ## Acceptance contracts
 - Unknown fields stay unknown; never invent company profile or contacts.
 - Forecasts are labeled distinctly from posted solicitations; subcontract awards are not primes.
