@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildUsaJobsBoard, usajobsRowToListing } from './usajobs-direct';
+import { buildUsaJobsBoard, customerJobBoardChoice, usajobsRowToListing } from './usajobs-direct';
 import { mapUSAJob } from './sources';
 
 const item = (id: string, title: string, org: string, extra: Record<string, unknown> = {}) => ({
@@ -22,7 +22,7 @@ const rows = [
   item('1', 'Contract Specialist', 'U.S. Pacific Fleet'),
   item('2', 'Contracting Officer', 'Central Intelligence Agency'),
   item('3', 'Contract Specialist', 'U.S. Pacific Fleet'),
-].map((i) => usajobsRowToListing(mapUSAJob(i as never, 'series:1102')!));
+].map((i) => usajobsRowToListing(mapUSAJob(i as never, 'series:1102')!, '2026-11-21T12:00:00.000Z'));
 
 describe('USAJobs direct board', () => {
   it('counts federal jobs and leaves contractor jobs unknown, never zero', () => {
@@ -42,6 +42,30 @@ describe('USAJobs direct board', () => {
 
   it('maps location, pay and clearance from the USAJobs record', () => {
     expect(rows[0]).toMatchObject({ source: 'usajobs', state: 'VA', city: 'Norfolk', salary_min: 72553, clearance: 'Secret' });
+  });
+
+  it('does not invent a 1970 date when USAJobs omits the posted date', () => {
+    const mapped = mapUSAJob(item('9', 'Contract Specialist', 'Defense Logistics Agency', {
+      PublicationStartDate: '',
+    }) as never, 'series:1102')!;
+    const row = usajobsRowToListing(mapped, '2026-11-21T12:00:00.000Z');
+    expect(row.posted_at).toBeNull();
+    expect(row.first_seen_at).toBe('2026-11-21T12:00:00.000Z');
+  });
+
+  it('a confirmed empty USAJobs read stays empty, and an error does not fall through', () => {
+    const empty = buildUsaJobsBoard([]);
+    expect(empty.state).toBe('ok');
+    expect(empty.totals.active).toBe(0);
+    expect(empty.totals.federal).toBe(0);
+    expect(empty.totals.contractor).toBeNull();
+    expect(customerJobBoardChoice(false, empty)).toBe('direct');
+    expect(customerJobBoardChoice(false, {
+      ...empty,
+      state: 'unavailable',
+      totals: { active: null, contractor: null, federal: null, cleared: null, contingent: null },
+    })).toBe('direct');
+    expect(customerJobBoardChoice(false, null)).toBe('funnels');
   });
 
   it('applies filters: a contractor-only filter shows no federal rows', () => {
