@@ -30,6 +30,8 @@
  *   passthrough          — fetched live, not persisted. NEVER a record count.
  */
 
+import { classifyGaoFreshness, type GaoClocks } from '@/lib/institute/source-clocks';
+
 export type DatasetKind =
   | 'source_corpus'
   | 'derived_intelligence'
@@ -509,6 +511,67 @@ export function classifyDodSbirHealth(input: {
   return {
     state: 'UNKNOWN',
     detail: 'Rows are held. A missing synced_at clock is not current.',
+  };
+}
+
+/**
+ * Source-backed pain points follow the GAO collector's three clocks.
+ * last_evidence_at moves only when a new claim is inserted, so a 24-hour
+ * cadence on that column calls a quiet, healthy day stale.
+ * A missing poll is UNKNOWN. A failed poll is UNREACHABLE. A poll older than
+ * the collector window is STALE. A quiet publication stretch stays CURRENT.
+ */
+export function classifySourcedClaimsFreshness(input: {
+  clocks: GaoClocks | null;
+  pollFailed: boolean;
+  evidenceAt: string | null;
+  now: Date;
+}): { state: FreshnessState; asOf: string | null; basis: string; detail: string } {
+  const judged = classifyGaoFreshness({
+    clocks: input.clocks,
+    now: input.now.toISOString(),
+    pollFailed: input.pollFailed,
+  });
+  const evidence = input.evidenceAt
+    ? `Newest claim recorded ${input.evidenceAt}. That timestamp is not the collector clock.`
+    : 'No claim timestamp is on file. That is not zero claims.';
+  const source = input.clocks?.lastSourceAdvance
+    ? `Newest observed publication date is ${input.clocks.lastSourceAdvance}.`
+    : 'No publication date is on file.';
+  const basis = 'institute-gao-sync last poll, newest GAO publication date, and newest claim. A missing poll is unknown, not stale and not zero.';
+  if (input.pollFailed) {
+    return {
+      state: 'UNREACHABLE',
+      asOf: input.clocks?.lastPoll ?? null,
+      basis,
+      detail: `The latest collector run failed. ${evidence}`,
+    };
+  }
+  if (judged.status === 'unmeasured') {
+    return {
+      state: 'UNKNOWN',
+      asOf: null,
+      basis,
+      detail: `The collector clock was not read. ${evidence}`,
+    };
+  }
+  if (judged.status === 'ingest_broken') {
+    return {
+      state: input.clocks?.lastPoll ? 'STALE' : 'UNREACHABLE',
+      asOf: input.clocks?.lastPoll ?? null,
+      basis,
+      detail: input.clocks?.lastPoll
+        ? `Last poll ${input.clocks.lastPoll} is outside the collector window. ${source} ${evidence}`
+        : `The collector poll failed. ${evidence}`,
+    };
+  }
+  return {
+    state: 'CURRENT',
+    asOf: input.clocks?.lastPoll ?? null,
+    basis,
+    detail: judged.status === 'upstream_quiet'
+      ? `The collector is polling. GAO has not published inside the quiet window. ${source} ${evidence}`
+      : `The collector polled and the publication date is inside the quiet window. ${source} ${evidence}`,
   };
 }
 
