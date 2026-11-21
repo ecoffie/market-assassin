@@ -1,0 +1,26 @@
+{
+  "target_uei": "VMRTJLWMQRH7",
+  "acquirer_name": "Tetra Tech, Inc.",
+  "change_of_controlling_interest": {
+    "status": "unknown",
+    "note": "Tetra Tech's 10-Q (quarter ended 2026-03-29) states 'we acquired Halvik Corp'. The legal entity that changed controlling interest (Halvik Corp vs HALVIK, LLC, UEI VMRTJLWMQRH7) and the transaction structure are not established."
+  },
+  "transaction_date": {
+    "status": "unknown",
+    "note": "No public source checked states the date the acquisition occurred. The announcement date and the 10-Q quarter are recorded under 'informational' and are deliberately NOT used."
+  },
+  "acquirer_size_by_naics": {},
+  "recertification_outcome_by_award": {},
+  "eight_a_ownership_or_control_relinquished": { "status": "unknown" },
+  "eight_a_waiver_status": { "status": "unknown" },
+  "partial_portion_by_award": {},
+  "g2_option_conditions_by_award": {},
+  "pending_offers": { "status": "unknown", "note": "Offers are not published in federal award data." },
+  "informational": {
+    "announcement_date": "2026-01-22",
+    "announcement_source": "Tetra Tech press release 'Tetra Tech Acquires Halvik Corp' (states 'has acquired'; no closing date)",
+    "reported_acquisition_window": { "from": "2025-12-29", "to": "2026-03-29", "source": "Tetra Tech Form 10-Q, quarter ended 2026-03-29: 'In the second quarter of fiscal 2026, we acquired Halvik Corp'" },
+    "eight_a_graduation_reported": { "date": "2024-01-23", "source": "secondary contractor profile (HigherGov); not primary" },
+    "federal_record_parent": "FPDS reports recipient_parent_uei = VMRTJLWMQRH7 (Halvik itself) on every action through 2026-10-01"
+  }
+}
