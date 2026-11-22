@@ -63,6 +63,18 @@ export function sectorSubTradeKeywords(keyword: string): string[] | null {
 // performers). NOT a guess.
 export const TERM_OF_ART_EXPANSIONS: { match: RegExp; keywords: string[]; pscCodes?: string[]; naicsCodes?: string[] }[] = [
   {
+    // HOSPITAL / MEDICAL-FACILITY CONSTRUCTION & RENOVATION — PSC-PINNED (2026-11-22, VA construction report).
+    // The phrase measured nothing literally and fell to the generic construction sector expansion (11 trades,
+    // 163 NAICS incl. highways, top PSC Y1NZ utilities) — not hospital work. "What was bought" is the PSC
+    // D-family for hospitals/infirmaries: Y1DA construction, Z1DA maintenance, Z2DA repair/alteration.
+    // ⚠️ Live USASpending verification of these codes is pending (Agent 4 / Claude Local) — see the PR.
+    // Requires a construction word, so "hospital staffing" / "medical center IT" never pin construction PSCs.
+    match: /\b(hospital|hospitals|medical\s+cent(er|re)s?|vamc|infirmar(y|ies)|clinics?)\b[^.]{0,40}\b(construct\w*|renovat\w*|alteration\w*|repairs?|build-?out|remodel\w*)\b|\b(construct\w*|renovat\w*|alteration\w*|repairs?|build-?out|remodel\w*)\b[^.]{0,40}\b(hospital|hospitals|medical\s+cent(er|re)s?|vamc|infirmar(y|ies)|clinics?)\b/i,
+    keywords: ['hospital construction', 'hospital renovation'],
+    pscCodes: ['Y1DA', 'Z1DA', 'Z2DA'],
+    naicsCodes: ['236220'],
+  },
+  {
     // Counter-UAS / drone defense — a distinct market from UAS itself. Checked BEFORE UAS.
     match: /\b(c-?uas|counter-?uas|counter-?drones?|drone\s+defense)\b/i,
     keywords: ['counter-UAS', 'counter-drone', 'C-UAS', 'drone defense'],

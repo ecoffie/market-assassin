@@ -22,6 +22,7 @@
  * PDF = the hosted page's Save-as-PDF (server-side HTML→PDF would need Chromium in
  * the lambda; puppeteer is a devDependency). See tasks/one-shot-tools-plan.md.
  */
+import { termOfArtNaicsCodes } from '@/lib/market/sector-expansions';
 import { keywordCoverage, codeMarketSize, marketKeywords, type KeywordCoverage } from '@/lib/market/keyword-coverage';
 import { detectUndercount } from '@/lib/market/undercount-signal';
 import { resolveMarketScope, filtersForScope, fetchSpendingCategory, buildSpendingFilters } from '@/lib/market/spend-query';
@@ -181,7 +182,7 @@ export interface MarketReportSummary {
    * disclosure that the headline is national while the sections are not.
    */
   total_market_basis?: {
-    source: 'lead_naics_code' | 'keyword_description_match' | 'explicit_code';
+    source: 'lead_naics_code' | 'keyword_description_match' | 'explicit_code' | 'psc_term_of_art';
     window: string | null;
     state_scoped: boolean;
     requested_state: string | null;
@@ -477,9 +478,18 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
     !keyword && naicsCodes.length
       ? await runSection(codeMarketSize({ naics: naicsCodes[0], strict: true }), (m) => !!m && (m.totalMarket ?? 0) > 0)
       : { status: 'empty', value: null };
-  const marketSize = keyword ? coverage : codeSizeOutcome.value;
+  // TERM-OF-ART PSC PIN (2026-11-22): when the keyword is a pinned term of art ("hospital construction"),
+  // the market IS those PSCs — "what was bought" — scoped to the named agency. The keyword's description
+  // match (which fell to generic construction trades) is NOT the market, so it is neither the headline
+  // nor the required measurement.
+  const pinnedPsc = coverage?.pinnedPscCodes?.length ? coverage.pinnedPscCodes : null;
+  const pinnedOutcome: SectionOutcome<Awaited<ReturnType<typeof codeMarketSize>>> = pinnedPsc
+    ? await runSection(codeMarketSize({ pscCodes: pinnedPsc, agency: agency || undefined, strict: true }), (m) => !!m && (m.totalMarket ?? 0) > 0)
+    : { status: 'empty', value: null };
+  const pinnedSize = pinnedPsc ? pinnedOutcome.value : null;
+  const marketSize = pinnedPsc ? pinnedSize : keyword ? coverage : codeSizeOutcome.value;
   /** The outcome of the REQUIRED market measurement for THIS report's axis. */
-  const requiredMeasurement: SectionOutcome<unknown> = keyword ? coverageOutcome : codeSizeOutcome;
+  const requiredMeasurement: SectionOutcome<unknown> = pinnedPsc ? pinnedOutcome : keyword ? coverageOutcome : codeSizeOutcome;
 
   // Resolve the market scope through the SHARED decision (src/lib/market/spend-query),
   // so this report's "Who is buying" is the IDENTICAL query the in-app FPDS
@@ -517,6 +527,10 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
   // The keyword axis's subject boundary (see the recompetes section below): the ~90% coverage set.
   const subjectNaicsSet: string[] = naicsCodes.length
         ? naicsCodes
+        // A pinned term of art carries its own curated industry codes (hospital construction → 236220);
+        // the description-match coverage set (generic trades) is not this market.
+        : pinnedPsc && termOfArtNaicsCodes(keyword)?.length
+          ? termOfArtNaicsCodes(keyword)!
         // Use the ~90% COVERAGE SET, not the full measured tail. The tail of a
         // multi-trade family carries long-tail noise — a construction family
         // measures 187 NAICS, of which 314910 textiles (0.004%) and 339112/339113
@@ -711,7 +725,8 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
    * can see the gap the keyword leaves, never to be quoted as the market size.
    */
   const sizeTiers: MarketSizeTier[] | null = await (async () => {
-    if (!keyword || !coverage) return null;
+    // A pinned market is measured by PSC; the keyword tiers describe a different (description-match) market.
+    if (!keyword || !coverage || pinnedPsc) return null;
     const expanded = marketKeywords(keyword);
     // Do not treat coverage.allNaics[0] as the surrounding industry. That is Senses /
     // identity. Size tiers stay on the keyword measurements.
@@ -805,7 +820,9 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
    * customer seeing both figures without labels reads a contradiction.
    */
   const totalMarketBasis = (() => {
-    const source = dominantSize?.totalMarket
+    const source = pinnedPsc
+      ? (pinnedSize ? ('psc_term_of_art' as const) : null)
+      : dominantSize?.totalMarket
       ? ('lead_naics_code' as const)
       : coverage?.totalMarket
         ? ('keyword_description_match' as const)
@@ -816,7 +833,8 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
     return {
       source,
       /** Measurement window for THIS number — not the sections' window. */
-      window: coverage?.windowLabel
+      window: (pinnedPsc ? pinnedSize?.windowLabel : null)
+        ?? coverage?.windowLabel
         ?? (dominantSize && 'windowLabel' in dominantSize ? dominantSize.windowLabel : null)
         ?? (marketSize && 'windowLabel' in marketSize ? (marketSize as { windowLabel?: string }).windowLabel ?? null : null),
       /**
@@ -826,7 +844,8 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
       state_scoped: false,
       requested_state: state ?? null,
       // Nor is it agency-scoped: keywordCoverage / codeMarketSize ignore the agency (VA report 2026-11-22).
-      agency_scoped: false,
+      // The PSC-pinned headline IS measured for the named agency (codeMarketSize agency filter).
+      agency_scoped: Boolean(pinnedPsc && agency),
       requested_agency: agency || null,
       /** What resolved identity when the literal phrase measured nothing (RC-1). */
       identity_resolved_via: coverage?.identityResolvedVia ?? null,
@@ -840,11 +859,13 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
     size_tiers: sizeTiers,
     undercount_note: undercountNote,
     // Dominant keyword → the lead code's total (same basis as every section below).
-    total_market: dominantSize?.totalMarket
+    total_market: pinnedPsc
+      ? (pinnedSize?.totalMarket ?? null)
+      : dominantSize?.totalMarket
       ?? coverage?.totalMarket
       ?? (marketSize && 'totalMarket' in marketSize ? marketSize.totalMarket : marketSize && 'total_market' in marketSize ? (marketSize as { total_market: number }).total_market : null),
-    naics_count: coverage?.naicsCount ?? null,
-    top_psc: coverage?.topPsc ?? (marketSize && 'topPsc' in marketSize ? (marketSize as { topPsc: { code: string; name: string } | null }).topPsc : null),
+    naics_count: pinnedPsc ? null : (coverage?.naicsCount ?? null),
+    top_psc: pinnedPsc ? (pinnedSize?.topPsc ?? null) : coverage?.topPsc ?? (marketSize && 'topPsc' in marketSize ? (marketSize as { topPsc: { code: string; name: string } | null }).topPsc : null),
     buying_agencies: topAgencies.length,
     top_contractors: contractors.length,
     recompetes: contracts.length,
@@ -877,7 +898,7 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
     ? [...coverage.allNaics].sort((a, b) => b.amount - a.amount)[0]
     : null;
   const reconciliation: MarketReconciliation | null =
-    coverage && biggest && !scope?.rankedByDominantNaics
+    coverage && biggest && !pinnedPsc && !scope?.rankedByDominantNaics
       && coverage.totalMarket > 0 && coverage.naicsCount > 1 && coverage.topCodePct < 0.9
       ? {
           single_naics: biggest.code,
