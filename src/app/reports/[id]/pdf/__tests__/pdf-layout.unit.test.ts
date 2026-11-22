@@ -93,3 +93,24 @@ describe.runIf(!!CHROME)('market report PDF: tables and summary text are never c
     }
   }, 60_000);
 });
+
+/**
+ * Claude Local retest, 2026-11-22 (report Ej6xCaGHX-jWLIlT9rlj2Q): `overflow-wrap: anywhere` let the PDF break
+ * INSIDE short tokens — "$1.6B" → "$1." / "6B", headers AM / OU / NT, "$279K" → "$27" / "9K", "medium" → "medi"
+ * / "um" — and `.sec { break-inside: avoid }` left half-empty pages and a page holding only the footer.
+ */
+describe.runIf(!!CHROME && !!PDFTOTEXT)('market report PDF: short values and headers are never split; no footer-only page', () => {
+  it('every amount, code, date, label and header survives on one line, and the last page has content', async () => {
+    const { pdf, error } = await htmlToPdf(wideReport(), PDF_OPTIONS, { lockdown: true, launch });
+    expect(error).toBeNull();
+    const pages = Number(/Pages:\s+(\d+)/.exec(execFileSync('pdfinfo', ['-'], { input: pdf!, encoding: 'utf8' }))?.[1] ?? 0);
+    const lines = execFileSync(PDFTOTEXT!, ['-enc', 'UTF-8', '-', '-'], { input: pdf!, encoding: 'utf8' }).split('\n').map((l) => l.trim());
+    for (const whole of ['$987.7B', '541330', '2027-09-30', 'OBLIGATED', 'LIKELIHOOD', 'NAICS', 'VALUE']) {
+      expect(lines.some((l) => l.includes(whole)), whole).toBe(true);
+    }
+    // No fragment of a split token on a line of its own.
+    expect(lines.filter((l) => /^(\$\d+\.?|\d+[KMB]|[KMB]|AM|OU|NT|OBLIGATE|D|LIKELI|HOOD|medi|um)$/.test(l))).toEqual([]);
+    const last = execFileSync(PDFTOTEXT!, ['-f', String(pages), '-l', String(pages), '-enc', 'UTF-8', '-', '-'], { input: pdf!, encoding: 'utf8' });
+    expect(last.replace(/Powered by[\s\S]*$/, '').trim().length, 'last page holds more than the footer').toBeGreaterThan(0);
+  }, 60_000);
+});
