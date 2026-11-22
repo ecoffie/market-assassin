@@ -2,6 +2,10 @@
 /**
  * Repair-ledger auditor — catches REVERTS.
  *
+ * Sources: the frozen archive docs/REPAIR-LEDGER.md PLUS one file per entry in docs/repair-ledger/
+ * (scripts/lib/ledger-sources.mjs). Every entry file must be named <YYYY-MM-DD>-<pr-or-slug>.md and
+ * carry at least one proof anchor.
+ *
  * Eric, 2026-07-27: "a ledger of repairs… we can audit to make sure nothing reverted."
  * Every row in docs/REPAIR-LEDGER.md carries a PROOF ANCHOR: an exact string that must be
  * present in a named file (`` `anchor` `` → `path`). This script re-greps every anchor against
@@ -14,17 +18,18 @@
  *   node scripts/audit-repair-ledger.mjs            # audit the working tree
  *   node scripts/audit-repair-ledger.mjs --ref main # audit a git ref (what actually ships)
  *   node scripts/audit-repair-ledger.mjs --list     # print every parsed anchor
+ *   node scripts/audit-repair-ledger.mjs --root <dir> # audit another checkout (tests use a fixture)
  * Exit 0 = all anchors present. Exit 1 = at least one vanished (a revert) or a parse problem.
  */
 import { readFileSync } from 'node:fs';
 import { execSync } from 'node:child_process';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const LEDGER = join(ROOT, 'docs/REPAIR-LEDGER.md');
+import { readLedger } from './lib/ledger-sources.mjs';
 
 const args = process.argv.slice(2);
+const rootIdx = args.indexOf('--root');
+const ROOT = rootIdx >= 0 ? args[rootIdx + 1] : join(dirname(fileURLToPath(import.meta.url)), '..');
 const refIdx = args.indexOf('--ref');
 const REF = refIdx >= 0 ? args[refIdx + 1] : null; // null = working tree
 const LIST = args.includes('--list');
@@ -81,8 +86,21 @@ function fileContents(path) {
   }
 }
 
-const md = readFileSync(LEDGER, 'utf8');
-const anchors = parseAnchors(md);
+// Archive + every per-entry file. An entry file with a bad name or no proof anchor is a ledger bug.
+const ledger = readLedger(ROOT);
+const anchors = [];
+const entryProblems = [];
+for (const src of ledger.sources) {
+  const found = parseAnchors(src.md).map((a) => ({ ...a, source: src.path }));
+  anchors.push(...found);
+  if (src.path !== 'docs/REPAIR-LEDGER.md' && found.length === 0) entryProblems.push(`${src.path}: no proof anchor (each entry needs \`<anchor>\` → \`<file>\`)`);
+}
+for (const e of ledger.entries) if (!e.validName) entryProblems.push(`${e.path}: name must be <YYYY-MM-DD>-<pr-or-slug>.md`);
+if (entryProblems.length) {
+  console.error(`✗ ${entryProblems.length} ledger entry file(s) are malformed:`);
+  for (const p of entryProblems) console.error(`  • ${p}`);
+  process.exit(1);
+}
 
 if (anchors.length === 0) {
   console.error('✗ No proof anchors parsed from the ledger. Each fix row needs `<anchor>` → `<file>`.');
@@ -125,7 +143,8 @@ if (vanished.length) {
   for (const v of vanished) {
     console.error(`  • ${v.why}`);
     console.error(`      anchor: ${JSON.stringify(v.anchor)}`);
-    console.error(`      row:    ${v.row}\n`);
+    console.error(`      row:    ${v.row}`);
+    console.error(`      in:     ${v.source}\n`);
   }
   console.error('If a preview merely looks old, that is NOT this — the code itself lost the fix. Investigate the commit that dropped it.');
 }
