@@ -28,6 +28,7 @@ import { createClient } from '@supabase/supabase-js';
 import { kv } from '@vercel/kv';
 import { sendOpsAlert } from '@/lib/ops-alert';
 import { INVARIANTS, passes, type Invariant } from '@/lib/data-invariants/registry';
+import { hasValidCronSecret } from '@/lib/cron/cron-request-auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -56,7 +57,7 @@ export async function GET(request: NextRequest) {
   const dryRun = searchParams.get('dry_run') === 'true';
   const password = searchParams.get('password');
   const bearer = request.headers.get('authorization')?.replace('Bearer ', '');
-  const isVercelCron = request.headers.get('x-vercel-cron') === '1';
+  const isVercelCron = hasValidCronSecret(request);
 
   const authorized =
     (ADMIN_PASSWORD && password === ADMIN_PASSWORD) ||

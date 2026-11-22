@@ -30,6 +30,7 @@ import { decideStamp } from '@/lib/data-sources/stamp-guard';
 import eventsCatalog from '@/data/federal-events-sources.json';
 import { CATALOG_KEY, catalogDateFindings, catalogLinkFindings, type EventCatalog } from '@/lib/events/catalog-freshness';
 import { measureEventDrift } from '@/lib/events/event-currency-live';
+import { hasValidCronSecret } from '@/lib/cron/cron-request-auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -38,7 +39,7 @@ export const maxDuration = 60; // the weekly catalog link check adds up to ~45s 
 export async function GET(request: NextRequest) {
   const auth = request.headers.get('authorization') || '';
   const pw = request.nextUrl.searchParams.get('password');
-  const ok = (process.env.CRON_SECRET && auth === `Bearer ${process.env.CRON_SECRET}`)
+  const ok = (process.env.CRON_SECRET && hasValidCronSecret(request))
     || pw === (process.env.ADMIN_PASSWORD);
   if (!ok) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 

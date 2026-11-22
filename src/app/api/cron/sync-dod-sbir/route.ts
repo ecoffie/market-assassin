@@ -27,6 +27,7 @@ import {
   type DodSbirStop,
 } from '@/lib/sbir/dod-sbir-outcome';
 import { reportCronOutcome } from '@/lib/cron-self-report';
+import { hasValidCronSecret } from '@/lib/cron/cron-request-auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -45,9 +46,9 @@ async function heldCount(client: ReturnType<typeof sb>): Promise<number | null> 
 }
 
 export async function GET(request: NextRequest) {
-  const isVercelCron = request.headers.get('x-vercel-cron') === '1';
+  const isVercelCron = hasValidCronSecret(request);
   const authHeader = request.headers.get('authorization');
-  const hasSecret = Boolean(process.env.CRON_SECRET) && authHeader === `Bearer ${process.env.CRON_SECRET}`;
+  const hasSecret = Boolean(process.env.CRON_SECRET) && hasValidCronSecret(request);
   const pw = new URL(request.url).searchParams.get('password');
   const hasPw = Boolean(process.env.ADMIN_PASSWORD) && pw === process.env.ADMIN_PASSWORD;
   if (!isVercelCron && !hasSecret && !hasPw) {

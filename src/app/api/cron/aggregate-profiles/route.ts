@@ -11,6 +11,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchAllPaged } from '@/lib/supabase/paged-read';
 import { createClient } from '@supabase/supabase-js';
+import { hasValidCronSecret } from '@/lib/cron/cron-request-auth';
 
 const CRON_SECRET = process.env.CRON_SECRET;
 
@@ -33,7 +34,7 @@ interface AggregatedProfile {
 export async function GET(request: NextRequest) {
   // Verify cron secret
   const authHeader = request.headers.get('authorization');
-  if (CRON_SECRET && authHeader !== `Bearer ${CRON_SECRET}`) {
+  if (!hasValidCronSecret(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
