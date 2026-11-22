@@ -40,10 +40,10 @@ beforeEach(() => {
 describe('offered tool definitions', () => {
   it('never offers blocked tools, and does offer ordinary reads and allowed writes', () => {
     const names = make().offeredToolDefs().map((d) => String(d.function.name));
-    for (const blocked of ['add_contacts_to_crm', 'one_click_proposal', 'get_proposal_job', 'search_sbir', 'get_agency_budget_trends', 'delete_market_schedule', 'generate_market_report', 'export_proposal', 'verify_m_scale', 'get_balance']) {
+    for (const blocked of ['add_contacts_to_crm', 'one_click_proposal', 'get_proposal_job', 'search_sbir', 'get_agency_budget_trends', 'delete_market_schedule', 'export_proposal', 'verify_m_scale', 'get_balance']) {
       expect(names, blocked).not.toContain(blocked);
     }
-    for (const ok of ['get_expiring_contracts', 'search_past_contracts', 'schedule_market_search', 'update_market_schedule', 'get_my_pipeline', 'search_my_vault']) {
+    for (const ok of ['get_expiring_contracts', 'search_past_contracts', 'schedule_market_search', 'update_market_schedule', 'generate_market_report', 'get_my_pipeline', 'search_my_vault']) {
       expect(names, ok).toContain(ok);
     }
     expect(new Set(names).size).toBe(names.length); // no duplicates / shadowing
@@ -51,7 +51,7 @@ describe('offered tool definitions', () => {
 });
 
 describe('execution is re-checked even for tools never offered', () => {
-  it.each(['add_contacts_to_crm', 'one_click_proposal', 'search_sbir', 'get_agency_budget_trends', 'generate_market_report', 'export_proposal'])(
+  it.each(['add_contacts_to_crm', 'one_click_proposal', 'search_sbir', 'get_agency_budget_trends', 'export_proposal'])(
     '%s is refused and tool code never runs',
     async (name) => {
       const [r] = await make().executeRound([call(name, { emails: ['a@b.com'] })], planner);

@@ -1,13 +1,8 @@
 /**
- * Ask Mindy "ask about this view": the view preamble must say WHERE the view is (2026-11-15 defect).
+ * Ask Mindy vs Map (2026-11-19): Map and Ask are separate tools.
  *
- * A Mid-Atlantic map view was answered about the "Birmingham metro": the preamble carried only
- * "853+ Open Now opps in view", so the planner took the location from the user's saved profile.
- * Pins, on the REAL map scripts:
- *  - __mindyViewStates counts the states of the plotted pins inside the map bounds (state or "City, ST");
- *  - the drawer's preamble names those states (or the state filter, or says the location is unknown)
- *    and tells the model not to use saved profile locations or a city the user did not name;
- *  - the context strip shows the states.
+ * Pin-state helpers (__mindyViewStates) still power the map itself. Ask messages must NOT
+ * inject map viewport geography — that bound Mid-Atlantic pins into company market research.
  */
 import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -84,7 +79,7 @@ function boot(ctx: Record<string, unknown>) {
   const calls: Array<Record<string, unknown>> = [];
   const pending: Promise<unknown>[] = [];
   w.fetch = vi.fn((u: string, init: { body: string }) => {
-    if (u === '/api/app/chat') calls.push(JSON.parse(init.body)); // the follow-up suggestions call is not the chat turn
+    if (u === '/api/app/chat') calls.push(JSON.parse(init.body));
     const enc = new NodeTextEncoder();
     const text = [{ type: 'token', content: 'ok' }, { type: 'done' }].map((e) => `data: ${JSON.stringify(e)}\n\n`).join('');
     const pr = Promise.resolve({ status: 200, ok: true, body: new ReadableStream({ start(c) { c.enqueue(enc.encode(text)); c.close(); } }), json: async () => ({}) });
@@ -104,32 +99,22 @@ function boot(ctx: Record<string, unknown>) {
 
 const MID_ATLANTIC = { count: 853, capped: true, scope: 'open', state: '', viewStates: [{ state: 'VA', pins: 312 }, { state: 'MD', pins: 140 }, { state: 'PA', pins: 90 }] };
 
-describe('map-view preamble names the location (ASK_MINDY_JS)', () => {
-  it('no state filter: names the states of the plotted pins and forbids profile locations / unnamed cities', async () => {
+describe('Ask Mindy does not inject map viewport (ASK_MINDY_JS)', () => {
+  it('sends only the customer words — no Current map view preamble', async () => {
     const t = boot(MID_ATLANTIC);
     const msg = await t.ask('Which agencies buy the most in this view?');
-    expect(msg).toContain('[Current map view');
-    expect(msg).toContain('853+ Open Now opps in view');
-    expect(msg).toContain('Location: the map area is in VA, MD, PA (plotted pins in view, most first: VA 312, MD 140, PA 90).');
-    expect(msg).toContain("not the user's saved profile locations");
-    expect(msg).toContain('do not choose a city the user did not name');
-    expect(msg.endsWith('Which agencies buy the most in this view?')).toBe(true);
-    expect(t.ctx()).toContain('in VA, MD, PA');
+    expect(msg).toBe('Which agencies buy the most in this view?');
+    expect(msg).not.toContain('[Current map view');
+    expect(msg).not.toContain('VA, MD, PA');
+    expect(t.ctx()).toBe('');
   });
-  it('a state filter is the location', async () => {
+  it('a state-filtered map still does not bind Ask', async () => {
     const t = boot({ count: 40, scope: 'open', state: 'CA', viewStates: [{ state: 'CA', pins: 40 }] });
     const msg = await t.ask('Who buys here?');
-    expect(msg).toContain('Location: the map is filtered to CA.');
-    expect(msg).not.toContain('map area is in');
+    expect(msg).toBe('Who buys here?');
+    expect(msg).not.toContain('filtered to CA');
   });
-  it('no plotted pins: says the location is unknown instead of leaving it blank', async () => {
-    const t = boot({ count: 0, scope: 'open', state: '', viewStates: [] });
-    const msg = await t.ask('Who buys here?');
-    expect(msg).toContain('Location: unknown for this view. If the question needs a place, ask which state or city before searching.');
-  });
-  it('an old view context without viewStates still works (unknown location)', async () => {
-    const t = boot({ count: 12, scope: 'all', q: 'janitorial', state: '' });
-    const msg = await t.ask('Who buys here?');
-    expect(msg).toContain('Location: unknown for this view');
+  it('placeholder is Ask Mindy, not "this view"', () => {
+    expect(MAP).toMatch(/placeholder="Ask Mindy&hellip;"/);
   });
 });

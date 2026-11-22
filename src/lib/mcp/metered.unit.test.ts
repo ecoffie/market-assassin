@@ -10,6 +10,14 @@ vi.mock('./credits', () => ({
   debitCredits: vi.fn(),
   logCall: vi.fn().mockResolvedValue(undefined),
 }));
+// insufficient_credits → recordPaywallAttempt → live Supabase without this mock
+// (hung unit gate 2026-11-21). Same shape as metered.ambassador.unit.test.ts.
+vi.mock('./paywall', () => ({
+  recordPaywallAttempt: vi.fn(async () => 'attempt-test'),
+  paywallMessage: vi.fn(() => 'pay'),
+  RESUME_BASE: 'https://getmindy.ai/mcp/continue',
+}));
+vi.mock('@/lib/ambassadors/store', () => ({ isApprovedAmbassador: vi.fn(async () => false) }));
 // PR 4A: runMeteredTool now resolves WHO PAYS before charging. Mocked to the
 // production-today answer — zero pools exist, so every real caller is `personal` and
 // `debitResolvedPayer` delegates straight to `debitCredits`. Mocking it this way keeps

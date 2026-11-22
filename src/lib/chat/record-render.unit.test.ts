@@ -212,12 +212,12 @@ describe('pricing and keywords', () => {
         { keyword: 'warehouse worker', sources: [{ type: 'calc_labor_category', n: 12 }] },
         { keyword: 'forklift operator', sources: [{ type: 'solicitation_text', n: 5 }] },
       ],
-      excluded_terms: { locations: ['memphis'], brand: ['superb'] },
+      excluded_terms: { locations: ['memphis'], brand: ['example'] },
     })!;
     expect(r.text).toMatch(/1\. warehouse worker · calc labor category n=12/);
     expect(r.text).toMatch(/3\. forklift operator · solicitation text n=5/);
     expect(r.text.match(/warehouse worker/g)).toHaveLength(1); // not duplicated
-    expect(r.text).toMatch(/Left out on purpose \(company names and places are not search terms\): memphis, superb\./);
+    expect(r.text).toMatch(/Left out on purpose \(company names and places are not search terms\): memphis, example\./);
   });
 });
 

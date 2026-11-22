@@ -57,6 +57,11 @@ export interface VaultContext {
   capabilities?: Array<Record<string, unknown>>;
   team?: Array<Record<string, unknown>>;
   has_any: boolean;
+  /**
+   * Sections whose query FAILED. Their fields above still read as empty (unchanged behaviour), so a caller
+   * that cares must check this: a listed section is unavailable, not empty (CLAUDE.md rule 5). Absent = none failed.
+   */
+  unavailable?: Array<'identity' | 'past_performance' | 'capabilities' | 'team'>;
 }
 
 export interface AgencyContext {

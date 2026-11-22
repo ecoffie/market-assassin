@@ -152,6 +152,11 @@ const nextConfig: NextConfig = {
         source: '/fonts/app/v1/:file*',
         headers: [{ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }],
       },
+      // Self-hosted Leaflet for the Map (formerly unpkg.com): the folder name is the version.
+      {
+        source: '/vendor/leaflet/:version/:file*',
+        headers: [{ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }],
+      },
     ];
   },
   // Rewrites for host-based routing

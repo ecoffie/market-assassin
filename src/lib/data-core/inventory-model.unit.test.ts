@@ -3,6 +3,7 @@ import { execFileSync } from 'node:child_process';
 import {
   classifyJobPostingHealth,
   classifyDodSbirHealth,
+  classifySourcedClaimsFreshness,
   computeTotals,
   countUpstreamPublishers,
   inventoryViolations,
@@ -278,6 +279,58 @@ describe('job postings are live when the mirror is not serving', () => {
     expect(h.state).toBe('CURRENT');
     expect(h.stored).toBe(40);
     expect(h.headlineContribution).toBe(40);
+  });
+});
+
+describe('sourced claims follow the collector poll, not the newest claim', () => {
+  const now = new Date('2026-11-21T12:00:00Z');
+  const clocks = {
+    lastPoll: '2026-11-21T06:00:00Z',
+    lastSourceAdvance: '2026-11-01',
+    lastIntelligenceChange: '2026-10-01T00:00:00Z',
+  };
+
+  it('a quiet publication stretch stays current when the collector polled today', () => {
+    const h = classifySourcedClaimsFreshness({
+      clocks,
+      pollFailed: false,
+      evidenceAt: '2026-09-01T00:00:00Z',
+      now,
+    });
+    expect(h.state).toBe('CURRENT');
+    expect(h.asOf).toBe('2026-11-21T06:00:00Z');
+    expect(h.detail).toMatch(/2026-09-01/);
+    expect(h.detail).toMatch(/not the collector clock/);
+  });
+
+  it('a missing poll is unknown, even when a claim timestamp is old', () => {
+    const h = classifySourcedClaimsFreshness({
+      clocks: null,
+      pollFailed: false,
+      evidenceAt: '2026-01-01T00:00:00Z',
+      now,
+    });
+    expect(h.state).toBe('UNKNOWN');
+    expect(h.asOf).toBeNull();
+    expect(h.detail).toMatch(/not the collector clock/);
+  });
+
+  it('a failed run is unreachable and an overdue poll is stale', () => {
+    const failed = classifySourcedClaimsFreshness({
+      clocks,
+      pollFailed: true,
+      evidenceAt: clocks.lastIntelligenceChange,
+      now,
+    });
+    expect(failed.state).toBe('UNREACHABLE');
+    const overdue = classifySourcedClaimsFreshness({
+      clocks: { ...clocks, lastPoll: '2026-11-01T06:00:00Z' },
+      pollFailed: false,
+      evidenceAt: null,
+      now,
+    });
+    expect(overdue.state).toBe('STALE');
+    expect(overdue.detail).toMatch(/not zero claims/);
   });
 });
 

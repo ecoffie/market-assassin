@@ -2,7 +2,7 @@
  * The selected notice rides along with the MAIN Ask Mindy chat (Eric, 2026-11-16: no separate per-card chat).
  * Runs the REAL ASK_MINDY_JS in jsdom: the chip mirrors the listing drawer's selection, only the notice id is
  * sent as context:{kind:'opportunity',notice_id}, the conversation is not forked, the chip can be removed,
- * and "Open in full workspace" hands the session + notice to MindyChatPanel via sessionStorage.
+ * and stays on the Map (no handoff to the retired /app Ask panel).
  */
 import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -73,10 +73,10 @@ describe('selected notice attaches to the main chat', () => {
     expect(t.chat[0].context).toEqual({ kind: 'opportunity', notice_id: NID });
     expect(t.chat[0].turn_id).toBeUndefined();
     const m = String(t.chat[0].message);
-    expect(m).toContain('[Current map view'); // kept exactly as without a notice (server contract)
+    expect(m).toBe('Who held this before?'); // Map viewport is not injected (2026-11-19)
+    expect(m).not.toContain('[Current map view');
     expect(m).not.toContain('Display:');
     expect(t.chat[0].display).toBe('narrow_panel');
-    expect(m.endsWith('Who held this before?')).toBe(true);
     expect(JSON.stringify(t.chat[0])).not.toContain('Key West'); // the title is never sent; the server loads the record
   });
   it('is the SAME conversation: session and history carry across attach and remove', async () => {
@@ -96,10 +96,10 @@ describe('selected notice attaches to the main chat', () => {
     t.open();
     (t.chip().querySelector('.rm') as HTMLButtonElement).click();
     expect(t.chip().textContent).toBe('');
-    expect(t.w.document.getElementById('amkCtx')!.textContent).toContain('in view');
+    expect(t.w.document.getElementById('amkCtx')!.textContent).toBe('');
     await t.ask('q');
     expect(t.chat[0].context).toBeUndefined();
-    expect(String(t.chat[0].message)).toContain('[Current map view');
+    expect(String(t.chat[0].message)).toBe('q');
     t.open(); // reopening with the same selection keeps it removed
     expect(t.chip().textContent).toBe('');
     t.select({ ...OPP, id: NID2, title: 'Other' }); // a different notice attaches
@@ -126,28 +126,15 @@ describe('selected notice attaches to the main chat', () => {
   });
 });
 
-describe('Open in full workspace', () => {
-  it('links to the Ask Mindy panel and hands over the session and attached notice (no message, no auto-send)', async () => {
+describe('Map Ask stays on the map (no /app chat handoff)', () => {
+  it('does not create an amkWs handoff link or write mindy_chat_handoff', async () => {
     const t = boot();
     t.w.__selectedOpp = OPP;
     t.open();
     await t.ask('q1');
-    const a = t.w.document.getElementById('amkWs') as HTMLAnchorElement;
-    expect(a.getAttribute('href')).toBe('/app?panel=chat');
-    a.addEventListener('click', (e) => e.preventDefault()); // jsdom: don't navigate
-    a.click();
-    const h = JSON.parse(t.w.sessionStorage.getItem('mindy_chat_handoff')!);
-    expect(h).toEqual({ v: 1, sessionId: 'sess-1', context: { kind: 'opportunity', notice_id: NID, title: OPP.title, deadline: OPP.deadline } });
-    expect(t.w.sessionStorage.getItem('mindy_chat_seed')).toBeNull();
-  });
-  it('without a notice it carries just the session', async () => {
-    const t = boot();
-    t.open();
-    await t.ask('q1');
-    const a = t.w.document.getElementById('amkWs') as HTMLAnchorElement;
-    a.addEventListener('click', (e) => e.preventDefault());
-    a.click();
-    expect(JSON.parse(t.w.sessionStorage.getItem('mindy_chat_handoff')!)).toEqual({ v: 1, sessionId: 'sess-1', context: null });
+    expect(t.w.document.getElementById('amkWs')).toBeNull();
+    expect(MAP).not.toMatch(/mindy_chat_handoff/);
+    expect(MAP).not.toMatch(/href='\/app\?panel=chat'/);
   });
 });
 
