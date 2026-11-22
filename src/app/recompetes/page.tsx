@@ -16,6 +16,7 @@
  * A read failure renders "temporarily unavailable" + noindex — never "no contracts expiring".
  */
 import type { Metadata } from 'next';
+import { siteShareImages } from '@/lib/seo/share-image';
 import Link from 'next/link';
 import { cache } from 'react';
 import { getRecompeteHubLinks, type RecompeteLink } from '@/lib/seo/recompetes';
@@ -49,7 +50,7 @@ export async function generateMetadata(): Promise<Metadata> {
     description,
     alternates: { canonical: url },
     robots: hub.ok && hub.links.length > 0 ? { index: true, follow: true } : { index: false, follow: true },
-    openGraph: { title, description, type: 'website', url },
+    openGraph: { title, description, type: 'website', url, images: siteShareImages() },
   };
 }
 

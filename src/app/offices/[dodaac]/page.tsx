@@ -13,6 +13,7 @@
  * Thin-content gate: src/lib/seo/office-gate.ts (thin offices render with robots noindex).
  */
 import type { Metadata } from 'next';
+import { siteShareImages } from '@/lib/seo/share-image';
 import Link from 'next/link';
 import { notFound, permanentRedirect } from 'next/navigation';
 import MemberAwareCta from '@/components/MemberAwareCta';
@@ -71,7 +72,7 @@ export async function generateMetadata({ params }: { params: Promise<{ dodaac: s
     description,
     alternates: { canonical: url },
     robots: o.indexable ? { index: true, follow: true } : { index: false, follow: true },
-    openGraph: { title, description, type: 'website', url },
+    openGraph: { title, description, type: 'website', url, images: siteShareImages() },
   };
 }
 
