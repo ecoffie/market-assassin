@@ -5,6 +5,7 @@
  * independent envelopes. One horizon failure never becomes a market-wide zero.
  * Does NOT change map viewport APIs. Cross-class dedupe is intentionally absent.
  */
+import { forecastLinkFields } from '@/lib/forecasts/forecast-link';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { forecastSyncClock } from '@/lib/forecasts/query';
 import { classifySearchFailure } from './search-failure';
@@ -1237,7 +1238,7 @@ async function queryComingSoon(
     }
 
     const COLS =
-      'id, title, description, department, source_agency, naics_code, naics_description, set_aside_type, estimated_value_min, estimated_value_max, estimated_value_range, anticipated_quarter, fiscal_year, anticipated_award_date, solicitation_date, pop_state, pop_city, map_lat, status, last_synced_at, updated_at, source_url, contracting_office, incumbent_name';
+      'id, title, description, department, source_agency, naics_code, naics_description, set_aside_type, estimated_value_min, estimated_value_max, estimated_value_range, anticipated_quarter, fiscal_year, anticipated_award_date, solicitation_date, pop_state, pop_city, map_lat, status, last_synced_at, updated_at, source_url, external_id, contracting_office, incumbent_name';
 
     const { data, count, error } = await applyForecastPlan(client.from(source).select(COLS, { count: 'exact' }), p.plan).limit(Math.max(limit, p.basePlan ? OPEN_FETCH_CAP : 200));
     if (error) return unavailable(source, SOON_HANDOFFS, error.message, unsupported);
@@ -1333,7 +1334,8 @@ async function queryComingSoon(
         naics_code: (r.naics_code as string) || null,
         incumbent_name: (r.incumbent_name as string) || null,
         contracting_office: (r.contracting_office as string) || null,
-        source_url: typeof r.source_url === 'string' ? r.source_url : null,
+        // Never the raw stored URL: an API root or a whole-feed file is not this forecast (forecast-link.ts).
+        ...forecastLinkFields(r),
         ...forecastSyncClock(r),
       };
     });
