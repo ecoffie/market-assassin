@@ -5,7 +5,7 @@
  * from its scope descriptions + capabilities — finds the market its codes miss.
  *
  * Ask Mindy R6 (2026-11): keywords used to be n-grams of the INPUT ranked against the same
- * input, so the company name and the city won ("superb staffing", "memphis") and the job
+ * input, so the company name and the city won ("example staffing", "memphis") and the job
  * titles a staffing buyer writes could never appear. Now (MCP/chat dispatch,
  * include_market_terms=true):
  *   - place names and distinctive brand tokens are removed before candidates are cut;
@@ -57,7 +57,7 @@ export interface CompanyKeywordsToolInput {
    * MINDY-004: the subject's OWN company name / brand / proper nouns. Each phrase is removed
    * from the input before keywords are cut from it, and any brand token that is distinctive
    * to the brand (not used elsewhere in the input, not a market term) is kept out of every
-   * keyword. "Superb Staffing" strips "superb" and keeps "staffing".
+   * keyword. "Example Staffing" strips "example" and keeps "staffing".
    */
   brand_exclude?: string[];
   /** NAICS codes to draw market vocabulary / solicitation text from. Inferred when omitted. */
