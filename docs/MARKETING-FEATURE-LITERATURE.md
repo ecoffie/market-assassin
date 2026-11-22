@@ -1367,8 +1367,8 @@ on hidden description field. Gate now matches email promise ("add keywords").
 **SEO:** N/A (conversion / alert onboarding)
 
 **Proof:** `user_engagement` Jun 12–13: 8 unique `alert_keyword_setup` clickers, 1 partial
-keyword save (`keytransportationsolutions@gmail.com`). Gate change clears users like
-`joanne.horowitz@xerox.com` (15 keywords, no description) from repeat red-banner CTAs.
+keyword save (`[email removed]`). Gate change clears users like
+`[email removed]` (15 keywords, no description) from repeat red-banner CTAs.
 
 
 ---
@@ -2883,7 +2883,7 @@ to the block verdict — known status never hides a real problem.
 registries (campaign-exclusions, advocate-accounts, partner-referrals);
 `computeVerdict()` short-circuits to an ok-level label for them (unless refunded).
 Verified live: westover105 → "Advocate — Sue Kranes — complimentary Pro" (no
-reason required); aj@cypherintel.com → "Comp / testimonial"; a random email still
+reason required); [email removed] → "Comp / testimonial"; a random email still
 warns + requires a source. Typecheck + full build pass.
 
 ---
@@ -6532,7 +6532,7 @@ an empty market. Recompetes are a later section, not a substitute for Open.
 **SEO.** Daily government contract alerts by NAICS / SAM.gov opportunity email
 that matches your market.
 
-**Proof.** Live replay 2026-09-13T13:41Z for `info@lwppropertysolutions.com`
+**Proof.** Live replay 2026-09-13T13:41Z for `[email removed]`
 (NAICS 561210 / 561720 / 561730 / 561790 / 238990). Old OR pull top titles:
 cubicle upgrade, UPS rental, shaft/tube/switch assembly, FLIR repair. Contract
 D: 30 distinctive hits inside the Open market — janitorial, grounds, facility
@@ -6602,9 +6602,9 @@ company evidence.
 government contracting market.
 
 **Proof.** Live matcher replay 2026-09-13. Radus
-(`john.simmons@radussoftware.com`, keyword `programming`): Peraton 541511
+(`[email removed]`, keyword `programming`): Peraton 541511
 leads; Booz Allen 541611 $211.8M is fifth and `inferred`. Kkurka
-(`kkurka@mac.com`) is `system_default` on every code — starter-market label.
+(`[email removed]`) is `system_default` on every code — starter-market label.
 541611 still wins when the profile has management-consulting evidence. Open D
 7/7. Tests: `src/lib/alerts/coming-back-to-market.unit.test.ts`.
 
@@ -7119,7 +7119,7 @@ no 504; representative drones capability completes grounded under 55s.
 
 **SEO.** Federal recompete alerts, contracts coming back to market, SAM.gov daily alerts vs expiring contracts, 6–18 month capture window.
 
-**Proof.** Live render 2026-09-17 (`scripts/render-coming-back-alert-examples.ts`) for five replay users — each HTML has both headings, Coming Back copy “not confirmed solicitations / prepare capture, not to bid today”, and no mixed Open/Recompete ids: 7hillstransportation@gmail.com Open Now janitorial SAM + Coming Back Goodwill CDC $38.8M / ServiceSource FBI $33.0M (561720, lead_6_18); americanpatriot1872@pm.me Open Now + Coming Back Saliense $24.7M (541512); civelladante@gmail.com roofing distinctive miss retains 238160/236220 (RQ-WM Jordan JV $239.7M, under the existing $250M teaming line); diannewilsoncontact@gmail.com Arrow Arc $32.1M (541910); wednel.joseph@gmail.com generic “construction” does not expand the stored 236220 market. Units: `coming-back-to-market.unit.test.ts` (window order, omit <3 months, miss keeps market, generic does not expand, hit-count not primary), `alert-mode.unit.test.ts` (Coming Back HTML has no “currently soliciting” / “Open Now”), `population-contract.unit.test.ts` (`OPEN_NOW_HEADING`). MINDY-006/007 overlay + preserve-enrichment restored onto this branch so the deploy does not revert them.
+**Proof.** Live render 2026-09-17 (`scripts/render-coming-back-alert-examples.ts`) for five replay users — each HTML has both headings, Coming Back copy “not confirmed solicitations / prepare capture, not to bid today”, and no mixed Open/Recompete ids: [email removed] Open Now janitorial SAM + Coming Back Goodwill CDC $38.8M / ServiceSource FBI $33.0M (561720, lead_6_18); [email removed] Open Now + Coming Back Saliense $24.7M (541512); [email removed] roofing distinctive miss retains 238160/236220 (RQ-WM Jordan JV $239.7M, under the existing $250M teaming line); [email removed] Arrow Arc $32.1M (541910); [email removed] generic “construction” does not expand the stored 236220 market. Units: `coming-back-to-market.unit.test.ts` (window order, omit <3 months, miss keeps market, generic does not expand, hit-count not primary), `alert-mode.unit.test.ts` (Coming Back HTML has no “currently soliciting” / “Open Now”), `population-contract.unit.test.ts` (`OPEN_NOW_HEADING`). MINDY-006/007 overlay + preserve-enrichment restored onto this branch so the deploy does not revert them.
 
 ---
 

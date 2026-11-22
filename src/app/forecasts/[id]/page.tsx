@@ -6,16 +6,18 @@
  * src/lib/seo/forecast-pages.ts — read rules, the thin gate and staleness live there.
  *
  *  - FREE (in the HTML): the published forecast fields. Absent fields read "Not stated".
- *  - BEHIND FREE SIGN-UP: point-of-contact details (never sent to the browser — the page only
+ *  - BEHIND THE 14-DAY TRIAL (no free plan since 2026-11-12): point-of-contact details (never sent to the browser — the page only
  *    knows whether a POC exists), "alert me when this becomes a solicitation", save to pipeline.
  *  - Thin / stale / closed forecasts still render, with `robots: noindex, follow`.
  *  - A read failure throws SeoTemporarilyUnavailableError (5xx, not ISR-cached); 404 only when
  *    the database answered "no such row".
  */
 import type { Metadata } from 'next';
+import { siteShareImages } from '@/lib/seo/share-image';
 import Link from 'next/link';
 import { notFound, permanentRedirect } from 'next/navigation';
 import MemberAwareCta from '@/components/MemberAwareCta';
+import { recordTrialHref, TRIAL_CTA_LABEL } from '@/lib/seo/record-trial-cta';
 import {
   parseForecastSlug,
   getForecastById,
@@ -89,7 +91,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     title: titleStr,
     description,
     alternates: { canonical: url },
-    openGraph: { title: titleStr, description, type: 'article', url, siteName: 'Mindy' },
+    openGraph: { title: titleStr, description, type: 'article', url, siteName: 'Mindy', images: siteShareImages() },
     ...(indexability.indexable ? {} : { robots: { index: false, follow: true } }),
   };
 }
@@ -191,7 +193,7 @@ export default async function ForecastDetailPage({ params }: PageProps) {
           <Fact label="Place of performance" value={place} />
           <Fact label="Incumbent (as published)" value={f.incumbentName} />
           <Fact label="Point of contact">
-            {f.hasPoc ? <span>Listed — <Link href="/signup" className="text-(--mp-navy) hover:underline">sign up free to view</Link></span> : null}
+            {f.hasPoc ? <span>Listed — <Link href={recordTrialHref('seo_forecast')} className="text-(--mp-navy) hover:underline">start a 14-day free trial to view</Link></span> : null}
           </Fact>
         </dl>
 
@@ -217,7 +219,7 @@ export default async function ForecastDetailPage({ params }: PageProps) {
         </section>
 
         <div className="mt-8 border border-(--mp-line) rounded-lg p-6 bg-(--mp-wash)">
-          <h2 className="text-lg font-bold text-(--mp-ink)">Get ahead of this requirement — free</h2>
+          <h2 className="text-lg font-bold text-(--mp-ink)">Get ahead of this requirement</h2>
           <ul className="mt-2 text-sm text-(--mp-body) list-disc pl-5 space-y-1">
             <li>Alert me when this forecast becomes a solicitation</li>
             <li>Save it to my pipeline</li>
@@ -226,10 +228,10 @@ export default async function ForecastDetailPage({ params }: PageProps) {
           <div className="mt-4">
             <MemberAwareCta appearance="public" memberHref="/app" memberLabel="Open forecasts in Mindy →">
               <Link
-                href="/signup"
+                href={recordTrialHref('seo_forecast')}
                 className="inline-block bg-(--mp-navy) hover:bg-(--mp-navy-hover) text-white font-semibold rounded-lg px-5 py-2.5 text-sm"
               >
-                Sign up free to track this forecast →
+                {TRIAL_CTA_LABEL}
               </Link>
             </MemberAwareCta>
           </div>

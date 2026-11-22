@@ -5,7 +5,7 @@
  * USASpending totals across all 1,000+ NAICS codes.
  */
 import { BQ_TABLES } from './client';
-import { queryCached } from './cache';
+import { bqResultState, queryCached } from './cache';
 
 export interface NaicsProfile {
   naics_code: string;
@@ -16,16 +16,49 @@ export interface NaicsProfile {
   transaction_count: number;
 }
 
-export async function getNaicsProfile(code: string): Promise<NaicsProfile | null> {
+/**
+ * What the profile read for one NAICS code ANSWERED.
+ *
+ * `absent` is a measured "naics_summary has no row for this code" and is the only state that
+ * may become a 404. `unavailable` means we do not know (the read failed, or live BigQuery was
+ * blocked) and must never be rendered as "not found" (CLAUDE.md rule 5).
+ */
+export type NaicsProfileLookup =
+  | { kind: 'found'; profile: NaicsProfile }
+  | { kind: 'absent' }
+  | { kind: 'unavailable'; reason: 'unavailable' | 'failed' };
+
+const NAICS_CODE_RE = /^\d{2,6}$/;
+
+export async function lookupNaicsProfile(code: string): Promise<NaicsProfileLookup> {
+  // Not a NAICS code at all: a real "no such page", and no BigQuery read for crawler junk.
+  if (!NAICS_CODE_RE.test(code)) return { kind: 'absent' };
+  const cacheKey = `naics:profile:${code}`;
   const rows = await queryCached<NaicsProfile>({
-    cacheKey: `naics:profile:${code}`,
+    // naics_summary is a pre-aggregated rollup (one row per NAICS, CLUSTER BY naics_code;
+    // scripts/usaspending-ingest/build-derived.sql), so a cold read is a few MB, like the
+    // /top rollup reads in top-listicles.ts. It used to be cache-only with nothing warming it,
+    // so every /naics/<code> outside NAICS_TOP_100 read a cold cache, got [] and 404'd
+    // (2026-11-22: /naics/236210 404 while /naics/236210/tx served 200).
+    cacheOnly: false,
+    maximumBytesBilled: String(100 * 1024 * 1024),
+    cacheKey,
     query: `
       SELECT * FROM ${BQ_TABLES.naicsSummary}
       WHERE naics_code = @code LIMIT 1
     `,
     params: { code },
   });
-  return rows[0] ?? null;
+  if (rows[0]) return { kind: 'found', profile: rows[0] };
+  const state = bqResultState(cacheKey, rows.length);
+  if (state === 'unavailable' || state === 'failed') return { kind: 'unavailable', reason: state };
+  return { kind: 'absent' };
+}
+
+/** Profile or null. null does NOT mean absent; use lookupNaicsProfile to tell them apart. */
+export async function getNaicsProfile(code: string): Promise<NaicsProfile | null> {
+  const r = await lookupNaicsProfile(code);
+  return r.kind === 'found' ? r.profile : null;
 }
 
 export interface TopRecipientForNaics {

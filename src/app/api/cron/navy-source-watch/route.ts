@@ -11,6 +11,7 @@ import { runNavyWatch } from '@/lib/forecasts/navy-watch';
 import { NAVY_LRAE_CONTRACT } from '@/lib/forecasts/navy-manual-contract';
 import { watchManualSource } from '@/lib/data-core/manual-source-watch';
 import type { InterventionState } from '@/lib/data-core/manual-source-ops';
+import { hasValidCronSecret } from '@/lib/cron/cron-request-auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -20,7 +21,7 @@ export async function GET(request: NextRequest) {
   const auth = request.headers.get('authorization');
   const pw = request.nextUrl.searchParams.get('password');
   const authorized =
-    auth === `Bearer ${process.env.CRON_SECRET}` || pw === process.env.ADMIN_PASSWORD;
+    hasValidCronSecret(request) || pw === process.env.ADMIN_PASSWORD;
   if (!authorized) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
   const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);

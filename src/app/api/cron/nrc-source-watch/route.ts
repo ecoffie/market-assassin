@@ -14,6 +14,7 @@ import { createClient } from '@supabase/supabase-js';
 import { probeNrcSource, NRC_SOURCE_KEY, NRC_DISCOVERY_URL, NRC_PDF_URL } from '@/lib/forecasts/nrc-reachability';
 import { sendOpsAlert } from '@/lib/ops-alert';
 import { shouldSendAlert, fingerprint } from '@/lib/ops-alert-dedup';
+import { hasValidCronSecret } from '@/lib/cron/cron-request-auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -22,7 +23,7 @@ export const maxDuration = 120;
 export async function GET(request: NextRequest) {
   const auth = request.headers.get('authorization');
   const pw = request.nextUrl.searchParams.get('password');
-  if (auth !== `Bearer ${process.env.CRON_SECRET}` && pw !== process.env.ADMIN_PASSWORD) {
+  if (!hasValidCronSecret(request) && pw !== process.env.ADMIN_PASSWORD) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
   const apply = request.nextUrl.searchParams.get('dry') !== '1';

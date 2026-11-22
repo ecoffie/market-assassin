@@ -7,6 +7,7 @@ import {
   bootcampLifetimeSubject,
   bootcampLifetimeHtml,
 } from '@/lib/mindy/bootcamp-lifetime-offer';
+import { hasValidCronSecret } from '@/lib/cron/cron-request-auth';
 
 /**
  * GET /api/cron/bootcamp-lifetime-offer
@@ -56,7 +57,7 @@ export async function GET(request: NextRequest) {
   const url = new URL(request.url);
   const password = url.searchParams.get('password');
   const bearer = request.headers.get('authorization')?.replace('Bearer ', '');
-  const isDispatch = request.headers.get('x-cron-dispatch') === '1';
+  const isDispatch = hasValidCronSecret(request);
   const authed = password === ADMIN_PASSWORD || (process.env.CRON_SECRET && bearer === process.env.CRON_SECRET) || isDispatch;
   if (!authed) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
 

@@ -16,10 +16,26 @@ function esc(v: unknown): string {
 function money(v: unknown): string {
   const n = typeof v === 'number' ? v : Number(v);
   if (!Number.isFinite(n) || n === 0) return '—';
+  // Transaction obligations are NET of de-obligations, so a bucket can be negative. Say so; never "$-1,188,272".
+  if (n < 0) return `−${money(-n)} net`;
   if (n >= 1e9) return `$${(n / 1e9).toFixed(1)}B`;
   if (n >= 1e6) return `$${(n / 1e6).toFixed(1)}M`;
   if (n >= 1e3) return `$${Math.round(n / 1e3)}K`;
   return `$${Math.round(n).toLocaleString()}`;
+}
+/**
+ * A share that is ALREADY in percent units (agency-spending-detail pct()). Never ×100, never clamped.
+ * Unavailable when the value is missing, or when the bucket's net amount is ≤ 0 (a net de-obligation
+ * has no meaningful share of awards).
+ */
+function percentShare(pct: unknown, amount: unknown): string {
+  const a = typeof amount === 'number' ? amount : Number(amount);
+  if (Number.isFinite(a) && a <= 0) return 'n/a (net de-obligation)';
+  if (pct === null || pct === undefined || pct === '') return 'unavailable';
+  const p = typeof pct === 'number' ? pct : Number(pct);
+  if (!Number.isFinite(p)) return 'unavailable';
+  if (p > 0 && p < 0.1) return '<0.1%';
+  return `${p.toFixed(1)}%`;
 }
 function num(v: unknown): string {
   const n = typeof v === 'number' ? v : Number(v);
@@ -71,6 +87,8 @@ interface ReportLike {
       window?: string | null;
       state_scoped?: boolean;
       requested_state?: string | null;
+      agency_scoped?: boolean;
+      requested_agency?: string | null;
       identity_resolved_via?: string[] | null;
     } | null;
     size_tiers?: {
@@ -110,7 +128,11 @@ interface ReportLike {
     agency_detail: unknown;
     set_aside_gap: unknown;
   };
-  _meta: { degraded: boolean; sections_grounded: number; sections_total: number };
+  _meta: {
+    degraded: boolean; sections_grounded: number; sections_total: number;
+    /** Per-section outcome (section-outcome.ts). 'failed' = UNKNOWN, never zero; 'withheld_no_subject' = not attempted. */
+    section_status?: { name: string; status: string; required?: boolean }[];
+  };
 }
 
 /**
@@ -133,8 +155,27 @@ function statCard(label: string, value: string, sub?: string): string {
     + `<div class="stat-l">${esc(label)}</div></div>`;
 }
 
-function table(headers: string[], rows: string[][]): string {
-  if (!rows.length) return `<p class="empty">No rows available for this section.</p>`;
+/**
+ * Why a section has no rows. Only 'empty' (the query succeeded and found nothing) may read as none;
+ * a failed lookup is UNKNOWN and a withheld one was not attempted — both used to print the same
+ * "No rows available" and a 0 KPI, which read as an established absence.
+ */
+const EMPTY_TEXT: Record<string, string> = {
+  failed: 'Unknown — this lookup failed, so no rows here is not evidence that there are none.',
+  withheld_no_subject: 'Not attempted — no defensible market boundary to search within, so this is not a count of zero.',
+};
+function emptyText(status: string | undefined): string {
+  return (status && EMPTY_TEXT[status]) || 'No rows available for this section.';
+}
+/** A KPI value that is only a number when its section's lookup actually answered. */
+function kpi(status: string | undefined, n: unknown): string {
+  if (status === 'failed') return 'Unknown';
+  if (status === 'withheld_no_subject') return 'Not attempted';
+  return num(n);
+}
+
+function table(headers: string[], rows: string[][], whenEmpty?: string): string {
+  if (!rows.length) return `<p class="empty">${esc(whenEmpty || emptyText(undefined))}</p>`;
   const head = headers.map((h) => `<th>${esc(h)}</th>`).join('');
   const body = rows
     .map((r) => `<tr>${r.map((c, i) => `<td${i === 0 ? ' class="lead"' : ''}>${c}</td>`).join('')}</tr>`)
@@ -146,8 +187,15 @@ function section(title: string, sub: string, inner: string): string {
   return `<section class="sec"><h2>${esc(title)}</h2>${sub ? `<p class="sub">${esc(sub)}</p>` : ''}${inner}</section>`;
 }
 
-export function renderMarketReportHtml(report: ReportLike, opts: { date?: string } = {}): string {
+/**
+ * opts.pdfUrl: where a real PDF of THIS report can be downloaded (the hosted /reports/<id> page passes
+ * /reports/<id>/pdf). With it the header button is a download link; without it (MCP's inline HTML, which
+ * has no stored copy to render) it stays the browser's print dialog.
+ */
+export function renderMarketReportHtml(report: ReportLike, opts: { date?: string; pdfUrl?: string } = {}): string {
   const { subject, summary, sections, generated_for } = report;
+  const statusByName = new Map((report._meta.section_status ?? []).map((x) => [x.name, x.status]));
+  const st = (name: string) => statusByName.get(name);
   const date = opts.date || new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 
   // Every section states WHAT IT MEASURED. An unlabelled figure loses the "your data is
@@ -239,16 +287,24 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
   ]);
 
   // ---- Agency deep-dive (optional) ----
-  const ad = sections.agency_detail as { total_obligated?: number; small_business_share?: number; sub_agencies?: Row[]; set_aside_breakdown?: Row[] } | null;
+  // agency_detail comes from getAgencySpendingDetail (USASpending spending_by_category): the WHOLE agency,
+  // all NAICS, one fiscal year, contract obligations net of de-obligations. Its pct_of_total and
+  // small_business_share are already PERCENT units (9.4 = 9.4%) — multiplying by 100 printed 940%.
+  const ad = sections.agency_detail as { total_obligated?: number; small_business_share?: number | null; fiscal_year?: number; agency?: string; sub_agencies?: Row[]; set_aside_breakdown?: Row[] } | null;
   let agencyDetailHtml = '';
   if (ad && ad.total_obligated) {
-    const subRows = (ad.sub_agencies || []).slice(0, 8).map((r) => [esc(r.name), money(r.amount), `${Math.round(Number(r.pct_of_total || 0) * 100)}%`]);
-    const saRows = (ad.set_aside_breakdown || []).slice(0, 8).map((r) => [esc(r.label), money(r.amount), `${Math.round(Number(r.pct_of_total || 0) * 100)}%`]);
+    const share = (r: Row) => percentShare(r.pct_of_total, r.amount);
+    const subRows = (ad.sub_agencies || []).slice(0, 8).map((r) => [esc(r.name), money(r.amount), share(r)]);
+    const saRows = (ad.set_aside_breakdown || []).slice(0, 8).map((r) => [esc(r.label), money(r.amount), share(r)]);
+    const fy = Number.isFinite(Number(ad.fiscal_year)) && ad.fiscal_year ? `FY${ad.fiscal_year}` : 'one fiscal year';
+    const sb = percentShare(ad.small_business_share, 1);
     agencyDetailHtml = section(
       'Agency deep-dive',
-      `Total obligated ${money(ad.total_obligated)} · small-business share ${Math.round(Number(ad.small_business_share || 0) * 100)}%`,
-      `<div class="two"><div><h3>Top sub-agencies</h3>${table(['Sub-agency', 'Obligated', 'Share'], subRows)}</div>` +
-        `<div><h3>Set-aside breakdown</h3>${table(['Set-aside', 'Obligated', 'Share'], saRows)}</div></div>`
+      `${esc(ad.agency || 'Agency')}-wide, all NAICS, ${fy} — not limited to this market. `
+        + `Total contract obligations ${money(ad.total_obligated)} (net of de-obligations) · set-aside-code share ${sb} `
+        + `(dollars awarded under small-business set-aside codes; not the SBA goaling figure — small firms also win full-and-open work)`,
+      `<div class="two"><div><h3>Top sub-agencies</h3>${table(['Sub-agency', 'Obligated', 'Share of agency total'], subRows)}</div>` +
+        `<div><h3>Set-aside breakdown</h3>${table(['Set-aside', 'Obligated (net)', 'Share of agency total'], saRows)}</div></div>`
     );
   }
 
@@ -276,13 +332,24 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
 
   // RC-5 — when the headline and the sections measure different scopes, SAY SO.
   // Presenting both figures unlabelled is what read as a contradiction.
-  const scopeNote = summary.total_market_basis?.requested_state && !summary.total_market_basis.state_scoped
+  const tmb = summary.total_market_basis;
+  const headlineNational = Boolean(tmb?.requested_state && !tmb.state_scoped);
+  const headlineAllAgencies = Boolean(tmb?.requested_agency && !tmb.agency_scoped);
+  const stateNote = headlineNational
     ? `<p class="note">“Total market” is the <strong>national</strong> figure for this market${
-        summary.total_market_basis.window ? ` (${esc(summary.total_market_basis.window)})` : ''
+        tmb!.window ? ` (${esc(tmb!.window)})` : ''
       }. Every section below is scoped to <strong>${esc(
-        summary.total_market_basis.requested_state,
+        tmb!.requested_state,
       )}</strong> — the agency and contractor dollars cover FY23-25 in that state, and the recompetes and forecasts are that state's rows — so those figures are smaller by design; they answer a different question.</p>`
     : '';
+  // The headline is never agency-scoped either: with an agency requested it still covers EVERY federal buyer,
+  // and the agency deep-dive is that agency's whole spend (all NAICS). Say both, so $1.6B vs $90.6B reads as
+  // two different questions rather than a contradiction (VA report 2026-11-22).
+  const agencyNote = headlineAllAgencies
+    ? `<p class="note">“Total market” covers <strong>all federal buyers</strong>, not only ${esc(tmb!.requested_agency)}. `
+      + `The agency deep-dive is ${esc(tmb!.requested_agency)}'s total contract spend across every industry and the whole country — neither figure is ${esc(tmb!.requested_agency)}'s spend in this market.</p>`
+    : '';
+  const scopeNote = stateNote + agencyNote;
 
   /**
    * EXPLAIN — every market figure on the page, side by side, each with what it
@@ -342,16 +409,20 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
       ${statCard(
         // RC-5: name WHAT this measures. A national 1-FY headline beside
         // state-scoped 3-FY sections is not a contradiction once it is labelled.
-        summary.total_market_basis?.requested_state && !summary.total_market_basis.state_scoped
-          ? 'Total market (national)'
-          : 'Total market',
+        headlineNational && headlineAllAgencies
+          ? 'Total market (national, all agencies)'
+          : headlineNational
+            ? 'Total market (national)'
+            : headlineAllAgencies
+              ? 'Total market (all agencies)'
+              : 'Total market',
         money(summary.total_market),
         summary.total_market_basis?.window ?? undefined,
       )}
       ${summary.naics_count != null ? statCard('Buying NAICS', num(summary.naics_count)) : ''}
       ${summary.top_psc ? statCard('Top product (PSC)', summary.top_psc.code, summary.top_psc.name) : ''}
-      ${statCard('Top agencies', num(summary.buying_agencies))}
-      ${statCard('Leading contractors', num(summary.top_contractors))}
+      ${statCard('Top agencies', kpi(st('top_agencies'), summary.buying_agencies))}
+      ${statCard('Leading contractors', kpi(st('competition'), summary.top_contractors))}
       ${(() => { const c = countValue(summary.recompetes, summary.recompetes_total); return statCard('Recompetes', c.value, c.sub); })()}
       ${(() => { const c = countValue(summary.forecasts, summary.forecasts_total); return statCard(c.sub ? 'Forecast records' : 'Forecasts', c.value, c.sub); })()}
       ${summary.contacts ? statCard('Contacts to call', num(summary.contacts)) : ''}
@@ -384,18 +455,18 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
           ? ` of ${sections.top_agencies_total} with spend`
           : ''
       }. Share is of the shown agencies, not of the whole market.`,
-      (agencyRows.length ? '' : phraseEmptyNote) + table(['Buying sub-agency', 'Obligated', 'Share of shown'], agencyRows)
+      (agencyRows.length ? '' : phraseEmptyNote) + table(['Buying sub-agency', 'Obligated', 'Share of shown'], agencyRows, emptyText(st('top_agencies')))
     ),
     contactsHtml,
     section('Competitive landscape', `Leading contractors by obligated dollars${basisNote} — the incumbents you would be up against. Showing the top ${vendorRows.length}.`,
-      (vendorRows.length ? '' : phraseEmptyNote) + table(['Contractor', 'UEI', 'Obligated'], vendorRows)),
+      (vendorRows.length ? '' : phraseEmptyNote) + table(['Contractor', 'UEI', 'Obligated'], vendorRows, emptyText(st('competition')))),
     section('Recompetes on the horizon',
       `Contracts whose current period of performance ends soonest — soonest first. "Ends" is the period-of-performance end date.${
         summary.recompetes_total != null && summary.recompetes_total > recompeteRows.length
           ? ` Showing ${num(recompeteRows.length)} of ${num(summary.recompetes_total)} found.`
           : ''
       }`,
-      table(['Incumbent / contract', 'Agency', 'NAICS', 'Value', 'Ends', 'Likelihood'], recompeteRows)),
+      table(['Incumbent / contract', 'Agency', 'NAICS', 'Value', 'Ends', 'Likelihood'], recompeteRows, emptyText(st('recompetes')))),
     section('Upcoming forecasts',
       `Planned procurements agencies have published.${
         summary.forecasts_total != null && summary.forecasts_total > forecastRows.length
@@ -406,7 +477,7 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
           ? ` ${num(summary.forecasts_duplicates_removed)} duplicate listing${summary.forecasts_duplicates_removed === 1 ? '' : 's'} (the same listing received from two sources) removed.`
           : ''
       }`,
-      table(['Title', 'Agency', 'NAICS', 'Value', 'FY', 'Set-aside'], forecastRows)),
+      table(['Title', 'Agency', 'NAICS', 'Value', 'FY', 'Set-aside'], forecastRows, emptyText(st('forecasts')))),
     agencyDetailHtml,
   ].join('\n');
 
@@ -455,9 +526,9 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
   footer.rp { margin-top:28px; text-align:center; color:var(--muted); font-size:12px; }
   footer.rp b { color:var(--purple); }
   .pdfbtn { position:absolute; top:22px; right:22px; background:rgba(255,255,255,.16); color:#fff; border:1px solid rgba(255,255,255,.5);
-            border-radius:8px; padding:7px 13px; font:600 12.5px/1 inherit; cursor:pointer; }
+            border-radius:8px; padding:7px 13px; font:600 12.5px/1 inherit; cursor:pointer; text-decoration:none; }
   .pdfbtn:hover { background:rgba(255,255,255,.28); }
-  @media (max-width:560px){ .pdfbtn { display:none; } }
+  @media (max-width:560px){ button.pdfbtn { display:none; } a.pdfbtn { position:static; display:inline-block; margin-top:12px; } }
   @media print { body { background:#fff; } .sec,.stat { break-inside:avoid; } .pdfbtn { display:none; } }
 </style></head>
 <body><div class="wrap">
@@ -465,7 +536,9 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
     <div class="kick">Federal Market Report</div>
     <h1>${esc(subject)}</h1>
     <div class="meta">${generated_for ? `Prepared for ${esc(generated_for)} · ` : ''}${esc(date)}</div>
-    <button class="pdfbtn" onclick="window.print()">Save as PDF</button>
+    ${opts.pdfUrl
+      ? `<a class="pdfbtn" href="${esc(opts.pdfUrl)}" download>Download PDF</a>`
+      : '<button class="pdfbtn" onclick="window.print()">Save as PDF</button>'}
   </header>
   ${degradedNote}
   ${body}

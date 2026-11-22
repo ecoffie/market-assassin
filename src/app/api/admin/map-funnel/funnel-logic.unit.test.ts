@@ -444,7 +444,7 @@ describe('north-star "Opportunities Advanced" — EXECUTION-ONLY', () => {
 interface WonRow { id?: string | null; notice_id: string | null; naics_code: string | null; owner_email: string | null; user_email: string | null }
 interface SamRow { department: string | null; sub_tier: string | null; naics_code: string | null; state: string | null }
 // A tiny stand-in for isExcludedFromMetrics (staff domain + a known testimonial address).
-const isExcluded = (email: string) => email.endsWith('@govcongiants.com') || email === 'aj@cypherintel.com';
+const isExcluded = (email: string) => email.endsWith('@govcongiants.com') || email === 'fixture-member-1@example.com';
 // wonAt: pipeline id -> won-transition ISO (from pipeline_history where to_stage='won'). sinceIso null = all-time.
 function buildProductIntelligence(won: WonRow[], sam: Record<string, SamRow>, wonAt: Record<string, string> = {}, sinceIso: string | null = null) {
   const staffOk = won.filter((r) => !isExcluded((r.owner_email || r.user_email || '').toLowerCase()));
@@ -516,7 +516,7 @@ describe('product intelligence — grounded in won pursuits ⋈ sam_opportunitie
   it('staff/testimonial won pursuits are EXCLUDED from the aggregation', () => {
     const won: WonRow[] = [
       { notice_id: 'n1', naics_code: '541512', owner_email: 'staff@govcongiants.com', user_email: 'staff@govcongiants.com' }, // staff
-      { notice_id: 'n2', naics_code: '541512', owner_email: 'aj@cypherintel.com', user_email: 'aj@cypherintel.com' },         // testimonial
+      { notice_id: 'n2', naics_code: '541512', owner_email: 'fixture-member-1@example.com', user_email: 'fixture-member-1@example.com' },         // testimonial
       { notice_id: 'n3', naics_code: '236220', owner_email: 'real@customer.com', user_email: 'real@customer.com' },           // real
     ];
     const sam: Record<string, SamRow> = {

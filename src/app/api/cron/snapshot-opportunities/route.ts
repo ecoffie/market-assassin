@@ -11,6 +11,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { fetchAllPaged } from '@/lib/supabase/paged-read';
 import { createClient } from '@supabase/supabase-js';
 import { fetchOpportunitiesForUser } from '@/lib/briefings/pipelines/sam-gov';
+import { hasValidCronSecret } from '@/lib/cron/cron-request-auth';
 
 // Vercel cron jobs send a secret to verify the request
 const CRON_SECRET = process.env.CRON_SECRET;
@@ -18,7 +19,7 @@ const CRON_SECRET = process.env.CRON_SECRET;
 export async function GET(request: NextRequest) {
   // Verify cron secret
   const authHeader = request.headers.get('authorization');
-  if (CRON_SECRET && authHeader !== `Bearer ${CRON_SECRET}`) {
+  if (!hasValidCronSecret(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

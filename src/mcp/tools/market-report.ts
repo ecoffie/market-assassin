@@ -184,6 +184,9 @@ export interface MarketReportSummary {
     window: string | null;
     state_scoped: boolean;
     requested_state: string | null;
+    /** The headline is never agency-scoped: false + requested_agency discloses that it covers ALL buyers. */
+    agency_scoped: boolean;
+    requested_agency: string | null;
     /** Measurement terms that recovered the market — evidence, not a rename. */
     identity_resolved_via: string[] | null;
   } | null;
@@ -487,6 +490,22 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
   // USASpending source). This is what makes the report a faithful readout of the search.
   const scopedFilters = scope ? filtersForScope(scope, state, scopeExtra) : null;
 
+  // The keyword axis's subject boundary (see the recompetes section below): the ~90% coverage set.
+  const subjectNaicsSet: string[] = naicsCodes.length
+        ? naicsCodes
+        // Use the ~90% COVERAGE SET, not the full measured tail. The tail of a
+        // multi-trade family carries long-tail noise — a construction family
+        // measures 187 NAICS, of which 314910 textiles (0.004%) and 339112/339113
+        // surgical (0.002%/0.007%) are rounding error. Filtering recompetes on
+        // the whole tail put those back on the page, which is exactly the
+        // off-subject defect the P0 lock exists to prevent. coverageCodes is the
+        // smallest set covering ~90% of the measured market — 14 clean
+        // construction codes here — so it is the defensible subject boundary.
+        : (coverage?.coverageCodes?.length
+            ? coverage.coverageCodes
+            : (coverage?.allNaics ?? []).map((n) => n.code)
+          ).filter(Boolean);
+
   // UNION filter sets for a market that is "A OR B" (Cybersecurity = NAICS 518210 hosting
   // OR PSC DJ01/DJ10 security). USASpending ANDs its filters, so this can't be one query —
   // the agencies/contractors sections run each set + merge (unionSpendingCategory). When
@@ -534,20 +553,7 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
     // banner reports). When neither axis yields one, we return NO recompetes
     // rather than unrelated ones.
     (() => {
-      const subjectNaics = naicsCodes.length
-        ? naicsCodes
-        // Use the ~90% COVERAGE SET, not the full measured tail. The tail of a
-        // multi-trade family carries long-tail noise — a construction family
-        // measures 187 NAICS, of which 314910 textiles (0.004%) and 339112/339113
-        // surgical (0.002%/0.007%) are rounding error. Filtering recompetes on
-        // the whole tail put those back on the page, which is exactly the
-        // off-subject defect the P0 lock exists to prevent. coverageCodes is the
-        // smallest set covering ~90% of the measured market — 14 clean
-        // construction codes here — so it is the defensible subject boundary.
-        : (coverage?.coverageCodes?.length
-            ? coverage.coverageCodes
-            : (coverage?.allNaics ?? []).map((n) => n.code)
-          ).filter(Boolean);
+      const subjectNaics = subjectNaicsSet;
       if (!subjectNaics.length && !primaryNaics) {
         // No defensible subject filter exists → withhold the section.
         return Promise.resolve({
@@ -566,13 +572,25 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
       }), (v) => (v.contracts?.length ?? 0) > 0);
     })(),
     // Forecasts honor the FULL NAICS UNION (queryForecasts splits a comma list), NOT one code —
-    // a DOD-IT search of 4 codes was reading only the first (541511) and missing 541519's 2,668
-    // rows. And NO toptier agency filter: agency_forecasts.source_agency is stored as SHORT CODES
-    // (NAVY / USACE / DOD / GSA…), so passing the toptier name "Department of Defense" matched
-    // NOTHING and zeroed the section (Eric 2026-08-02: "the market report shows no forecast?").
-    // NAICS scope is the right market for forecasts; the saved-search agency was a $-section
-    // narrowing the forecast table can't honor by name anyway.
-    guard(agencyForecasts({ keyword: keyword || undefined, naics: naicsCodes.length ? naicsCodes.join(',') : primaryNaics, state, set_aside: setAside, limit: 15 }), (v) => (v.forecasts?.length ?? 0) > 0),
+    // a DOD-IT search of 4 codes was reading only the first (541511) and missing 541519's 2,668 rows.
+    // AGENCY: passed again — agencyForecasts now resolves names through agency-identity.ts (VA →
+    // source_agency 'VA', "Department of Defense" → its components), which is what the old toptier
+    // name could not match (Eric 2026-08-02). KEYWORD: when the literal phrase measured NOTHING and the
+    // market was identified through curated alternates (identityResolvedVia — e.g. "hospital construction
+    // renovation"), the literal is not a usable title filter (it matched 0 forecasts while VA publishes
+    // construction forecasts); the measured subject NAICS set scopes it instead, as for recompetes.
+    (() => {
+      const literalMeasuredNothing = Boolean(coverage?.identityResolvedVia?.length);
+      const forecastNaics = naicsCodes.length
+        ? naicsCodes.join(',')
+        : (literalMeasuredNothing && subjectNaicsSet.length ? subjectNaicsSet.join(',') : primaryNaics);
+      return guard(agencyForecasts({
+        keyword: keyword && !literalMeasuredNothing ? keyword : undefined,
+        naics: forecastNaics,
+        agency: agency || undefined,
+        state, set_aside: setAside, limit: 15,
+      }), (v) => (v.forecasts?.length ?? 0) > 0);
+    })(),
     agency ? guard(getAgencySpendingDetailTool({ agency }), (v) => v._meta?.grounded === true) : Promise.resolve({ value: null, degraded: false, status: 'empty' as SectionStatus, outcome: { status: 'empty' as SectionStatus, value: null } }),
     agency ? guard(getSbaGoalingShare({ agency }), (v) => v._meta?.grounded === true) : Promise.resolve({ value: null, degraded: false, status: 'empty' as SectionStatus, outcome: { status: 'empty' as SectionStatus, value: null } }),
   ]);
@@ -764,6 +782,9 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
        */
       state_scoped: false,
       requested_state: state ?? null,
+      // Nor is it agency-scoped: keywordCoverage / codeMarketSize ignore the agency (VA report 2026-11-22).
+      agency_scoped: false,
+      requested_agency: agency || null,
       /** What resolved identity when the literal phrase measured nothing (RC-1). */
       identity_resolved_via: coverage?.identityResolvedVia ?? null,
     };

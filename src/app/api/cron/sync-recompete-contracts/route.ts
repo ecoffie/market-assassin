@@ -39,6 +39,7 @@ import { diffContracts, TRACKED_FIELDS, type ExistingRow } from '@/lib/recompete
 import { findFollowOnAward, type FollowOnParent } from '@/lib/recompete/find-followon';
 import { preserveRicherEnrichment, type EnrichmentFields } from '@/lib/recompete/preserve-enrichment';
 import { reportCronOutcome } from '@/lib/cron-self-report';
+import { hasValidCronSecret } from '@/lib/cron/cron-request-auth';
 
 const RECOMPETE_JOB = 'sync-recompete-contracts';
 
@@ -138,9 +139,9 @@ async function upsertContracts(supabase: ReturnType<typeof sb>, contracts: Synce
 }
 
 export async function GET(request: NextRequest) {
-  const isVercelCron = request.headers.get('x-vercel-cron') === '1';
+  const isVercelCron = hasValidCronSecret(request);
   const authHeader = request.headers.get('authorization');
-  const hasSecret = Boolean(process.env.CRON_SECRET) && authHeader === `Bearer ${process.env.CRON_SECRET}`;
+  const hasSecret = Boolean(process.env.CRON_SECRET) && hasValidCronSecret(request);
   if (!isVercelCron && !hasSecret) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
