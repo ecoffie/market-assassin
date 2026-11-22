@@ -286,7 +286,13 @@ export function scoreFit(r: FitResult, p: FitProfile, nowMs: number = Date.now()
 
   let band: FitScore['band'] = t.expired ? 'hidden' : score >= SHOW_AT ? 'show' : score >= RELATED_AT ? 'related' : 'hidden';
   let evidenceNote: string | undefined;
-  const capabilityKnown = factors.find((f) => f.id === 'capability')?.points !== null;
+  const capabilityPoints = factors.find((f) => f.id === 'capability')?.points ?? null;
+  const capabilityKnown = capabilityPoints !== null;
+  // A KNOWN zero work match is not a fit, whatever timing or a set-aside add up to. Without this, 0 capability
+  // + an open deadline (15) + a small business set-aside (7) = 22 of 55 known points = 40 → 'related', so
+  // "show more" lists offered work the company does not do. Unknown capability is untouched (it is not a zero).
+  const noWorkMatch = capabilityKnown && capabilityPoints === 0;
+  if (noWorkMatch) band = 'hidden';
   if (band === 'show' && (!capabilityKnown || knownWeight < SHOW_MIN_KNOWN_WEIGHT)) {
     band = 'related';
     evidenceNote = `limited evidence: only ${listWords(known.map((f) => FACTOR_WORDS[f.id]))} could be checked`;
@@ -294,7 +300,7 @@ export function scoreFit(r: FitResult, p: FitProfile, nowMs: number = Date.now()
   return {
     score, band, route, reasons, known_weight: knownWeight, factors,
     ...(gate ? { gate } : {}),
-    ...(t.expired ? { hiddenBecause: 'response deadline has passed' } : {}),
+    ...(t.expired ? { hiddenBecause: 'response deadline has passed' } : noWorkMatch ? { hiddenBecause: 'no work match: the title, codes and description do not match what the company does' } : {}),
     ...(evidenceNote ? { evidenceNote } : {}),
   };
 }
