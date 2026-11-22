@@ -162,6 +162,8 @@ export function filterToolsForTurn<T extends { function?: Record<string, unknown
   defs: T[],
   customerText: string,
   priorCustomerText?: string | null,
+  /** strategyPlan: an Ask Mindy strategy-plan turn (flag-gated by the caller): no packaged market report. */
+  opts: { strategyPlan?: boolean } = {},
 ): {
   defs: T[];
   removed: string[];
@@ -179,9 +181,9 @@ export function filterToolsForTurn<T extends { function?: Record<string, unknown
     : filterToolsForQuestion(defs, customerText);
   const intent = federalMarketProfile ? 'OTHER' : inheritFindIntent(customerText, priorCustomerText);
   const openOnly = isOpenOnlyRequest(customerText);
-  const marketResearch = !federalMarketProfile && isMarketResearchRequest(customerText);
+  const marketResearch = !federalMarketProfile && !opts.strategyPlan && isMarketResearchRequest(customerText);
   const findOffered = base.defs.some((d) => String(d.function?.name ?? '') === FIND_TOOL);
-  let removed = [...base.removed];
+  const removed = [...base.removed];
   let kept = base.defs;
   if (intent === 'CURRENT_FIND' && !openOnly && findOffered) {
     kept = kept.filter((d) => {
@@ -204,6 +206,14 @@ export function filterToolsForTurn<T extends { function?: Record<string, unknown
         return false;
       }
       return true;
+    });
+  }
+  // Strategy plan: the deliverable is an argued plan written with create_document, never the keyword market report.
+  if (opts.strategyPlan) {
+    kept = kept.filter((d) => {
+      if (String(d.function?.name ?? '') !== MARKET_REPORT_TOOL) return true;
+      if (!removed.includes(MARKET_REPORT_TOOL)) removed.push(MARKET_REPORT_TOOL);
+      return false;
     });
   }
   return { defs: kept, removed, intent, openOnly, marketResearch, federalMarketProfile };

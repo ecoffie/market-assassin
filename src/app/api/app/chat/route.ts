@@ -37,6 +37,7 @@ import { hasProAccess } from '@/lib/access/resolve-access';
 // podcast retrieval (retrieveRagContext / retrievePodcastEpisodes) is gone entirely.
 import { loadBidderProfileResult, formatProfileForPrompt } from '@/lib/proposal/loaders';
 import { contractIdentityNote, contractEvidence, contractEvidenceNote, priorAwardIds } from '@/lib/chat/contract-evidence';
+import { askMindyStrategyPlanEnabledFor, isStrategyPlanRequest, STRATEGY_PLAN_CHAT_CONTRACT, strategyPlanCheck } from '@/lib/ask-mindy/strategy-plan';
 import { isUserOverBudget, recordLlmUsage } from '@/lib/llm/usage-cost';
 import { makeTier0Tools, TIER0_TOOL_DEFS, TIER0_TOOL_NAMES } from '@/lib/chat/tier0-tools';
 import { makeMyDocumentsTool, MY_DOCUMENTS_TOOL_DEF, FIND_MY_DOCUMENTS } from '@/lib/chat/my-documents-tool';
@@ -711,12 +712,18 @@ export async function POST(request: NextRequest) {
         const rulesLayer = askMindyRulesEnabledFor(auth.email);
         const customerAskForContract = splitViewPreamble(message).rest || message;
         const federalMarketProfileAsk = !cardCtx && isFederalMarketProfileRequest(customerAskForContract);
+        // Federal Strategy Plan (ASK_MINDY_STRATEGY_PLAN, default off; src/lib/ask-mindy/strategy-plan.ts): a plan for
+        // this company is argued (stands -> focus -> why -> next) and written with create_document, never answered
+        // with the packaged keyword market report. Off -> this turn is exactly as before.
+        const strategyPlanAsk = !cardCtx && !federalMarketProfileAsk && askMindyStrategyPlanEnabledFor(auth.email) && isStrategyPlanRequest(customerAskForContract);
         const findContract = rulesLayer ? rulesLayerFindContract() : CURRENT_FIND_CHAT_CONTRACT;
         const hostContract = cardCtx
           ? ''
           : federalMarketProfileAsk
             ? `\n\n${FEDERAL_MARKET_PROFILE_CHAT_CONTRACT}`
-            : `\n\n${findContract}`;
+            : strategyPlanAsk
+              ? `\n\n${STRATEGY_PLAN_CHAT_CONTRACT}`
+              : `\n\n${findContract}`;
         const rulesBlock = !rulesLayer ? '' : federalMarketProfileAsk ? `\n\n${ASK_MINDY_RULES_LAYER}` : `\n\n${askMindyRulesPromptBlock()}`;
         const systemPrompt = SYSTEM_PROMPT_TEMPLATE.replace('{today}', today).replace('{userProfile}', userProfileBlock)
           + hostContract
@@ -1057,7 +1064,16 @@ export async function POST(request: NextRequest) {
                     return r;
                   });
                 }
-                if (genDoc && n === CREATE_DOCUMENT) return genDoc.execute(a);
+                if (genDoc && n === CREATE_DOCUMENT) {
+                  // Strategy plan: record the plan's structural check (evaluation only; never blocks the save).
+                  if (strategyPlanAsk) {
+                    try {
+                      const check = strategyPlanCheck((a as { doc_model?: unknown }).doc_model as Parameters<typeof strategyPlanCheck>[0]);
+                      turnTrace.notices.push(check.pass ? 'strategy_plan_check:pass' : `strategy_plan_check:missing=${check.missing.length}`);
+                    } catch { turnTrace.notices.push('strategy_plan_check:unreadable'); }
+                  }
+                  return genDoc.execute(a);
+                }
                 return tier0Runtime.execute(n, a);
               },
             },
@@ -1076,7 +1092,8 @@ export async function POST(request: NextRequest) {
           const priorCustomerAsk = priorCustomerRaw
             ? (splitViewPreamble(String(priorCustomerRaw)).rest || String(priorCustomerRaw))
             : null;
-          const toolOffer = filterToolsForTurn(executor.offeredToolDefs(), customerAskForContract, priorCustomerAsk);
+          const toolOffer = filterToolsForTurn(executor.offeredToolDefs(), customerAskForContract, priorCustomerAsk, { strategyPlan: strategyPlanAsk });
+          if (strategyPlanAsk) turnTrace.notices.push('intent:strategy_plan');
           if (toolOffer.federalMarketProfile) turnTrace.notices.push('intent:federal_market_profile');
           if (toolOffer.marketResearch) turnTrace.notices.push('intent:market_research');
           // Industry codes the CUSTOMER typed (a planner-chosen code is not passed to find_opportunities).
