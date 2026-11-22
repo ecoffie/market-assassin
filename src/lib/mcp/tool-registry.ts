@@ -679,7 +679,11 @@ const FIND_OPPORTUNITIES_TOOL_DEF = {
         },
         limit_per_horizon: {
           type: 'number',
-          description: 'Max items returned per horizon (default 5, max 25). Not a cross-horizon merge.',
+          description: 'Max items returned per horizon (default 5, max 25). Not a cross-horizon merge. Keep it small and page with offset_per_horizon.',
+        },
+        offset_per_horizon: {
+          type: 'number',
+          description: 'Paging: first item to return in each horizon (0-based). Pass horizons.<h>.page.next_offset from the previous call with the same query.',
         },
         advanced: {
           type: 'object',
@@ -2472,6 +2476,7 @@ async function dispatchMcpTool(
           }
         : undefined,
       limit_per_horizon: typeof args.limit_per_horizon === 'number' ? args.limit_per_horizon : undefined,
+      offset_per_horizon: typeof args.offset_per_horizon === 'number' ? args.offset_per_horizon : undefined,
       advanced: advanced
         ? {
             naics: typeof advanced.naics === 'string' ? advanced.naics : undefined,
