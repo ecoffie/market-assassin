@@ -54,6 +54,7 @@ export interface AgencySpendingDetailInput {
 /** amount / pct_of_total are null when that bucket's lookup FAILED (unknown, never $0). */
 export interface SetAsideSlice { label: string; codes: string[]; amount: number | null; pct_of_total: number | null }
 export interface SubAgencySlice { name: string; amount: number; pct_of_total: number }
+export type SubAgencyStructure = 'breakdown' | 'single_self_named' | 'none' | 'unavailable' | 'not_applicable';
 
 export interface NestedSpending {
   scope: SpendingScope;
@@ -72,7 +73,18 @@ export interface AgencySpendingDetailResult {
    * on `spending.total`, never here.
    */
   total_obligated: number | null;
-  sub_agencies: SubAgencySlice[];
+  /** null = the sub-agency lookup FAILED (unknown, never "none"); [] = see sub_agency_structure. */
+  sub_agencies: SubAgencySlice[] | null;
+  /**
+   * breakdown          — component sub-agencies listed.
+   * single_self_named  — USASpending files every award under ONE sub-agency named like the department
+   *                      (VA: "Department of Veterans Affairs", $90.61B FY2026, confirmed live 2026-11-22);
+   *                      spending splits by contracting OFFICE, not sub-agency. Not an empty breakdown.
+   * none               — the lookup succeeded and returned no rows.
+   * unavailable        — the lookup failed (sub_agencies null).
+   * not_applicable     — a command/service request whose own spend is not established (parent-service path).
+   */
+  sub_agency_structure: SubAgencyStructure;
   set_aside_breakdown: SetAsideSlice[];
   /** Set-aside-code share (SBA+8(a)+SDVOSB+WOSB+HUBZone) ÷ requested total. Not goaling. */
   small_business_share: number | null;
@@ -175,6 +187,7 @@ function emptyResult(
     window,
     total_obligated: null,
     sub_agencies: [],
+    sub_agency_structure: 'not_applicable',
     set_aside_breakdown: [],
     small_business_share: null,
     set_aside_share: null,
@@ -187,6 +200,33 @@ function emptyResult(
     trace,
     ...extras,
   };
+}
+
+
+/**
+ * Sub-agency breakdown with an explicit structure. The self-named row ("Department of Veterans Affairs" under
+ * Department of Veterans Affairs) is dropped as a duplicate of the department — but when it is the ONLY row,
+ * the department records every award under one sub-agency: that is a fact about the source, not an empty
+ * breakdown. A FAILED fetch (rows null) is unknown, never "none".
+ */
+export function classifySubAgencies(
+  rows: Array<{ name?: string | null; amount?: number | null }> | null,
+  departmentName: string,
+  parentService: boolean,
+  pct: (n: number) => number,
+): { sub_agencies: SubAgencySlice[] | null; sub_agency_structure: SubAgencyStructure } {
+  if (parentService) return { sub_agencies: [], sub_agency_structure: 'not_applicable' };
+  if (rows === null) return { sub_agencies: null, sub_agency_structure: 'unavailable' };
+  const dept = departmentName.toLowerCase();
+  const positive = rows.filter((r) => (r.name || '') && (r.amount || 0) > 0);
+  const listed = positive
+    .filter((r) => String(r.name).toLowerCase() !== dept)
+    .map((r) => ({ name: String(r.name), amount: r.amount || 0, pct_of_total: pct(r.amount || 0) }))
+    .sort((a, b) => b.amount - a.amount)
+    .slice(0, 15);
+  if (listed.length) return { sub_agencies: listed, sub_agency_structure: 'breakdown' };
+  if (positive.some((r) => String(r.name).toLowerCase() === dept)) return { sub_agencies: [], sub_agency_structure: 'single_self_named' };
+  return { sub_agencies: [], sub_agency_structure: 'none' };
 }
 
 export async function getAgencySpendingDetail(input: AgencySpendingDetailInput): Promise<AgencySpendingDetailResult> {
@@ -295,13 +335,7 @@ export async function getAgencySpendingDetail(input: AgencySpendingDetailInput):
   const total = (totalRows || []).reduce((s, r) => s + (r.amount || 0), 0);
   const pct = (n: number) => (total > 0 ? Math.round((n / total) * 1000) / 10 : 0);
 
-  const sub_agencies: SubAgencySlice[] = parentService
-    ? []
-    : (subRows || [])
-      .map((r) => ({ name: r.name || '', amount: r.amount || 0, pct_of_total: pct(r.amount || 0) }))
-      .filter((s) => s.name && s.amount > 0 && s.name.toLowerCase() !== resolved!.name.toLowerCase())
-      .sort((a, b) => b.amount - a.amount)
-      .slice(0, 15);
+  const { sub_agencies, sub_agency_structure } = classifySubAgencies(subRows, resolved.name, parentService, pct);
 
   const set_aside_breakdown: SetAsideSlice[] = SET_ASIDE_BUCKETS.map((b, i) => {
       const rows = bucketRows[i];
@@ -332,6 +366,7 @@ export async function getAgencySpendingDetail(input: AgencySpendingDetailInput):
     window,
     total_obligated: parentService ? null : total,
     sub_agencies,
+    sub_agency_structure,
     set_aside_breakdown,
     small_business_share: set_aside_share,
     set_aside_share,
