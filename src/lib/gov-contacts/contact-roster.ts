@@ -20,7 +20,7 @@ import { deriveSubAgencyEvidence } from '@/lib/gov-contacts/derive-subagency';
 import { loadDodaacNames, dodaacCodesForAgency } from '@/lib/gov-contacts/dodaac-directory';
 import { osbpContactForAgency } from '@/lib/utils/command-info';
 import { isValidDodaac } from '@/lib/gov-contacts/agency-key';
-import { withDodaacPrefix, dodaacPrefixOrExpr, officePrefixOrExpr } from '@/lib/gov-contacts/dodaac-prefix';
+import { withDodaacPrefix, dodaacPrefixOrExpr, officePrefixOrExpr, isValidOfficeCode } from '@/lib/gov-contacts/dodaac-prefix';
 import { agencySearchTargets } from '@/lib/gov-contacts/agency-search';
 import { isUsableContactCard, placeholderNameFilter, displayContactName } from '@/lib/gov-contacts/contact-quality';
 import { governmentBuyersOnly } from '@/lib/gov-contacts/contact-kind';
@@ -257,6 +257,11 @@ export interface FederalContact {
   sub_agency_uncertain?: boolean;
   derived_office: string | null;
   dodaac: string | null;
+  /**
+   * The contracting office's 6-char code from the solicitation-number prefix: a DoDAAC, or a civilian
+   * office code (VA NCO 8 = 36C248) ONLY when that code is in the office directory — never guessed.
+   */
+  office_code: string | null;
   is_osbp?: boolean;
   director_verified?: string | null;
   /** OSBP rows only: "YYYY-MM" when the mailbox was seen on an official page; null = unverified. */
@@ -418,7 +423,15 @@ export async function queryFederalContacts(input: ContactRosterInput): Promise<C
     })
     .map((r) => {
       const dod = decodeDodaac(r.solicitation_number || '');
-      const rawOffice = dod?.dodaac ? dodaacNames.get(dod.dodaac) || dod.officeName || dod.dodaac : null;
+      // decodeDodaac only accepts letter-leading DoD codes; a civilian office code (36C248) is taken only when
+      // the office directory knows it, so a 6-char fragment of an arbitrary solicitation number is never an office.
+      const prefix = String(r.solicitation_number || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
+      const civilianCode = !dod?.dodaac && isValidOfficeCode(prefix) && dodaacNames.has(prefix) ? prefix : null;
+      // office_code is only ever a directory-known office (DoD or civilian) — never an unverified prefix.
+      const officeCode = dod?.dodaac && dodaacNames.has(dod.dodaac) ? dod.dodaac : civilianCode;
+      const rawOffice = dod?.dodaac
+        ? dodaacNames.get(dod.dodaac) || dod.officeName || dod.dodaac
+        : civilianCode ? dodaacNames.get(civilianCode) || null : null;
       let officeName = rawOffice ? normalizeOfficeName(rawOffice, { mode: 'expand' }) : null;
       if (!officeName && r.office) {
         const cleaned = cleanRawOffice(String(r.office));
@@ -446,6 +459,7 @@ export async function queryFederalContacts(input: ContactRosterInput): Promise<C
         sub_agency_uncertain: sub.uncertain,
         derived_office: officeName,
         dodaac: dod?.dodaac || null,
+        office_code: officeCode || null,
       } as FederalContact;
     })
     // second-pass foreign filter on the DECODED office name — skipped when
@@ -492,6 +506,7 @@ export async function queryFederalContacts(input: ContactRosterInput): Promise<C
           sub_agency: null,
           derived_office: osbp.name || null,
           dodaac: null,
+          office_code: null,
           is_osbp: true,
           director_verified: osbp.directorVerified || null,
           email_verified: osbp.email ? (osbp.emailVerified || null) : null,
