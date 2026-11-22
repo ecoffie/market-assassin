@@ -69,8 +69,9 @@ export function newReportId(): string {
 }
 
 /**
- * Persist a report. Returns its id, or null when storage is unavailable/failed —
- * the caller degrades to "no shareable link" rather than failing the whole report.
+ * Persist a report. Returns its id and the link's expiry (null = no expiry, which only happens when the
+ * link-control columns don't exist yet), or null when storage is unavailable/failed. The caller degrades to
+ * "no shareable link" rather than failing the whole report.
  */
 export async function saveMarketReport(input: {
   ownerEmail: string;
@@ -78,7 +79,7 @@ export async function saveMarketReport(input: {
   clientName?: string | null;
   params: Record<string, unknown>;
   payload: Record<string, unknown>;
-}): Promise<string | null> {
+}): Promise<{ id: string; expires_at: string | null } | null> {
   const sb = client();
   // Owner key is stored lowercase: the owner routes match the verified (lowercased) email exactly, and a
   // mixed-case owner would otherwise lose access to their own report. Never ilike (emails contain _ and %).
@@ -96,18 +97,20 @@ export async function saveMarketReport(input: {
       payload: input.payload,
     };
     const expires_at = new Date(Date.now() + REPORT_LINK_DAYS * 86_400_000).toISOString();
+    let savedExpiry: string | null = expires_at;
     let { error } = await sb.from('market_reports').insert({ ...row, expires_at });
     // Code deployed before the migration is applied: save the report without an expiry rather than lose it
     // (a report the caller paid for must never fail to save over link metadata).
     if (error && missingLinkColumns(error)) {
       console.warn('[market-report] link-control columns missing; saved without expiry (apply 20261122_market_reports_share_controls.sql)');
       ({ error } = await sb.from('market_reports').insert(row));
+      savedExpiry = null;
     }
     if (error) {
       console.error('[market-report] save failed:', error.message);
       return null;
     }
-    return id;
+    return { id, expires_at: savedExpiry };
   } catch (err) {
     console.error('[market-report] save threw:', err);
     return null;

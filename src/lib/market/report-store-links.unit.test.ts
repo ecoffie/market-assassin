@@ -23,7 +23,7 @@ beforeEach(() => {
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'service';
 });
 
-const save = () => saveMarketReport({ ownerEmail: 'sue@example.com', subject: 'drones', clientName: 'Acme', params: {}, payload: { subject: 'drones' } });
+const save = () => saveMarketReport({ ownerEmail: 'sue@example.com', subject: 'drones', clientName: 'Acme', params: {}, payload: { subject: 'drones' } }).then((r) => r?.id ?? null);
 
 describe('linkStatus', () => {
   it('a row with no expiry and not revoked is live (every link that exists today)', () => {
@@ -41,6 +41,14 @@ describe('linkStatus', () => {
 });
 
 describe('saveMarketReport', () => {
+  it('returns the saved expiry (null when saved before the migration)', async () => {
+    const r = await saveMarketReport({ ownerEmail: 'sue@example.com', subject: 'd', params: {}, payload: {} });
+    expect(r!.expires_at).toBe(db.rows[0].expires_at);
+    db.state.missingLinkColumns = true;
+    const r2 = await saveMarketReport({ ownerEmail: 'sue@example.com', subject: 'd', params: {}, payload: {} });
+    expect(r2!.expires_at).toBeNull();
+  });
+
   it('new links expire after 90 days', async () => {
     const before = Date.now();
     const id = await save();
@@ -64,9 +72,9 @@ describe('saveMarketReport', () => {
   });
 
   it('stores the owner key lowercase, so the (lowercased) verified owner keeps access', async () => {
-    const id = await saveMarketReport({ ownerEmail: '  Sue.Smith@Example.COM ', subject: 's', params: {}, payload: { subject: 's' } });
+    const saved = await saveMarketReport({ ownerEmail: '  Sue.Smith@Example.COM ', subject: 's', params: {}, payload: { subject: 's' } });
     expect(db.rows[0].owner_email).toBe('sue.smith@example.com');
-    expect(await getOwnedMarketReport(id!, 'sue.smith@example.com')).not.toBeNull();
+    expect(await getOwnedMarketReport(saved!.id, 'sue.smith@example.com')).not.toBeNull();
   });
 
   it('an unrelated storage error still returns null (no silent retry)', async () => {

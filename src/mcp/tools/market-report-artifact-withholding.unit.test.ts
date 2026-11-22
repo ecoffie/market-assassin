@@ -12,7 +12,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const saveMarketReport = vi.fn(async () => 'stub-report-id');
+const saveMarketReport = vi.fn(async () => ({ id: 'stub-report-id', expires_at: '2027-02-20T00:00:00.000Z' }));
 
 vi.mock('@/lib/market/report-store', () => ({ saveMarketReport }));
 
@@ -126,6 +126,15 @@ describe('a PUBLISHED report still produces the artifact', () => {
     expect(r.deliverable.report_id).toBe('stub-report-id');
     expect(r.deliverable.url).toContain('/reports/stub-report-id');
     expect(r._meta.saved).toBe(true);
+    // Link controls (sharing PR 2): the expiry rides with the link.
+    expect(r.deliverable.expires_at).toBe('2027-02-20T00:00:00.000Z');
+  });
+
+  it('a withheld report has no link and no expiry', async () => {
+    stubGroundedMarket();
+    const r = await generateMarketReport({ keyword: 'widgets' });
+    expect(r.deliverable.url).toBeNull();
+    expect(r.deliverable.expires_at).toBeNull();
   });
 
   it('does not persist without a verified caller, but still renders the page', async () => {

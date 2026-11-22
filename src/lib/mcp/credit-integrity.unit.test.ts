@@ -139,7 +139,7 @@ vi.mock('@/mcp/tools/agency-spending-detail', () => ({ getAgencySpendingDetailTo
 vi.mock('@/mcp/tools/sba-goaling', () => ({ getSbaGoalingShare: vi.fn(async () => null) }));
 const store = vi.hoisted(() => ({ saved: 0 }));
 vi.mock('@/lib/market/report-store', () => ({
-  saveMarketReport: vi.fn(async () => { store.saved += 1; return `rep${store.saved}`; }),
+  saveMarketReport: vi.fn(async () => { store.saved += 1; return { id: `rep${store.saved}`, expires_at: '2027-02-20T00:00:00.000Z' }; }),
 }));
 
 // Pursuit dossier upstreams.

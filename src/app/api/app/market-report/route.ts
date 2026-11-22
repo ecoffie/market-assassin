@@ -124,6 +124,8 @@ export async function POST(request: NextRequest) {
       success: true,
       url: report.deliverable.url,
       report_id: report.deliverable.report_id,
+      // When the hosted link stops working (null = no expiry); the owner can extend or revoke it.
+      expires_at: report.deliverable.expires_at ?? null,
       subject: report.subject,
       summary: report.summary,
       // The UI surfaces the honest-gap note when an axis came back thin.
