@@ -10,7 +10,8 @@
  *
  * Access is the hosted page's: the unguessable id is the capability (a client opens the link without a
  * Mindy login). Malformed and missing ids get the same 404. Starting a browser costs real compute, so
- * every request is rate-limited per IP and per report before Chromium starts.
+ * every request is rate-limited per IP and per report before Chromium starts. If KV is unavailable the
+ * limit does NOT fail open: smaller in-process caps apply per instance (src/lib/pdf/render-rate-limit.ts).
  *
  * Errors are answered so a person can act on them: JSON ({ error, message }) when the caller asks for
  * JSON (Ask Mindy's Export button), otherwise a short HTML page linking back to the report. A failed
@@ -22,7 +23,8 @@ import { NextResponse } from 'next/server';
 import { getMarketReport } from '@/lib/market/report-store';
 import { renderStoredReportHtml, reportPdfFileName } from '@/lib/market/stored-report-html';
 import { htmlToPdf } from '@/lib/pdf/launch-browser';
-import { checkRateLimit, getClientIP } from '@/lib/rate-limit';
+import { getClientIP } from '@/lib/rate-limit';
+import { checkBrowserRateLimits } from '@/lib/pdf/render-rate-limit';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -31,6 +33,10 @@ export const maxDuration = 60;
 const ID_RE = /^[A-Za-z0-9_-]{16,64}$/;
 export const PDF_LIMIT_PER_IP_HOUR = 20;
 export const PDF_LIMIT_PER_REPORT_HOUR = 60;
+// KV unavailable → in-process, per-instance caps (never fail open: this route starts Chromium).
+export const PDF_FALLBACK_PER_IP_HOUR = 5;
+export const PDF_FALLBACK_PER_REPORT_HOUR = 10;
+export const PDF_FALLBACK_INSTANCE_HOUR = 30;
 
 export const PDF_OPTIONS = {
   format: 'Letter',
@@ -78,14 +84,15 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   const { id } = await ctx.params;
   if (!ID_RE.test(id || '')) return fail(req, '', { status: 404, error: 'not_found', message: MESSAGES.not_found });
 
-  const [byIp, byReport] = await Promise.all([
-    checkRateLimit(`report-pdf:ip:${getClientIP(req)}`, PDF_LIMIT_PER_IP_HOUR, 3600),
-    checkRateLimit(`report-pdf:id:${id}`, PDF_LIMIT_PER_REPORT_HOUR, 3600),
-  ]);
-  if (!byIp.allowed || !byReport.allowed) {
-    const resetAt = Math.max(byIp.allowed ? 0 : byIp.resetAt, byReport.allowed ? 0 : byReport.resetAt);
-    const retryAfter = Math.max(1, resetAt - Math.floor(Date.now() / 1000));
-    return fail(req, id, { status: 429, error: 'rate_limited', message: MESSAGES.rate_limited, retryAfter });
+  const limits = await checkBrowserRateLimits(
+    [
+      { key: `report-pdf:ip:${getClientIP(req)}`, limit: PDF_LIMIT_PER_IP_HOUR, fallbackLimit: PDF_FALLBACK_PER_IP_HOUR, windowSeconds: 3600 },
+      { key: `report-pdf:id:${id}`, limit: PDF_LIMIT_PER_REPORT_HOUR, fallbackLimit: PDF_FALLBACK_PER_REPORT_HOUR, windowSeconds: 3600 },
+    ],
+    { key: 'report-pdf:instance', limit: PDF_FALLBACK_INSTANCE_HOUR, windowSeconds: 3600 },
+  );
+  if (!limits.allowed) {
+    return fail(req, id, { status: 429, error: 'rate_limited', message: MESSAGES.rate_limited, retryAfter: limits.retryAfter });
   }
 
   const report = await getMarketReport(id);
