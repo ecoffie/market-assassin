@@ -1,0 +1,3 @@
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-11-22 | Map Ask Mindy window / History | Deleting a conversation from History now asks first ("Delete this conversation? Delete / Cancel") instead of deleting permanently on a single click (Agent 4 follow-up on #2332). Cancel keeps it, a second click doesn't stack prompts, and a failed delete can be retried. | `function confirmDelete(sid,row){` → `src/app/opportunity-map/route.ts` | `ask-window-history.unit.test.ts`: × alone sends no DELETE, a single prompt, Cancel keeps the row; existing delete tests now confirm first; a failed delete re-enables Delete. Map suites 1536/1536. | PR |
