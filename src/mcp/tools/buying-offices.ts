@@ -21,6 +21,7 @@
  * Registered in the shared registry for Ask Mindy only. Hidden from the public MCP catalog
  * (public-catalog-config.ts) until an owner review decides otherwise.
  */
+import { voteOfficeIdentity, type OfficeIdentityBasis } from '@/lib/gov-contacts/office-identity';
 import {
   bqDateString,
   normalizeCities,
@@ -255,11 +256,13 @@ ORDER BY ranked.obligated DESC`;
 
 /** Name lookup for awarding-office codes, one fiscal-year partition per query. */
 export function buildOfficeNameQuery(): string {
-  return `SELECT awarding_office_code AS code, ANY_VALUE(awarding_office) AS name,
-  ANY_VALUE(awarding_agency) AS agency, ANY_VALUE(awarding_sub_agency) AS sub_agency
+  // One row per (code, name, agency, sub_agency) with its row count: the identity is decided by
+  // voteOfficeIdentity, never ANY_VALUE (which mixed agencies across rows — 70B01C read as the FTC).
+  return `SELECT awarding_office_code AS code, awarding_office AS name,
+  awarding_agency AS agency, awarding_sub_agency AS sub_agency, COUNT(*) AS n
 FROM ${AWARDS_TABLE}
 WHERE fiscal_year = @fy AND awarding_office_code IN UNNEST(@codes)
-GROUP BY 1`;
+GROUP BY 1, 2, 3, 4`;
 }
 
 /** Agency lookup for funding-office names, one fiscal-year partition per query. */
@@ -270,7 +273,13 @@ WHERE fiscal_year = @fy AND funding_office IN UNNEST(@names)
 GROUP BY 1`;
 }
 
-interface NameRow { code?: string | null; name: string | null; agency: string | null; sub_agency?: string | null }
+interface NameRow {
+  code?: string | null; name: string | null; agency: string | null; sub_agency?: string | null;
+  /** Office rows only: vote counts per (name, agency, sub_agency). */
+  n?: number | string;
+  identity_basis?: OfficeIdentityBasis;
+  agency_share?: number;
+}
 
 /**
  * Resolve names for a small set of keys, newest partition first, stopping once all are found.
@@ -290,7 +299,7 @@ async function resolveNames(
     const sorted = [...missing].sort();
     const outcome = await runScopedAggregate<NameRow>(
       kind === 'office'
-        ? { cacheKey: `ask:office-names:v1:${fy}:${sorted.join('|')}`, query: buildOfficeNameQuery(), params: { fy, codes: sorted }, tool: 'get_buying_offices', family: 'office_names' }
+        ? { cacheKey: `ask:office-names:v2:${fy}:${sorted.join('|')}`, query: buildOfficeNameQuery(), params: { fy, codes: sorted }, tool: 'get_buying_offices', family: 'office_names' }
         : { cacheKey: `ask:funding-agency:v1:${fy}:${sorted.join('|')}`, query: buildFundingAgencyQuery(), params: { fy, names: sorted }, tool: 'get_buying_offices', family: 'funding_agency' },
       deps,
     );
@@ -298,9 +307,14 @@ async function resolveNames(
       failed = true;
       break;
     }
-    for (const r of outcome.rows) {
-      const k = kind === 'office' ? r.code : r.name;
-      if (k && !map.has(k)) map.set(k, r);
+    if (kind === 'office') {
+      for (const [code, id] of voteOfficeIdentity(outcome.rows.map((r) => ({ code: r.code ?? null, name: r.name, agency: r.agency, sub_agency: r.sub_agency ?? null, n: r.n ?? 1 })))) {
+        if (!map.has(code)) map.set(code, { code, name: id.name, agency: id.agency, sub_agency: id.sub_agency, identity_basis: id.identity_basis, agency_share: id.agency_share });
+      }
+    } else {
+      for (const r of outcome.rows) {
+        if (r.name && !map.has(r.name)) map.set(r.name, r);
+      }
     }
     missing = missing.filter((k) => !map.has(k));
   }
@@ -526,6 +540,8 @@ export async function getBuyingOffices(
       office_code_type: role === 'awarding' && key ? (isDodOffice(named?.agency) ? 'dodaac' : 'agency_office_code') : null,
       agency: role === 'awarding' ? (named?.agency ?? null) : (fundingNamed?.agency ?? null),
       sub_agency: role === 'awarding' ? (named?.sub_agency ?? null) : null,
+      // 'conflicting' = the code's rows name different agencies with no clear majority: agency unknown.
+      ...(role === 'awarding' && named?.identity_basis ? { agency_identity: { basis: named.identity_basis, share: named.agency_share ?? null } } : {}),
       award_count: num(r.award_count),
       transaction_count: num(r.transaction_count),
       obligated: round2(num(r.obligated)),

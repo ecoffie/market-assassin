@@ -17,6 +17,7 @@
  *
  * Do NOT "simplify" this into an upsert — see the never-overwrite guard below.
  */
+import { voteOfficeIdentity } from './office-identity';
 import { createClient } from '@supabase/supabase-js';
 import { bqQuery, BQ_TABLES } from '@/lib/bigquery/client';
 
@@ -34,7 +35,42 @@ function cleanName(code: string, raw: string): string {
   return n || raw || code;
 }
 
+/**
+ * Collapse per-(code, name, agency, sub_agency) rows into one directory record per code. Counts and
+ * obligations are summed over EVERY row of the code; agency / sub_agency / name come from the vote
+ * and are null when the code's rows conflict (explicit unknown, never the minority agency).
+ */
+export function buildDirectoryRecords(
+  rows: Array<{ dodaac: string; office_name: string | null; agency: string | null; sub_agency: string | null; award_count: number | string; total_obligated: number | string | null }>,
+  updatedAt: string,
+) {
+  const ids = voteOfficeIdentity(rows.map((r) => ({ code: r.dodaac, name: r.office_name, agency: r.agency, sub_agency: r.sub_agency, n: r.award_count })));
+  const totals = new Map<string, { count: number; obligated: number; anyName: string | null }>();
+  for (const r of rows) {
+    const t = totals.get(r.dodaac) ?? { count: 0, obligated: 0, anyName: null };
+    t.count += Number(r.award_count || 0);
+    t.obligated += Number(r.total_obligated || 0);
+    t.anyName = t.anyName ?? r.office_name;
+    totals.set(r.dodaac, t);
+  }
+  return [...ids.values()].map((id) => {
+    const t = totals.get(id.code)!;
+    return {
+      dodaac: id.code,
+      office_name: cleanName(id.code, id.name ?? t.anyName ?? id.code),
+      agency: id.agency,
+      sub_agency: id.sub_agency,
+      award_count: t.count,
+      total_obligated: t.obligated,
+      source: 'fpds_awards',
+      updated_at: updatedAt,
+    };
+  });
+}
+
 export async function refreshDodaacDirectory(): Promise<{ offices: number; written: number }> {
+  // One row per (code, name, agency, sub_agency): the office's agency is decided by majority vote
+  // (office-identity.ts), never ANY_VALUE — that let one miskeyed transaction label CBP's 70B01C the FTC.
   const rows = await bqQuery<{
     dodaac: string; office_name: string; agency: string | null;
     sub_agency: string | null; award_count: number; total_obligated: number;
@@ -42,31 +78,21 @@ export async function refreshDodaacDirectory(): Promise<{ offices: number; writt
     query: `
       SELECT
         awarding_office_code AS dodaac,
-        ANY_VALUE(awarding_office) AS office_name,
-        ANY_VALUE(awarding_agency) AS agency,
-        ANY_VALUE(awarding_sub_agency) AS sub_agency,
+        awarding_office AS office_name,
+        awarding_agency AS agency,
+        awarding_sub_agency AS sub_agency,
         COUNT(*) AS award_count,
         SUM(obligation_amount) AS total_obligated
       FROM ${BQ_TABLES.awards}
       WHERE awarding_office_code IS NOT NULL
         AND awarding_office IS NOT NULL
         AND LENGTH(awarding_office_code) = 6
-      GROUP BY awarding_office_code
-      HAVING award_count > 0
+      GROUP BY 1, 2, 3, 4
     `,
     maximumBytesBilled: String(20 * 1024 * 1024 * 1024),
   });
 
-  const records = rows.map(r => ({
-    dodaac: r.dodaac,
-    office_name: cleanName(r.dodaac, r.office_name),
-    agency: r.agency || null,
-    sub_agency: r.sub_agency || null,
-    award_count: Number(r.award_count || 0),
-    total_obligated: Number(r.total_obligated || 0),
-    source: 'fpds_awards',
-    updated_at: new Date().toISOString(),
-  }));
+  const records = buildDirectoryRecords(rows, new Date().toISOString());
 
   const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
   let written = 0;
@@ -76,7 +102,7 @@ export async function refreshDodaacDirectory(): Promise<{ offices: number; writt
     if (error) throw new Error(`dodaac upsert: ${error.message}`);
     written += batch.length;
   }
-  return { offices: rows.length, written };
+  return { offices: records.length, written };
 }
 
 /**

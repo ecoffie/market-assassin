@@ -44,7 +44,7 @@ function deps(opts: { bytes?: number; fail?: boolean; rows?: unknown[] } = {}) {
     run: vi.fn(async (o: { cacheKey: string; query: string; params: Record<string, unknown> }) => {
       calls.push(o);
       if (opts.fail) return { rows: [], state: 'failed' as const };
-      if (o.query.includes('ANY_VALUE(awarding_office)')) return { rows: NAMES as never[], state: 'hit' as const };
+      if (o.query.includes('awarding_office AS name')) return { rows: NAMES as never[], state: 'hit' as const };
       if (o.query.includes('ANY_VALUE(funding_agency)')) return { rows: [] as never[], state: 'empty' as const };
       const rows = opts.rows ?? OFFICE_ROWS;
       return { rows: rows as never[], state: rows.length ? ('hit' as const) : ('empty' as const) };
