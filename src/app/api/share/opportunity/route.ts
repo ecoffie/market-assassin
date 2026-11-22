@@ -7,6 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { classifyShareLookup } from '@/lib/share/opportunity-share-lookup';
 
 export const dynamic = 'force-dynamic';
 
@@ -170,7 +171,16 @@ export async function GET(request: NextRequest) {
       .eq('share_id', shareId)
       .maybeSingle();
 
-    if (fetchError || !share) {
+    // A query error is unknown, not a dead link — never report it as notFound.
+    if (classifyShareLookup({ data: share, error: fetchError }) === 'unknown') {
+      console.error('[ShareOpportunity] Lookup error:', fetchError);
+      return NextResponse.json(
+        { error: 'Failed to load share link' },
+        { status: 500 }
+      );
+    }
+
+    if (!share) {
       return NextResponse.json(
         { error: 'Share link not found', notFound: true },
         { status: 404 }

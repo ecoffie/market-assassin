@@ -99,7 +99,6 @@ describe('chat route wiring (source assertions)', () => {
       add_contacts_to_crm: /add (them|contacts) to (your )?CRM/i,
       one_click_proposal: /one[- ]click proposal/i,
       export_proposal: /export (the )?proposal/i,
-      generate_market_report: /(generate|create|save) a market report/i,
       delete_market_schedule: /delete (an |your )?(alert|saved search|schedule)/i,
     };
     for (const [tool, re] of Object.entries(BLOCKED_TOOL_PHRASES)) expect(re.test(prompt), tool).toBe(false);

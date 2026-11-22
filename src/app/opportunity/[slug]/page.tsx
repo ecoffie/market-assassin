@@ -26,6 +26,7 @@ import {
   getRelatedOpenOpportunities,
   type SeoOpportunity,
 } from '@/lib/seo/opportunities';
+import { buildOpportunityTitles } from '@/lib/seo/opportunity-title';
 
 /** The row facts the status banner is built from (shared by metadata and the page). */
 function statusOf(opp: SeoOpportunity) {
@@ -87,15 +88,13 @@ export async function generateMetadata({
       statusSentence,
   );
   const url = `${SITE_URL}/opportunity/${slug}`;
-  const kind = status === 'closed' ? 'Closed Federal Solicitation' : 'Federal Contract Opportunity';
-  const titleStr = `${opp.title} — ${kind} | Mindy`;
+  // Titles repeat across notices ("53--GASKET"), so the solicitation number (else agency) is in the title.
+  const { title, ogTitle } = buildOpportunityTitles({ ...opp, status });
   return {
-    title: titleStr.length > 65
-      ? `${opp.title.slice(0, 50)}… — ${status === 'closed' ? 'Closed' : 'Federal Opportunity'} | Mindy`
-      : titleStr,
+    title,
     description: desc,
     alternates: { canonical: url },
-    openGraph: { title: titleStr, description: desc, type: 'article', url, images: opportunityShareImages(opp.noticeId, opp.title) },
+    openGraph: { title: ogTitle, description: desc, type: 'article', url, images: opportunityShareImages(opp.noticeId, opp.title) },
     keywords: [
       `${opp.title.toLowerCase()} government contract`,
       opp.solicitationNumber ? `${opp.solicitationNumber} solicitation` : 'federal solicitation',
