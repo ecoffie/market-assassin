@@ -186,7 +186,7 @@ export default async function CustomersPage() {
           <h2 className="m-0 font-(family-name:--mp-font-serif) text-[32px] font-bold text-(--mp-surface)">Find your next federal contract.</h2>
           <p className="mx-auto mt-3 mb-0 max-w-[36rem] text-[17px] text-(--mp-navy-wash)">Try Mindy free for 14 days.</p>
           <Link href="/pricing" className="mt-7 inline-flex items-center rounded-xl bg-(--mp-surface) px-6 py-3.5 text-[16px] font-semibold text-(--mp-navy) no-underline">
-            Start for free
+            Start 14-day free trial
           </Link>
         </div>
       </section>
