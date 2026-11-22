@@ -86,10 +86,12 @@ describe('Map drawer attach', () => {
     expect(doc.querySelector('[data-testid="amk-attach"]')).toBeNull();
   });
 
-  it('server says yes → says "Saved privately to your Vault"', async () => {
+  it('server says yes → says "Saved privately" (no Vault push in the attach line)', async () => {
     const { doc, settle } = boot({ flag: true });
     await settle();
-    expect(doc.querySelector('[data-testid="amk-attach"]')?.textContent).toContain('Saved privately to your Vault');
+    const txt = doc.querySelector('[data-testid="amk-attach"]')?.textContent || '';
+    expect(txt).toContain('Saved privately');
+    expect(txt).not.toMatch(/Vault/i);
   });
 
   it('nothing is baked into the page: no window flag turns the row on, and a failed check shows nothing', async () => {

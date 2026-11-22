@@ -153,6 +153,7 @@ const card = { context: { kind: 'opportunity', notice_id: NID }, turn_id: TURN }
 
 const sysOf = (msgs: Array<{ role: string; content: string }>) => msgs.filter((m) => m.role === 'system').map((m) => m.content).join('\n');
 const FIND_Q = 'What should we go after in Tennessee?';
+const FMP_Q = 'Build a federal market profile for our company with pathways in priority order.';
 
 describe('Ask Mindy rules layer flag', () => {
   beforeEach(() => { state.pro = true; });
@@ -187,6 +188,24 @@ describe('Ask Mindy rules layer flag', () => {
     vi.stubEnv('ASK_MINDY_RULES_ALLOWLIST', ME);
     await post({ message: FIND_Q });
     expect(sysOf(state.answerMessages[0])).toContain('ASK MINDY RULES');
+  });
+
+  it('Federal Market Profile ask, flag off: the FMP contract and no rules layer (unchanged from #2204)', async () => {
+    await post({ message: FMP_Q });
+    const sys = sysOf(state.answerMessages[0]);
+    expect(sys).toContain('FEDERAL MARKET PROFILE (company-first pathway report');
+    expect(sys).not.toContain('ASK MINDY RULES');
+    expect(sys).not.toContain('FINDING OPPORTUNITIES');
+  });
+
+  it("Federal Market Profile ask, flag on: keeps its own contract, gets the rules, never the top-picks answer format", async () => {
+    vi.stubEnv('ASK_MINDY_RULES_LAYER', 'true');
+    await post({ message: FMP_Q });
+    const sys = sysOf(state.answerMessages[0]);
+    expect(sys).toContain('FEDERAL MARKET PROFILE (company-first pathway report');
+    expect(sys).toContain('ASK MINDY RULES');
+    expect(sys).not.toContain('ANSWER FORMAT');
+    expect(sys).not.toContain('Pick the 3 to 5 best fits');
   });
 
   it('card chat gets the rules layer but no FIND contract', async () => {
