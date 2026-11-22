@@ -47,12 +47,31 @@ export interface GhlSmsResult {
   messageId?: string;
   error?: string;
   /**
-   * True when GHL refused the send because the contact has unsubscribed / is in
-   * SMS DND (they texted STOP). GHL is the source of truth for opt-out and hard-
+   * True when GHL refused the send because the contact has unsubscribed (texted
+   * STOP) or has DND active (see isGhlSmsOptOut). GHL is the source of truth for opt-out and hard-
    * blocks the send itself, so this is not a real failure — it means "skip, they
    * opted out." Callers should mirror this to sms_opted_out and NOT log an error.
    */
   optedOut?: boolean;
+}
+
+/**
+ * True when a failed GHL send was refused because the contact opted out, not
+ * because something broke. GHL reports this two ways:
+ *   - 400 CONVERSATIONS_MSG_UNSUBSCRIBED_SMS / "...unsubscribed..." (texted STOP)
+ *   - "DND is active" (Do Not Disturb set on the contact, for SMS or all channels)
+ * Both hard-block the send, so retrying can never succeed.
+ */
+export function isGhlSmsOptOut(data: unknown): boolean {
+  const d = (data ?? {}) as { canonicalCode?: unknown; message?: unknown };
+  const code = String(d.canonicalCode ?? '');
+  const message = String(d.message ?? '');
+  return (
+    code === 'CONVERSATIONS_MSG_UNSUBSCRIBED_SMS' ||
+    /\bDND\b/i.test(code) ||
+    /unsubscribed/i.test(message) ||
+    /\bDND\b/i.test(message)
+  );
 }
 
 /**
@@ -99,12 +118,9 @@ export async function sendViaGHL(phone: string, body: string): Promise<GhlSmsRes
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    // GHL enforces STOP itself: a send to an unsubscribed contact returns 400
-    // CONVERSATIONS_MSG_UNSUBSCRIBED_SMS. That's not a failure — it's the carrier/
-    // GHL honoring opt-out. Surface it as optedOut so callers can sync our flag.
-    const optedOut =
-      data?.canonicalCode === 'CONVERSATIONS_MSG_UNSUBSCRIBED_SMS' ||
-      /unsubscribed/i.test(String(data?.message || ''));
+    // GHL enforces STOP itself. That's not a failure — it's the carrier/GHL
+    // honoring opt-out. Surface it as optedOut so callers can sync our flag.
+    const optedOut = isGhlSmsOptOut(data);
     return {
       success: false,
       contactId,
@@ -138,9 +154,7 @@ export async function sendSmsToContact(
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    const optedOut =
-      data?.canonicalCode === 'CONVERSATIONS_MSG_UNSUBSCRIBED_SMS' ||
-      /unsubscribed/i.test(String(data?.message || ''));
+    const optedOut = isGhlSmsOptOut(data);
     return { success: false, contactId, optedOut, error: data?.message || `message send failed (${res.status})` };
   }
   return { success: true, contactId, messageId: data?.messageId || data?.conversationId || data?.id };
