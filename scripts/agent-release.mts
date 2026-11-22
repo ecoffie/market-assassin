@@ -121,6 +121,18 @@ function typecheckMerged(pr: number, sha: string): { ok: boolean; detail: string
   }
 }
 
+/**
+ * Compare-and-swap on the lock ref: a new commit whose parent is `expectedCommit`, written with force=false,
+ * fast-forwards only from that exact commit. Returns the new commit, or null when another run moved the ref.
+ */
+function casLock(expectedCommit: string, p: LockPayload): string | null {
+  const commit = lockCommit(p, [expectedCommit]);
+  const r = ghTry(`repos/${REPO}/git/${LOCK_REF}`, 'PATCH', {}, JSON.stringify({ sha: commit, force: false }));
+  if (r.ok) return commit;
+  if (r.status === 422 || r.status === 409) return null;
+  throw new Error(`lock update failed: ${r.msg}`);
+}
+
 /** A lock commit: message = JSON payload (the tree holds the same, for humans browsing the ref). */
 function lockCommit(p: LockPayload, parents: string[]): string {
   const tree = gh<{ sha: string }>(`repos/${REPO}/git/trees`, 'POST', {}, JSON.stringify({ tree: [{ path: 'LOCK', mode: '100644', type: 'blob', content: JSON.stringify(p) }] }));
@@ -178,21 +190,17 @@ const port: Port = {
   createLock: async (p) => {
     const commit = lockCommit(p, []);
     const r = ghTry(`repos/${REPO}/git/refs`, 'POST', {}, JSON.stringify({ ref: LOCK_REF, sha: commit }));
-    if (r.ok) return true;
-    if (r.status === 422) return false; // already exists → someone else holds it
+    if (r.ok) return commit;
+    if (r.status === 422) return null; // already exists → someone else holds it
     throw new Error(`lock create failed: ${r.msg}`);
   },
-  takeOverLock: async (expectedCommit, p) => {
-    // The new lock commit's parent is the expired lock commit, so force=false makes this a fast-forward ONLY
-    // from that exact commit. A concurrent takeover that already moved the ref makes ours a non-fast-forward
-    // (422), and we lose cleanly.
-    const commit = lockCommit(p, [expectedCommit]);
-    const r = ghTry(`repos/${REPO}/git/${LOCK_REF}`, 'PATCH', {}, JSON.stringify({ sha: commit, force: false }));
-    if (r.ok) return true;
-    if (r.status === 422 || r.status === 409) return false;
-    throw new Error(`lock takeover failed: ${r.msg}`);
+  takeOverLock: async (expectedCommit, p) => casLock(expectedCommit, p),
+  releaseLock: async (expectedCommit) => {
+    // A tombstone, written atomically from the exact commit we hold: already expired and marked released.
+    const cur = await port.readLock();
+    const tomb: LockPayload = { ...(cur?.payload ?? { owner: 'agent4-release', pr: 0, sha: '' }), expires_at: new Date(0).toISOString(), released: true };
+    return (await casLock(expectedCommit, tomb)) !== null;
   },
-  deleteLock: async () => { ghTry(`repos/${REPO}/git/${LOCK_REF}`, 'DELETE'); },
 };
 
 // Mergeability is only computed on the single-PR endpoint (and lazily): refresh allowlisted candidates,

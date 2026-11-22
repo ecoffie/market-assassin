@@ -94,12 +94,19 @@ function port(w: World): Port {
     addLabels: async (n, labels) => { w.labels.push({ pr: n, labels }); const p = w.prs.get(n); if (p) p.labels.push(...labels); },
     readLock: async () => (w.lock ? { payload: { ...w.lock.payload }, commit: w.lock.commit } : null),
     // Atomic: a ref create fails if the ref exists (GitHub returns 422).
-    createLock: async (p) => { if (w.lock) return false; w.lock = { payload: p, commit: `lock${++w.lockSeq}` }; return true; },
+    createLock: async (p) => { if (w.lock) return null; w.lock = { payload: p, commit: `lock${++w.lockSeq}` }; return w.lock.commit; },
     // Atomic: a force=false update fast-forwards only from the expected old commit.
-    takeOverLock: async (expected, p) => { if (!w.lock || w.lock.commit !== expected) return false; w.lock = { payload: p, commit: `lock${++w.lockSeq}` }; return true; },
-    deleteLock: async () => { w.lock = null; },
+    takeOverLock: async (expected, p) => { if (!w.lock || w.lock.commit !== expected) return null; w.lock = { payload: p, commit: `lock${++w.lockSeq}` }; return w.lock.commit; },
+    releaseLock: async (expected) => {
+      if (!w.lock || w.lock.commit !== expected) return false;
+      w.lock = { payload: { ...w.lock.payload, expires_at: new Date(0).toISOString(), released: true }, commit: `lock${++w.lockSeq}` };
+      return true;
+    },
   };
 }
+
+/** Free = no lock, or a released tombstone. */
+const lockFree = (w: World) => !w.lock || !!w.lock.payload.released;
 
 const records = (w: World, n: number): ReleaseRecord[] =>
   (w.comments.get(n) ?? []).flatMap((c) => [...c.body.matchAll(/```agent4-release\n([\s\S]*?)\n```/g)].map((m) => JSON.parse(m[1])));
@@ -129,7 +136,7 @@ describe('happy path', () => {
     await apply(p, v);
     expect(records(w, 101).at(-1)).toMatchObject({ status: 'released' });
     expect(w.labels.at(-1)).toEqual({ pr: 101, labels: [LABELS.released] });
-    expect(w.lock).toBeNull();
+    expect(lockFree(w)).toBe(true);
     expect(w.merges).toHaveLength(1);
     expect((await decide(p)).kind).toBe('idle');
   });
@@ -363,18 +370,48 @@ describe('serialization and restart safety', () => {
     expect(w.lock?.payload.pr).toBe(101);
   });
 
-  it('takeover never deletes the lock (no delete-then-create window)', async () => {
-    const w = world({ lock: { payload: { owner: 'agent4-release', pr: 99, sha: SHA('9'), expires_at: new Date(T0 - 1).toISOString() }, commit: 'lock-expired' } });
-    w.prs.set(99, { number: 99, draft: false, state: 'open', merged: false, merge_commit_sha: null, created_at: '2026-11-22T10:00:00Z', head: { sha: SHA('9'), ref: 'claude/y' }, base: { ref: 'main' }, mergeable: true, labels: [] });
-    w.comments.set(99, []);
-    addPr(w, 101, {}, [{ body: review() }]);
+  it('a stale runner can never release a lock another runner now holds', async () => {
+    const w = world(); addPr(w, 101, {}, [{ body: review() }]);
     const p = port(w);
-    let deletes = 0; const orig = p.deleteLock; p.deleteLock = async () => { deletes++; return orig(); };
     const d = await decide(p);
-    const before = deletes;
-    // Apply only the takeover action.
-    await apply(p, { ...d, actions: d.actions.slice(0, 1) });
-    expect(deletes - before).toBe(0);
+    // Runner A acquires; before it merges, its lock expires and runner B takes it over.
+    const realMerge = p.merge;
+    p.merge = async (n, sha) => {
+      const mine = w.lock!.commit;
+      await p.takeOverLock(mine, { owner: 'agent4-release', pr: 202, sha: SHA('2'), expires_at: new Date(T0 + LOCK_TTL_MS).toISOString() });
+      w.mergeResult = () => ({ merged: false, message: 'Head branch was modified' });
+      return realMerge(n, sha);
+    };
+    const r = await apply(p, d);
+    expect(r.stopped).toContain('merge refused');
+    // A tried to release with ITS commit: the swap loses, B still holds the lock.
+    expect(w.lock?.payload.pr).toBe(202);
+    expect(w.lock?.payload.released).toBeUndefined();
+  });
+
+  it('a verify step releases only a lock that names its PR; someone else\'s lock is left alone', async () => {
+    const w = world(); addPr(w, 101, {}, [{ body: review() }]);
+    const p = port(w);
+    await apply(p, await decide(p));
+    w.prod = SHA('c');
+    const v = await decide(p);
+    // Between decide and apply, another runner replaces the (by then expired) lock.
+    await p.takeOverLock(w.lock!.commit, { owner: 'agent4-release', pr: 303, sha: SHA('3'), expires_at: new Date(T0 + LOCK_TTL_MS).toISOString() });
+    const r = await apply(p, v);
+    expect(r.applied).toContain('lock not released (another run holds it now)');
+    expect(w.lock?.payload.pr).toBe(303);
+  });
+
+  it('nothing ever deletes the lock ref: the port has no unconditional delete', () => {
+    const p = port(world()) as unknown as Record<string, unknown>;
+    expect(p.deleteLock).toBeUndefined();
+  });
+
+  it('a released tombstone is free: the next run takes it over atomically', async () => {
+    const w = world(); addPr(w, 101, {}, [{ body: review() }]);
+    w.lock = { payload: { owner: 'agent4-release', pr: 99, sha: SHA('9'), expires_at: new Date(0).toISOString(), released: true }, commit: 'tomb' };
+    const d = await decide(port(w));
+    expect(d.actions[0]).toMatchObject({ do: 'take_over_lock', expectedCommit: 'tomb' });
   });
 
   it('the head moved between the decision and the merge → stop, no merge, lock released', async () => {
@@ -385,7 +422,7 @@ describe('serialization and restart safety', () => {
     const r = await apply(p, d);
     expect(r.stopped).toContain('head moved');
     expect(w.merges).toEqual([]);
-    expect(w.lock).toBeNull();
+    expect(lockFree(w)).toBe(true);
   });
 
   it('a merge the API refuses is recorded as a failed attempt and the lock is released', async () => {
@@ -394,7 +431,7 @@ describe('serialization and restart safety', () => {
     const r = await apply(p, await decide(p));
     expect(r.stopped).toContain('merge refused');
     expect(records(w, 101).at(-1)).toMatchObject({ status: 'attempt_failed' });
-    expect(w.lock).toBeNull();
+    expect(lockFree(w)).toBe(true);
   });
 });
 

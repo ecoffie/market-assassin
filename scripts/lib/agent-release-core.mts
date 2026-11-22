@@ -70,7 +70,7 @@ export interface ReleaseRecord {
   reason?: string;
   at: string;
 }
-export interface LockPayload { owner: string; pr: number; sha: string; expires_at: string }
+export interface LockPayload { owner: string; pr: number; sha: string; expires_at: string; released?: boolean }
 /** The lock as read: its payload and the commit the lock ref points at (the compare-and-swap token). */
 export interface LockState { payload: LockPayload; commit: string }
 export type Compare = 'identical' | 'ahead' | 'behind' | 'diverged';
@@ -97,13 +97,17 @@ export interface Port {
   merge(n: number, sha: string): Promise<{ merged: boolean; merge_commit?: string; message?: string }>;
   comment(n: number, body: string): Promise<void>;
   addLabels(n: number, labels: string[]): Promise<void>;
-  // Atomic lock. createLock: ref create, fails (false) if the ref exists. takeOverLock: ref update with
-  // force=false to a new commit whose PARENT is `expectedCommit`: a fast-forward only from that exact old
-  // lock, so of two concurrent takeovers exactly one wins (the other gets 422 / not a fast-forward → false).
+  // Atomic lock. Every write is a compare-and-swap; nothing ever deletes the ref unconditionally.
+  //  - createLock: ref create; null if the ref already exists.
+  //  - takeOverLock / releaseLock: ref update with force=false to a new commit whose PARENT is `expectedCommit`,
+  //    which is a fast-forward only from that exact lock commit. Two concurrent takeovers → one winner. A stale
+  //    runner can never release a lock another run now holds. A release writes a tombstone: an
+  //    already-expired payload with released=true, which the next run takes over atomically.
+  // Each returns the new lock commit (the token the holder carries), or null when the swap lost.
   readLock(): Promise<LockState | null>;
-  createLock(p: LockPayload): Promise<boolean>;
-  takeOverLock(expectedCommit: string, p: LockPayload): Promise<boolean>;
-  deleteLock(): Promise<void>;
+  createLock(p: LockPayload): Promise<string | null>;
+  takeOverLock(expectedCommit: string, p: LockPayload): Promise<string | null>;
+  releaseLock(expectedCommit: string): Promise<boolean>;
 }
 
 // ── records ──────────────────────────────────────────────────────────────────────────────────────
@@ -175,7 +179,8 @@ export type Action =
   | { do: 'merge'; pr: number; sha: string }
   | { do: 'record'; pr: number; record: ReleaseRecord; note?: string }
   | { do: 'label'; pr: number; labels: string[] }
-  | { do: 'release_lock' }
+  /** Release only the lock this run holds: `expectedCommit` from decide(), or the commit apply() acquired. */
+  | { do: 'release_lock'; expectedCommit?: string }
   | { do: 'take_over_lock'; payload: LockPayload; expectedCommit: string };
 
 export interface Decision {
@@ -203,8 +208,9 @@ async function pendingVerification(port: Port): Promise<Pending | null> {
   const allow = await port.allowlist();
   const merged = new Map<number, Pr>();
   for (const p of await port.recentlyMergedPrs()) merged.set(p.number, p);
-  if (lock && !merged.has(lock.payload.pr)) {
-    const p = await port.pr(lock.payload.pr);
+  const liveLock = lock && !lock.payload.released ? lock : null; // a released tombstone is already resolved
+  if (liveLock && !merged.has(liveLock.payload.pr)) {
+    const p = await port.pr(liveLock.payload.pr);
     if (p.merged) merged.set(p.number, p);
   }
   // Oldest first, so an older unresolved merge is verified before a newer one.
@@ -214,19 +220,21 @@ async function pendingVerification(port: Port): Promise<Pending | null> {
     const recs = releaseRecords(comments).filter((r) => r.pr === p.number);
     if (recs.some((r) => RESOLVED.includes(r.status))) continue;
     const mergedRec = recs.find((r) => r.status === 'merged');
-    const lockedHere = !!lock && lock.payload.pr === p.number;
+    const lockedHere = !!liveLock && liveLock.payload.pr === p.number;
     let reviewedHere = false;
     if (!mergedRec && !lockedHere && isAllowed(p, allow)) {
       const fenced = comments.flatMap((c) => [...c.body.matchAll(/```agent4-review\s*\n([\s\S]*?)\n```/g)].map((m) => { try { return JSON.parse(m[1]) as ReviewRecord; } catch { return null; } })).filter(isReviewRecord);
       reviewedHere = fenced.length > 0 && fenced[fenced.length - 1].reviewed_sha === p.head.sha;
     }
     if (!mergedRec && !lockedHere && !reviewedHere) continue;
-    return { pr: p.number, sha: mergedRec?.sha ?? (lockedHere ? lock!.payload.sha : p.head.sha), merge_commit: mergedRec?.merge_commit ?? p.merge_commit_sha ?? null };
+    return { pr: p.number, sha: mergedRec?.sha ?? (lockedHere ? liveLock!.payload.sha : p.head.sha), merge_commit: mergedRec?.merge_commit ?? p.merge_commit_sha ?? null };
   }
   return null;
 }
 
 async function verifyStep(port: Port, pend: Pending): Promise<Decision> {
+  const lock = await port.readLock();
+  const ownLock = lock && lock.payload.pr === pend.pr && !lock.payload.released ? lock.commit : undefined;
   const nowIso = new Date(port.now()).toISOString();
   const prod = await port.productionSha();
   if (!prod) return { kind: 'wait', pr: pend.pr, reasons: ['production build stamp unreadable'], actions: [] };
@@ -246,7 +254,7 @@ async function verifyStep(port: Port, pend: Pending): Promise<Decision> {
     actions: [
       { do: 'record', pr: pend.pr, record, note: `Production verification (${prod.slice(0, 8)}):\n\n${summary}` },
       { do: 'label', pr: pend.pr, labels: [checks.ok ? LABELS.released : LABELS.blocked] },
-      { do: 'release_lock' },
+      ...(ownLock ? [{ do: 'release_lock' as const, expectedCommit: ownLock }] : []),
     ],
   };
 }
@@ -260,7 +268,7 @@ export async function decide(port: Port): Promise<Decision> {
   const now = port.now();
   let takeOver: LockState | null = null;
   if (lock) {
-    if (Date.parse(lock.payload.expires_at) > now) return { kind: 'wait', pr: lock.payload.pr, reasons: [`release lock held for #${lock.payload.pr} until ${lock.payload.expires_at}`], actions: [] };
+    if (!lock.payload.released && Date.parse(lock.payload.expires_at) > now) return { kind: 'wait', pr: lock.payload.pr, reasons: [`release lock held for #${lock.payload.pr} until ${lock.payload.expires_at}`], actions: [] };
     takeOver = lock; // expired, and the reconciliation above found nothing unresolved
   }
 
@@ -325,23 +333,33 @@ export interface ApplyResult { applied: string[]; stopped?: string }
 export async function apply(port: Port, d: Decision): Promise<ApplyResult> {
   const applied: string[] = [];
   let mergeCommit: string | undefined;
+  let held: string | null = null; // the lock commit THIS run holds, if it acquired or took one over
+  const release = async (expected?: string | null) => {
+    const token = expected ?? held;
+    if (!token) return false;
+    const ok = await port.releaseLock(token);
+    if (ok && token === held) held = null;
+    return ok;
+  };
   for (const a of d.actions) {
     if (a.do === 'acquire_lock') {
-      if (!(await port.createLock(a.payload))) return { applied, stopped: 'another run holds the release lock' };
+      held = await port.createLock(a.payload);
+      if (!held) return { applied, stopped: 'another run holds the release lock' };
       applied.push(`lock #${a.payload.pr}`);
     } else if (a.do === 'take_over_lock') {
       // Atomic: succeeds only if the ref still points at the exact expired lock we decided on. Never
       // delete-then-create, where two runners could both delete and one recreate.
-      if (!(await port.takeOverLock(a.expectedCommit, a.payload))) return { applied, stopped: 'another run took over the expired lock' };
+      held = await port.takeOverLock(a.expectedCommit, a.payload);
+      if (!held) return { applied, stopped: 'another run took over the expired lock' };
       applied.push(`took over lock for #${a.payload.pr}`);
     } else if (a.do === 'merge') {
       const live = await port.pr(a.pr);
-      if (live.head.sha !== a.sha) { await port.deleteLock(); return { applied, stopped: 'head moved after the decision' }; }
+      if (live.head.sha !== a.sha) { await release(); return { applied, stopped: 'head moved after the decision' }; }
       const m = await port.merge(a.pr, a.sha);
       if (!m.merged) {
         const reason = `merge refused: ${m.message || 'unknown'}`;
         await port.comment(a.pr, releaseRecordBody({ type: 'release', pr: a.pr, status: 'attempt_failed', sha: a.sha, reason, at: new Date(port.now()).toISOString() }));
-        await port.deleteLock();
+        await release();
         return { applied, stopped: reason };
       }
       mergeCommit = m.merge_commit;
@@ -354,8 +372,7 @@ export async function apply(port: Port, d: Decision): Promise<ApplyResult> {
       await port.addLabels(a.pr, a.labels);
       applied.push(`label #${a.pr} ${a.labels.join(',')}`);
     } else if (a.do === 'release_lock') {
-      await port.deleteLock();
-      applied.push('lock released');
+      applied.push((await release(a.expectedCommit)) ? 'lock released' : 'lock not released (another run holds it now)');
     }
   }
   return { applied };
