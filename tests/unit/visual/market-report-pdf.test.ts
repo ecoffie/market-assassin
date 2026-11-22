@@ -32,9 +32,12 @@ const PDF_CONTENT_WIDTH_PX = (8.5 - 1) * 96;
 /**
  * Print defects found on main when the harness landed (2026-11-22) — the headline's basis cut by an ellipsis,
  * the Recompetes Likelihood column clipped off the page — are fixed by the print-layout change. These lists
- * stay EMPTY: anything added here is material a PDF reader loses.
+ * stay EMPTY, so every check is strict: anything added here is material a PDF reader loses.
  */
 const KNOWN_PRINT_DEFECTS = { missingLines: [] as string[], overflowingTables: [] as string[], clippedText: [] as string[] };
+
+/** Anything found that is not a known defect. */
+const unexpected = (found: string[], known: string[]) => found.filter((x) => !known.includes(x));
 
 /** Pages the full fixture may use. It printed 8 (two of them a third full or less) before the layout fix. */
 const PAGE_BUDGET = 6;
@@ -84,13 +87,13 @@ describe.runIf(!!CHROME)('market report PDF — full report', () => {
     expect(lines.length).toBeGreaterThan(100);
     if (PDFTOTEXT) {
       const all = squash(execFileSync(PDFTOTEXT, ['-enc', 'UTF-8', '-', '-'], { input: pdf, encoding: 'utf8' }));
-      expect(lines.filter((l) => !all.includes(squash(l)))).toEqual(KNOWN_PRINT_DEFECTS.missingLines);
+      expect(unexpected(lines.filter((l) => !all.includes(squash(l))), KNOWN_PRINT_DEFECTS.missingLines)).toEqual([]);
     } else {
       // pdf.js drops tabular digits: compare letters only. A short line ("high") is found inside other words by a
       // letters-only search, so it proves nothing either way; only lines of 8+ letters are compared here.
       const all = lettersOnly(pages.join(''));
       const comparable = (l: string) => lettersOnly(l).length >= 8;
-      expect(lines.filter((l) => comparable(l) && !all.includes(lettersOnly(l)))).toEqual(KNOWN_PRINT_DEFECTS.missingLines.filter(comparable));
+      expect(unexpected(lines.filter((l) => comparable(l) && !all.includes(lettersOnly(l))), KNOWN_PRINT_DEFECTS.missingLines)).toEqual([]);
     }
   });
 
@@ -134,8 +137,8 @@ describe.runIf(!!CHROME)('market report PDF — full report', () => {
 
   it('prints tables a reader can read: nothing clipped, no cell under 9px', async () => {
     const layout = await printLayout(html, PDF_CONTENT_WIDTH_PX);
-    expect(layout.overflowingTables, 'tables wider than the printed page').toEqual(KNOWN_PRINT_DEFECTS.overflowingTables);
-    expect(layout.clippedText, 'text cut off by an ellipsis or line clamp in print').toEqual(KNOWN_PRINT_DEFECTS.clippedText);
+    expect(unexpected(layout.overflowingTables, KNOWN_PRINT_DEFECTS.overflowingTables), 'tables wider than the printed page').toEqual([]);
+    expect(unexpected(layout.clippedText, KNOWN_PRINT_DEFECTS.clippedText), 'text cut off by an ellipsis or line clamp in print').toEqual([]);
     expect(layout.minCellFontPx).toBeGreaterThanOrEqual(9);
   }, 60_000);
 });
