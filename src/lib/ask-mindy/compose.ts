@@ -140,3 +140,68 @@ export function composeWhereToStart(run: RecipeRun, profile: CompanyProfile, opt
     not_checked,
   };
 }
+
+// ---------------------------------------------------------------------------------------------------------------
+// Profile Setup: readiness checklist (spec section 5, recipe 2: "contacts, SBA keywords, service codes, website").
+
+export type ReadinessStatus = 'ok' | 'missing' | 'unknown' | 'unavailable';
+export interface ReadinessItem {
+  item: 'sam_registration' | 'naics_codes' | 'service_codes' | 'points_of_contact' | 'past_performance' | 'derived_keywords' | 'sba_profile' | 'website';
+  status: ReadinessStatus;
+  /** Plain words, from the record (dates and counts copied, never computed beyond counting). */
+  detail: string;
+}
+
+type SamEntityLike = {
+  registrationStatus?: string; registrationExpirationDate?: string; daysUntilExpiration?: number;
+  naicsList?: unknown[]; pscList?: unknown[]; pointsOfContact?: unknown[];
+};
+
+const stepOf = (run: RecipeRun, id: string) => (run.status === 'ran' ? run.results[id] : undefined);
+
+/** Profile Setup: what is in place, missing, unknown or unavailable. Nothing is guessed. */
+export function composeProfileSetup(run: RecipeRun): ReadinessItem[] {
+  const items: ReadinessItem[] = [];
+  const sam = stepOf(run, 'sam');
+  const samValue = sam?.state === 'ok' ? (sam.value as { entity?: SamEntityLike | null; _meta?: { lookup_status?: string; points_of_contact_as_of?: string | null } }) : null;
+  const entity = samValue?.entity ?? null;
+  const lookup = samValue?._meta?.lookup_status;
+
+  if (!sam || sam.state === 'skipped') items.push({ item: 'sam_registration', status: 'unknown', detail: 'No UEI or company name to look up yet.' });
+  else if (sam.state !== 'ok' || lookup === 'lookup_failed') items.push({ item: 'sam_registration', status: 'unavailable', detail: 'SAM.gov lookup could not be completed; this is not a finding that the company is unregistered.' });
+  else if (!entity) items.push({ item: 'sam_registration', status: lookup === 'not_found' ? 'missing' : 'unknown', detail: lookup === 'not_found' ? 'No SAM.gov registration found for this UEI or name.' : 'Several or no exact matches; the registration was not identified.' });
+  else {
+    const active = entity.registrationStatus === 'Active';
+    const exp = entity.registrationExpirationDate ? ` until ${entity.registrationExpirationDate}` : '';
+    const soon = typeof entity.daysUntilExpiration === 'number' && entity.daysUntilExpiration <= 60 ? ` Renew soon: ${entity.daysUntilExpiration} days left.` : '';
+    items.push({ item: 'sam_registration', status: active ? 'ok' : 'missing', detail: active ? `Active${exp}.${soon}` : `Registration is ${entity.registrationStatus ?? 'not active'}.` });
+  }
+
+  const listItem = (item: ReadinessItem['item'], list: unknown[] | undefined, what: string) => {
+    if (!entity) items.push({ item, status: 'unknown', detail: `${what}: needs the SAM.gov registration first.` });
+    else if (list?.length) items.push({ item, status: 'ok', detail: `${list.length} ${what} registered.` });
+    else items.push({ item, status: 'missing', detail: `No ${what} on the SAM.gov registration.` });
+  };
+  listItem('naics_codes', entity?.naicsList, 'NAICS codes');
+  listItem('service_codes', entity?.pscList, 'service codes (PSC)');
+  listItem('points_of_contact', entity?.pointsOfContact, 'points of contact');
+
+  const awards = stepOf(run, 'awards');
+  items.push(!awards || awards.state === 'skipped'
+    ? { item: 'past_performance', status: 'unknown', detail: 'Company not identified, so award history was not checked.' }
+    : awards.state === 'ok'
+      ? { item: 'past_performance', status: 'ok', detail: 'Federal award history retrieved (prime and subcontract shown separately in the answer).' }
+      : { item: 'past_performance', status: 'unavailable', detail: 'Award history could not be retrieved; not a finding of no past performance.' });
+
+  const kw = stepOf(run, 'keywords');
+  items.push(kw?.state === 'ok'
+    ? { item: 'derived_keywords', status: 'ok', detail: 'Search keywords derived from the registration and codes.' }
+    : { item: 'derived_keywords', status: kw && kw.state !== 'skipped' ? 'unavailable' : 'unknown', detail: 'Search keywords not derived yet.' });
+
+  const sba = stepOf(run, 'sba_profile');
+  const sbaFields = sba && sba.state === 'missing_tool' ? (sba as { unknownFields?: string[] }).unknownFields ?? [] : [];
+  items.push({ item: 'sba_profile', status: 'unavailable', detail: `SBA profile lookup is not available yet${sbaFields.length ? `; unknown until then: ${sbaFields.join(', ').replace(/_/g, ' ')}` : ''}.` });
+
+  items.push({ item: 'website', status: 'unknown', detail: 'No tool returns the company website yet; add it on the profile page.' });
+  return items;
+}

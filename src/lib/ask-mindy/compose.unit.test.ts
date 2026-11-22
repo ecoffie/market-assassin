@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { composeWhereToStart, toAskMindyProfile, toFitProfile, MAX_TOP_PICKS } from './compose';
+import { composeProfileSetup, composeWhereToStart, toAskMindyProfile, toFitProfile, MAX_TOP_PICKS } from './compose';
 import { buildCompanyProfile } from './company-profile';
 import type { RecipeRun } from './orchestrator';
 
@@ -113,5 +113,52 @@ describe('composeWhereToStart', () => {
     const ctx = composeWhereToStart({ recipe: 'where_to_start', status: 'not_implemented' }, PROFILE, { nowMs: NOW });
     expect(ctx.top_picks).toEqual([]);
     expect(ctx.horizons.every((h) => h.status === 'unavailable')).toBe(true);
+  });
+});
+
+describe('composeProfileSetup', () => {
+  const ranRun = (results: Record<string, unknown>): RecipeRun => ({
+    recipe: 'profile_setup', status: 'ran', steps: [], results: results as never,
+  });
+  const ENTITY = {
+    registrationStatus: 'Active', registrationExpirationDate: '2027-03-01', daysUntilExpiration: 45,
+    naicsList: [{ naicsCode: '561320' }], pscList: [], pointsOfContact: [{ name: 'A', title: 'B' }, { name: 'C' }],
+  };
+  const sbaMissing = { state: 'missing_tool', reason: 'SBA profile lookup', unknownFields: ['owner', 'sba_keywords'] };
+
+  it('builds the checklist from the records: ok, missing, counts and renewal warning copied from SAM', () => {
+    const items = composeProfileSetup(ranRun({
+      sam: { state: 'ok', value: { entity: ENTITY, _meta: { lookup_status: 'found' } } },
+      awards: { state: 'ok', value: {} }, keywords: { state: 'ok', value: {} }, sba_profile: sbaMissing,
+    }));
+    const by = Object.fromEntries(items.map((i) => [i.item, i]));
+    expect(by.sam_registration).toEqual({ item: 'sam_registration', status: 'ok', detail: 'Active until 2027-03-01. Renew soon: 45 days left.' });
+    expect(by.naics_codes.status).toBe('ok');
+    expect(by.service_codes).toMatchObject({ status: 'missing' });
+    expect(by.points_of_contact.detail).toBe('2 points of contact registered.');
+    expect(by.sba_profile).toEqual({ item: 'sba_profile', status: 'unavailable', detail: 'SBA profile lookup is not available yet; unknown until then: owner, sba keywords.' });
+    expect(by.website.status).toBe('unknown');
+  });
+
+  it('a failed SAM lookup is unavailable, never "unregistered"; dependent items are unknown', () => {
+    const items = composeProfileSetup(ranRun({ sam: { state: 'unavailable', reason: 'timeout' }, awards: { state: 'skipped', reason: 'x' }, sba_profile: sbaMissing }));
+    const by = Object.fromEntries(items.map((i) => [i.item, i]));
+    expect(by.sam_registration.status).toBe('unavailable');
+    expect(by.sam_registration.detail).toMatch(/not a finding that the company is unregistered/);
+    expect(by.naics_codes.status).toBe('unknown');
+    expect(by.past_performance.status).toBe('unknown');
+  });
+
+  it('a lookup_failed result is unavailable; not_found is missing; an inactive registration is missing', () => {
+    const at = (v: unknown) => Object.fromEntries(composeProfileSetup(ranRun({ sam: { state: 'ok', value: v } })).map((i) => [i.item, i])).sam_registration.status;
+    expect(at({ entity: null, _meta: { lookup_status: 'lookup_failed' } })).toBe('unavailable');
+    expect(at({ entity: null, _meta: { lookup_status: 'not_found' } })).toBe('missing');
+    expect(at({ entity: { ...ENTITY, registrationStatus: 'Expired' }, _meta: { lookup_status: 'found' } })).toBe('missing');
+  });
+
+  it('a failed award history is unavailable, not "no past performance"', () => {
+    const by = Object.fromEntries(composeProfileSetup(ranRun({ sam: { state: 'skipped', reason: 'x' }, awards: { state: 'unavailable', reason: 'quota' } })).map((i) => [i.item, i]));
+    expect(by.past_performance).toMatchObject({ status: 'unavailable' });
+    expect(by.past_performance.detail).toMatch(/not a finding of no past performance/);
   });
 });
