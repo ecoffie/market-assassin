@@ -355,7 +355,8 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
         authedFetch('/api/app/chat/suggestions', email, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, message: text, answer: finalContent }),
+          // The customer's earlier messages, so a next step never asks for something already said (2026-11-22).
+          body: JSON.stringify({ email, message: text, answer: finalContent, earlier: historyForServer.filter((h) => h.role === 'user').slice(-6).map((h) => customerText(String(h.content || ''))) }),
         })
           .then(r => r.json())
           .then(d => {

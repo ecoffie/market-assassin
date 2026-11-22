@@ -106,6 +106,9 @@ const nextConfig: NextConfig = {
     // Third browser route: the document engine renders DocModel -> PDF (src/lib/documents/render-pdf.ts).
     '/api/app/documents/render': ['./node_modules/@sparticuz/chromium/bin/**/*'],
     '/api/app/documents/render/**/*': ['./node_modules/@sparticuz/chromium/bin/**/*'],
+    // Fourth: the hosted market report's PDF download (src/app/reports/[id]/pdf/route.ts). '*' stands in for
+    // the [id] segment (Next matches these keys with picomatch, where brackets are a character class).
+    '/reports/*/pdf': ['./node_modules/@sparticuz/chromium/bin/**/*'],
     // Ralph Phase 1 MRR assembler reads a vendored .docx by absolute cwd path.
     // Nothing `require()`s the binary, so NFT never sees it → ENOENT on Vercel
     // at assembling_documents (job.error: open '.../mrr-rfo-may-2026-prototype.docx').

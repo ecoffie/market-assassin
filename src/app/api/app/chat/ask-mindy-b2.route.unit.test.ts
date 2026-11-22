@@ -39,7 +39,7 @@ const budget = { over: false };
 vi.mock('@/lib/api-auth', () => ({ verifyUserOwnsEmail: async (_r: unknown, email: string) => ({ authenticated: true, email }) }));
 vi.mock('@/lib/access/resolve-access', () => ({ hasProAccess: async () => true }));
 const profile = { block: '' };
-vi.mock('@/lib/proposal/loaders', () => ({ loadBidderProfile: async () => null, formatProfileForPrompt: () => profile.block }));
+vi.mock('@/lib/proposal/loaders', () => ({ loadBidderProfile: async () => null, loadBidderProfileResult: async () => ({ status: 'empty' as const, profile: {} }), formatProfileForPrompt: () => profile.block }));
 vi.mock('@/lib/llm/usage-cost', () => ({ isUserOverBudget: async () => budget.over, recordLlmUsage: async () => {} }));
 vi.mock('@/lib/chat/provider-events', () => ({ recordProviderEvent: async () => {} }));
 vi.mock('@/lib/entitlements/shadow', () => ({ shadowEntitlement: () => {} }));

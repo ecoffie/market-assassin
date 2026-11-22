@@ -126,7 +126,11 @@ interface ReportLike {
     agency_detail: unknown;
     set_aside_gap: unknown;
   };
-  _meta: { degraded: boolean; sections_grounded: number; sections_total: number };
+  _meta: {
+    degraded: boolean; sections_grounded: number; sections_total: number;
+    /** Per-section outcome (section-outcome.ts). 'failed' = UNKNOWN, never zero; 'withheld_no_subject' = not attempted. */
+    section_status?: { name: string; status: string; required?: boolean }[];
+  };
 }
 
 /**
@@ -149,8 +153,27 @@ function statCard(label: string, value: string, sub?: string): string {
     + `<div class="stat-l">${esc(label)}</div></div>`;
 }
 
-function table(headers: string[], rows: string[][]): string {
-  if (!rows.length) return `<p class="empty">No rows available for this section.</p>`;
+/**
+ * Why a section has no rows. Only 'empty' (the query succeeded and found nothing) may read as none;
+ * a failed lookup is UNKNOWN and a withheld one was not attempted — both used to print the same
+ * "No rows available" and a 0 KPI, which read as an established absence.
+ */
+const EMPTY_TEXT: Record<string, string> = {
+  failed: 'Unknown — this lookup failed, so no rows here is not evidence that there are none.',
+  withheld_no_subject: 'Not attempted — no defensible market boundary to search within, so this is not a count of zero.',
+};
+function emptyText(status: string | undefined): string {
+  return (status && EMPTY_TEXT[status]) || 'No rows available for this section.';
+}
+/** A KPI value that is only a number when its section's lookup actually answered. */
+function kpi(status: string | undefined, n: unknown): string {
+  if (status === 'failed') return 'Unknown';
+  if (status === 'withheld_no_subject') return 'Not attempted';
+  return num(n);
+}
+
+function table(headers: string[], rows: string[][], whenEmpty?: string): string {
+  if (!rows.length) return `<p class="empty">${esc(whenEmpty || emptyText(undefined))}</p>`;
   const head = headers.map((h) => `<th>${esc(h)}</th>`).join('');
   const body = rows
     .map((r) => `<tr>${r.map((c, i) => `<td${i === 0 ? ' class="lead"' : ''}>${c}</td>`).join('')}</tr>`)
@@ -162,8 +185,15 @@ function section(title: string, sub: string, inner: string): string {
   return `<section class="sec"><h2>${esc(title)}</h2>${sub ? `<p class="sub">${esc(sub)}</p>` : ''}${inner}</section>`;
 }
 
-export function renderMarketReportHtml(report: ReportLike, opts: { date?: string } = {}): string {
+/**
+ * opts.pdfUrl: where a real PDF of THIS report can be downloaded (the hosted /reports/<id> page passes
+ * /reports/<id>/pdf). With it the header button is a download link; without it (MCP's inline HTML, which
+ * has no stored copy to render) it stays the browser's print dialog.
+ */
+export function renderMarketReportHtml(report: ReportLike, opts: { date?: string; pdfUrl?: string } = {}): string {
   const { subject, summary, sections, generated_for } = report;
+  const statusByName = new Map((report._meta.section_status ?? []).map((x) => [x.name, x.status]));
+  const st = (name: string) => statusByName.get(name);
   const date = opts.date || new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 
   // Every section states WHAT IT MEASURED. An unlabelled figure loses the "your data is
@@ -374,8 +404,8 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
       )}
       ${summary.naics_count != null ? statCard('Buying NAICS', num(summary.naics_count)) : ''}
       ${summary.top_psc ? statCard('Top product (PSC)', summary.top_psc.code, summary.top_psc.name) : ''}
-      ${statCard('Top agencies', num(summary.buying_agencies))}
-      ${statCard('Leading contractors', num(summary.top_contractors))}
+      ${statCard('Top agencies', kpi(st('top_agencies'), summary.buying_agencies))}
+      ${statCard('Leading contractors', kpi(st('competition'), summary.top_contractors))}
       ${(() => { const c = countValue(summary.recompetes, summary.recompetes_total); return statCard('Recompetes', c.value, c.sub); })()}
       ${(() => { const c = countValue(summary.forecasts, summary.forecasts_total); return statCard(c.sub ? 'Forecast records' : 'Forecasts', c.value, c.sub); })()}
       ${summary.contacts ? statCard('Contacts to call', num(summary.contacts)) : ''}
@@ -408,18 +438,18 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
           ? ` of ${sections.top_agencies_total} with spend`
           : ''
       }. Share is of the shown agencies, not of the whole market.`,
-      (agencyRows.length ? '' : phraseEmptyNote) + table(['Buying sub-agency', 'Obligated', 'Share of shown'], agencyRows)
+      (agencyRows.length ? '' : phraseEmptyNote) + table(['Buying sub-agency', 'Obligated', 'Share of shown'], agencyRows, emptyText(st('top_agencies')))
     ),
     contactsHtml,
     section('Competitive landscape', `Leading contractors by obligated dollars${basisNote} — the incumbents you would be up against. Showing the top ${vendorRows.length}.`,
-      (vendorRows.length ? '' : phraseEmptyNote) + table(['Contractor', 'UEI', 'Obligated'], vendorRows)),
+      (vendorRows.length ? '' : phraseEmptyNote) + table(['Contractor', 'UEI', 'Obligated'], vendorRows, emptyText(st('competition')))),
     section('Recompetes on the horizon',
       `Contracts whose current period of performance ends soonest — soonest first. "Ends" is the period-of-performance end date.${
         summary.recompetes_total != null && summary.recompetes_total > recompeteRows.length
           ? ` Showing ${num(recompeteRows.length)} of ${num(summary.recompetes_total)} found.`
           : ''
       }`,
-      table(['Incumbent / contract', 'Agency', 'NAICS', 'Value', 'Ends', 'Likelihood'], recompeteRows)),
+      table(['Incumbent / contract', 'Agency', 'NAICS', 'Value', 'Ends', 'Likelihood'], recompeteRows, emptyText(st('recompetes')))),
     section('Upcoming forecasts',
       `Planned procurements agencies have published.${
         summary.forecasts_total != null && summary.forecasts_total > forecastRows.length
@@ -430,7 +460,7 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
           ? ` ${num(summary.forecasts_duplicates_removed)} duplicate listing${summary.forecasts_duplicates_removed === 1 ? '' : 's'} (the same listing received from two sources) removed.`
           : ''
       }`,
-      table(['Title', 'Agency', 'NAICS', 'Value', 'FY', 'Set-aside'], forecastRows)),
+      table(['Title', 'Agency', 'NAICS', 'Value', 'FY', 'Set-aside'], forecastRows, emptyText(st('forecasts')))),
     agencyDetailHtml,
   ].join('\n');
 
@@ -479,9 +509,9 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
   footer.rp { margin-top:28px; text-align:center; color:var(--muted); font-size:12px; }
   footer.rp b { color:var(--purple); }
   .pdfbtn { position:absolute; top:22px; right:22px; background:rgba(255,255,255,.16); color:#fff; border:1px solid rgba(255,255,255,.5);
-            border-radius:8px; padding:7px 13px; font:600 12.5px/1 inherit; cursor:pointer; }
+            border-radius:8px; padding:7px 13px; font:600 12.5px/1 inherit; cursor:pointer; text-decoration:none; }
   .pdfbtn:hover { background:rgba(255,255,255,.28); }
-  @media (max-width:560px){ .pdfbtn { display:none; } }
+  @media (max-width:560px){ button.pdfbtn { display:none; } a.pdfbtn { position:static; display:inline-block; margin-top:12px; } }
   @media print { body { background:#fff; } .sec,.stat { break-inside:avoid; } .pdfbtn { display:none; } }
 </style></head>
 <body><div class="wrap">
@@ -489,7 +519,9 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
     <div class="kick">Federal Market Report</div>
     <h1>${esc(subject)}</h1>
     <div class="meta">${generated_for ? `Prepared for ${esc(generated_for)} · ` : ''}${esc(date)}</div>
-    <button class="pdfbtn" onclick="window.print()">Save as PDF</button>
+    ${opts.pdfUrl
+      ? `<a class="pdfbtn" href="${esc(opts.pdfUrl)}" download>Download PDF</a>`
+      : '<button class="pdfbtn" onclick="window.print()">Save as PDF</button>'}
   </header>
   ${degradedNote}
   ${body}

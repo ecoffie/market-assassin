@@ -69,7 +69,7 @@ const charges = () => completeCardTurn.mock.calls.filter(([p]) => p.credits > 0)
 
 vi.mock('@/lib/api-auth', () => ({ verifyUserOwnsEmail: async (_r: unknown, email: string) => ({ authenticated: true, email }) }));
 vi.mock('@/lib/access/resolve-access', () => ({ hasProAccess: async () => state.pro }));
-vi.mock('@/lib/proposal/loaders', () => ({ loadBidderProfile: async () => null, formatProfileForPrompt: () => '' }));
+vi.mock('@/lib/proposal/loaders', () => ({ loadBidderProfile: async () => null, loadBidderProfileResult: async () => ({ status: 'empty' as const, profile: {} }), formatProfileForPrompt: () => '' }));
 vi.mock('@/lib/llm/usage-cost', () => ({ isUserOverBudget: async () => false, recordLlmUsage: async () => {} }));
 vi.mock('@/lib/chat/provider-events', () => ({ recordProviderEvent: async () => {} }));
 vi.mock('@/lib/entitlements/shadow', () => ({ shadowEntitlement: () => {} }));
