@@ -73,6 +73,7 @@ import { matchRecompeteSowTool } from './tools/recompete-sow';
 import { extractStatementOfWork } from './tools/statement-of-work';
 import { getFederalEventSeries } from './tools/event-series';
 import { getSbaGoalingShare } from './tools/sba-goaling';
+import { naicsSpendingByYear } from './tools/naics-spending-by-year';
 import { draftProposal, draftProposalSection } from './tools/draft-proposal';
 import { exportProposal } from './tools/export-proposal';
 import {
@@ -1635,6 +1636,29 @@ server.registerTool(
   },
   async ({ agency, fiscal_year }) => {
     const result = await getSbaGoalingShare({ agency, fiscal_year });
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }], structuredContent: result as unknown as Record<string, unknown> };
+  },
+);
+
+server.registerTool(
+  'get_naics_spending_by_year',
+  {
+    title: 'Industry (NAICS) Spending & Small-Business Wins by Fiscal Year',
+    annotations: { readOnlyHint: true, openWorldHint: true },
+    description:
+      "An industry's (NAICS) federal contract spending PER FISCAL YEAR, with the dollars and % small businesses won " +
+      'and the dollars and % through small-business set-asides. Use to size or rank industries over time; call once ' +
+      'per NAICS to compare, or pass several codes to combine. 6-digit = exact. Live USASpending, contracts only. ' +
+      'Small-business share is NOT the official SBA Scorecard number. Null = source failed, never $0.',
+    inputSchema: {
+      naics: z.string().describe('One or more NAICS codes, comma-separated (2-6 digits, max 10).'),
+      from_fy: z.number().optional().describe('First fiscal year, inclusive. Defaults to to_fy - 4. Max 10-year span.'),
+      to_fy: z.number().optional().describe('Last fiscal year, inclusive. Defaults to the latest complete FY.'),
+      state: z.string().optional().describe('Optional place-of-performance state.'),
+    },
+  },
+  async ({ naics, from_fy, to_fy, state }) => {
+    const result = await naicsSpendingByYear({ naics, from_fy, to_fy, state });
     return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }], structuredContent: result as unknown as Record<string, unknown> };
   },
 );

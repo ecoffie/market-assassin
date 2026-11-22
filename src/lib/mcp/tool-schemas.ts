@@ -153,6 +153,7 @@ const TOOL_META: Readonly<Record<string, ToolMeta>> = {
   get_legislation_status: { title: 'Legislation Status (NDAA · Bills · Public Law)' },
   get_regulatory_demand: { title: 'Get Regulatory Demand' },
   get_sba_goaling_share: { title: 'Get SBA Goaling Share' },
+  get_naics_spending_by_year: { title: 'Get Industry Spending by Year' },
   get_sblo_contact: { title: 'Get SBLO Contact' },
   get_solicitation_documents: { title: 'Get Solicitation Documents' },
   get_solicitation_incumbent: { title: 'Get Solicitation Incumbent' },

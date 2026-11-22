@@ -54,6 +54,7 @@ const LINE: Record<string, string> = {
   get_agency_intel: 'The buyer brief: priorities, pain points, hierarchy and spend',
   understand_customer: 'After a FIND hit: what this customer cares about and what to emphasize',
   get_agency_spending_detail: 'Who inside the department buys, and its set-aside mix',
+  get_naics_spending_by_year: 'An industry\'s spending and small-business wins, year by year',
   get_sba_goaling_share: "Small-business goals against the agency's set-aside dollars",
   get_award_detail: "One award's full record: ceiling, parent vehicle, period of performance",
   schedule_market_search: 'Watch a market and get new matches by email, daily or weekly',

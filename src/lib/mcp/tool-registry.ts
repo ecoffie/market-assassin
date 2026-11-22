@@ -46,6 +46,7 @@ import { getKeywordCoverage } from '@/mcp/tools/keyword-coverage';
 import { idvContracts } from '@/mcp/tools/idv-contracts';
 import { searchPastContracts } from '@/mcp/tools/past-contracts';
 import { getAnnualObligations } from '@/mcp/tools/annual-obligations';
+import { naicsSpendingByYear } from '@/mcp/tools/naics-spending-by-year';
 import { generateMarketReport } from '@/mcp/tools/market-report';
 import { capabilityMarketMatch } from '@/mcp/tools/capability-market-match';
 import { buildPursuitDossier } from '@/mcp/tools/pursuit-dossier';
@@ -157,6 +158,7 @@ export const TOOL_CREDITS: Readonly<Record<string, number>> = {
   assess_market_depth: 10,
   get_agency_spending_detail: 10,
   get_sba_goaling_share: 10,
+  get_naics_spending_by_year: 5,
   // Ask Mindy only (hidden from public MCP). Same tier as the other BigQuery profile reads.
   get_buying_offices: 10,
   get_vehicle_spend_mix: 10,
@@ -964,6 +966,33 @@ const ANNUAL_OBLIGATIONS_TOOL_DEF = {
         agency: { type: 'string', description: 'Optional awarding agency (toptier name, e.g. "Department of Defense").' },
       },
       required: ['recipient'],
+    },
+  },
+};
+
+const NAICS_SPENDING_BY_YEAR_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'get_naics_spending_by_year',
+    description:
+      'An INDUSTRY\'s (NAICS) federal contract spending PER FISCAL YEAR, with the dollars and % SMALL BUSINESSES won ' +
+      'and the dollars and % that went through small-business SET-ASIDES (SB, 8(a), SDVOSB, WOSB, HUBZone). ' +
+      'USE THIS to size or rank industries by spending and small-business wins over time ("which of these NAICS ' +
+      'have the most small-business dollars", "is small-business share in 541512 growing"). Call once per NAICS to ' +
+      'compare/rank; pass several codes in one call to COMBINE them. 6-digit codes are exact; shorter codes include ' +
+      'everything beneath them. Optional place-of-performance state. Defaults to the last 5 complete fiscal years ' +
+      '(max 10). Source: live USASpending, contracts only. Small-business share is the closest public proxy to SBA ' +
+      'goaling but NOT the official Scorecard figure. A null column means the source failed (degraded=true) - never ' +
+      'report it as $0.',
+    parameters: {
+      type: 'object' as const,
+      properties: {
+        naics: { type: 'string', description: 'One or more NAICS codes, comma-separated (2-6 digits each, max 10). Combined into one series.' },
+        from_fy: { type: 'number', description: 'First fiscal year, inclusive. Defaults to to_fy - 4. Max 10-year span. Earliest 2008.' },
+        to_fy: { type: 'number', description: 'Last fiscal year, inclusive. Defaults to the latest COMPLETE fiscal year.' },
+        state: { type: 'string', description: 'Optional place-of-performance state (2-letter code or full name).' },
+      },
+      required: ['naics'],
     },
   },
 };
@@ -2100,6 +2129,7 @@ export function listMcpTools(): Array<Record<string, unknown>> {
     IDV_CONTRACTS_TOOL_DEF,
     PAST_CONTRACTS_TOOL_DEF,
     ANNUAL_OBLIGATIONS_TOOL_DEF,
+    NAICS_SPENDING_BY_YEAR_TOOL_DEF,
     MARKET_REPORT_TOOL_DEF,
     CAPABILITY_MATCH_TOOL_DEF,
     PURSUIT_DOSSIER_TOOL_DEF,
@@ -2172,6 +2202,7 @@ export function isMcpTool(name: string): boolean {
     name === 'search_idv_contracts' ||
     name === 'search_past_contracts' ||
     name === 'get_recipient_annual_obligations' ||
+    name === 'get_naics_spending_by_year' ||
     name === 'generate_market_report' ||
     name === 'capability_market_match' ||
     name === 'build_pursuit_dossier' ||
@@ -2598,6 +2629,16 @@ async function dispatchMcpTool(
       to_fy: typeof args.to_fy === 'number' ? args.to_fy : undefined,
       naics: typeof args.naics === 'string' ? args.naics : undefined,
       agency: typeof args.agency === 'string' ? args.agency : undefined,
+    })) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'get_naics_spending_by_year') {
+    const result = (await naicsSpendingByYear({
+      naics: typeof args.naics === 'string' || Array.isArray(args.naics) ? (args.naics as string | string[]) : '',
+      from_fy: typeof args.from_fy === 'number' ? args.from_fy : undefined,
+      to_fy: typeof args.to_fy === 'number' ? args.to_fy : undefined,
+      state: typeof args.state === 'string' ? args.state : undefined,
     })) as unknown as Record<string, unknown>;
     return { result, credits };
   }

@@ -89,6 +89,7 @@ export const TOOL_GROUPS: ToolGroup[] = [
       'understand_customer',
       'get_agency_spending_detail',
       'get_sba_goaling_share',
+      'get_naics_spending_by_year',
       'get_award_detail',
       'get_legislation_status',
     ],

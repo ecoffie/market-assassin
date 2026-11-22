@@ -39,6 +39,7 @@ export const PUBLIC_MCP_TOOLS: readonly string[] = [
   'get_keyword_coverage',
   'get_legislation_status',
   'get_market_vocabulary',
+  'get_naics_spending_by_year',
   'get_pricing_intel',
   'get_recipient_annual_obligations',
   'get_sba_goaling_share',
