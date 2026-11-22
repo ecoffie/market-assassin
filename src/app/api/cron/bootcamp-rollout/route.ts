@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { sendEmail } from '@/lib/send-email';
 import { MINDY_FROM_NAME, MINDY_SITE_URL, renderMindyEmailLogo } from '@/lib/mindy/email-branding';
+import { hasValidCronSecret } from '@/lib/cron/cron-request-auth';
 import { loadBootcampAttendees } from '@/lib/bootcamp/attendee-list';
 
 export const runtime = 'nodejs';
@@ -29,9 +30,9 @@ function normalizeEmail(email: string) {
 }
 
 function isAuthorized(request: NextRequest) {
-  const isVercelCron = request.headers.get('x-vercel-cron') === '1';
+  const isVercelCron = hasValidCronSecret(request);
   const authHeader = request.headers.get('authorization');
-  const hasCronSecret = authHeader === `Bearer ${process.env.CRON_SECRET}`;
+  const hasCronSecret = hasValidCronSecret(request);
   const hasPassword = request.nextUrl.searchParams.get('password') === ADMIN_PASSWORD;
   return isVercelCron || hasCronSecret || hasPassword;
 }

@@ -61,6 +61,7 @@ import {
   type LegislationClocks,
 } from '@/lib/institute/legislation-clocks';
 import CODES from '@/data/agency-toptier-codes.json';
+import { hasValidCronSecret } from '@/lib/cron/cron-request-auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -120,9 +121,9 @@ export function classifyFamilyState(input: {
 }
 
 export async function GET(request: NextRequest) {
-  const isVercelCron = request.headers.get('x-vercel-cron') === '1';
+  const isVercelCron = hasValidCronSecret(request);
   const authHeader = request.headers.get('authorization');
-  const hasSecret = Boolean(process.env.CRON_SECRET) && authHeader === `Bearer ${process.env.CRON_SECRET}`;
+  const hasSecret = Boolean(process.env.CRON_SECRET) && hasValidCronSecret(request);
   const { searchParams } = new URL(request.url);
   const hasPassword =
     Boolean(process.env.ADMIN_PASSWORD) && searchParams.get('password') === process.env.ADMIN_PASSWORD;

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { kv } from '@vercel/kv';
 import { sendOpsAlert } from '@/lib/ops-alert';
+import { hasValidCronSecret } from '@/lib/cron/cron-request-auth';
 
 /**
  * DB Health Watch — Layer 2 early warning (the "hear it first, not from users").
@@ -63,8 +64,8 @@ function isAuthed(request: NextRequest): boolean {
   // (see api/cron/dispatch line ~197) and an `x-cron-dispatch: 1` header — match
   // that, plus the `x-vercel-cron` header and the manual ?password= path.
   const bearer = request.headers.get('authorization')?.replace('Bearer ', '');
-  const isVercelCron = request.headers.get('x-vercel-cron') === '1';
-  const isDispatch = request.headers.get('x-cron-dispatch') === '1';
+  const isVercelCron = hasValidCronSecret(request);
+  const isDispatch = hasValidCronSecret(request);
   return (
     (!!ADMIN_PASSWORD && pw === ADMIN_PASSWORD) ||
     (!!CRON_SECRET && bearer === CRON_SECRET) ||

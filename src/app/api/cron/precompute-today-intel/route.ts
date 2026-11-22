@@ -26,6 +26,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { refreshTodayIntelCache } from '@/lib/today/intel';
+import { hasValidCronSecret } from '@/lib/cron/cron-request-auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -46,8 +47,8 @@ function isAuthed(request: NextRequest): boolean {
   const pw = request.nextUrl.searchParams.get('password');
   return (
     (!!CRON_SECRET && bearer === CRON_SECRET) ||
-    request.headers.get('x-vercel-cron') === '1' ||
-    request.headers.get('x-cron-dispatch') === '1' ||
+    hasValidCronSecret(request) ||
+    hasValidCronSecret(request) ||
     (!!ADMIN_PASSWORD && pw === ADMIN_PASSWORD)
   );
 }

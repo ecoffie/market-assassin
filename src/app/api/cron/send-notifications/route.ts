@@ -43,6 +43,7 @@ import agencySatData from '@/data/agency-sat-friendliness.json';
 import { persistSentAlert } from '@/lib/alerts/delivery-log';
 import { shouldShowAlertSetupNudges } from '@/lib/alerts/profile-setup';
 import { MINDY_APP_URL, MINDY_SITE_URL, renderMindyEmailLogo } from '@/lib/mindy/email-branding';
+import { hasValidCronSecret } from '@/lib/cron/cron-request-auth';
 
 // SAT Badge helper
 /**
@@ -541,13 +542,15 @@ export async function GET(request: NextRequest) {
   const email = request.nextUrl.searchParams.get('email');
   const test = request.nextUrl.searchParams.get('test') === 'true';
 
+  // `?email=` is a FILTER, never authorization: a test send needs the CRON_SECRET bearer.
   if (email && test) {
+    if (!hasValidCronSecret(request)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     return runNotificationJob({ testEmail: email, skipTimezoneCheck: true });
   }
 
-  const isVercelCron = request.headers.get('x-vercel-cron') === '1';
+  const isVercelCron = hasValidCronSecret(request);
   const authHeader = request.headers.get('authorization');
-  const hasCronSecret = authHeader === `Bearer ${process.env.CRON_SECRET}`;
+  const hasCronSecret = hasValidCronSecret(request);
 
   if (isVercelCron || hasCronSecret) {
     return NextResponse.json({
@@ -577,7 +580,7 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   const authHeader = request.headers.get('authorization');
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}` && process.env.NODE_ENV === 'production') {
+  if (!hasValidCronSecret(request) && process.env.NODE_ENV === 'production') {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

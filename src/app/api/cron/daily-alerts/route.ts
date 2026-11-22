@@ -59,6 +59,7 @@ import { MINDY_APP_URL, MINDY_SITE_URL, mindyDashboardUrlFor } from '@/lib/mindy
 import { computeTodaysLens, type TodaysLens } from '@/lib/dashboard/todays-lens';
 import { renderTodaysLensEmailBlock } from '@/lib/alerts/todays-lens-email';
 import { isInternalTestAccount } from '@/lib/mindy/campaign-exclusions';
+import { hasValidCronSecret } from '@/lib/cron/cron-request-auth';
 
 export const maxDuration = 300;
 
@@ -1307,7 +1308,7 @@ async function runDailyAlertJob(options?: {
 export async function POST(request: NextRequest) {
   // Verify cron secret
   const authHeader = request.headers.get('authorization');
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!hasValidCronSecret(request)) {
     if (process.env.NODE_ENV === 'production') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -1349,15 +1350,17 @@ export async function GET(request: NextRequest) {
     });
   }
 
-  // If checking/testing for a specific email
+  // If checking/testing for a specific email. `?email=` is a FILTER, never authorization: a test send
+  // needs the CRON_SECRET bearer (admins use the ?password= path above, which takes the same email).
   if (email && test) {
+    if (!hasValidCronSecret(request)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     return runDailyAlertJob({ testEmail: email, skipTimezoneCheck: true });
   }
 
   // Check if this is a Vercel cron request
-  const isVercelCron = request.headers.get('x-vercel-cron') === '1';
+  const isVercelCron = hasValidCronSecret(request);
   const authHeader = request.headers.get('authorization');
-  const hasCronSecret = authHeader === `Bearer ${process.env.CRON_SECRET}`;
+  const hasCronSecret = hasValidCronSecret(request);
 
   // Run the job if triggered by Vercel cron or has CRON_SECRET
   if (isVercelCron || hasCronSecret) {

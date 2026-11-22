@@ -5,6 +5,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { refreshFoundersSeats } from '@/lib/mindy/founders-seats';
+import { hasValidCronSecret } from '@/lib/cron/cron-request-auth';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
@@ -12,7 +13,7 @@ export const maxDuration = 300;
 export async function GET(request: NextRequest) {
   const password = request.nextUrl.searchParams.get('password');
   const cronSecret = request.headers.get('authorization')?.replace('Bearer ', '');
-  if (password !== process.env.ADMIN_PASSWORD && cronSecret !== process.env.CRON_SECRET) {
+  if (password !== process.env.ADMIN_PASSWORD && !hasValidCronSecret(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
   try {
