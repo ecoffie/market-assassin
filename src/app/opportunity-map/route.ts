@@ -10941,6 +10941,7 @@ const ASK_MINDY_CSS =
   + '.amk-in textarea:focus{border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.12)}'
   + '.amk-send{flex:none;width:40px;height:40px;border:0;border-radius:11px;background:#2563eb;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center}'
   + '.amk-send:disabled{opacity:.45;cursor:default}.amk-send svg{width:18px;height:18px}'
+  + '.amk-stop{display:inline-block;margin-top:6px;border:1px solid #dde3ec;background:#fff;color:#334155;font:600 11.5px Inter,system-ui,sans-serif;border-radius:7px;padding:4px 10px;cursor:pointer}.amk-stop:hover{background:#f1f5f9}'
   // ── In-chat REPORT PANE (create_document → read it here, no download). Sits beside the chat drawer on wide
   // screens and over it on narrow ones. The report itself is the shared document engine's HTML in a
   // script-less sandboxed iframe; Export menu lives in the open pane header.
@@ -11440,6 +11441,16 @@ const ASK_MINDY_JS = `<script>(function(){
     var aEl=addMsg('assistant',''); var bub=aEl.querySelector('.bub');
     bub.innerHTML='<span class="amk-typing"><i></i><i></i><i></i></span>';
     busy=true; if(send)send.disabled=true; clearFollowups();
+    // Stop (view mode): abort the stream, keep what already arrived. Card chat keeps its once-per-question retry flow.
+    var ctrl=(!oppCtx&&typeof AbortController==='function')?new AbortController():null, stopped=false, stopBtn=null;
+    if(ctrl){ stopBtn=document.createElement('button'); stopBtn.type='button'; stopBtn.className='amk-stop'; stopBtn.setAttribute('data-testid','amk-stop'); stopBtn.textContent='Stop';
+      stopBtn.onclick=function(){ stopped=true; try{ ctrl.abort(); }catch(e){} }; aEl.appendChild(stopBtn); }
+    function stoppedEnd(){
+      if(acc){ paint(bub,acc); history.push({role:'user',content:q}); history.push(ledger?{role:'assistant',content:acc,sources:ledger}:{role:'assistant',content:acc}); }
+      else bub.textContent='';
+      var sn=document.createElement('div'); sn.className='amk-credits'; sn.setAttribute('data-testid','amk-stopped'); sn.textContent=acc?'You stopped this answer, so it may be incomplete.':'You stopped this answer.'; aEl.appendChild(sn);
+      release(); body.scrollTop=body.scrollHeight;
+    }
     var acc='', started=false, gotDone=false, gotError=false, ledger=null, turnDoc=false;
     // Product decision 2026-11-19: Map and Ask Mindy are separate tools. Send the customer's words
     // only — never inject map viewport filters/geography into Ask. Card chat still sends notice
@@ -11455,17 +11466,17 @@ const ASK_MINDY_JS = `<script>(function(){
     if(oppCtx){ payload.context={kind:'opportunity',notice_id:oppCtx.id}; payload.turn_id=turnId; if(opts.replay)payload.replay_only=true;
       if(!opts.turnId){ try{ if(window.__track) window.__track('tool_use','card_chat_ask',{turn:Math.floor(history.length/2)+1}); }catch(e){} } }
     var cardAtSend=oppCtx;
-    function release(){ busy=false; if(send)send.disabled=false; }
+    function release(){ busy=false; if(send)send.disabled=false; if(stopBtn&&stopBtn.parentNode)stopBtn.parentNode.removeChild(stopBtn); stopBtn=null; }
     // Drop the question's two bubbles (it is about to be re-asked with the same turn id).
     function dropBubbles(){ var u=aEl.previousSibling; if(aEl.parentNode)aEl.parentNode.removeChild(aEl); if(u&&u.classList&&u.classList.contains('u')&&u.parentNode)u.parentNode.removeChild(u); }
     // The answer did not arrive: offer to get it. Same turn id, so an answer the server already finished
     // comes back free, and one it did not finish is answered (and charged) once.
     function offerRetry(msg){ bub.textContent=msg; var w=document.createElement('div'); w.className='amk-act'; var b=document.createElement('button'); b.textContent='Get the answer';
       b.onclick=function(){ if(busy||oppCtx!==cardAtSend)return; dropBubbles(); ask(q,{turnId:turnId}); }; w.appendChild(b); aEl.appendChild(w); }
-    fetch('/api/app/chat',{method:'POST',headers:withWorkspace({'Content-Type':'application/json','x-mi-auth-token':t,'x-user-email':em}),body:JSON.stringify(payload)})
+    fetch('/api/app/chat',{method:'POST',headers:withWorkspace({'Content-Type':'application/json','x-mi-auth-token':t,'x-user-email':em}),body:JSON.stringify(payload),signal:ctrl?ctrl.signal:undefined})
       .then(function(r){
-        if(r.status===403){ if(turnId){ pendingTurn=null; saveCard(); } upsell(); busy=false; if(send)send.disabled=false; return null; }
-        if(r.status===402){ if(turnId){ pendingTurn=null; saveCard(); } r.json().then(function(d){ creditsWall(bub,d||{}); },function(){ creditsWall(bub,{}); }); busy=false; if(send)send.disabled=false; return null; }
+        if(r.status===403){ if(turnId){ pendingTurn=null; saveCard(); } upsell(); release(); return null; }
+        if(r.status===402){ if(turnId){ pendingTurn=null; saveCard(); } r.json().then(function(d){ creditsWall(bub,d||{}); },function(){ creditsWall(bub,{}); }); release(); return null; }
         // Charge once per question: the same question is still being answered by another request (a second
         // tab, a double click, a retry during a slow answer). Wait, then fetch the saved answer (free).
         if(r.status===409&&turnId){ return r.json().catch(function(){ return {}; }).then(function(d){
@@ -11477,9 +11488,9 @@ const ASK_MINDY_JS = `<script>(function(){
         if(r.status===404&&turnId&&opts.replay){ return r.json().catch(function(){ return {}; }).then(function(d){
           if(d&&d.error==='turn_not_completed'){ offerRetry('This answer did not finish, so it was not charged.'); release(); return null; }
           bub.textContent='Mindy could not load this opportunity right now. Try reopening it.'; release(); return null; }); }
-        if(r.status===404&&oppCtx){ if(turnId){ pendingTurn=null; saveCard(); } bub.textContent='Mindy could not load this opportunity right now. Try reopening it.'; busy=false; if(send)send.disabled=false; return null; }
-        if(r.status===401){ bub.textContent='Please sign in again to ask Mindy.'; busy=false; if(send)send.disabled=false; return null; }
-        if(!r.ok||!r.body){ if(turnId){ offerRetry('Something went wrong before the answer arrived.'); release(); return null; } bub.textContent='Something went wrong. Try again.'; busy=false; if(send)send.disabled=false; return null; }
+        if(r.status===404&&oppCtx){ if(turnId){ pendingTurn=null; saveCard(); } bub.textContent='Mindy could not load this opportunity right now. Try reopening it.'; release(); return null; }
+        if(r.status===401){ bub.textContent='Please sign in again to ask Mindy.'; release(); return null; }
+        if(!r.ok||!r.body){ if(turnId){ offerRetry('Something went wrong before the answer arrived.'); release(); return null; } bub.textContent='Something went wrong. Try again.'; release(); return null; }
         var reader=r.body.getReader(), dec=new TextDecoder(), buf='';
         function pump(){ return reader.read().then(function(res){
           if(res.done){ finish(); return; }
@@ -11494,7 +11505,7 @@ const ASK_MINDY_JS = `<script>(function(){
             else if(ev.type==='market_report'&&ev.html&&!oppCtx){ turnDoc=true; try{ repOnMarketReport(ev,aEl); }catch(e){} }
             else if(ev.type==='token'){ if(!started){ bub.textContent=''; started=true; } acc+=(ev.content||''); paint(bub,acc); body.scrollTop=body.scrollHeight; }
             // citations event is now always empty (RAG corpus removed 2026-08-02) \\u2014 ignored.
-            else if(ev.type==='error'){ gotError=true; if(!started)bub.textContent=(ev.message||'Something went wrong.'); }
+            else if(ev.type==='error'){ gotError=true; if(!started)bub.textContent=safeErr(ev.message); }
             else if(ev.type==='done'){ gotDone=true; }
             else if(ev.type==='replayed'){ var rd=document.createElement('div'); rd.className='amk-credits'; rd.textContent='Saved answer \\u00b7 no extra credits'; aEl.appendChild(rd); }
             else if(ev.type==='citations'&&oppCtx&&Array.isArray(ev.sources)&&ev.sources.length){ var sd=document.createElement('div'); sd.className='amk-src'; var s0=ev.sources[0]; sd.innerHTML='Source: '+(s0.url?'<a href="'+esc(s0.url)+'" target="_blank" rel="noopener">'+esc(s0.title||'SAM.gov notice')+'</a>':esc(s0.title||'SAM.gov notice')); aEl.appendChild(sd); }
@@ -11513,11 +11524,15 @@ const ASK_MINDY_JS = `<script>(function(){
           saveCard(); if(acc)paint(bub,acc);
           // Follow-ups only after a real outcome (report/files) or a finished Q&A answer — never mid-gather.
           if(acc&&!oppCtx&&(turnDoc||String(acc).trim().length>=80))followups(aEl,q,acc);
-          busy=false; if(send)send.disabled=false; body.scrollTop=body.scrollHeight; }
-        return pump().catch(function(){ if(turnId){ if(oppCtx===cardAtSend)offerRetry('The connection dropped before the answer finished.'); release(); return; } bub.textContent='Connection failed. Check your network and try again.'; release(); });
+          release(); body.scrollTop=body.scrollHeight; }
+        return pump().catch(function(){ if(stopped){ stoppedEnd(); return; } if(turnId){ if(oppCtx===cardAtSend)offerRetry('The connection dropped before the answer finished.'); release(); return; } bub.textContent='Connection failed. Check your network and try again.'; release(); });
       })
-      .catch(function(){ if(turnId){ offerRetry('Connection failed before the answer arrived.'); release(); return; } bub.textContent='Connection failed. Check your network and try again.'; busy=false; if(send)send.disabled=false; });
+      .catch(function(){ if(stopped){ stoppedEnd(); return; } if(turnId){ offerRetry('Connection failed before the answer arrived.'); release(); return; } bub.textContent='Connection failed. Check your network and try again.'; release(); });
   }
+  // Customer-safe failure text (B2): only these exact strings are shown verbatim; anything else becomes the
+  // generic one. Kept identical to src/lib/chat/customer-errors.ts (ask-window-stop-errors.unit.test.ts).
+  var SAFE_ERR=["Mindy couldn't answer right now. Nothing was wrong with your question. Please try again in a moment.","Something went wrong while Mindy was answering, so this answer is incomplete. Please try again.","Couldn't reach Mindy. Check your connection and try again.","Mindy is temporarily unavailable. Please try again in a moment.","That question pulled in more data than Mindy can read at once. Try narrowing it, for example to one agency, state or contract type.","Mindy took too long to answer, so this answer is incomplete. Please try again, or narrow the question."];
+  function safeErr(m){ return (typeof m==='string'&&SAFE_ERR.indexOf(m)>=0)?m:SAFE_ERR[0]; }
   // Card chat out of credits: say what an answer costs and what they hold; Pro is the next step. No new grant.
   function creditsWall(bub,d){
     var per=(typeof d.credits_per_answer==='number')?d.credits_per_answer:null, bal=(typeof d.balance==='number')?d.balance:null;
