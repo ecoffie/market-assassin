@@ -69,6 +69,14 @@ describe.runIf(!!CHROME)('market report PDF: a valid file that matches the repor
     }
     // The on-screen button is not printed into the file.
     expect(t).not.toContain(squash('Download PDF'));
+
+    // Every visible line's WORDS are in the PDF. pdf.js drops tabular-number digits and some punctuation, so
+    // this compares letters only; the numbers are checked by the pdftotext test below where poppler exists.
+    const letters = (x: string) => x.toLowerCase().replace(/[^a-z]/g, '');
+    const pdfLetters = letters(text);
+    const lines = htmlLines(html).filter((l) => letters(l).length >= 3);
+    expect(lines.length).toBeGreaterThan(20);
+    expect(lines.filter((l) => !pdfLetters.includes(letters(l)))).toEqual([]);
   }, 60_000);
 
   it.runIf(!!PDFTOTEXT)('contains every visible line of the report, numbers included', () => {
