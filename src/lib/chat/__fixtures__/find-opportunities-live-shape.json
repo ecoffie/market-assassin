@@ -1,0 +1,438 @@
+{
+ "query_summary": {
+  "query": "bridge highway construction inspection",
+  "location": null,
+  "agency": "Federal Highway Administration",
+  "timeframe": {
+   "open_closing_days": null,
+   "recompete_months": 18,
+   "forecast_include_past": false
+  },
+  "set_aside": null,
+  "horizons_requested": [
+   "open_now",
+   "coming_back",
+   "coming_soon"
+  ],
+  "interpreted_as": {
+   "open_now": "Canonical discovery (text_or_taxonomy): ANY(bridge \u00b7 highway) rank-only(construction \u00b7 inspection); buyer = whole-word identity on department OR sub_tier; geo = place-of-performance state, else buying-office state when none is recorded; rank = evidence tier \u2192 breadth \u2192 score \u2192 deadline",
+   "coming_back": "Canonical discovery (industry_preset): ANY(bridge \u00b7 highway) rank-only(construction \u00b7 inspection); buyer = awarding_agency OR awarding_sub_agency identity; geo = place_of_performance_state; window \u226418mo",
+   "coming_soon": "Canonical discovery (coverage_unestablished): ANY(bridge \u00b7 highway) rank-only(construction \u00b7 inspection); agency = forecast identity codes; geo = pop_state; current + future fiscal years; unresolved publisher \u2192 unavailable, not zero"
+  }
+ },
+ "market_interpretation": {
+  "customer_phrase": "bridge highway construction inspection",
+  "buyer": {
+   "requested": "Federal Highway Administration",
+   "canonical": null,
+   "aliases": [
+    "Federal Highway Administration"
+   ],
+   "needles": [
+    "Federal Highway Administration"
+   ],
+   "kind": "passthrough",
+   "parent_department_applied": false,
+   "reason": "No alias for \u201cFederal Highway Administration\u201d; used as typed. Not broadened to a parent department."
+  },
+  "capability": {
+   "requested": "bridge highway construction inspection",
+   "kind": "industry_preset",
+   "direct": {
+    "source": "Construction",
+    "naics": [
+     "236",
+     "237",
+     "238"
+    ],
+    "psc": [],
+    "terms": [
+     "Construction",
+     "bridge highway construction inspection"
+    ],
+    "reason": "Customer phrase maps to the \u201cConstruction\u201d industry preset."
+   },
+   "related_market": null,
+   "excluded": []
+  },
+  "retrieval_plan": {
+   "buyer_is_normalization": true,
+   "related_market_applied": false,
+   "related_market_reason": null
+  },
+  "truth": {
+   "what_was_requested": {
+    "phrase": "bridge highway construction inspection",
+    "buyer": "Federal Highway Administration"
+   },
+   "what_was_consumed": [
+    "phrase:bridge highway construction inspection",
+    "buyer:Federal Highway Administration",
+    "direct_taxonomy:Construction"
+   ],
+   "what_was_expanded": [],
+   "why": "No alias for \u201cFederal Highway Administration\u201d; used as typed. Not broadened to a parent department.",
+   "what_remains_unsupported": [
+    "buyer alias not in agency-aliases.json",
+    "no forecast publisher could be resolved for \"Federal Highway Administration\""
+   ],
+   "records": {
+    "DIRECT_MATCH": [
+     "CONT_AWD_6982AF26P000022_6925_-NONE-_-NONE-",
+     "CONT_AWD_6982AF24C000016_6925_-NONE-_-NONE-",
+     "CONT_AWD_6982AF26C000003_6925_-NONE-_-NONE-",
+     "CONT_AWD_6982AF25C000018_6925_-NONE-_-NONE-",
+     "CONT_AWD_6982AF25C000019_6925_-NONE-_-NONE-"
+    ],
+    "RELATED_MARKET_CANDIDATE": []
+   }
+  }
+ },
+ "presentation_note": "I searched the buyer as \u201cFederal Highway Administration\u201d. I found 5 coming-back contracts with direct bridge highway construction inspection evidence.",
+ "horizons": {
+  "open_now": {
+   "status": "grounded",
+   "matched_count": 41,
+   "returned_count": 5,
+   "items": [
+    {
+     "horizon": "open_now",
+     "title": "Northeast Region Pavement and Bridge Preservation Construction - NP NER PMS BMS FY24(1)",
+     "buyer": "TRANSPORTATION, DEPARTMENT OF",
+     "location_label": "Ashburn, NY",
+     "relevant_date": "2026-12-01T19:00:00+00:00",
+     "relevant_date_label": "response_deadline",
+     "value_label": null,
+     "source": "sam_opportunities",
+     "why_this_matched": "Direct match for \u201cbridge highway construction inspection\u201d \u2014 the record itself establishes relevance.",
+     "identity": {
+      "kind": "notice_id",
+      "id": "a1ba95352eca4537ad2efdaf01a46a9d"
+     },
+     "evidence_class": "DIRECT_MATCH",
+     "match_basis": [
+      "buy_side_code"
+     ],
+     "notice_id": "a1ba95352eca4537ad2efdaf01a46a9d",
+     "solicitation_number": "693C73-27-B-000003",
+     "response_deadline": "2026-12-01T19:00:00+00:00",
+     "set_aside": "Small Business Set Aside - Total",
+     "sam_url": "https://sam.gov/workspace/contract/opp/a1ba95352eca4537ad2efdaf01a46a9d/view",
+     "notice_type": "Presolicitation",
+     "naics_code": "237310",
+     "psc_code": "Y1LB",
+     "sub_agency": "FEDERAL HIGHWAY ADMINISTRATION"
+    },
+    {
+     "horizon": "open_now",
+     "title": "Northeast Region Pavement and Bridge Preservation Construction - NP NER PMS BMS FY24(1)",
+     "buyer": "TRANSPORTATION, DEPARTMENT OF",
+     "location_label": "Ashburn, NY",
+     "relevant_date": "2026-12-01T19:00:00+00:00",
+     "relevant_date_label": "response_deadline",
+     "value_label": null,
+     "source": "sam_opportunities",
+     "why_this_matched": "Direct match for \u201cbridge highway construction inspection\u201d \u2014 the record itself establishes relevance.",
+     "identity": {
+      "kind": "notice_id",
+      "id": "5fd8dfcd8c1443feb06df11de92015d6"
+     },
+     "evidence_class": "DIRECT_MATCH",
+     "match_basis": [
+      "buy_side_code"
+     ],
+     "notice_id": "5fd8dfcd8c1443feb06df11de92015d6",
+     "solicitation_number": "693C73-27-B-000003",
+     "response_deadline": "2026-12-01T19:00:00+00:00",
+     "set_aside": "Small Business Set Aside - Total",
+     "sam_url": "https://sam.gov/workspace/contract/opp/5fd8dfcd8c1443feb06df11de92015d6/view",
+     "notice_type": "Solicitation",
+     "naics_code": "237310",
+     "psc_code": "Y1LB",
+     "sub_agency": "FEDERAL HIGHWAY ADMINISTRATION"
+    }
+   ],
+   "source": "sam_opportunities",
+   "as_of": "2026-11-20T13:00:33.891726+00:00",
+   "filters_consumed": [
+    "canonical_discovery:v4",
+    "eligibility:ANY(bridge \u00b7 highway) rank-only(construction \u00b7 inspection)",
+    "agency\u2192identity_words(Federal Highway Administration)",
+    "status=active",
+    "query\u2192text\u222adirect_taxonomy",
+    "rank\u2192evidence_tier\u00b7breadth\u00b7score\u00b7date"
+   ],
+   "filters_unsupported": [],
+   "unmapped_count": 1,
+   "error": null,
+   "allowed_handoffs": [
+    "incumbent",
+    "bid_fit",
+    "dossier",
+    "documents",
+    "draft_response",
+    "agency_intel",
+    "market_intel",
+    "prepare_positioning",
+    "monitor_market",
+    "monitor_notice"
+   ],
+   "semantics_note": "Canonical discovery eligibility (word-bounded). Ranked DIRECT_MATCH \u2192 RELATED_MARKET_CANDIDATE \u2192 other, then by how many of the query\u2019s concepts a notice carries, then deadline. Geography: place-of-performance state when SAM records one; the buying-office state only when it does not (work performed in another state or territory is never shown).",
+   "evidence_counts": {
+    "DIRECT_MATCH": 37,
+    "RELATED_MARKET_CANDIDATE": 0
+   }
+  },
+  "coming_back": {
+   "status": "grounded",
+   "matched_count": 71,
+   "returned_count": 5,
+   "items": [
+    {
+     "horizon": "coming_back",
+     "title": "HAWK CONTRACTING LLC",
+     "buyer": "Federal Highway Administration",
+     "location_label": "AZ",
+     "award_kind": "standalone_contract",
+     "capture_start_date": "2025-11-20",
+     "capture_start_basis": "derived: period_of_performance_current_end \u2212 12 months (Mindy capture lead rule)",
+     "relevant_date": "2026-11-20",
+     "relevant_date_label": "current_end",
+     "value_label": "$3.8M",
+     "source": "recompete_opportunities",
+     "why_this_matched": "Direct match for \u201cbridge highway construction inspection\u201d \u2014 the record itself establishes relevance.",
+     "identity": {
+      "kind": "contract_id",
+      "id": "CONT_AWD_6982AF26P000022_6925_-NONE-_-NONE-"
+     },
+     "evidence_class": "DIRECT_MATCH",
+     "match_basis": [
+      "buy_side_code"
+     ],
+     "contract_id": "CONT_AWD_6982AF26P000022_6925_-NONE-_-NONE-",
+     "piid": "6982AF26P000022",
+     "incumbent_name": "HAWK CONTRACTING LLC",
+     "incumbent_uei": "ZCCVJNG4D9R3",
+     "current_end": "2026-11-20",
+     "potential_total_value": 3777777,
+     "total_obligation": 3777777,
+     "recompete_likelihood": "high",
+     "set_aside_type": null,
+     "naics_code": "237310",
+     "psc_code": "Y1LB",
+     "description": "AZ NP GRCA 14(2) ROADWAY IMPROVEMENTS GUARDRAIL AND PAVING IMPROVEMENTS",
+     "awarding_sub_agency": "Federal Highway Administration",
+     "source_url": "https://www.usaspending.gov/award/CONT_AWD_6982AF26P000022_6925_-NONE-_-NONE-",
+     "competition": {
+      "class": "competed",
+      "label": "Competed \u00b7 SB set-aside"
+     }
+    },
+    {
+     "horizon": "coming_back",
+     "title": "JOSEPH J. ALBANESE, INC.",
+     "buyer": "Federal Highway Administration",
+     "location_label": "CA",
+     "award_kind": "standalone_contract",
+     "capture_start_date": "2025-11-30",
+     "capture_start_basis": "derived: period_of_performance_current_end \u2212 12 months (Mindy capture lead rule)",
+     "relevant_date": "2026-11-30",
+     "relevant_date_label": "current_end",
+     "value_label": "$33.6M",
+     "source": "recompete_opportunities",
+     "why_this_matched": "Direct match for \u201cbridge highway construction inspection\u201d \u2014 the record itself establishes relevance.",
+     "identity": {
+      "kind": "contract_id",
+      "id": "CONT_AWD_6982AF24C000016_6925_-NONE-_-NONE-"
+     },
+     "evidence_class": "DIRECT_MATCH",
+     "match_basis": [
+      "buy_side_code"
+     ],
+     "contract_id": "CONT_AWD_6982AF24C000016_6925_-NONE-_-NONE-",
+     "piid": "6982AF24C000016",
+     "incumbent_name": "JOSEPH J. ALBANESE, INC.",
+     "incumbent_uei": "L3DGMCLTFZY5",
+     "current_end": "2026-11-30",
+     "potential_total_value": 33645591.78,
+     "total_obligation": 33645591.78,
+     "recompete_likelihood": "high",
+     "set_aside_type": "Full & Open",
+     "naics_code": "237310",
+     "psc_code": "Y1LB",
+     "description": "CA FLAP SCR T5(1) MONTEREY BAY SANCTUARY SCENIC TRAIL CONSTRUCTION CONTRACT",
+     "awarding_sub_agency": "Federal Highway Administration",
+     "source_url": "https://www.usaspending.gov/award/CONT_AWD_6982AF24C000016_6925_-NONE-_-NONE-",
+     "competition": {
+      "class": "competed",
+      "label": "Competed"
+     }
+    }
+   ],
+   "source": "recompete_opportunities",
+   "as_of": "2026-11-20T22:26:25.77+00:00",
+   "filters_consumed": [
+    "canonical_discovery:v4",
+    "eligibility:ANY(bridge \u00b7 highway) rank-only(construction \u00b7 inspection)",
+    "agency\u2192identity_words(Federal Highway Administration)",
+    "quality_flag=null",
+    "pop_end\u2265today",
+    "recompete_via=industry_preset",
+    "timeframe.recompete_months=18",
+    "rank\u2192evidence_tier\u00b7breadth\u00b7score\u00b7date"
+   ],
+   "filters_unsupported": [],
+   "unmapped_count": 18,
+   "error": null,
+   "allowed_handoffs": [
+    "incumbent",
+    "agency_intel",
+    "contract_history",
+    "recompete_planning",
+    "market_intel",
+    "prepare_positioning",
+    "monitor_market"
+   ],
+   "semantics_note": "Geography: place of performance only (not buying-office). Not a live solicitation \u2014 do not draft a proposal as if an RFP exists. Watch/email for this horizon is not available yet. DIRECT_MATCH requires buy-side evidence (description / PSC / NAICS). HOLDER_SIGNAL rows matched only on the holder's name. Task/delivery orders under a contract vehicle are excluded \u2014 they are not re-competed on their own. competition {class,label} = how the CURRENT award was made, from its USASpending record (source_url): not_competed covers AbilityOne mandatory-source and 8(a) sole-source awards; unknown = not established, never assume competed. It does not decide how the follow-on will be bought.",
+   "evidence_counts": {
+    "DIRECT_MATCH": 5,
+    "RELATED_MARKET_CANDIDATE": 0,
+    "HOLDER_SIGNAL": 0
+   },
+   "orders_excluded": 67,
+   "competition_counts": {
+    "competed": 4,
+    "not_competed": 1,
+    "unknown": 0
+   }
+  },
+  "coming_soon": {
+   "status": "unavailable",
+   "matched_count": null,
+   "returned_count": 0,
+   "items": [],
+   "source": "agency_forecasts",
+   "as_of": "2026-11-20T14:05:47.495+00:00",
+   "filters_consumed": [
+    "canonical_discovery:v4",
+    "eligibility:ANY(bridge \u00b7 highway) rank-only(construction \u00b7 inspection)",
+    "agency\u2192identity_words(Federal Highway Administration)",
+    "exclude_past_fy",
+    "forecast_via=coverage_unestablished",
+    "rank\u2192evidence_tier\u00b7breadth\u00b7score\u00b7date",
+    "agency\u2192forecast_publisher_unresolved"
+   ],
+   "filters_unsupported": [
+    "agency forecast publisher"
+   ],
+   "unmapped_count": null,
+   "coverage": {
+    "state": "unestablished",
+    "gaps": [
+     {
+      "requested": "Federal Highway Administration",
+      "reason": "unresolved_publisher"
+     }
+    ]
+   },
+   "error": {
+    "class": "coverage_unestablished",
+    "message": "No forecast publisher could be resolved for \"Federal Highway Administration\". Coverage is not established \u2014 not a measured zero."
+   },
+   "allowed_handoffs": [
+    "agency_intel",
+    "market_intel",
+    "prepare_positioning",
+    "monitor_market"
+   ],
+   "semantics_note": "Coverage not established for this buyer in agency_forecasts. Do not treat as zero demand. Do not substitute parent-department forecasts."
+  }
+ },
+ "summary": {
+  "open_now": {
+   "status": "grounded",
+   "matched_count": 41
+  },
+  "coming_back": {
+   "status": "grounded",
+   "matched_count": 71,
+   "direct_match": 5,
+   "related_market_candidate": 0,
+   "holder_signal": 0
+  },
+  "coming_soon": {
+   "status": "unavailable",
+   "matched_count": null
+  },
+  "headline": "41 open now (37 direct \u00b7 0 related-market) \u00b7 71 coming back (5 direct \u00b7 0 related-market) \u00b7 coming soon unavailable",
+  "claim_hygiene": "Counts are per-horizon matches under this query \u2014 not unique procurements across horizons. Do not call combined raw rows unique opportunities. Do not count RELATED_MARKET_CANDIDATE as confirmed \u201cbridge highway construction inspection\u201d demand."
+ },
+ "_meta": {
+  "grounded": true,
+  "degraded": true,
+  "composition": "opportunity_map_horizons_v1",
+  "expansion_note": "Cross-class deduplicated procurement identity is unknown. Buyer alias normalization is not expansion.",
+  "watch_coverage": [
+   "open_now",
+   "coming_soon"
+  ],
+  "find_shape": "specific",
+  "discovery": {
+   "plan_version": 4,
+   "status": "ok",
+   "refinement": null,
+   "eligibility": "ANY(bridge \u00b7 highway) rank-only(construction \u00b7 inspection)"
+  }
+ },
+ "presentation": {
+  "host_rules": [
+   "FIRST VALUE: present this result immediately. Do not ask questions before showing it.",
+   "HERE'S WHERE I SEE THE MONEY \u2014 use presentation.sections titles in order: Open now, Coming back, Coming soon. Report each horizon's own status. An unavailable or failed horizon is a coverage gap \u2014 never zero / none / empty demand.",
+   "WHERE I WOULD START: one evidence-supported point from the returned items (prefer a live Open hit if grounded; else Coming back; else Coming soon). Do not invent a solicitation for a recompete or forecast.",
+   "WHY: 1\u20133 concise reasons from this result's evidence only.",
+   "WHAT I CAN'T ESTABLISH YET: one material limitation if any (sparse coverage, unavailable horizon, broad query).",
+   "ONE FIND: this call is the first-value FIND. Do not call find_opportunities again before presenting. Do not fan out parallel FIND variants.",
+   "Then ask at most ONE plain-English refinement (what they actually sell). WAIT. Do not auto-call understand_customer or get_current_acquisition_intelligence even if `_next` offers them \u2014 those are confirmation-gated after first value.",
+   "Do not ask company identity, UEI, CAGE, certifications, clearance, FCL, set-aside, vehicle, or desired deliverable before presenting this. Do not expose NAICS/PSC/ATO/CNO/CEMA/CSO/OT/PAE/FCL in the refinement unless the user already used that word.",
+   "Do not web-search or create an artifact on this turn. Do not ask market map vs access-path vs capability statement.",
+   "Clearance is not a first-value question. Do not call it a hard gate merely because of who the buyer is.",
+   "EVIDENCE CLASS: DIRECT_MATCH is confirmed relevance to what they asked to sell. RELATED_MARKET_CANDIDATE is a broader related market that can contain that work (the same industry family, or the buyer\u2019s broader market); the record does not establish the requested work. Never count related-market rows as confirmed demand for what they asked to sell. Never mix the two into one combined count for the requested capability. Explain the distinction in plain English. Do not dump NAICS/PSC.",
+   "COMING BACK SPLIT: when summary.coming_back has related_market_candidate > 0, say \u201cN contracts with direct <what they asked for> evidence and M related-market contracts worth reviewing (same industry family or broader buyer market, not confirmed).\u201d Never say \u201cN+M <what they asked for> recompetes/contracts.\u201d presentation_note and summary.headline already split the counts \u2014 use them.",
+   "INTERPRETATION: use presentation_note / market_interpretation.truth. A buyer alias (an acronym or short name resolved to the full agency name) is spelling, not a wider department. Never say you searched the whole parent department. Never claim a broader related market is the requested capability.",
+   "COMING SOON UNAVAILABLE: if coming_soon status is unavailable because this buyer has no forecast publisher, that is coverage not established \u2014 not a measured zero. Do not invent forecast rows from parent-department feeds.",
+   "COMING SOON PARTIAL: if coming_soon status is partial, its count covers only the buyers with a forecast publisher. Name the buyers listed in coverage.gaps as not measured \u2014 never say they have zero upcoming buys.",
+   "COMPETITION: a Coming back item may carry `competition`, read from that award's own USASpending record. Use competition.label for how the current award was made, in preference to set_aside_type. not_competed rows (for example \"Not competed \u00b7 AbilityOne\" or \"8(a) sole source\") are not equally realistic targets: rank them after competed and not-established rows in every list, short list or table (items already arrive in that order; never open a list with a not-competed row), and say why in plain words (an AbilityOne award goes to a nonprofit that employs people with disabilities without competition; an 8(a) sole-source award goes to one 8(a) firm without competition). unknown means not established: say \"not established\", never \"full and open\". competition describes the CURRENT award only; never say the follow-on cannot be won.",
+   "HOLDER_SIGNAL: a Coming back row labelled HOLDER_SIGNAL matched only on the incumbent's NAME (the company name contains the search words). It is NOT a direct match and NOT demand for this work \u2014 never count it with DIRECT_MATCH. At most say the holder's name suggests related work worth checking; the contract itself (see naics_code / psc_code) may be something else entirely."
+  ],
+  "sections": {
+   "open_now": {
+    "display_title": "Open now",
+    "provenance_label": "Live solicitations for this query \u2014 grounded, empty, or unavailable (unavailable is not zero)"
+   },
+   "coming_back": {
+    "display_title": "Coming back",
+    "provenance_label": "Contracts likely to recompete \u2014 not a live solicitation number"
+   },
+   "coming_soon": {
+    "display_title": "Coming soon",
+    "provenance_label": "Agency forecasts / planned demand \u2014 not a live solicitation number"
+   },
+   "start": {
+    "display_title": "Where I would start",
+    "provenance_label": "One item from the returned evidence \u2014 not a new lookup"
+   },
+   "why": {
+    "display_title": "Why",
+    "provenance_label": "1\u20133 reasons from this result only"
+   },
+   "gaps": {
+    "display_title": "What I can't establish yet",
+    "provenance_label": "Coverage gap or query limit \u2014 never fabricated as zero"
+   },
+   "related": {
+    "display_title": "Related market \u2014 not confirmed",
+    "provenance_label": "RELATED_MARKET_CANDIDATE rows. Broader related market (industry family or buyer); not confirmed capability demand"
+   }
+  }
+ }
+}
