@@ -280,8 +280,8 @@ function formatGoaling(call: ToolCall): GroundedField<string> {
     goals?: Array<{
       category: string;
       goal_pct: number;
-      actual_setaside_pct: number;
-      meets_goal: boolean;
+      actual_setaside_pct: number | null;
+      meets_goal: boolean | null;
     }> | null;
     _meta?: { grounded?: boolean; small_business_setaside_share?: number; basis?: string };
   };
@@ -301,7 +301,7 @@ function formatGoaling(call: ToolCall): GroundedField<string> {
   // compare unlike numbers. The goals are therefore not shown beside them.
   const shares = r.goals.map(
     (g) =>
-      `${/prime/i.test(g.category) ? 'general small-business set-aside' : g.category} ${g.actual_setaside_pct}%`,
+      `${/prime/i.test(g.category) ? 'general small-business set-aside' : g.category} ${g.actual_setaside_pct === null ? 'unavailable (lookup failed)' : `${g.actual_setaside_pct}%`}`,
   );
   const head =
     typeof sbShare === 'number'

@@ -10941,6 +10941,8 @@ const ASK_MINDY_CSS =
   + '.amk-in textarea:focus{border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.12)}'
   + '.amk-send{flex:none;width:40px;height:40px;border:0;border-radius:11px;background:#2563eb;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center}'
   + '.amk-send:disabled{opacity:.45;cursor:default}.amk-send svg{width:18px;height:18px}'
+  + '.amk-notices{margin-top:8px;display:flex;flex-direction:column;gap:4px}.amk-notice{font:500 12px Inter,system-ui,sans-serif;color:#92400e;background:#fffbeb;border:1px solid #fde68a;border-radius:7px;padding:4px 8px}'
+  + '@media(prefers-color-scheme:dark){.amk-notice{color:#fcd34d;background:rgba(245,158,11,.1);border-color:rgba(245,158,11,.25)}}'
   + '.amk-stop{display:inline-block;margin-top:6px;border:1px solid #dde3ec;background:#fff;color:#334155;font:600 11.5px Inter,system-ui,sans-serif;border-radius:7px;padding:4px 10px;cursor:pointer}.amk-stop:hover{background:#f1f5f9}'
   // ── In-chat REPORT PANE (create_document → read it here, no download). Sits beside the chat drawer on wide
   // screens and over it on narrow ones. The report itself is the shared document engine's HTML in a
@@ -11506,6 +11508,9 @@ const ASK_MINDY_JS = `<script>(function(){
             else if(ev.type==='token'){ if(!started){ bub.textContent=''; started=true; } acc+=(ev.content||''); paint(bub,acc); body.scrollTop=body.scrollHeight; }
             // citations event is now always empty (RAG corpus removed 2026-08-02) \\u2014 ignored.
             else if(ev.type==='error'){ gotError=true; if(!started)bub.textContent=safeErr(ev.message); }
+            // Server status lines (a data source unavailable, a lookup failed, a long step under way): shown under
+            // the answer, as the old chat does, instead of only typing dots.
+            else if((ev.type==='notice'||ev.type==='progress')&&typeof ev.message==='string'&&ev.message.trim()){ addNotice(aEl,ev.message); }
             else if(ev.type==='done'){ gotDone=true; }
             else if(ev.type==='replayed'){ var rd=document.createElement('div'); rd.className='amk-credits'; rd.textContent='Saved answer \\u00b7 no extra credits'; aEl.appendChild(rd); }
             else if(ev.type==='citations'&&oppCtx&&Array.isArray(ev.sources)&&ev.sources.length){ var sd=document.createElement('div'); sd.className='amk-src'; var s0=ev.sources[0]; sd.innerHTML='Source: '+(s0.url?'<a href="'+esc(s0.url)+'" target="_blank" rel="noopener">'+esc(s0.title||'SAM.gov notice')+'</a>':esc(s0.title||'SAM.gov notice')); aEl.appendChild(sd); }
@@ -11532,6 +11537,13 @@ const ASK_MINDY_JS = `<script>(function(){
   // Customer-safe failure text (B2): only these exact strings are shown verbatim; anything else becomes the
   // generic one. Kept identical to src/lib/chat/customer-errors.ts (ask-window-stop-errors.unit.test.ts).
   var SAFE_ERR=["Mindy couldn't answer right now. Nothing was wrong with your question. Please try again in a moment.","Something went wrong while Mindy was answering, so this answer is incomplete. Please try again.","Couldn't reach Mindy. Check your connection and try again.","Mindy is temporarily unavailable. Please try again in a moment.","That question pulled in more data than Mindy can read at once. Try narrowing it, for example to one agency, state or contract type.","Mindy took too long to answer, so this answer is incomplete. Please try again, or narrow the question."];
+  function addNotice(aEl,text){
+    var box=aEl.querySelector('.amk-notices');
+    if(!box){ box=document.createElement('div'); box.className='amk-notices'; box.setAttribute('role','status'); box.setAttribute('data-testid','amk-notices'); aEl.appendChild(box); }
+    if(box.children.length>=6) return; // a runaway stream cannot bury the answer
+    var n=document.createElement('div'); n.className='amk-notice'; n.textContent=String(text).slice(0,300); box.appendChild(n);
+    body.scrollTop=body.scrollHeight;
+  }
   function safeErr(m){ return (typeof m==='string'&&SAFE_ERR.indexOf(m)>=0)?m:SAFE_ERR[0]; }
   // Card chat out of credits: say what an answer costs and what they hold; Pro is the next step. No new grant.
   function creditsWall(bub,d){
@@ -11544,11 +11556,18 @@ const ASK_MINDY_JS = `<script>(function(){
   // endpoint the /app panel uses (POST /api/app/chat/suggestions). The old version appended the same four
   // fixed chips under every answer (2026-11-15). No chips when the endpoint returns none or fails.
   function clearFollowups(){ var old=body.querySelectorAll('.amk-act.amk-fu'); for(var i=0;i<old.length;i++){ if(old[i].parentNode)old[i].parentNode.removeChild(old[i]); } }
+  // The customer's earlier questions (last 6, not the current one), so a suggested next step never asks for
+  // something they already said. Same contract as the /app panel (the "earlier" field of POST /api/app/chat/suggestions).
+  function earlierAsks(q){
+    var u=history.filter(function(h){ return h&&h.role==='user'&&typeof h.content==='string'; }).map(function(h){ return h.content; });
+    if(u.length&&u[u.length-1]===q) u.pop();
+    return u.slice(-6);
+  }
   function followups(aEl,q,answer){
     clearFollowups();
     var t=tok(), em=email(); if(!t||!em)return;
     var mine=aEl;
-    fetch('/api/app/chat/suggestions',{method:'POST',headers:{'Content-Type':'application/json','x-mi-auth-token':t,'x-user-email':em},body:JSON.stringify({email:em,message:q,answer:String(answer||'').slice(0,6000)})})
+    fetch('/api/app/chat/suggestions',{method:'POST',headers:{'Content-Type':'application/json','x-mi-auth-token':t,'x-user-email':em},body:JSON.stringify({email:em,message:q,answer:String(answer||'').slice(0,6000),earlier:earlierAsks(q)})})
       .then(function(r){ return r.ok?r.json():null; })
       .then(function(d){
         var list=(d&&Array.isArray(d.suggestions))?d.suggestions.filter(function(x){ return typeof x==='string'&&x.trim(); }).slice(0,3):[];
