@@ -38,6 +38,12 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 |---|---|---|---|---|---|
 | 2026-11-21 | MCP / saved-search-alerts | Confirmed recipient suppressions and invalid_saved_naics no longer make the drain `error` or HTTP 500. The drain decides the outcome once: attributed per-search failures with the rest evaluated are `partial`; run-level failures, or every search failing, are `error` — and readiness treats every non-2xx `error` as a whole-job failure (no second-guessing). Delivery readiness treats action-item-only runs (including legacy HTTP 500) as healthy, and does not upgrade an attributed `opportunity_query_failed` beside suppressions into a whole-job outage. Preview curls no longer self-report over the day's real outcome. Partial runs answer 503 (same as their self-report), and the dispatcher never replaces a route's terminal self-report with a cleaner/less specific record inside the 12s ack window (partial → success, or suppression summary → `error=null`). The watchdog reads action items off success runs, so the 🛡️ suppression Slack item still posts. Claude had told Mortgage Link1 that alert delivery was degraded with last success September 29. | `ACTION_ITEM_FAILURE_CLASSES` → `src/lib/saved-searches/alert-drain.ts`; `resolveDispatchFinal` → `src/lib/cron/dispatch-final-status.ts` | `alert-drain.unit.test.ts` + `delivery-readiness.unit.test.ts` + `dispatch/dispatch-self-report-race.unit.test.ts` + `dispatcher-watchdog/cron-to-watchdog.unit.test.ts` | BUILT |
 
+## 2026-11-21 — USAJobs empty is not the funnels board
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-11-21 | Data Core / job postings | A confirmed empty USAJobs read stays on USAJobs with a real zero. An API error stays unavailable. Only a missing key falls through to the funnels feed. A missing posted date is not stamped 1970. | `customerJobBoardChoice` → `src/lib/jobs/usajobs-direct.ts` | `usajobs-direct.unit.test.ts` | BUILT, NOT MERGED |
+
 ## 2026-11-20 — Scorecard second slot confirms before it publishes
 
 | Date | Area | Fix | Proof anchor | Verified | Status |

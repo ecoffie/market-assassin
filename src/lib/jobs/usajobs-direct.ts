@@ -14,7 +14,7 @@ import type { JobBoardData, JobBoardFilters, JobListing } from './read';
 export const USAJOBS_DIRECT_SERIES = '1102';
 export const USAJOBS_DIRECT_DAYS = 30;
 
-export function usajobsRowToListing(r: JobPostingRow): JobListing {
+export function usajobsRowToListing(r: JobPostingRow, seenAt: string): JobListing {
   return {
     id: r.id,
     source: 'usajobs',
@@ -29,10 +29,24 @@ export function usajobsRowToListing(r: JobPostingRow): JobListing {
     salary_min: r.salary_min,
     salary_max: r.salary_max,
     posted_at: r.posted_at,
-    first_seen_at: r.posted_at ?? new Date(0).toISOString(),
+    first_seen_at: seenAt,
     apply_url: r.apply_url,
     role: categorizeJob(r.title),
   };
+}
+
+/**
+ * Which board the customer sees.
+ * A USAJobs error stays unavailable. A confirmed empty USAJobs read stays that
+ * read. Only a missing key (no direct result) may fall through to the funnels feed.
+ */
+export function customerJobBoardChoice(
+  mirrorServing: boolean,
+  direct: JobBoardData | null,
+): 'mirror' | 'direct' | 'funnels' {
+  if (mirrorServing) return 'mirror';
+  if (direct == null) return 'funnels';
+  return 'direct';
 }
 
 /** Pure: turn fetched postings into the board, applying the page filters. */
@@ -83,7 +97,8 @@ const UNAVAILABLE: JobBoardData = {
 const fetchCached = unstable_cache(
   async () => {
     const rows = await fetchUSAJobs(USAJOBS_DIRECT_SERIES, USAJOBS_DIRECT_DAYS);
-    return { rows: rows.map(usajobsRowToListing), fetchedAt: new Date().toISOString() };
+    const fetchedAt = new Date().toISOString();
+    return { rows: rows.map((row) => usajobsRowToListing(row, fetchedAt)), fetchedAt };
   },
   ['jobs-usajobs-direct-v1'],
   { revalidate: 6 * 3600 },
@@ -94,7 +109,6 @@ export async function readJobBoardFromUsaJobs(filters: JobBoardFilters = {}): Pr
   if (!usajobsKey()) return null;
   try {
     const { rows, fetchedAt } = await fetchCached();
-    if (rows.length === 0) return null;
     return buildUsaJobsBoard(rows, filters, 60, new Date(fetchedAt));
   } catch (e) {
     console.error('[jobs] USAJobs direct read failed:', (e as Error).message);
