@@ -11196,7 +11196,7 @@ const ASK_MINDY_JS = `<script>(function(){
   function readView(){ try{ var o=JSON.parse(sessionStorage.getItem(VIEW_KEY)||'null'); return (o&&o.email&&o.email===email()&&(o.ws||'')===wsKey()&&Array.isArray(o.history))?o:null; }catch(e){ return null; } }
   function renderConversation(msgs){
     body.innerHTML='';
-    msgs.forEach(function(m){ if(!m||typeof m.content!=='string') return; var d=addMsg(m.role==='user'?'user':'assistant', m.content); if(m.role!=='user'&&m.files&&m.files.length) repCard(cleanFiles(m.files),d); });
+    msgs.forEach(function(m){ if(!m||typeof m.content!=='string') return; var d=addMsg(m.role==='user'?'user':'assistant', m.content); if(m.role!=='user'&&m.files&&m.files.length) repCard(cleanFiles(m.files),d); if(m.role!=='user'){ var r=savedReport(m.report); if(r) repSavedCard(r,d); } });
   }
   function newChat(){
     if(busy||oppCtx) return;
@@ -11252,7 +11252,8 @@ const ASK_MINDY_JS = `<script>(function(){
         if(!d||!d.success||!Array.isArray(d.messages)) throw new Error('shape');
         sessionId=sid;
         history=d.messages.filter(function(m){ return m&&(m.role==='user'||m.role==='assistant')&&typeof m.content==='string'; }).map(function(m){
-          var h={role:m.role,content:m.content}; var f=m.deliverables&&Array.isArray(m.deliverables.files)?m.deliverables.files:null; if(f&&f.length) h.files=f; return h; });
+          var h={role:m.role,content:m.content}; var f=m.deliverables&&Array.isArray(m.deliverables.files)?m.deliverables.files:null; if(f&&f.length) h.files=f;
+          var r=m.market_report?savedReport({id:m.market_report.report_id,title:m.market_report.title}):null; if(r) h.report=r; return h; });
         clearFollowups(); hideHistory(); renderConversation(history); saveView();
         try{ if(window.__track) window.__track('tool_use','map_chat_reopen',{messages:history.length}); }catch(e){}
       })
@@ -11533,6 +11534,7 @@ const ASK_MINDY_JS = `<script>(function(){
     }
     mrExport();
     syncRepBtn();
+    if(!aEl) return; // re-opened from a saved card: that card already exists
     var w=document.createElement('div'); w.className='amk-repcard'; w.setAttribute('data-testid','amk-report-card');
     w.innerHTML='<div class="amk-repcard-t"><b></b><span></span></div><button type="button" class="amk-repcard-open">Open report</button>';
     w.querySelector('b').textContent=title;
@@ -11543,6 +11545,40 @@ const ASK_MINDY_JS = `<script>(function(){
     };
     aEl.appendChild(w); body.scrollTop=body.scrollHeight;
     try{ if(window.__track) window.__track('tool_use','map_market_report_open',{}); }catch(e){}
+  }
+  // A packaged report in a reopened or reloaded conversation: the conversation keeps only its id and title
+  // (chat-sessions never returns the html), so the card re-opens it from the hosted page /reports/<id>
+  // (same renderer as the PDF), with the same Export menu. A removed or expired report says so.
+  function savedReport(r){
+    if(!r||typeof r.id!=='string'||!REPORT_ID_RX.test(r.id)) return null;
+    return {id:r.id,title:String(typeof r.title==='string'&&r.title?r.title:'Market report').slice(0,160)};
+  }
+  function repSavedCard(r,aEl){
+    var w=document.createElement('div'); w.className='amk-repcard'; w.setAttribute('data-testid','amk-report-card');
+    w.innerHTML='<div class="amk-repcard-t"><b></b><span></span></div><button type="button" class="amk-repcard-open">Open report</button>';
+    w.querySelector('b').textContent=r.title;
+    w.querySelector('span').textContent='Packaged research \\u00b7 same engine as MCP';
+    w.querySelector('.amk-repcard-open').onclick=function(){ repOpenSaved(r); };
+    aEl.appendChild(w);
+  }
+  function repOpenSaved(r){
+    var E=ensurePane(), seq=++repSeq, path='/reports/'+encodeURIComponent(r.id);
+    E.el.classList.add('show'); E.el.setAttribute('aria-hidden','false');
+    E.t.textContent=r.title; E.v.textContent='Packaged market report'; E.exp.innerHTML='';
+    syncRepBtn(); repMessage('Loading your report...');
+    var fail=function(text,retry){ if(seq!==repSeq) return; repMessage(text); if(retry){ var b=document.createElement('button'); b.type='button'; b.textContent='Try again'; b.onclick=function(){ repOpenSaved(r); }; E.msg.appendChild(b); } };
+    fetch(path,{headers:{Accept:'text/html'}})
+      .then(function(res){
+        if(res.status===404||res.status===410){ fail('This report is no longer available. Ask Mindy to create it again.',false); return null; }
+        if(!res.ok){ fail('Your report could not be loaded. Try again.',true); return null; }
+        return res.text();
+      })
+      .then(function(html){
+        if(html==null||seq!==repSeq) return;
+        if(!html){ fail('Your report could not be loaded. Try again.',true); return; }
+        repOnMarketReport({html:html,title:r.title,url:location.origin+path,report_id:r.id},null);
+      },function(){ fail('Your report could not be loaded. Check your connection and try again.',true); });
+    try{ if(window.__track) window.__track('tool_use','map_market_report_reopen',{}); }catch(e){}
   }
   function addMsg(role, text){ var d=document.createElement('div'); d.className='amk-msg '+(role==='user'?'u':'a'); d.innerHTML=(role==='user')?esc(text):('<div class="bub"></div>'); if(role!=='user'){ var bb=d.querySelector('.bub'); if(text) paint(bb,text); else bb.textContent=''; } body.appendChild(d); body.scrollTop=body.scrollHeight; return d; }
   function upsell(){ body.innerHTML='<div class="amk-up"><h4>\\ud83d\\udd12 Ask Mindy is a Pro feature</h4><p>Get grounded, real-data answers on set-asides, agencies, opportunities, teaming and proposals \\u2014 with sources.</p><a href="/market-intelligence">Upgrade to Pro</a></div>'; }
@@ -11574,7 +11610,7 @@ const ASK_MINDY_JS = `<script>(function(){
       var sn=document.createElement('div'); sn.className='amk-credits'; sn.setAttribute('data-testid','amk-stopped'); sn.textContent=acc?'You stopped this answer, so it may be incomplete.':'You stopped this answer.'; aEl.appendChild(sn);
       saveView(); release(); body.scrollTop=body.scrollHeight;
     }
-    var acc='', started=false, gotDone=false, gotError=false, ledger=null, turnDoc=false, turnFiles=null;
+    var acc='', started=false, gotDone=false, gotError=false, ledger=null, turnDoc=false, turnFiles=null, turnReport=null;
     // Product decision 2026-11-19: Map and Ask Mindy are separate tools. Send the customer's words
     // only — never inject map viewport filters/geography into Ask. Card chat still sends notice
     // context (below); that is an opportunity record, not the map view.
@@ -11625,7 +11661,7 @@ const ASK_MINDY_JS = `<script>(function(){
             else if(ev.type==='sources'){ ledger=(ev.ledger&&typeof ev.ledger==='object')?ev.ledger:null; if(turnDoc&&rep&&ledger){ rep.ledger=ledger; repWrite(); } }
             // create_document saved a document: a card under the answer and the report opens in the pane (view mode only).
             else if(ev.type==='deliverables'&&Array.isArray(ev.files)&&!oppCtx){ turnDoc=true; turnFiles=ev.files; try{ repOnDeliverables(ev.files,aEl); }catch(e){} }
-            else if(ev.type==='market_report'&&ev.html&&!oppCtx){ turnDoc=true; try{ repOnMarketReport(ev,aEl); }catch(e){} }
+            else if(ev.type==='market_report'&&ev.html&&!oppCtx){ turnDoc=true; turnReport=savedReport({id:ev.report_id,title:ev.title}); try{ repOnMarketReport(ev,aEl); }catch(e){} }
             else if(ev.type==='token'){ if(!started){ bub.textContent=''; started=true; } acc+=(ev.content||''); paint(bub,acc); body.scrollTop=body.scrollHeight; }
             // citations event is now always empty (RAG corpus removed 2026-08-02) \\u2014 ignored.
             else if(ev.type==='error'){ gotError=true; if(!started)bub.textContent=safeErr(ev.message); }
@@ -11648,6 +11684,7 @@ const ASK_MINDY_JS = `<script>(function(){
           if(!started&&!acc&&!gotError)bub.textContent='Mindy had no answer for that \\u2014 try rephrasing.';
           if(!(turnId&&gotError&&!acc)){ history.push({role:'user',content:q}); history.push(ledger?{role:'assistant',content:acc,sources:ledger}:{role:'assistant',content:acc}); }
           if(turnFiles&&history.length&&history[history.length-1].role==='assistant') history[history.length-1].files=turnFiles;
+          if(turnReport&&history.length&&history[history.length-1].role==='assistant') history[history.length-1].report=turnReport;
           saveCard(); saveView(); if(acc)paint(bub,acc);
           // Follow-ups only after a real outcome (report/files) or a finished Q&A answer — never mid-gather.
           if(acc&&!oppCtx&&(turnDoc||String(acc).trim().length>=80))followups(aEl,q,acc);
