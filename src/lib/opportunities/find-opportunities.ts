@@ -1110,7 +1110,8 @@ async function queryComingBack(
       capture_start_basis: a.capture_start_basis,
       relevant_date: (r.period_of_performance_current_end as string) || null,
       relevant_date_label: 'current_end',
-      value_label: moneyLabel(r.potential_total_value) || moneyLabel(r.total_obligation),
+      // Ceiling only when a source reported one (annotate.ts / contract-value.ts); else the obligated amount.
+      value_label: moneyLabel(a.potential_total_value) || moneyLabel(r.total_obligation),
       source,
       why_this_matched: cls === null
         ? companyCodeWhy(basis.includes('company_registered_psc') ? 'company_registered_psc' : 'company_registered_naics', r as { naics_code?: string; psc_code?: string }, 'contract')
@@ -1128,7 +1129,8 @@ async function queryComingBack(
       incumbent_name: (r.incumbent_name as string) || null,
       incumbent_uei: (r.incumbent_uei as string) || null,
       current_end: (r.period_of_performance_current_end as string) || null,
-      potential_total_value: r.potential_total_value ?? null,
+      potential_total_value: a.potential_total_value,
+      ceiling_basis: a.ceiling_basis,
       total_obligation: r.total_obligation ?? null,
       recompete_likelihood: (r.recompete_likelihood as string) || null,
       set_aside_type: (r.set_aside_type as string) || null,
