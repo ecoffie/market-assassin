@@ -13,13 +13,13 @@ OR ≥8 engagement events).
 
 | Email | Pursuits | Pursuing | Events | Cert | NAICS focus |
 |-------|---------:|---------:|-------:|------|-------------|
-| proposals@griffincpl.com | **62** | 0 | 144 | WOSB | logistics/IT (484/488/493/518210) |
-| hello@eganrose.com ⭐ | 19 | **14** | 71 | 8(a) | consulting (5411xx) |
-| candice@capglobalworks.com | 18 | 1 | 143 | — | media/consulting (5121/5411) |
-| david.elliott@oscedge.com | 7 | 0 | **205** | Native American/Tribal | IT (518210/5411) |
-| kashif6331@gmail.com | 7 | 2 | — | Small Business | construction (236/237) |
-| paul@therivercompany.co | 7 | 0 | — | — | IT (5415xx) |
-| office@getmore.llc | 6 | 5 | — | Small Business | construction (236/237/238) |
+| [email removed] | **62** | 0 | 144 | WOSB | logistics/IT (484/488/493/518210) |
+| [email removed] ⭐ | 19 | **14** | 71 | 8(a) | consulting (5411xx) |
+| [email removed] | 18 | 1 | 143 | — | media/consulting (5121/5411) |
+| [email removed] | 7 | 0 | **205** | Native American/Tribal | IT (518210/5411) |
+| [email removed] | 7 | 2 | — | Small Business | construction (236/237) |
+| [email removed] | 7 | 0 | — | — | IT (5415xx) |
+| [email removed] | 6 | 5 | — | Small Business | construction (236/237/238) |
 
 ⭐ = recommended June 27 customer-hero (8(a), 14 active pursuits — real intent). See
 `MINDY-DAY-CUSTOMER-HERO-BRIEF.md`.
@@ -28,16 +28,16 @@ OR ≥8 engagement events).
 
 | Email | Events | NAICS focus |
 |-------|-------:|-------------|
-| a.hill@heliosvanguard.com | 64 | consulting (5411xx) |
-| 247metou@gmail.com | 58 | consulting |
-| abbey.oasonubi@gmail.com | 55 | — |
-| ali.chathiwala@burhanienterprisesinc.com | 53 | — |
-| 2livingafulllife@gmail.com | 43 | consulting |
-| amakacomms@gmail.com | 43 | consulting |
-| amjazz007@comcast.net | 42 | consulting |
-| aleonsoon@atspartners.org | 35 | 8(a) consulting |
-| alant@olomana.agency | 34 | consulting |
-| allyson.hassett@fed.csaassociates.com | 31 | consulting |
+| [email removed] | 64 | consulting (5411xx) |
+| [email removed] | 58 | consulting |
+| [email removed] | 55 | — |
+| [email removed] | 53 | — |
+| [email removed] | 43 | consulting |
+| [email removed] | 43 | consulting |
+| [email removed] | 42 | consulting |
+| [email removed] | 35 | 8(a) consulting |
+| [email removed] | 34 | consulting |
+| [email removed] | 31 | consulting |
 
 *(Full 67-user list: re-run `npx tsx scripts/data-quality-audit.ts`'s sibling query, or
 ask Claude to regenerate. Truncated here to the top 17 for discussion.)*

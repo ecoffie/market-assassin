@@ -20,22 +20,25 @@
  *   LIMIT          optional — stop after N downloads (testing)
  *
  * Reads the in-scope manifest the classifier already produced:
- *   tasks/cache/calls/_inscope.jsonl   (one JSON per line: {id|fileId, title|name, mimeType})
+ *   $MINDY_PRIVATE_DIR/cache/calls/_inscope.jsonl   (one JSON per line: {id|fileId, title|name, mimeType})
  * Falls back to listing the folder live if that file is missing.
  *
  * Writes:
- *   tasks/cache/calls/<fileId>.txt    raw transcript text
- *   tasks/cache/calls/<fileId>.json   {fileId,title,source:"fireflies",mimeType}
+ *   $MINDY_PRIVATE_DIR/cache/calls/<fileId>.txt    raw transcript text
+ *   $MINDY_PRIVATE_DIR/cache/calls/<fileId>.json   {fileId,title,source:"fireflies",mimeType}
  * Idempotent: skips files whose .txt already exists non-empty.
- * Also exports the big assessment doc → tasks/cache/calls/assessment-doc.txt
+ * Also exports the big assessment doc → $MINDY_PRIVATE_DIR/cache/calls/assessment-doc.txt
  */
 
 const fs = require('fs');
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { privatePath } = require('./lib/private-path');
 const path = require('path');
 
 const TOKEN = process.env.ACCESS_TOKEN;
 const LIMIT = process.env.LIMIT ? Number(process.env.LIMIT) : Infinity;
-const CACHE = path.join(__dirname, '..', 'tasks', 'cache', 'calls');
+// Call transcripts are private: $MINDY_PRIVATE_DIR/cache/calls (never tasks/cache in the repository).
+const CACHE = privatePath('cache', 'calls');
 const INSCOPE = path.join(CACHE, '_inscope.jsonl');
 const FIREFLIES_FOLDER = '1N4ud8ar-nDHo-mNRU3FPRI7DS_ArPTm3';
 const ASSESSMENT_DOC = '1rR0BL2Aq0apYZsA07ggg6AqxfuI7mVuWK0kolWXCW04';

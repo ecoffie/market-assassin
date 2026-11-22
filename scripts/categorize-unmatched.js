@@ -311,10 +311,10 @@ async function categorizeUnmatched() {
 
   // Save detailed report
   fs.writeFileSync(
-    'scripts/unmatched_categorized_2026-04-28.json',
+    require('./lib/private-path').privatePath('unmatched_categorized.json'), // eslint-disable-line @typescript-eslint/no-require-imports
     JSON.stringify(categories, null, 2)
   );
-  console.log('\nDetailed report saved to: scripts/unmatched_categorized_2026-04-28.json');
+  console.log('\nDetailed report saved to the private directory: unmatched_categorized.json');
 }
 
 categorizeUnmatched().catch(console.error);
