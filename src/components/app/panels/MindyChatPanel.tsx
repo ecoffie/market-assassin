@@ -168,7 +168,7 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
   const [sidebarOpen, setSidebarOpen] = useState(true);
   // Phones: the 240px history list starts closed and, when opened, overlays the chat instead of squeezing it
   // (open by default it left an 80–150px chat column and widened the page past the screen).
-  const isPhoneWidth = useCallback(() => typeof window !== 'undefined' && !window.matchMedia(PHONE_SIDEBAR_QUERY).matches, []);
+  const isPhoneWidth = useCallback(() => typeof window !== 'undefined' && typeof window.matchMedia === 'function' && !window.matchMedia(PHONE_SIDEBAR_QUERY).matches, []);
   useEffect(() => { if (isPhoneWidth()) setSidebarOpen(false); }, [isPhoneWidth]);
   // Document drawer state: when set, opens RagDocDrawer with the
   // requested mindy_rag_documents.id loaded from /api/app/rag-doc.
