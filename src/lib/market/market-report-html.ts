@@ -328,7 +328,7 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
   // agency_detail comes from getAgencySpendingDetail (USASpending spending_by_category): the WHOLE agency,
   // all NAICS, one fiscal year, contract obligations net of de-obligations. Its pct_of_total and
   // small_business_share are already PERCENT units (9.4 = 9.4%) — multiplying by 100 printed 940%.
-  const ad = sections.agency_detail as { total_obligated?: number; small_business_share?: number | null; fiscal_year?: number; agency?: string; sub_agencies?: Row[]; set_aside_breakdown?: Row[] } | null;
+  const ad = sections.agency_detail as { total_obligated?: number; small_business_share?: number | null; fiscal_year?: number; agency?: string; sub_agencies?: Row[] | null; sub_agency_structure?: string; sub_agency_note?: string; set_aside_breakdown?: Row[] } | null;
   let agencyDetailHtml = '';
   if (ad && ad.total_obligated) {
     const share = (r: Row) => percentShare(r.pct_of_total, r.amount);
@@ -341,7 +341,13 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
       `${esc(ad.agency || 'Agency')}-wide, all NAICS, ${fy} — not limited to this market. `
         + `Total contract obligations ${money(ad.total_obligated)} (net of de-obligations) · set-aside-code share ${sb} `
         + `(dollars awarded under small-business set-aside codes; not the SBA goaling figure — small firms also win full-and-open work)`,
-      `<div class="two"><div><h3>Top sub-agencies</h3>${table(['Sub-agency', 'Obligated', 'Share of agency total'], subRows)}</div>` +
+      `<div class="two"><div><h3>Top sub-agencies</h3>${
+          // A department that files every award under one self-named sub-agency (VA) or a failed lookup gets a
+          // plain sentence (sub_agency_note), never an unexplained "No rows" next to a $90B total.
+          subRows.length || !ad.sub_agency_note
+            ? table(['Sub-agency', 'Obligated', 'Share of agency total'], subRows)
+            : `<p class="empty">${esc(ad.sub_agency_note)}</p>`
+        }</div>` +
         `<div><h3>Set-aside breakdown</h3>${table(['Set-aside', 'Obligated (net)', 'Share of agency total'], saRows)}</div></div>`
     );
   }
