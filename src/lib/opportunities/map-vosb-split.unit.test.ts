@@ -77,7 +77,7 @@ describe('pin display bucket', () => {
   });
   it('both buckets have a label + color (never fall through to None)', () => {
     expect(SET_LABEL.SDVOSB).toBe('SDVOSB');
-    expect(SET_LABEL.VOSB).toBe('VOSB (veteran-owned)');
+    expect(SET_LABEL.VOSB).toBe('VOSB (VA only)');
     expect(SET_COLOR.VOSB).toBeTruthy();
     expect(SET_COLOR.VOSB).not.toBe(SET_COLOR.SDVOSB);
   });
@@ -126,7 +126,7 @@ describe('map client wiring (source)', () => {
   it('every client set map knows VOSB', () => {
     expect(route).toMatch(/const SET_TO_EVC[^}]*VOSB: 'VOSB'/);
     expect(route).toMatch(/var SETMAP=\{[^}]*VOSB:'VOSB'/);
-    expect(tpl).toMatch(/\{key:"VOSB",label:"VOSB \(veteran-owned\)"[^}]*s==="VOSB"/);
+    expect(tpl).toMatch(/\{key:"VOSB",label:"VOSB \(VA only\)"[^}]*s==="VOSB"/);
     expect(tpl).toMatch(/\{key:"SDVOSB",label:"SDVOSB",col:"--grnd",match:s=>s==="SDVOSB"\}/);
   });
   it('plain-English sdvosb/vosb map to the canonical keys where they are appended', () => {

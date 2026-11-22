@@ -176,7 +176,11 @@ export function companySetAsideBuckets(raw: string): { buckets: string; unsuppor
  */
 export const SET_GROUPS: Array<{ key: string; label: string; color: string; codes: string[]; pin?: string }> = [
   { key: 'SDVOSB_ONLY', pin: 'SDVOSB', label: 'SDVOSB', color: '#10b981', codes: ['SDVOSBC', 'SDVOSBS', 'SDVOSB'] },
-  { key: 'VOSB', label: 'VOSB (veteran-owned)', color: '#14b8a6', codes: ['VSA', 'VSS', 'VSB'] },
+  // SAM.gov (open.gsa.gov Get Opportunities API, Set-Aside Values): VSA = "Veteran-Owned Small Business Set-Aside
+  // (specific to Department of Veterans Affairs)", VSS = the VA sole source. A VA-only (Vets First) program —
+  // never present it as government-wide eligibility. 'VSB' is NOT a SAM code; it is matched only so legacy
+  // non-SAM tokens elsewhere in our code keep resolving (no rows are expected to carry it).
+  { key: 'VOSB', label: 'VOSB (VA only)', color: '#14b8a6', codes: ['VSA', 'VSS', 'VSB'] },
   { key: 'SB', label: 'Small Business', color: '#3b82f6', codes: ['SBA', 'SBP', 'SB'] },
   { key: '8A', label: '8(a)', color: '#a855f7', codes: ['8A', '8AN', '8(A)'] },
   { key: 'WOSB', label: 'WOSB / EDWOSB', color: '#ef4444', codes: ['WOSB', 'WOSBSS', 'EDWOSB', 'EDWOSBSS'] },

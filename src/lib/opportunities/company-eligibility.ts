@@ -60,7 +60,8 @@ const PROGRAM_LABEL: Partial<Record<SetAsideKind, string>> = {
   sdvosb: 'SDVOSB set-aside',
   wosb: 'WOSB set-aside',
   edwosb: 'EDWOSB set-aside',
-  vosb: 'veteran-owned set-aside',
+  // SAM.gov: VSA/VSS are specific to the Department of Veterans Affairs (Vets First) — not government-wide.
+  vosb: 'VA-only veteran-owned (VOSB) set-aside (Department of Veterans Affairs, Vets First)',
 };
 
 /*
