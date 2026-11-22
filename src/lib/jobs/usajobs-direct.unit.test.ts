@@ -1,5 +1,9 @@
-import { describe, expect, it } from 'vitest';
-import { buildUsaJobsBoard, customerJobBoardChoice, usajobsRowToListing } from './usajobs-direct';
+import { describe, expect, it, vi } from 'vitest';
+import { buildUsaJobsBoard, customerJobBoardChoice, readJobBoardFromUsaJobs, usajobsRowToListing } from './usajobs-direct';
+import { fetchUSAJobs } from './sources';
+
+// The 6-hour cache is a pass-through here, so each test drives the real fetch path.
+vi.mock('next/cache', () => ({ unstable_cache: (fn: (...a: unknown[]) => unknown) => fn }));
 import { mapUSAJob } from './sources';
 
 const item = (id: string, title: string, org: string, extra: Record<string, unknown> = {}) => ({
@@ -71,5 +75,38 @@ describe('USAJobs direct board', () => {
   it('applies filters: a contractor-only filter shows no federal rows', () => {
     expect(buildUsaJobsBoard(rows, { source: 'jsearch' }).listings).toHaveLength(0);
     expect(buildUsaJobsBoard(rows, { clearance: 'none-stated' }).listings).toHaveLength(0);
+  });
+});
+
+describe('an unproven USAJobs response is unavailable, never a confirmed zero', () => {
+  const json = (body: unknown) => vi.fn(async () => new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } }));
+
+  it('fetchUSAJobs throws on a 200 with no SearchResult.SearchResultItems array', async () => {
+    vi.stubEnv('USAJOBS_API_KEY', 'test-key');
+    try {
+      await expect(fetchUSAJobs('1102', 30, json({}) as never)).rejects.toThrow(/SearchResultItems/);
+      await expect(fetchUSAJobs('1102', 30, json({ SearchResult: {} }) as never)).rejects.toThrow(/SearchResultItems/);
+      await expect(fetchUSAJobs('1102', 30, json({ SearchResult: { SearchResultItems: 'x' } }) as never)).rejects.toThrow(/SearchResultItems/);
+    } finally { vi.unstubAllEnvs(); }
+  });
+
+  it('a real empty search (an empty array) is a confirmed zero', async () => {
+    vi.stubEnv('USAJOBS_API_KEY', 'test-key');
+    try {
+      const rows = await fetchUSAJobs('1102', 30, json({ SearchResult: { SearchResultItems: [], UserArea: { NumberOfPages: '1' } } }) as never);
+      expect(rows).toEqual([]);
+    } finally { vi.unstubAllEnvs(); }
+  });
+
+  it('`{}` never yields state ok with totals.active === 0', async () => {
+    vi.stubEnv('USAJOBS_API_KEY', 'test-key');
+    vi.stubGlobal('fetch', json({}));
+    try {
+      const board = await readJobBoardFromUsaJobs();
+      expect(board).not.toBeNull();
+      expect(board!.state).toBe('unavailable');
+      expect(board!.totals.active).toBeNull();
+      expect(board!.state === 'ok' && board!.totals.active === 0).toBe(false);
+    } finally { vi.unstubAllEnvs(); vi.unstubAllGlobals(); }
   });
 });
