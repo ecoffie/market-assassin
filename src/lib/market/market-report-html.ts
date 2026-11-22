@@ -328,7 +328,7 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
   // agency_detail comes from getAgencySpendingDetail (USASpending spending_by_category): the WHOLE agency,
   // all NAICS, one fiscal year, contract obligations net of de-obligations. Its pct_of_total and
   // small_business_share are already PERCENT units (9.4 = 9.4%) — multiplying by 100 printed 940%.
-  const ad = sections.agency_detail as { total_obligated?: number; small_business_share?: number | null; fiscal_year?: number; agency?: string; sub_agencies?: Row[] | null; sub_agency_structure?: string; sub_agency_note?: string; set_aside_breakdown?: Row[] } | null;
+  const ad = sections.agency_detail as { total_obligated?: number; small_business_share?: number | null; fiscal_year?: number; agency?: string; sub_agencies?: Row[] | null; sub_agency_structure?: string; sub_agency_note?: string; set_aside_breakdown?: Row[]; set_aside_note?: string } | null;
   let agencyDetailHtml = '';
   if (ad && ad.total_obligated) {
     const share = (r: Row) => percentShare(r.pct_of_total, r.amount);
@@ -348,7 +348,10 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
             ? table(['Sub-agency', 'Obligated', 'Share of agency total'], subRows)
             : `<p class="empty">${esc(ad.sub_agency_note)}</p>`
         }</div>` +
-        `<div><h3>Set-aside breakdown</h3>${table(['Set-aside', 'Obligated (net)', 'Share of agency total'], saRows)}</div></div>`
+        // VA's distinct VOSB (VA only) row is explained in one factual sentence from the tool (set_aside_note).
+        `<div><h3>Set-aside breakdown</h3>${table(['Set-aside', 'Obligated (net)', 'Share of agency total'], saRows)}${
+          ad.set_aside_note ? `<p class="empty">${esc(ad.set_aside_note)}</p>` : ''
+        }</div></div>`
     );
   }
 
