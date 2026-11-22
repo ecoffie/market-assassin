@@ -29,6 +29,8 @@ function money(v: unknown): string {
  * has no meaningful share of awards).
  */
 function percentShare(pct: unknown, amount: unknown): string {
+  // A FAILED lookup carries null (agency-spending-detail): unknown, never "net de-obligation" (Number(null) = 0).
+  if (amount === null || amount === undefined || pct === null || pct === undefined || pct === '') return 'unavailable';
   const a = typeof amount === 'number' ? amount : Number(amount);
   if (Number.isFinite(a) && a <= 0) return 'n/a (net de-obligation)';
   if (pct === null || pct === undefined || pct === '') return 'unavailable';
@@ -87,6 +89,8 @@ interface ReportLike {
       window?: string | null;
       state_scoped?: boolean;
       requested_state?: string | null;
+      agency_scoped?: boolean;
+      requested_agency?: string | null;
       identity_resolved_via?: string[] | null;
     } | null;
     size_tiers?: {
@@ -293,7 +297,7 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
   if (ad && ad.total_obligated) {
     const share = (r: Row) => percentShare(r.pct_of_total, r.amount);
     const subRows = (ad.sub_agencies || []).slice(0, 8).map((r) => [esc(r.name), money(r.amount), share(r)]);
-    const saRows = (ad.set_aside_breakdown || []).slice(0, 8).map((r) => [esc(r.label), money(r.amount), share(r)]);
+    const saRows = (ad.set_aside_breakdown || []).slice(0, 8).map((r) => [esc(r.label), r.amount === null ? 'unavailable' : money(r.amount), share(r)]);
     const fy = Number.isFinite(Number(ad.fiscal_year)) && ad.fiscal_year ? `FY${ad.fiscal_year}` : 'one fiscal year';
     const sb = percentShare(ad.small_business_share, 1);
     agencyDetailHtml = section(
@@ -330,13 +334,24 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
 
   // RC-5 — when the headline and the sections measure different scopes, SAY SO.
   // Presenting both figures unlabelled is what read as a contradiction.
-  const scopeNote = summary.total_market_basis?.requested_state && !summary.total_market_basis.state_scoped
+  const tmb = summary.total_market_basis;
+  const headlineNational = Boolean(tmb?.requested_state && !tmb.state_scoped);
+  const headlineAllAgencies = Boolean(tmb?.requested_agency && !tmb.agency_scoped);
+  const stateNote = headlineNational
     ? `<p class="note">“Total market” is the <strong>national</strong> figure for this market${
-        summary.total_market_basis.window ? ` (${esc(summary.total_market_basis.window)})` : ''
+        tmb!.window ? ` (${esc(tmb!.window)})` : ''
       }. Every section below is scoped to <strong>${esc(
-        summary.total_market_basis.requested_state,
+        tmb!.requested_state,
       )}</strong> — the agency and contractor dollars cover FY23-25 in that state, and the recompetes and forecasts are that state's rows — so those figures are smaller by design; they answer a different question.</p>`
     : '';
+  // The headline is never agency-scoped either: with an agency requested it still covers EVERY federal buyer,
+  // and the agency deep-dive is that agency's whole spend (all NAICS). Say both, so $1.6B vs $90.6B reads as
+  // two different questions rather than a contradiction (VA report 2026-11-22).
+  const agencyNote = headlineAllAgencies
+    ? `<p class="note">“Total market” covers <strong>all federal buyers</strong>, not only ${esc(tmb!.requested_agency)}. `
+      + `The agency deep-dive is ${esc(tmb!.requested_agency)}'s total contract spend across every industry and the whole country — neither figure is ${esc(tmb!.requested_agency)}'s spend in this market.</p>`
+    : '';
+  const scopeNote = stateNote + agencyNote;
 
   /**
    * EXPLAIN — every market figure on the page, side by side, each with what it
@@ -396,9 +411,13 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
       ${statCard(
         // RC-5: name WHAT this measures. A national 1-FY headline beside
         // state-scoped 3-FY sections is not a contradiction once it is labelled.
-        summary.total_market_basis?.requested_state && !summary.total_market_basis.state_scoped
-          ? 'Total market (national)'
-          : 'Total market',
+        headlineNational && headlineAllAgencies
+          ? 'Total market (national, all agencies)'
+          : headlineNational
+            ? 'Total market (national)'
+            : headlineAllAgencies
+              ? 'Total market (all agencies)'
+              : 'Total market',
         money(summary.total_market),
         summary.total_market_basis?.window ?? undefined,
       )}

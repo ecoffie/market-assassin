@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { TRIAL_CTA_LABEL } from '@/lib/public-site/trial-cta';
 
 /**
  * "New here? Meet Mindy" strip for PUBLIC / logged-out pages (newcomer-clarity
@@ -8,7 +9,7 @@ import Link from 'next/link';
  * product + offer the 14-day free trial. Dismissible (per-session via state).
  *
  * Auth-aware: HIDDEN for logged-in Mindy users (they reach these public pages via
- * the in-app global lookup; nagging an existing member to "Start for free" is wrong).
+ * the in-app global lookup; nagging an existing member to start a trial is wrong).
  *
  * Drop into any public page. Links to the getmindy.ai signup.
  */
@@ -52,7 +53,7 @@ export default function MeetMindyStrip({
   const c = CLASSES[appearance];
   const [dismissed, setDismissed] = useState(false);
   // Suppress for signed-in Mindy users. Start hidden until we've checked, so a
-  // member never sees a flash of the "Start for free" acquisition CTA.
+  // member never sees a flash of the trial acquisition CTA.
   const [hideForMember, setHideForMember] = useState(true);
   useEffect(() => {
     const loggedIn = typeof window !== 'undefined' && Boolean(
@@ -79,7 +80,7 @@ export default function MeetMindyStrip({
               href="https://getmindy.ai/pricing"
               className={c.cardCta}
             >
-              Start for free →
+              {TRIAL_CTA_LABEL} →
             </Link>
           </div>
         </div>
@@ -95,7 +96,7 @@ export default function MeetMindyStrip({
         <span className={c.bannerName}>Mindy</span> finds federal opportunities that fit you, daily.
       </span>
       <Link href="https://getmindy.ai/pricing" className={c.bannerCta}>
-        Start for free →
+        {TRIAL_CTA_LABEL} →
       </Link>
       <button onClick={() => setDismissed(true)} className={c.dismiss} aria-label="Dismiss">✕</button>
     </div>

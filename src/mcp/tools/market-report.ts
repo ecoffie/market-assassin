@@ -184,6 +184,9 @@ export interface MarketReportSummary {
     window: string | null;
     state_scoped: boolean;
     requested_state: string | null;
+    /** The headline is never agency-scoped: false + requested_agency discloses that it covers ALL buyers. */
+    agency_scoped: boolean;
+    requested_agency: string | null;
     /** Measurement terms that recovered the market — evidence, not a rename. */
     identity_resolved_via: string[] | null;
   } | null;
@@ -779,6 +782,9 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
        */
       state_scoped: false,
       requested_state: state ?? null,
+      // Nor is it agency-scoped: keywordCoverage / codeMarketSize ignore the agency (VA report 2026-11-22).
+      agency_scoped: false,
+      requested_agency: agency || null,
       /** What resolved identity when the literal phrase measured nothing (RC-1). */
       identity_resolved_via: coverage?.identityResolvedVia ?? null,
     };

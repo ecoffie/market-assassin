@@ -102,8 +102,8 @@ describe('account panel: no competing first-month discount for Free users', () =
 
 describe('app plan cards: paying accounts are never offered another trial', () => {
   const cards = () => [
-    { name: 'Pro', href: PRO_TRIAL_ANNUAL, cta: 'Start for free', pill: '-17%', note: '14 days free…' },
-    { name: 'Teams', href: TEAM_TRIAL_ANNUAL, cta: 'Start for free', note: '14 days free…' },
+    { name: 'Pro', href: PRO_TRIAL_ANNUAL, cta: 'Start 14-day free trial', pill: '-17%', note: '14 days free…' },
+    { name: 'Teams', href: TEAM_TRIAL_ANNUAL, cta: 'Start 14-day free trial', note: '14 days free…' },
   ];
   it('signed-out and Free keep the trial CTAs untouched', () => {
     expect(suppressTrialCardsForPaid(cards(), null)).toEqual(cards());

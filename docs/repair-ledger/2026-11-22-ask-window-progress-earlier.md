@@ -1,0 +1,3 @@
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-11-22 | Map Ask Mindy window | Two more parity gaps with the old chat are closed, using the contracts Ask Mindy confirmed. Server `notice` and `progress` events now appear as status lines under the answer (inserted as text, at most 6). Suggested next steps send `earlier` (the customer's last 6 earlier questions), so a chip never asks for something already said. | `function earlierAsks(q){` → `src/app/opportunity-map/route.ts` | `ask-window-notices-earlier.unit.test.ts` (4, the real drawer script in jsdom; all fail on main): status lines in order with role=status, text-only, capped at 6, and `earlier` excludes the current question and keeps the last 6. Map suites 1525/1525. | PR |

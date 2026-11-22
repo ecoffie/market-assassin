@@ -219,3 +219,42 @@ export function renderOppShareHead(meta: OppShareMeta, origin: string): string {
     `<meta name="twitter:image:alt" content="${escAttr(alt)}">`,
   ].join('');
 }
+
+// Default head for a plain /opportunity-map visit (no ?opp= share). Before this the page shipped
+// only `<title>Mindy Map</title>` — no description, canonical, og:* or twitter:* — so a shared map
+// link or a search result was a bare card. Copy is sourced from the map itself: its three horizon
+// buttons (Open Now / Coming Back / Coming Soon) and the site's data sources (SAM.gov, expiring
+// contracts, agency forecasts). The image is the site-wide root opengraph-image (1200x630).
+export const MAP_DEFAULT_TITLE = 'Mindy Map — Federal Contract Opportunities on a Map';
+export const MAP_DEFAULT_DESCRIPTION =
+  'See federal contracts on a map: Open Now solicitations from SAM.gov, Coming Back expiring contracts, and Coming Soon agency forecasts.';
+
+export function renderMapDefaultHead(origin: string): string {
+  const url = escAttr(`${origin}/opportunity-map`);
+  const img = escAttr(`${origin}/opengraph-image`);
+  const t = escAttr(MAP_DEFAULT_TITLE);
+  const d = escAttr(MAP_DEFAULT_DESCRIPTION);
+  return [
+    `<title>${t}</title>`,
+    `<meta name="description" content="${d}">`,
+    `<link rel="canonical" href="${url}">`,
+    `<meta property="og:type" content="website">`,
+    `<meta property="og:site_name" content="Mindy">`,
+    `<meta property="og:title" content="${t}">`,
+    `<meta property="og:description" content="${d}">`,
+    `<meta property="og:url" content="${url}">`,
+    `<meta property="og:image" content="${img}">`,
+    `<meta property="og:image:width" content="1200">`,
+    `<meta property="og:image:height" content="630">`,
+    `<meta name="twitter:card" content="summary_large_image">`,
+    `<meta name="twitter:title" content="${t}">`,
+    `<meta name="twitter:description" content="${d}">`,
+    `<meta name="twitter:image" content="${img}">`,
+  ].join('');
+}
+
+/** Swap the template's bare title for the share head (wins when present) or the default head. */
+export function applyMapHead(html: string, shareHead: string | null, origin: string): string {
+  const head = shareHead || renderMapDefaultHead(origin);
+  return html.replace('<title>Mindy Map</title>', () => head);
+}
