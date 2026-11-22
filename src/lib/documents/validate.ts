@@ -17,10 +17,13 @@
  *     a revision never turns an assumption into a fact (hardenedAssumptions);
  *   - numbers: table/chart values must be finite; a missing value is null ("Not available"), never 0.
  *
- * `demoteUncitedFacts` is the one sanctioned repair (Eric's rule: verified, ASSUMPTION, or omitted —
- * never "estimate"): an uncited decision-critical statement is OMITTED; any other uncited statement
- * is relabeled `unverified`, which renders "Unverified — no source" and is listed in its own section.
- * Ask Mindy retries sourcing first and only then calls this.
+ * Sanctioned repairs (Ask Mindy runs ONE tool round per turn — "fix and call again" is unreachable):
+ *   - `repairDocModelStructure`: uniquify duplicate ids; infer missing table columns from row keys.
+ *     Live 2026-11-19: comprehensive market-research create_document failed twice on duplicate
+ *     section/block ids and "at least one column" — the model apologised instead of saving.
+ *   - `demoteUncitedFacts` (Eric's rule: verified, ASSUMPTION, or omitted — never "estimate"): an
+ *     uncited decision-critical statement is OMITTED; any other uncited statement is relabeled
+ *     `unverified`, which renders "Unverified — no source" and is listed in its own section.
  */
 import { DOC_LIMITS, DOC_SCHEMA, labeledUnits, type Block, type DocModel } from './model';
 import agencyAliases from '@/data/agency-aliases.json';
@@ -448,6 +451,125 @@ export interface DemotionResult {
    * treat the repaired document as a clean one.
    */
   droppedCites: Array<{ where: string; ids: string[] }>;
+}
+
+export interface StructureRepairResult {
+  model: DocModel;
+  /** Human-readable notes for diagnostics (never customer-facing). */
+  changes: string[];
+}
+
+function humanizeKey(key: string): string {
+  const s = key.replace(/[_-]+/g, ' ').trim();
+  if (!s) return 'Value';
+  return s.replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function uniqueId(base: string, used: Set<string>, fallback: string): string {
+  const root = (typeof base === 'string' && base.trim() ? base.trim() : fallback).slice(0, 80);
+  let id = root;
+  let n = 2;
+  while (used.has(id)) {
+    id = `${root}-${n}`;
+    n += 1;
+  }
+  used.add(id);
+  return id;
+}
+
+/**
+ * Repair structural DocModel problems that LLMs hit on long comprehensive reports and that cannot
+ * be fixed in a second tool call on the same turn: duplicate ids, empty table columns when rows
+ * already carry keys, and column entries missing key/label.
+ *
+ * Does NOT invent facts, dollars, or claim labels — only shape. Call before demoteUncitedFacts.
+ */
+export function repairDocModelStructure(model: DocModel): StructureRepairResult {
+  const changes: string[] = [];
+  const usedIds = new Set<string>();
+
+  const sources = Array.isArray(model.sources)
+    ? model.sources.map((src, i) => {
+        if (!src || typeof src !== 'object') return src;
+        const nextId = uniqueId(String(src.id ?? ''), usedIds, `src-${i + 1}`);
+        if (nextId !== src.id) changes.push(`source id "${String(src.id)}" → "${nextId}"`);
+        return nextId === src.id ? src : { ...src, id: nextId };
+      })
+    : model.sources;
+
+  const sections = Array.isArray(model.sections)
+    ? model.sections.map((sec, si) => {
+        if (!sec || typeof sec !== 'object') return sec;
+        const secId = uniqueId(String(sec.id ?? ''), usedIds, `sec-${si + 1}`);
+        if (secId !== sec.id) changes.push(`section id "${String(sec.id)}" → "${secId}"`);
+        const blocks = Array.isArray(sec.blocks)
+          ? sec.blocks.map((blk, bi) => {
+              if (!blk || typeof blk !== 'object') return blk;
+              const blkId = uniqueId(String(blk.id ?? ''), usedIds, `${secId}-b${bi + 1}`);
+              if (blkId !== blk.id) changes.push(`block id "${String(blk.id)}" → "${blkId}"`);
+              if (blk.type !== 'table') return blkId === blk.id ? blk : { ...blk, id: blkId };
+
+              const rows = Array.isArray(blk.rows) ? blk.rows : [];
+              let columns = Array.isArray(blk.columns) ? [...blk.columns] : [];
+              const colKeys = new Set<string>();
+              const fixedCols: typeof columns = [];
+              for (let ci = 0; ci < columns.length; ci++) {
+                const c = columns[ci];
+                if (!c || typeof c !== 'object') continue;
+                let key = typeof c.key === 'string' ? c.key.trim() : '';
+                let label = typeof c.label === 'string' ? c.label.trim() : '';
+                if (!key && label) key = label.toLowerCase().replace(/\s+/g, '_').slice(0, 40);
+                if (!key) key = `col_${ci + 1}`;
+                if (colKeys.has(key)) {
+                  let n = 2;
+                  let k2 = `${key}_${n}`;
+                  while (colKeys.has(k2)) { n += 1; k2 = `${key}_${n}`; }
+                  changes.push(`table ${blkId}: duplicate column key "${key}" → "${k2}"`);
+                  key = k2;
+                }
+                colKeys.add(key);
+                if (!label) {
+                  label = humanizeKey(key);
+                  changes.push(`table ${blkId}: filled missing label for column "${key}"`);
+                }
+                fixedCols.push({ ...c, key, label });
+              }
+              // Infer columns from row keys when the model supplied rows but forgot columns
+              // (live create_document failure: "at least one column").
+              if (fixedCols.length === 0 && rows.length > 0) {
+                const inferred: string[] = [];
+                for (const r of rows) {
+                  if (!r || typeof r !== 'object' || Array.isArray(r)) continue;
+                  for (const k of Object.keys(r)) {
+                    if (!inferred.includes(k)) inferred.push(k);
+                  }
+                }
+                for (const k of inferred) {
+                  fixedCols.push({ key: k, label: humanizeKey(k) });
+                  colKeys.add(k);
+                }
+                if (fixedCols.length) changes.push(`table ${blkId}: inferred ${fixedCols.length} column(s) from row keys`);
+              } else {
+                // Expand columns for undeclared row keys (validator: "not a declared column").
+                for (const r of rows) {
+                  if (!r || typeof r !== 'object' || Array.isArray(r)) continue;
+                  for (const k of Object.keys(r)) {
+                    if (colKeys.has(k)) continue;
+                    colKeys.add(k);
+                    fixedCols.push({ key: k, label: humanizeKey(k) });
+                    changes.push(`table ${blkId}: added column "${k}" from row data`);
+                  }
+                }
+              }
+              columns = fixedCols;
+              return { ...blk, id: blkId, columns, rows };
+            })
+          : sec.blocks;
+        return { ...sec, id: secId, blocks };
+      })
+    : model.sections;
+
+  return { model: { ...model, sources, sections }, changes };
 }
 
 /**
