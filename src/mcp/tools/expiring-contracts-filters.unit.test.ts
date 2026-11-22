@@ -160,3 +160,34 @@ describe('result size: summary plus a page of 25, page the rest (Ask Mindy Backe
     expect(queryMock).toHaveBeenCalledWith(expect.objectContaining({ limit: 25, offset: 50 }));
   });
 });
+
+describe('near-term contracts are counted, not listed first (reported: renewals led by contracts ending tomorrow)', () => {
+  it('with no months_min the list starts 3 months out and the near-term count is reported', async () => {
+    queryMock.mockImplementation(async (o: { monthsWindow?: number; minMonthsWindow?: number }) =>
+      o.monthsWindow === 3
+        ? { contracts: [], total: 41, count: 0, duplicates_collapsed: 0, degraded: false, window: WINDOW }
+        : { contracts: [standalone('A')], total: 1, count: 1, duplicates_collapsed: 0, degraded: false, window: WINDOW });
+    const r = await expiringContracts({ naics: '561110' }, noLookup);
+    const listCall = queryMock.mock.calls.find((c) => c[0].monthsWindow !== 3)![0];
+    expect(listCall.minMonthsWindow).toBe(3);
+    expect(r._meta.near_term).toMatchObject({ months: 3, excluded_count: 41, include_with: 'months_min=0' });
+    expect(r._meta.applied_filters.months_min).toBe(3);
+  });
+  it('a failed near-term count is unknown (null), never 0', async () => {
+    queryMock.mockImplementation(async (o: { monthsWindow?: number }) =>
+      o.monthsWindow === 3
+        ? { contracts: [], total: 0, count: 0, duplicates_collapsed: 0, degraded: true, window: WINDOW }
+        : { contracts: [], total: 0, count: 0, duplicates_collapsed: 0, degraded: false, window: WINDOW });
+    const r = await expiringContracts({ naics: '561110' }, noLookup);
+    expect(r._meta.near_term?.excluded_count).toBeNull();
+  });
+  it('months_min (0 included) or a near-term-only window is obeyed with no default', async () => {
+    for (const input of [{ months_min: 0 }, { months_window: 2 }]) {
+      queryMock.mockClear();
+      const r = await expiringContracts({ naics: '561110', ...input }, noLookup);
+      expect(queryMock).toHaveBeenCalledTimes(1);
+      expect(queryMock.mock.calls[0][0].minMonthsWindow).toBe(input.months_min);
+      expect(r._meta.near_term).toBeUndefined();
+    }
+  });
+});

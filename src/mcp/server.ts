@@ -734,7 +734,7 @@ server.registerTool(
     annotations: { readOnlyHint: true, openWorldHint: true },
     description:
       'Federal contracts EXPIRING soon — recompete targets ("who is about to lose their contract"). Filter by ' +
-      'NAICS / agency / state / expiration window (months) / value / recompete-likelihood; soonest-expiring first. ' +
+      'NAICS / agency / state / expiration window (months) / value / recompete-likelihood; soonest-expiring first, starting 3 months out unless months_min is given (months_min=0 includes contracts ending sooner; their count is in _meta.near_term). ' +
       'Task/delivery orders are rolled up into vehicles[] under their parent IDV with its ordering end (null = unknown), ' +
       'not listed as recompetes; parentless orders are listed individually (unresolved_orders). capture_start_date is a ' +
       'suggested capture start (PoP end − 12 months), not a recompete date; estimated_recompete_date is null. grounded=false — widen months_window. ' +

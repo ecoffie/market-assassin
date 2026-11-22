@@ -846,7 +846,7 @@ const EXPIRING_CONTRACTS_TOOL_DEF = {
       'Federal contracts EXPIRING soon — recompete targets ("who is about to lose their contract so I can ' +
       'pursue it"). Filter by NAICS / agency / state / expiration window (months) / value / recompete-likelihood. ' +
       'Returns incumbent, agency, NAICS, obligated + ceiling value, period-of-performance end, suggested capture start, ' +
-      'likelihood — soonest-expiring first. Task/delivery orders are NOT listed as recompetes: they are rolled up ' +
+      'likelihood — soonest-expiring first, starting 3 months out by default (contracts ending sooner are too late to pursue; they are counted in _meta.near_term, and months_min=0 includes them). Task/delivery orders are NOT listed as recompetes: they are rolled up ' +
       'into vehicles[] under their parent IDV with its ordering end (null = unknown); sibling holder IDVs of one ' +
       'multiple-award vehicle are NOT merged; orders whose parent is not recorded are listed individually in ' +
       'unresolved_orders[] (parent_vehicle=UNKNOWN). capture_start_date is a SUGGESTED capture start (PoP end − 12 ' +
