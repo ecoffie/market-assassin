@@ -39,6 +39,18 @@ function percentShare(pct: unknown, amount: unknown): string {
   if (p > 0 && p < 0.1) return '<0.1%';
   return `${p.toFixed(1)}%`;
 }
+/**
+ * Display casing for the report title only: capitalise words typed all in lower case ("janitorial services"
+ * → "Janitorial Services"), keep anything the user cased themselves ("VA IT", "eDiscovery") and keep short
+ * joining words lower case after the first word. The stored subject, file name and quoted search phrase are
+ * unchanged.
+ */
+export function displayTitle(subject: unknown): string {
+  const SMALL = new Set(['a', 'an', 'and', 'as', 'at', 'by', 'for', 'in', 'of', 'on', 'or', 'the', 'to', 'vs', 'with']);
+  return s(subject).split(/(\s+)/).map((w, i) =>
+    /^[a-z][a-z'-]*$/.test(w) && !(i > 0 && SMALL.has(w)) ? w[0].toUpperCase() + w.slice(1) : w,
+  ).join('');
+}
 function num(v: unknown): string {
   const n = typeof v === 'number' ? v : Number(v);
   return Number.isFinite(n) ? n.toLocaleString() : '—';
@@ -155,7 +167,7 @@ function countValue(shown: number, total: number | null | undefined): { value: s
 // whole grid row uneven). The sub line is clamped to 2 lines in CSS.
 function statCard(label: string, value: string, sub?: string): string {
   return `<div class="stat"><div class="stat-v">${esc(value)}</div>`
-    + (sub ? `<div class="stat-sub">${esc(sub)}</div>` : '')
+    + (sub ? `<div class="stat-sub" title="${esc(sub)}">${esc(sub)}</div>` : '')
     + `<div class="stat-l">${esc(label)}</div></div>`;
 }
 
@@ -270,7 +282,7 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
     `${esc(c.incumbent_name || '—')}<div class="rowsub">${esc(c.piid || '')}${
       c.description ? ` · ${esc(s(c.description).slice(0, 90))}${s(c.description).length > 90 ? '…' : ''}` : ''
     }</div>`,
-    esc(c.awarding_sub_agency || c.awarding_agency || '—'),
+    `<span class="txt">${esc(c.awarding_sub_agency || c.awarding_agency || '—')}</span>`,
     esc(c.naics_code || '—'),
     money(c.potential_total_value ?? c.total_obligation),
     esc(s(c.period_of_performance_current_end).slice(0, 10) || '—'),
@@ -282,7 +294,7 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
   // three different incumbents. Show the incumbent so the reader can see that.
   const forecastRows = (sections.forecasts.forecasts as Row[]).map((f) => [
     esc(f.title) + (f.incumbent_name ? `<div class="rowsub">Incumbent: ${esc(f.incumbent_name)}</div>` : ''),
-    esc(f.agency || f.department || '—'),
+    `<span class="txt">${esc(f.agency || f.department || '—')}</span>`,
     esc(f.naics_code || '—'),
     esc(prettyRange(f.value_range, f.value_max, f.value_min)),
     esc([f.fiscal_year, f.quarter].filter(Boolean).join(' ') || '—'),
@@ -325,15 +337,20 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
             ? `General contacts at ${esc(contacts.agency)} — <strong>not specific to this market or location</strong>: no in-scope contract identified a contracting office to anchor on`
             : `Real points of contact at ${esc(contacts.agency)}${contacts.office ? ` · ${esc(contacts.office)}` : ''} — the buyer's small-business and contracting people`)
           + (contacts.total > contacts.people.length ? `. Showing ${contacts.people.length} of ${num(contacts.total)}.` : '.'),
-        table(
-          ['Name', 'Role', 'Office', 'Email'],
-          contacts.people.map((p) => [
-            esc(p.name),
-            esc(p.role || '—'),
-            esc(p.office || '—'),
-            p.email ? `<a href="mailto:${esc(p.email)}">${esc(p.email)}</a>` : '—',
-          ])
-        )
+        // The Office column is shown only when at least one person has an office: a column of dashes
+        // tells the reader nothing (the section subtitle already names the offices).
+        (() => {
+          const withOffice = contacts.people.some((p) => p.office);
+          return table(
+            withOffice ? ['Name', 'Role', 'Office', 'Email'] : ['Name', 'Role', 'Email'],
+            contacts.people.map((p) => [
+              esc(p.name),
+              `<span class="txt">${esc(p.role || '—')}</span>`,
+              ...(withOffice ? [esc(p.office || '—')] : []),
+              p.email ? `<a href="mailto:${esc(p.email)}">${esc(p.email)}</a>` : '—',
+            ]),
+          );
+        })()
       )
     : '';
 
@@ -493,7 +510,7 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
     : '';
 
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Market Report — ${esc(subject)}</title>
+<title>Market Report — ${esc(displayTitle(subject))}</title>
 <style>
   :root { --navy:#1e3a8a; --purple:#7c3aed; --ink:#1e2230; --muted:#6b7280; --line:#e5e7eb; --bg:#f7f7fb; --card:#fff; }
   * { box-sizing:border-box; }
@@ -507,7 +524,7 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
   .stat { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px 16px; min-width:0; }
   .stat-v { font-size:20px; font-weight:800; color:var(--navy); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .stat-sub { font-size:11.5px; font-weight:600; color:var(--ink,#334155); line-height:1.35; margin-top:3px;
-    display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+    display:-webkit-box; -webkit-line-clamp:4; -webkit-box-orient:vertical; overflow:hidden; }
   .stat-l { font-size:11.5px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); margin-top:6px; }
   .sec { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:20px 22px; margin-top:18px; }
   .sec h2 { margin:0 0 2px; font-size:18px; color:var(--navy); }
@@ -521,6 +538,8 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
   td { padding:8px 10px; border-bottom:1px solid var(--line); vertical-align:top; }
   td.lead { font-weight:600; }
   td:not(.lead) { font-variant-numeric:tabular-nums; white-space:nowrap; }
+  /* Text columns (agency names, roles) may wrap; figures, codes and dates never do. */
+  .txt { white-space:normal; }
   .muted { color:var(--muted); font-weight:400; }
   .empty { color:var(--muted); font-size:13px; font-style:italic; }
   .tier-tag { font-weight:400; color:var(--muted); font-size:.85em; }
@@ -536,12 +555,30 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
             border-radius:8px; padding:7px 13px; font:600 12.5px/1 inherit; cursor:pointer; text-decoration:none; }
   .pdfbtn:hover { background:rgba(255,255,255,.28); }
   @media (max-width:560px){ button.pdfbtn { display:none; } a.pdfbtn { position:static; display:inline-block; margin-top:12px; } }
-  @media print { body { background:#fff; } .sec,.stat { break-inside:avoid; } .pdfbtn { display:none; } }
+  /* PRINT (the PDF download): sections flow across pages instead of jumping whole to the next one, which
+     left pages half empty; a heading stays with what follows it; table rows never split and table headers
+     repeat on each page; every cell wraps so no column is clipped off the page; nothing is truncated. */
+  @page { size: Letter; }
+  @media print {
+    body { background:#fff; }
+    .wrap { max-width:none; padding:0; }
+    header.rp { break-inside:avoid; }
+    .sec { break-inside:auto; background:none; border:0; border-top:1px solid var(--line); border-radius:0; padding:14px 0 0; margin-top:20px; }
+    .rec { background:none; }
+    .sec h2, .sec h3, .sub, .note { break-after:avoid; }
+    .stat, tr, .rowsub, .sub, .note, footer.rp { break-inside:avoid; }
+    thead { display:table-header-group; }
+    .tw { overflow:visible; }
+    td.lead { overflow-wrap:break-word; }
+    .stat-v { white-space:normal; overflow:visible; }
+    .stat-sub { display:block; -webkit-line-clamp:unset; overflow:visible; }
+    .pdfbtn { display:none; }
+  }
 </style></head>
 <body><div class="wrap">
   <header class="rp" style="position:relative">
     <div class="kick">Federal Market Report</div>
-    <h1>${esc(subject)}</h1>
+    <h1>${esc(displayTitle(subject))}</h1>
     <div class="meta">${generated_for ? `Prepared for ${esc(generated_for)} · ` : ''}${esc(date)}</div>
     ${opts.pdfUrl
       ? `<a class="pdfbtn" href="${esc(opts.pdfUrl)}" download>Download PDF</a>`

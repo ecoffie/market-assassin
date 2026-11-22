@@ -30,16 +30,14 @@ import { renderStoredReportHtml } from '@/lib/market/stored-report-html';
 const PDF_CONTENT_WIDTH_PX = (8.5 - 1) * 96;
 
 /**
- * Print defects present on main when this suite landed (2026-11-22). They are pinned EXACTLY, so any NEW
- * omission fails, and the print-layout PR that fixes them must empty these lists. Each is material the
- * reader loses in the PDF only (the hosted page shows it): the headline's basis is cut by an ellipsis,
- * and the Recompetes table is wider than the page, so its Likelihood column is clipped off.
+ * Print defects found on main when the harness landed (2026-11-22) — the headline's basis cut by an ellipsis,
+ * the Recompetes Likelihood column clipped off the page — are fixed by the print-layout change. These lists
+ * stay EMPTY: anything added here is material a PDF reader loses.
  */
-const KNOWN_PRINT_DEFECTS = {
-  missingLines: ['FY2026 (1 complete fiscal year · description match)', 'Likelihood', 'high', 'medium'],
-  overflowingTables: ['Recompetes on the horizon'],
-  clippedText: ['FY2026 (1 complete fiscal year · description match)', 'HOUSEKEEPING- CUSTODIAL JANITORIAL'],
-};
+const KNOWN_PRINT_DEFECTS = { missingLines: [] as string[], overflowingTables: [] as string[], clippedText: [] as string[] };
+
+/** Pages the full fixture may use. It printed 8 (two of them a third full or less) before the layout fix. */
+const PAGE_BUDGET = 6;
 
 /** Section headings this report must carry, in reading order. Each one is backed by data in the fixture. */
 const SECTIONS = [
@@ -110,6 +108,27 @@ describe.runIf(!!CHROME)('market report PDF — full report', () => {
 
   it('never prints a blank page', () => {
     expect(pages.map((p, i) => [i + 1, p.trim().length] as const).filter(([, n]) => n === 0)).toEqual([]);
+  });
+
+  it('numbers every page: "Page X of Y" on each', () => {
+    expect(pages.map((p, i) => squash(p).includes(squash(`Page ${i + 1} of ${pages.length}`))).every(Boolean)).toBe(true);
+  });
+
+  it('does not waste pages: no near-empty page, no page holding only the closing footer, within budget', () => {
+    const footer = /Mindy · Federal market report.*|Page \d+ of \d+/g;
+    const body = pages.map((p) => p.replace(footer, '').replace(/\s+/g, ' ').trim());
+    const sizes = body.map((b) => b.length);
+    const median = [...sizes].sort((a, b) => a - b)[Math.floor(sizes.length / 2)];
+    // Every page but the last is at least 40% as full as a typical page.
+    expect(sizes.slice(0, -1).map((n, i) => [i + 1, n] as const).filter(([, n]) => n < median * 0.4)).toEqual([]);
+    // The last page carries report content, not only "Powered by Mindy …".
+    expect(squash(body[body.length - 1].replace(/Powered by Mindy[\s\S]*$/, '')).length).toBeGreaterThan(80);
+    expect(pages.length).toBeLessThanOrEqual(PAGE_BUDGET);
+  });
+
+  it('keeps every section heading with its content (no heading at the foot of a page)', () => {
+    const lastLine = (p: string) => p.replace(/Mindy · Federal market report.*|Page \d+ of \d+/g, '').trim().split('\n').map((l) => l.trim()).filter(Boolean).pop() || '';
+    expect(pages.map((p, i) => [i + 1, lastLine(p)] as const).filter(([, l]) => SECTIONS.some((h) => squash(l) === squash(h)))).toEqual([]);
   });
 
   it('prints tables a reader can read: nothing clipped, no cell under 9px', async () => {

@@ -23,6 +23,7 @@ import { NextResponse } from 'next/server';
 import { getMarketReport } from '@/lib/market/report-store';
 import { renderStoredReportHtml, reportPdfFileName } from '@/lib/market/stored-report-html';
 import { htmlToPdf } from '@/lib/pdf/launch-browser';
+import { displayTitle } from '@/lib/market/market-report-html';
 import { getClientIP } from '@/lib/rate-limit';
 import { checkBrowserRateLimits } from '@/lib/pdf/render-rate-limit';
 
@@ -38,11 +39,27 @@ export const PDF_FALLBACK_PER_IP_HOUR = 5;
 export const PDF_FALLBACK_PER_REPORT_HOUR = 10;
 export const PDF_FALLBACK_INSTANCE_HOUR = 30;
 
-export const PDF_OPTIONS = {
-  format: 'Letter',
-  printBackground: true,
-  margin: { top: '0.5in', right: '0.5in', bottom: '0.6in', left: '0.5in' },
-};
+const escHtml = (v: string) => v.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+/**
+ * Letter, with a running footer on every page: the report it belongs to and "Page X of Y", so a printed or
+ * forwarded page can always be traced and put back in order. Chromium fills pageNumber/totalPages itself;
+ * the template needs explicit font sizes (it does not inherit the page's styles) and loads nothing.
+ */
+export function pdfOptions(subject: unknown) {
+  const title = escHtml(displayTitle(subject) || 'Market report');
+  return {
+    format: 'Letter',
+    printBackground: true,
+    displayHeaderFooter: true,
+    headerTemplate: '<span></span>',
+    footerTemplate:
+      '<div style="width:100%;padding:0 0.5in;font:8px -apple-system,BlinkMacSystemFont,\'Segoe UI\',Roboto,Helvetica,Arial,sans-serif;color:#6b7280;display:flex;justify-content:space-between">'
+      + `<span>Mindy · Federal market report · ${title}</span>`
+      + '<span>Page <span class="pageNumber"></span> of <span class="totalPages"></span></span></div>',
+    margin: { top: '0.5in', right: '0.5in', bottom: '0.7in', left: '0.5in' },
+  };
+}
 
 const NO_STORE = { 'Cache-Control': 'private, no-store', 'X-Robots-Tag': 'noindex, nofollow' };
 
@@ -106,7 +123,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
     return fail(req, id, { status: 500, error: 'pdf_unavailable', message: MESSAGES.pdf_unavailable });
   }
 
-  const { pdf, error } = await htmlToPdf(html, PDF_OPTIONS, { lockdown: true });
+  const { pdf, error } = await htmlToPdf(html, pdfOptions(report.subject), { lockdown: true });
   if (!isPdf(pdf)) {
     console.error('[reports/pdf] PDF render failed for', id, error || 'not a PDF');
     return fail(req, id, { status: 503, error: 'pdf_unavailable', message: MESSAGES.pdf_unavailable, retryAfter: 60 });
