@@ -514,6 +514,11 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
     ? `<p class="note">Some sections could not be loaded at generation time and may be incomplete.</p>`
     : '';
 
+  // Styles below carry no comments: the HTML goes to clients (market-report-artifact-withholding test).
+  // .txt — text columns (agency names, roles) may wrap; figures, codes and dates never do.
+  // PRINT (the PDF download): sections flow across pages instead of jumping whole to the next one, which left
+  // pages half empty; a heading stays with what follows it; rows, tiles and short paragraphs never split; table
+  // headers repeat on each page; text columns wrap so no column is clipped off the page; nothing is truncated.
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Market Report — ${esc(displayTitle(subject))}</title>
 <style>
@@ -543,7 +548,6 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
   td { padding:8px 10px; border-bottom:1px solid var(--line); vertical-align:top; }
   td.lead { font-weight:600; }
   td:not(.lead) { font-variant-numeric:tabular-nums; white-space:nowrap; }
-  /* Text columns (agency names, roles) may wrap; figures, codes and dates never do. */
   .txt { white-space:normal; }
   .muted { color:var(--muted); font-weight:400; }
   .empty { color:var(--muted); font-size:13px; font-style:italic; }
@@ -560,9 +564,6 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
             border-radius:8px; padding:7px 13px; font:600 12.5px/1 inherit; cursor:pointer; text-decoration:none; }
   .pdfbtn:hover { background:rgba(255,255,255,.28); }
   @media (max-width:560px){ button.pdfbtn { display:none; } a.pdfbtn { position:static; display:inline-block; margin-top:12px; } }
-  /* PRINT (the PDF download): sections flow across pages instead of jumping whole to the next one, which
-     left pages half empty; a heading stays with what follows it; table rows never split and table headers
-     repeat on each page; every cell wraps so no column is clipped off the page; nothing is truncated. */
   @page { size: Letter; }
   @media print {
     body { background:#fff; }
