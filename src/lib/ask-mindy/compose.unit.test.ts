@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { composeProfileSetup, composeWhereToStart, toAskMindyProfile, toFitProfile, MAX_TOP_PICKS } from './compose';
+import { composeDeepDive, composeProfileSetup, composeWhereToStart, toAskMindyProfile, toFitProfile, MAX_TOP_PICKS } from './compose';
 import { buildCompanyProfile } from './company-profile';
 import type { RecipeRun } from './orchestrator';
 
@@ -160,5 +160,64 @@ describe('composeProfileSetup', () => {
     const by = Object.fromEntries(composeProfileSetup(ranRun({ sam: { state: 'skipped', reason: 'x' }, awards: { state: 'unavailable', reason: 'quota' } })).map((i) => [i.item, i]));
     expect(by.past_performance).toMatchObject({ status: 'unavailable' });
     expect(by.past_performance.detail).toMatch(/not a finding of no past performance/);
+  });
+});
+
+describe('composeDeepDive', () => {
+  const NOW_DD = Date.parse('2026-11-22T12:00:00Z');
+  const item = (over: Record<string, unknown> = {}) => ({
+    kind: 'solicitation', title: 'Laboratory Staffing Services', identifiers: ['36C24927Q0113'], status: 'open', award_status: 'AWARD_NOT_ESTABLISHED',
+    latest_amendment: '0002', response_deadline: '2026-12-02T17:00:00Z', buyer: 'Department of Veterans Affairs', naics: '561320', psc: 'R499',
+    contact: { name: 'Contracting Officer', email: null, phone: null }, notice_id: 'n1', not_biddable: false, deadline_conflict: false, ...over,
+  });
+  const ddRun = (results: Record<string, unknown>, steps: unknown[] = []): RecipeRun =>
+    ({ recipe: 'opportunity_deep_dive', status: 'ran', steps: steps as never, results: results as never });
+
+  it('a found notice: facts copied, days to deadline counted, amendment and contact carried', () => {
+    const d = composeDeepDive(ddRun({ notice: { state: 'ok', value: { items: [item()] } } }), NOW_DD);
+    expect(d.notice).toMatchObject({ state: 'found', title: 'Laboratory Staffing Services', status: 'open', days_to_deadline: 10, latest_amendment: '0002', not_biddable: false });
+    expect(d.notice.contact).toEqual({ name: 'Contracting Officer', email: null, phone: null });
+  });
+
+  it('ambiguous and not-found lookups are said as such; a failed lookup is unavailable', () => {
+    expect(composeDeepDive(ddRun({ notice: { state: 'ok', value: { items: [item(), item({ identifiers: ['X2'] })] } } })).notice)
+      .toEqual({ state: 'ambiguous', identifiers: ['36C24927Q0113', 'X2'] });
+    expect(composeDeepDive(ddRun({ notice: { state: 'ok', value: { items: [] } } })).notice).toEqual({ state: 'not_found' });
+    expect(composeDeepDive(ddRun({ notice: { state: 'unavailable', reason: 'timeout' } })).notice).toEqual({ state: 'unavailable' });
+  });
+
+  it('an identified incumbent is named with its award facts', () => {
+    const d = composeDeepDive(ddRun({
+      notice: { state: 'ok', value: { items: [item()] } },
+      incumbent: { state: 'ok', value: { incumbent: { recipientName: 'Example Holder LLC', awardId: '36C24921C0001', obligated: 900_000, ceiling: 0 }, prior_awards: [{}, {}], _meta: { incumbent_finding: 'identified' } } },
+    }));
+    expect(d.incumbent).toEqual({ finding: 'identified', name: 'Example Holder LLC', award_id: '36C24921C0001', obligated: 900_000, prior_award_count: 2 });
+  });
+
+  it('a candidate is never named as the incumbent; the tool\'s absence note is passed through verbatim', () => {
+    const note = 'A prior award looks similar but the evidence does not identify it as the incumbent.';
+    const d = composeDeepDive(ddRun({ incumbent: { state: 'ok', value: { incumbent: { recipientName: 'Lookalike Co' }, prior_awards: [{}], _meta: { incumbent_finding: 'candidate_not_confirmed', absence_note: note } } } }));
+    expect(d.incumbent).toEqual({ finding: 'candidate_not_confirmed', absence_note: note, prior_award_count: 1 });
+    expect(JSON.stringify(d.incumbent)).not.toContain('Lookalike');
+  });
+
+  it('"identified" without an incumbent record is treated as a failed search, never as "no incumbent"', () => {
+    const d = composeDeepDive(ddRun({ incumbent: { state: 'ok', value: { incumbent: null, _meta: { incumbent_finding: 'identified' } } } }));
+    expect(d.incumbent.finding).toBe('search_failed');
+    expect(d.incumbent.absence_note).toMatch(/Never say there is no incumbent/);
+  });
+
+  it('an incumbent step that did not run is unavailable (or notice_not_found when skipped), never absence', () => {
+    expect(composeDeepDive(ddRun({ incumbent: { state: 'unavailable', reason: 'x' } })).incumbent.finding).toBe('unavailable');
+    expect(composeDeepDive(ddRun({ incumbent: { state: 'skipped', reason: 'no notice id' } })).incumbent.finding).toBe('notice_not_found');
+  });
+
+  it('reports whether the customer brief is available and what was not checked', () => {
+    const d = composeDeepDive(ddRun(
+      { customer: { state: 'ok', value: {} }, bid_decision: { state: 'skipped', reason: 'needs gates' } },
+      [{ id: 'bid_decision', tool: 'evaluate_bid_decision', wave: 2, outcome: { state: 'skipped', reason: 'needs gates' } }],
+    ));
+    expect(d.customer_brief_available).toBe(true);
+    expect(d.not_checked).toEqual([{ step: 'bid_decision', state: 'skipped', reason: 'needs gates' }]);
   });
 });
