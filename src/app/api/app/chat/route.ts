@@ -111,6 +111,11 @@ import {
 } from '@/lib/chat/fmp-writeup-grounding';
 import { CURRENT_FIND_CHAT_CONTRACT } from '@/lib/mcp/potato-journey';
 import { ASK_MINDY_RULES_LAYER, askMindyRulesEnabledFor, askMindyRulesPromptBlock, rulesLayerFindContract } from '@/lib/chat/ask-mindy-rules';
+import { askMindyRecipesEnabledFor } from '@/lib/ask-mindy/flags';
+import { loadCompanyProfile } from '@/lib/ask-mindy/company-profile';
+import { fitRankingNote, rankFindResult } from '@/lib/ask-mindy/compose';
+/** How long the answer waits for the company profile before skipping the ranking note (value first). */
+const FIT_PROFILE_WAIT_MS = 1500;
 import { findCompletionFooter, comingBackListLeadsWithNotCompeted, type FindResultWithItems } from '@/lib/chat/find-completeness';
 import { inferredCodeDisclosure } from '@/lib/chat/code-disclosure';
 import { getNaics } from '@/lib/codes/lookup';
@@ -688,6 +693,11 @@ export async function POST(request: NextRequest) {
         // Unresolved workspace → NO profile (the private tools refuse too): a coach acting for a
         // client must never get an answer built on their own profile.
         const profileEmail = vaultEmailFor(actingScope);
+        // Ask Mindy fit ranking (ASK_MINDY_RECIPES, default off; src/lib/ask-mindy/compose.ts). Off → nothing is
+        // loaded and no note is added. On → the company profile loads in parallel through the strict acting
+        // scope only (never a raw email); a refused or failed load just means no ranking note (value first).
+        const fitRankingOn = !cardCtx && askMindyRecipesEnabledFor(auth.email);
+        const fitProfileP = fitRankingOn ? loadCompanyProfile(actingScope).catch(() => null) : null;
         // The profile's STATUS is kept (2026-11-22): a failed read used to look exactly like an empty profile, so
         // the answer treated a known company as unknown and asked again for details given earlier.
         const profileResult = profileEmail ? await loadBidderProfileResult(profileEmail) : null;
@@ -2222,6 +2232,21 @@ export async function POST(request: NextRequest) {
         // budget is downgraded from gpt-4o to gpt-4o-mini — never blocked, just a
         // cheaper model. Protects the $149 margin now that chat leads with gpt-4o.
         // (Resolved once above for the tool round; reuse to avoid a second budget read.)
+        // Ask Mindy fit ranking note: only when the flag is on AND find_opportunities ran this turn. It orders and
+        // explains the results the tool already returned (shared scorer bands, no second filter); it never blocks
+        // the answer: a slow, refused or failed profile load skips the note.
+        if (fitProfileP && findResult) {
+          const loaded = await withTimeout(fitProfileP, FIT_PROFILE_WAIT_MS, 'fit_profile').catch(() => null);
+          if (loaded && loaded.status === 'ok') {
+            const note = fitRankingNote(rankFindResult(findResult as unknown as Parameters<typeof rankFindResult>[0], loaded.profile));
+            if (note) {
+              messages.push({ role: 'system', content: note });
+              turnTrace.notices.push('fit_ranking_note');
+            }
+          } else {
+            turnTrace.notices.push(`fit_ranking_skipped:${loaded ? loaded.reason : 'profile_unavailable'}`);
+          }
+        }
         // Contract evidence guard (2026-11-22, 36C24825C0020): facts about a contract the customer named come only
         // from a record of that exact id; a result about a different record, or sources that disagree, are stated,
         // and pursuit advice is blocked while holder, value or end date is unresolved. The customer's two previous
