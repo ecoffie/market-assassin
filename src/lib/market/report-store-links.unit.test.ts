@@ -63,6 +63,12 @@ describe('saveMarketReport', () => {
     expect(linkStatus(loaded!)).toBe('live');
   });
 
+  it('stores the owner key lowercase, so the (lowercased) verified owner keeps access', async () => {
+    const id = await saveMarketReport({ ownerEmail: '  Sue.Smith@Example.COM ', subject: 's', params: {}, payload: { subject: 's' } });
+    expect(db.rows[0].owner_email).toBe('sue.smith@example.com');
+    expect(await getOwnedMarketReport(id!, 'sue.smith@example.com')).not.toBeNull();
+  });
+
   it('an unrelated storage error still returns null (no silent retry)', async () => {
     db.state.failNext = 'boom';
     expect(await save()).toBeNull();

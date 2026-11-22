@@ -43,7 +43,10 @@ beforeEach(() => {
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'service';
   verify.mockReset().mockImplementation(async (_r: unknown, email: string, opts: { requireStrongAuth?: boolean }) => {
     expect(opts).toEqual({ requireStrongAuth: true }); // existing strong auth, no new auth system
-    return email === 'weak@example.com' ? { authenticated: false, error: 'strong_auth_required' } : { authenticated: true, email };
+    if (email === 'weak@example.com') return { authenticated: false, error: 'strong_auth_required' };
+    // A signed email-action link (?token=&ts=) authenticates as method 'token'.
+    if (email === 'link@example.com') return { authenticated: true, email, method: 'token' };
+    return { authenticated: true, email, method: 'session' };
   });
 });
 
@@ -56,6 +59,26 @@ describe('auth', () => {
     expect((await EXTEND(req(`/x/${ID}`, 'weak@example.com', { method: 'POST', body: '{"days":30}' }), p(ID))).status).toBe(401);
     expect((await DEL(req(`/x/${ID}`, 'weak@example.com', { method: 'DELETE' }), p(ID))).status).toBe(401);
     expect((await LIST(new Request('https://getmindy.ai/api/app/market-reports'))).status).toBe(400);
+    expect(db.rows[0].revoked_at).toBeNull();
+  });
+});
+
+describe('signed email-action links cannot operate the controls', () => {
+  it('a token-authenticated caller gets 401 on list, view, revoke, extend and delete, and nothing changes', async () => {
+    seed({ owner_email: 'link@example.com' });
+    const E = 'link@example.com';
+    const res = [
+      await LIST(req('/api/app/market-reports', E)),
+      await VIEW(req(`/x/${ID}`, E), p(ID)),
+      await REVOKE(req(`/x/${ID}`, E, { method: 'POST' }), p(ID)),
+      await EXTEND(req(`/x/${ID}`, E, { method: 'POST', body: '{"days":30}' }), p(ID)),
+      await DEL(req(`/x/${ID}`, E, { method: 'DELETE' }), p(ID)),
+    ];
+    for (const r of res) {
+      expect(r.status).toBe(401);
+      expect(await r.json()).toMatchObject({ error: 'session_required' });
+    }
+    expect(db.rows).toHaveLength(1);
     expect(db.rows[0].revoked_at).toBeNull();
   });
 });

@@ -2,7 +2,8 @@
  * Shared plumbing for the owner routes under /api/app/market-reports (report link controls).
  *
  * The rules, same as the Vault document routes:
- * - STRONG auth for `email` (verifyUserOwnsEmail requireStrongAuth). There is no new auth system.
+ * - STRONG auth for `email` (verifyUserOwnsEmail requireStrongAuth), from a real SESSION only: signed
+ *   email-action links (method 'token') are refused. There is no new auth system.
  * - The owner is the verified caller. Every query filters on owner_email inside the query itself.
  * - Not-yours and missing get the IDENTICAL 404 body, with no subject, status or counts, so ids cannot be
  *   probed for metadata.
@@ -24,6 +25,12 @@ export async function requireOwner(request: Request): Promise<{ email: string } 
   const auth = await verifyUserOwnsEmail(request as never, email, { requireStrongAuth: true });
   if (!auth.authenticated || !auth.email) {
     return { response: NextResponse.json({ success: false, error: auth.error || 'Unauthorized' }, { status: 401, headers: NO_STORE }) };
+  }
+  // A real signed-in session only (Supabase bearer or the Mindy session header). A signed email-action link
+  // (?token=&ts=, method 'token', valid 24 h) must never operate these controls: anyone holding a forwarded
+  // alert email could otherwise list, revoke, extend or delete the owner's reports.
+  if (auth.method !== 'session') {
+    return { response: NextResponse.json({ success: false, error: 'session_required' }, { status: 401, headers: NO_STORE }) };
   }
   return { email: auth.email.toLowerCase() };
 }

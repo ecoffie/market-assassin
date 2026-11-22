@@ -80,13 +80,16 @@ export async function saveMarketReport(input: {
   payload: Record<string, unknown>;
 }): Promise<string | null> {
   const sb = client();
-  if (!sb || !input.ownerEmail) return null;
+  // Owner key is stored lowercase: the owner routes match the verified (lowercased) email exactly, and a
+  // mixed-case owner would otherwise lose access to their own report. Never ilike (emails contain _ and %).
+  const ownerEmail = String(input.ownerEmail || '').trim().toLowerCase();
+  if (!sb || !ownerEmail) return null;
 
   const id = newReportId();
   try {
     const row = {
       id,
-      owner_email: input.ownerEmail,
+      owner_email: ownerEmail,
       subject: input.subject,
       client_name: input.clientName || null,
       params: input.params,
