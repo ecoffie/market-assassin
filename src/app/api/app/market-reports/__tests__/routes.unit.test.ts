@@ -63,6 +63,39 @@ describe('auth', () => {
   });
 });
 
+describe('malformed stored owners (production has 7) can never match a verified email', () => {
+  // The verified email comes from the session (Supabase / Mindy session header), never from the stored row,
+  // and every owner query is an EXACT match on owner_email (never ilike, never trimmed in SQL). So a stored
+  // owner with whitespace, a display name, a trailing dot, no @, or two @ matches no real account. Those
+  // reports stay reachable by link, as today, and no account can operate their controls.
+  const MALFORMED = [' sue@example.com', 'sue@example.com ', 'Sue <sue@example.com>', 'sue@example.com.', 'sueexample.com', 'sue@@example.com', '', 'mailto:sue@example.com'];
+  it.each(MALFORMED)('stored owner %j: the verified owner sue@example.com gets the identical 404 everywhere and nothing changes', async (bad) => {
+    seed({ owner_email: bad });
+    const E = 'sue@example.com';
+    for (const r of [
+      await VIEW(req(`/x/${ID}`, E), p(ID)),
+      await REVOKE(req(`/x/${ID}`, E, { method: 'POST' }), p(ID)),
+      await EXTEND(req(`/x/${ID}`, E, { method: 'POST', body: '{"days":30}' }), p(ID)),
+      await DEL(req(`/x/${ID}`, E, { method: 'DELETE' }), p(ID)),
+    ]) {
+      expect(r.status).toBe(404);
+      expect(await r.json()).toEqual({ success: false, error: 'not_found' });
+    }
+    expect((await (await LIST(req('/api/app/market-reports', E))).json()).reports).toEqual([]);
+    expect(db.rows).toHaveLength(1);
+    expect(db.rows[0].revoked_at).toBeNull();
+    // The public link is unchanged: still reachable while live.
+    expect((await PUBLIC_PAGE(new Request(`https://getmindy.ai/reports/${ID}`), p(ID))).status).toBe(200);
+  });
+
+  it('the owner key comes from the VERIFIED session email, not from the request', async () => {
+    seed({ owner_email: 'eve@example.com' });
+    // The request claims eve, but the session verifies as sue: auth answers with sue's email.
+    verify.mockImplementationOnce(async () => ({ authenticated: true, email: 'sue@example.com', method: 'session' }));
+    expect((await VIEW(req(`/x/${ID}`, 'eve@example.com'), p(ID))).status).toBe(404);
+  });
+});
+
 describe('signed email-action links cannot operate the controls', () => {
   it('a token-authenticated caller gets 401 on list, view, revoke, extend and delete, and nothing changes', async () => {
     seed({ owner_email: 'link@example.com' });
