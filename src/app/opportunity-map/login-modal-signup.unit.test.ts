@@ -26,10 +26,11 @@ describe('login modal — in-modal signup keeps the visitor on the map', () => {
     }
   });
 
-  it('"Start for free" links to /pricing (no free plan for new users), NOT the in-modal free signup', () => {
+  it('the trial CTA links to /pricing (no free plan for new users), NOT the in-modal free signup', () => {
     // The old behavior was toApp('&signup=1') (page leave). It must stay gone.
     expect(route).not.toContain("toApp('&signup=1')");
-    expect(route).toContain('<a id="lgmCreate" href="/pricing">Start for free</a>');
+    expect(route).toContain(`<a id="lgmCreate" href="/pricing">' + TRIAL_CTA_LABEL + '</a>`);
+    expect(route).not.toContain('Start for free');
     expect(route).not.toMatch(/lgmCreate.*addEventListener[\s\S]*?step\(3\)/);
     expect(route).not.toContain('Create a free account');
   });
