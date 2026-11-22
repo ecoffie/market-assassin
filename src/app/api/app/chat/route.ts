@@ -116,6 +116,7 @@ import { ASK_MINDY_RULES_LAYER, askMindyRulesEnabledFor, askMindyRulesPromptBloc
 import { askMindyRecipesEnabledFor } from '@/lib/ask-mindy/flags';
 import { loadCompanyProfile } from '@/lib/ask-mindy/company-profile';
 import { fitRankingNote, rankFindResult } from '@/lib/ask-mindy/compose';
+import { requestedDocSections, requestedSectionsPlannerNote } from '@/lib/chat/requested-doc-sections';
 /** How long the answer waits for the company profile before skipping the ranking note (value first). */
 const FIT_PROFILE_WAIT_MS = 1500;
 import { findCompletionFooter, comingBackListLeadsWithNotCompeted, type FindResultWithItems } from '@/lib/chat/find-completeness';
@@ -722,6 +723,9 @@ export async function POST(request: NextRequest) {
         // layout and gets only the rules (truth, writing), never the top-picks answer format.
         const rulesLayer = askMindyRulesEnabledFor(auth.email);
         const customerAskForContract = splitViewPreamble(message).rest || message;
+        // Sections the customer named for the document ("executive summary, risks, actions and sources"): the planner
+        // is told to carry them and create_document completes any it left out from the document's own statements.
+        const requestedSections = requestedDocSections(customerAskForContract);
         const fmpTextAsk = !cardCtx && isFederalMarketProfileRequest(customerAskForContract);
         // Federal Strategy Plan (ASK_MINDY_STRATEGY_PLAN, default off; src/lib/ask-mindy/strategy-plan.ts): a plan for
         // this company runs the EXISTING Federal Market Profile research workflow (phase machine, write-up validator,
@@ -1050,6 +1054,7 @@ export async function POST(request: NextRequest) {
               callerEmail: auth.email!,
               request,
               chatSessionId: body.sessionId === sessionId ? turnSessionId : null,
+              ...(requestedSections.length ? { requestedSections } : {}),
               // FMP step-8 validator: refuse incomplete / banned profiles before Vault save.
               ...(federalMarketProfileAsk && fmpWriteupCtx
                 ? {
@@ -1158,6 +1163,14 @@ export async function POST(request: NextRequest) {
             const phaseNote = fmpPhaseHostNote(fmpState);
             messages.push({ role: 'system', content: phaseNote });
             toolRoundMessages.splice(1, 0, { role: 'system', content: phaseNote });
+          }
+          // Requested document sections: only when create_document is in this turn's catalog (FMP unlocks it later).
+          const requestedNote = fmpCatalogDefs.some((d) => (d.function as { name?: string })?.name === CREATE_DOCUMENT)
+            ? requestedSectionsPlannerNote(requestedSections) : null;
+          if (requestedNote) {
+            messages.push({ role: 'system', content: requestedNote });
+            toolRoundMessages.splice(1, 0, { role: 'system', content: requestedNote });
+            turnTrace.notices.push(`requested_doc_sections:${requestedSections.map((r) => r.key).join(',')}`);
           }
           turnTrace.tools_offered = ALL_TOOL_DEFS.length;
 

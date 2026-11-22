@@ -30,6 +30,7 @@ import { detectProhibitedMarkings, markingRefusalMessage } from '@/lib/vault/mar
 import { vaultEmailFor, WORKSPACE_UNCONFIRMED_NOTE, type ChatActingScope } from './chat-acting-scope';
 import { vaultDocEnabledFor } from '@/lib/vault/flags';
 import { validateFmpWriteup, type FmpWriteupContext } from './fmp-writeup-validate';
+import { ensureRequestedSections, requestedSectionsMissingNote, type RequestedSection, type RequestedSectionKey } from './requested-doc-sections';
 
 export const CREATE_DOCUMENT = 'create_document';
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -157,6 +158,11 @@ export interface GenerateDocumentDeps {
    * host-extracted tool JSON (FmpWriteupContext.requiredSnippets).
    */
   fmpWriteupContext?: FmpWriteupContext;
+  /**
+   * Sections the customer named for the document (requested-doc-sections.ts). A requested section the doc_model
+   * lacks is assembled from the document's own labeled statements; one with nothing to draw from is reported.
+   */
+  requestedSections?: readonly RequestedSection[];
 }
 
 type Row = { id: string; original_filename: string; mime_type: string | null; version: number | null; parent_id: string | null; doc_model: unknown };
@@ -346,6 +352,23 @@ export function makeGenerateDocumentTool(deps: GenerateDocumentDeps) {
       }
     }
 
+    // Requested sections (executive summary, risks, actions, sources): the file must carry what the customer asked
+    // for, not only the chat answer. Built from the document's own statements; never a new fact. A completed model
+    // that would not validate is discarded (the document is never broken to add a section).
+    let requestedMissing: RequestedSectionKey[] = [];
+    let requestedAdded: RequestedSectionKey[] = [];
+    if (deps.requestedSections?.length) {
+      const ensured = ensureRequestedSections(model, deps.requestedSections);
+      if (ensured.added.length && validateDocModel(ensured.model).ok) {
+        model = ensured.model;
+        requestedAdded = ensured.added;
+        requestedMissing = ensured.missing;
+      } else {
+        requestedMissing = [...ensured.missing, ...(ensured.added.length ? ensured.added : [])];
+      }
+      console.info('[create_document] requested_sections', JSON.stringify({ requested: deps.requestedSections.map((r) => r.key), present: ensured.present, added: requestedAdded, missing: requestedMissing }));
+    }
+
     const text = docModelText(model);
     const marking = detectProhibitedMarkings(markingText(model));
     if (marking.blocked && marking.kind) return { ok: false, error: 'prohibited_marking', note: markingRefusalMessage(marking.kind) };
@@ -443,13 +466,15 @@ export function makeGenerateDocumentTool(deps: GenerateDocumentDeps) {
       ...(spreadsheetNote ? { spreadsheet_note: spreadsheetNote } : {}),
       ...(repeats.length ? { repeated_sentences: repeats.length } : {}),
       ...(fmpWarnings.length ? { fmp_warnings: fmpWarnings } : {}),
+      ...(deps.requestedSections?.length ? { requested_sections: { requested: deps.requestedSections.map((r) => r.key), added: requestedAdded, missing: requestedMissing } } : {}),
       diagnostics,
       note: 'Saved privately to the Vault (Documents → Generated). Under this answer the user gets an "Open report" card (on the Map the report also opens in a reading pane beside the chat). Tell them they can read it there, open Export in the report for PDF/Word/Excel/CSV, ask you for changes (a new version is saved, the old one is kept), or find it under Documents → Generated. Do not paste download links or list format buttons in the chat text.'
         + (unverified.length ? ` ${unverified.length} statement(s) are labeled "Unverified — no source"; say so.` : '')
         + (omitted.length ? ` ${omitted.length} decision-critical statement(s) without a source were left out; say so.` : '')
         + (uncitedSources.some((s) => s.kind === 'upload')
           ? ` Warning: the uploaded file(s) ${uncitedSources.filter((s) => s.kind === 'upload').map((s) => `"${s.label}"`).join(', ')} were declared as sources but NO block cites them, so the document does not include their content. Tell the user plainly and offer to make a new version that includes it.`
-          : uncitedSources.length ? ` Note: ${uncitedSources.length} declared source(s) are not cited by any block.` : ''),
+          : uncitedSources.length ? ` Note: ${uncitedSources.length} declared source(s) are not cited by any block.` : '')
+        + requestedSectionsMissingNote(requestedMissing),
     };
   }
 
