@@ -121,6 +121,12 @@ function typecheckMerged(pr: number, sha: string): { ok: boolean; detail: string
   }
 }
 
+/** A lock commit: message = JSON payload (the tree holds the same, for humans browsing the ref). */
+function lockCommit(p: LockPayload, parents: string[]): string {
+  const tree = gh<{ sha: string }>(`repos/${REPO}/git/trees`, 'POST', {}, JSON.stringify({ tree: [{ path: 'LOCK', mode: '100644', type: 'blob', content: JSON.stringify(p) }] }));
+  return gh<{ sha: string }>(`repos/${REPO}/git/commits`, 'POST', {}, JSON.stringify({ message: JSON.stringify(p), tree: tree.sha, parents })).sha;
+}
+
 // ── the port ─────────────────────────────────────────────────────────────────────────────────────
 const port: Port = {
   now: () => Date.now(),
@@ -165,15 +171,26 @@ const port: Port = {
     const ref = ghTry<{ object: { sha: string } }>(`repos/${REPO}/git/${LOCK_REF.replace(/^refs\//, 'ref/')}`);
     if (!ref.ok) return null;
     const c = gh<{ message: string }>(`repos/${REPO}/git/commits/${ref.v.object.sha}`);
-    try { return JSON.parse(c.message) as LockPayload; } catch { return { owner: 'unknown', pr: 0, sha: '', expires_at: new Date(0).toISOString() }; }
+    let payload: LockPayload;
+    try { payload = JSON.parse(c.message) as LockPayload; } catch { payload = { owner: 'unknown', pr: 0, sha: '', expires_at: new Date(0).toISOString() }; }
+    return { payload, commit: ref.v.object.sha };
   },
   createLock: async (p) => {
-    const tree = gh<{ sha: string }>(`repos/${REPO}/git/trees`, 'POST', {}, JSON.stringify({ tree: [{ path: 'LOCK', mode: '100644', type: 'blob', content: JSON.stringify(p) }] }));
-    const commit = gh<{ sha: string }>(`repos/${REPO}/git/commits`, 'POST', {}, JSON.stringify({ message: JSON.stringify(p), tree: tree.sha, parents: [] }));
-    const r = ghTry(`repos/${REPO}/git/refs`, 'POST', {}, JSON.stringify({ ref: LOCK_REF, sha: commit.sha }));
+    const commit = lockCommit(p, []);
+    const r = ghTry(`repos/${REPO}/git/refs`, 'POST', {}, JSON.stringify({ ref: LOCK_REF, sha: commit }));
     if (r.ok) return true;
     if (r.status === 422) return false; // already exists → someone else holds it
     throw new Error(`lock create failed: ${r.msg}`);
+  },
+  takeOverLock: async (expectedCommit, p) => {
+    // The new lock commit's parent is the expired lock commit, so force=false makes this a fast-forward ONLY
+    // from that exact commit. A concurrent takeover that already moved the ref makes ours a non-fast-forward
+    // (422), and we lose cleanly.
+    const commit = lockCommit(p, [expectedCommit]);
+    const r = ghTry(`repos/${REPO}/git/${LOCK_REF}`, 'PATCH', {}, JSON.stringify({ sha: commit, force: false }));
+    if (r.ok) return true;
+    if (r.status === 422 || r.status === 409) return false;
+    throw new Error(`lock takeover failed: ${r.msg}`);
   },
   deleteLock: async () => { ghTry(`repos/${REPO}/git/${LOCK_REF}`, 'DELETE'); },
 };

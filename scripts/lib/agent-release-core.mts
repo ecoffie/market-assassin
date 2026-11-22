@@ -71,6 +71,8 @@ export interface ReleaseRecord {
   at: string;
 }
 export interface LockPayload { owner: string; pr: number; sha: string; expires_at: string }
+/** The lock as read: its payload and the commit the lock ref points at (the compare-and-swap token). */
+export interface LockState { payload: LockPayload; commit: string }
 export type Compare = 'identical' | 'ahead' | 'behind' | 'diverged';
 
 export interface Port {
@@ -95,9 +97,12 @@ export interface Port {
   merge(n: number, sha: string): Promise<{ merged: boolean; merge_commit?: string; message?: string }>;
   comment(n: number, body: string): Promise<void>;
   addLabels(n: number, labels: string[]): Promise<void>;
-  // atomic lock: createLock fails (false) when the ref already exists
-  readLock(): Promise<LockPayload | null>;
+  // Atomic lock. createLock: ref create, fails (false) if the ref exists. takeOverLock: ref update with
+  // force=false to a new commit whose PARENT is `expectedCommit`: a fast-forward only from that exact old
+  // lock, so of two concurrent takeovers exactly one wins (the other gets 422 / not a fast-forward → false).
+  readLock(): Promise<LockState | null>;
   createLock(p: LockPayload): Promise<boolean>;
+  takeOverLock(expectedCommit: string, p: LockPayload): Promise<boolean>;
   deleteLock(): Promise<void>;
 }
 
@@ -171,7 +176,7 @@ export type Action =
   | { do: 'record'; pr: number; record: ReleaseRecord; note?: string }
   | { do: 'label'; pr: number; labels: string[] }
   | { do: 'release_lock' }
-  | { do: 'take_over_lock'; payload: LockPayload };
+  | { do: 'take_over_lock'; payload: LockPayload; expectedCommit: string };
 
 export interface Decision {
   kind: 'verify' | 'wait' | 'merge' | 'refuse' | 'blocked' | 'idle';
@@ -182,25 +187,41 @@ export interface Decision {
 
 interface Pending { pr: number; sha: string; merge_commit: string | null }
 
+const RESOLVED: ReleaseRecord['status'][] = ['released', 'verify_failed', 'blocked'];
+
+/**
+ * Every merge of ours that is not yet resolved (released / verify_failed / blocked), reconciled from GITHUB
+ * STATE, not trusted from the lock alone. A merged PR counts as ours when:
+ *  - the lock names it; or
+ *  - it carries a 'merged' release record; or
+ *  - it is allowlisted and its latest review record names its merged head (a crash between the merge and
+ *    its record, after the lock expired or was taken over).
+ * While any is unresolved, nothing else merges.
+ */
 async function pendingVerification(port: Port): Promise<Pending | null> {
-  // 1. A lock that names a merged PR: covers a crash between the merge and its record.
   const lock = await port.readLock();
-  if (lock) {
-    const p = await port.pr(lock.pr);
-    if (p.merged) {
-      const recs = releaseRecords(await port.comments(lock.pr)).filter((r) => r.pr === lock.pr);
-      const done = recs.some((r) => r.status === 'released' || r.status === 'verify_failed');
-      if (!done && !p.labels.includes(LABELS.released)) return { pr: lock.pr, sha: lock.sha, merge_commit: p.merge_commit_sha ?? null };
-    }
+  const allow = await port.allowlist();
+  const merged = new Map<number, Pr>();
+  for (const p of await port.recentlyMergedPrs()) merged.set(p.number, p);
+  if (lock && !merged.has(lock.payload.pr)) {
+    const p = await port.pr(lock.payload.pr);
+    if (p.merged) merged.set(p.number, p);
   }
-  // 2. Records: a 'merged' record without a later 'released' / 'verify_failed'.
-  for (const p of await port.recentlyMergedPrs()) {
+  // Oldest first, so an older unresolved merge is verified before a newer one.
+  for (const p of [...merged.values()].sort((a, b) => a.number - b.number)) {
     if (p.labels.includes(LABELS.released)) continue;
-    const recs = releaseRecords(await port.comments(p.number)).filter((r) => r.pr === p.number);
-    const merged = recs.find((r) => r.status === 'merged');
-    if (!merged) continue;
-    if (recs.some((r) => r.status === 'released' || r.status === 'verify_failed')) continue;
-    return { pr: p.number, sha: merged.sha, merge_commit: merged.merge_commit ?? p.merge_commit_sha ?? null };
+    const comments = await port.comments(p.number);
+    const recs = releaseRecords(comments).filter((r) => r.pr === p.number);
+    if (recs.some((r) => RESOLVED.includes(r.status))) continue;
+    const mergedRec = recs.find((r) => r.status === 'merged');
+    const lockedHere = !!lock && lock.payload.pr === p.number;
+    let reviewedHere = false;
+    if (!mergedRec && !lockedHere && isAllowed(p, allow)) {
+      const fenced = comments.flatMap((c) => [...c.body.matchAll(/```agent4-review\s*\n([\s\S]*?)\n```/g)].map((m) => { try { return JSON.parse(m[1]) as ReviewRecord; } catch { return null; } })).filter(isReviewRecord);
+      reviewedHere = fenced.length > 0 && fenced[fenced.length - 1].reviewed_sha === p.head.sha;
+    }
+    if (!mergedRec && !lockedHere && !reviewedHere) continue;
+    return { pr: p.number, sha: mergedRec?.sha ?? (lockedHere ? lock!.payload.sha : p.head.sha), merge_commit: mergedRec?.merge_commit ?? p.merge_commit_sha ?? null };
   }
   return null;
 }
@@ -237,10 +258,10 @@ export async function decide(port: Port): Promise<Decision> {
 
   const lock = await port.readLock();
   const now = port.now();
-  let takeOver: LockPayload | null = null;
+  let takeOver: LockState | null = null;
   if (lock) {
-    if (Date.parse(lock.expires_at) > now) return { kind: 'wait', pr: lock.pr, reasons: [`release lock held for #${lock.pr} until ${lock.expires_at}`], actions: [] };
-    takeOver = lock; // expired, and state above shows nothing awaiting verification
+    if (Date.parse(lock.payload.expires_at) > now) return { kind: 'wait', pr: lock.payload.pr, reasons: [`release lock held for #${lock.payload.pr} until ${lock.payload.expires_at}`], actions: [] };
+    takeOver = lock; // expired, and the reconciliation above found nothing unresolved
   }
 
   const [main, prod] = await Promise.all([port.mainSha(), port.productionSha()]);
@@ -283,7 +304,7 @@ export async function decide(port: Port): Promise<Decision> {
       kind: 'merge', pr: c.number,
       reasons: [`${review.record.class} reviewed at ${c.head.sha.slice(0, 8)}; CI green; mergeable; type-checks`],
       actions: [
-        takeOver ? { do: 'take_over_lock', payload } : { do: 'acquire_lock', payload },
+        takeOver ? { do: 'take_over_lock', payload, expectedCommit: takeOver.commit } : { do: 'acquire_lock', payload },
         { do: 'merge', pr: c.number, sha: c.head.sha },
         { do: 'record', pr: c.number, record: { type: 'release', pr: c.number, status: 'merged', sha: c.head.sha, at: new Date(now).toISOString() } },
       ],
@@ -305,15 +326,14 @@ export async function apply(port: Port, d: Decision): Promise<ApplyResult> {
   const applied: string[] = [];
   let mergeCommit: string | undefined;
   for (const a of d.actions) {
-    if (a.do === 'acquire_lock' || a.do === 'take_over_lock') {
-      if (a.do === 'take_over_lock') {
-        // Re-verify before taking over: the expired lock must still be the same one.
-        const cur = await port.readLock();
-        if (cur && Date.parse(cur.expires_at) > port.now()) return { applied, stopped: 'lock was renewed by another run' };
-        await port.deleteLock();
-      }
+    if (a.do === 'acquire_lock') {
       if (!(await port.createLock(a.payload))) return { applied, stopped: 'another run holds the release lock' };
       applied.push(`lock #${a.payload.pr}`);
+    } else if (a.do === 'take_over_lock') {
+      // Atomic: succeeds only if the ref still points at the exact expired lock we decided on. Never
+      // delete-then-create, where two runners could both delete and one recreate.
+      if (!(await port.takeOverLock(a.expectedCommit, a.payload))) return { applied, stopped: 'another run took over the expired lock' };
+      applied.push(`took over lock for #${a.payload.pr}`);
     } else if (a.do === 'merge') {
       const live = await port.pr(a.pr);
       if (live.head.sha !== a.sha) { await port.deleteLock(); return { applied, stopped: 'head moved after the decision' }; }

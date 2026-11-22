@@ -5,7 +5,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   decide, apply, validateReview, isAllowed, stampMatches, releaseRecordBody, LABELS, LOCK_TTL_MS, MAX_ATTEMPTS,
-  type Port, type Pr, type Comment, type LockPayload, type ReviewRecord, type ReleaseRecord, type Compare,
+  type Port, type Pr, type Comment, type LockPayload, type LockState, type ReviewRecord, type ReleaseRecord, type Compare,
 } from '../../scripts/lib/agent-release-core.mjs';
 
 const SHA = (c: string) => c.repeat(40).slice(0, 40);
@@ -31,7 +31,8 @@ type World = {
   prodChecksOk: boolean;
   allow: { prs: number[]; branches: string[] };
   prodCheckCalls: string[];
-  lock: LockPayload | null;
+  lock: LockState | null;
+  lockSeq: number;
   merges: Array<{ pr: number; sha: string }>;
   mergeResult: (pr: number) => { merged: boolean; merge_commit?: string; message?: string };
   labels: Array<{ pr: number; labels: string[] }>;
@@ -53,6 +54,7 @@ function world(over: Partial<World> = {}): World {
     allow: { prs: [101, 102, 103], branches: [] },
     prodCheckCalls: [],
     lock: null,
+    lockSeq: 0,
     merges: [],
     mergeResult: () => ({ merged: true, merge_commit: SHA('c') }),
     labels: [],
@@ -90,9 +92,11 @@ function port(w: World): Port {
     },
     comment: async (n, body) => { const iso = new Date(w.now).toISOString(); (w.comments.get(n) ?? w.comments.set(n, []).get(n)!).push({ id: w.nextCommentId++, body, created_at: iso, updated_at: iso }); },
     addLabels: async (n, labels) => { w.labels.push({ pr: n, labels }); const p = w.prs.get(n); if (p) p.labels.push(...labels); },
-    readLock: async () => w.lock,
+    readLock: async () => (w.lock ? { payload: { ...w.lock.payload }, commit: w.lock.commit } : null),
     // Atomic: a ref create fails if the ref exists (GitHub returns 422).
-    createLock: async (p) => { if (w.lock) return false; w.lock = p; return true; },
+    createLock: async (p) => { if (w.lock) return false; w.lock = { payload: p, commit: `lock${++w.lockSeq}` }; return true; },
+    // Atomic: a force=false update fast-forwards only from the expected old commit.
+    takeOverLock: async (expected, p) => { if (!w.lock || w.lock.commit !== expected) return false; w.lock = { payload: p, commit: `lock${++w.lockSeq}` }; return true; },
     deleteLock: async () => { w.lock = null; },
   };
 }
@@ -110,8 +114,8 @@ describe('happy path', () => {
     const r = await apply(p, d);
     expect(r.stopped).toBeUndefined();
     expect(w.merges).toEqual([{ pr: 101, sha: HEAD }]);
-    expect(w.lock).toMatchObject({ pr: 101, sha: HEAD });
-    expect(Date.parse(w.lock!.expires_at) - T0).toBe(LOCK_TTL_MS);
+    expect(w.lock?.payload).toMatchObject({ pr: 101, sha: HEAD });
+    expect(Date.parse(w.lock!.payload.expires_at) - T0).toBe(LOCK_TTL_MS);
     expect(records(w, 101).at(-1)).toMatchObject({ status: 'merged', sha: HEAD, merge_commit: SHA('c') });
   });
 
@@ -295,7 +299,7 @@ describe('serialization and restart safety', () => {
   });
 
   it('a held (unexpired) lock → wait; an expired lock with nothing pending is taken over safely', async () => {
-    const w = world({ lock: { owner: 'agent4-release', pr: 99, sha: SHA('9'), expires_at: new Date(T0 + 60_000).toISOString() } });
+    const w = world({ lock: { payload: { owner: 'agent4-release', pr: 99, sha: SHA('9'), expires_at: new Date(T0 + 60_000).toISOString() }, commit: 'lock-old' } });
     w.prs.set(99, { number: 99, draft: false, state: 'open', merged: false, merge_commit_sha: null, created_at: '2026-11-22T10:00:00Z', head: { sha: SHA('9'), ref: 'claude/y' }, base: { ref: 'main' }, mergeable: true, labels: [] });
     w.comments.set(99, []);
     addPr(w, 101, {}, [{ body: review() }]);
@@ -304,9 +308,73 @@ describe('serialization and restart safety', () => {
     w.now = T0 + 120_000; // expired
     const d = await decide(p);
     expect(d.kind).toBe('merge');
-    expect(d.actions[0].do).toBe('take_over_lock');
+    expect(d.actions[0]).toMatchObject({ do: 'take_over_lock', expectedCommit: 'lock-old' });
     await apply(p, d);
-    expect(w.lock?.pr).toBe(101);
+    expect(w.lock?.payload.pr).toBe(101);
+  });
+
+  it('lock expired while the previous merge is still unresolved → reconcile from GitHub: verify/wait for X, never merge Y', async () => {
+    const w = world();
+    // X (#100) was merged under the lock; production does not contain it yet; the lock TTL has passed.
+    w.prs.set(100, { number: 100, draft: false, state: 'closed', merged: true, merge_commit_sha: SHA('x'), created_at: '2026-11-22T09:00:00Z',
+      head: { sha: SHA('1'), ref: 'claude/x' }, base: { ref: 'main' }, mergeable: null, labels: [] });
+    w.comments.set(100, []);
+    w.lock = { payload: { owner: 'agent4-release', pr: 100, sha: SHA('1'), expires_at: new Date(T0 - 60_000).toISOString() }, commit: 'lock-x' };
+    w.compare = () => 'behind';
+    addPr(w, 101, {}, [{ body: review() }]); // Y, otherwise fully eligible
+    const p = port(w);
+    const d = await decide(p);
+    expect(d.pr).toBe(100);
+    expect(['wait', 'verify']).toContain(d.kind);
+    expect(d.actions.some((a) => a.do === 'merge' || a.do === 'take_over_lock')).toBe(false);
+    expect(w.merges).toEqual([]);
+    // Once production contains X: verify X first; Y is not touched in that run.
+    w.compare = () => 'ahead';
+    const v = await decide(p);
+    expect(v).toMatchObject({ kind: 'verify', pr: 100 });
+    await apply(p, v);
+    expect(w.merges).toEqual([]);
+    expect((await decide(p)).kind).toBe('merge'); // only now does Y become eligible
+  });
+
+  it('a crashed merge with NO lock and NO record is still found from GitHub state (allowlisted, reviewed head merged)', async () => {
+    const w = world({ allow: { prs: [100, 101], branches: [] } });
+    w.prs.set(100, { number: 100, draft: false, state: 'closed', merged: true, merge_commit_sha: SHA('x'), created_at: '2026-11-22T09:00:00Z',
+      head: { sha: HEAD, ref: 'claude/x' }, base: { ref: 'main' }, mergeable: null, labels: [] });
+    w.comments.set(100, [{ id: 900, body: review(), created_at: '2026-11-22T17:30:00Z', updated_at: '2026-11-22T17:30:00Z' }]);
+    w.compare = () => 'behind';
+    addPr(w, 101, {}, [{ body: review() }]);
+    const d = await decide(port(w));
+    expect(d).toMatchObject({ kind: 'wait', pr: 100 });
+  });
+
+  it('two runners take over the same expired lock at the same moment → exactly one owner; the other exits without acting', async () => {
+    const w = world({ lock: { payload: { owner: 'agent4-release', pr: 99, sha: SHA('9'), expires_at: new Date(T0 - 1).toISOString() }, commit: 'lock-expired' } });
+    w.prs.set(99, { number: 99, draft: false, state: 'open', merged: false, merge_commit_sha: null, created_at: '2026-11-22T10:00:00Z', head: { sha: SHA('9'), ref: 'claude/y' }, base: { ref: 'main' }, mergeable: true, labels: [] });
+    w.comments.set(99, []);
+    addPr(w, 101, {}, [{ body: review() }]);
+    const p = port(w);
+    const [d1, d2] = await Promise.all([decide(p), decide(p)]);
+    expect(d1.actions[0]).toMatchObject({ do: 'take_over_lock', expectedCommit: 'lock-expired' });
+    expect(d2.actions[0]).toMatchObject({ do: 'take_over_lock', expectedCommit: 'lock-expired' });
+    const [r1, r2] = await Promise.all([apply(p, d1), apply(p, d2)]);
+    expect(w.merges).toHaveLength(1);
+    expect([r1.stopped, r2.stopped].filter(Boolean)).toEqual(['another run took over the expired lock']);
+    expect(w.lock?.payload.pr).toBe(101);
+  });
+
+  it('takeover never deletes the lock (no delete-then-create window)', async () => {
+    const w = world({ lock: { payload: { owner: 'agent4-release', pr: 99, sha: SHA('9'), expires_at: new Date(T0 - 1).toISOString() }, commit: 'lock-expired' } });
+    w.prs.set(99, { number: 99, draft: false, state: 'open', merged: false, merge_commit_sha: null, created_at: '2026-11-22T10:00:00Z', head: { sha: SHA('9'), ref: 'claude/y' }, base: { ref: 'main' }, mergeable: true, labels: [] });
+    w.comments.set(99, []);
+    addPr(w, 101, {}, [{ body: review() }]);
+    const p = port(w);
+    let deletes = 0; const orig = p.deleteLock; p.deleteLock = async () => { deletes++; return orig(); };
+    const d = await decide(p);
+    const before = deletes;
+    // Apply only the takeover action.
+    await apply(p, { ...d, actions: d.actions.slice(0, 1) });
+    expect(deletes - before).toBe(0);
   });
 
   it('the head moved between the decision and the merge → stop, no merge, lock released', async () => {
