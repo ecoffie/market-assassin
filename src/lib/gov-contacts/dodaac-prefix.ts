@@ -54,3 +54,28 @@ export function dodaacPrefixOrExpr(codes: readonly string[], max = MAX_DODAAC_PR
   }
   return parts.join(',');
 }
+
+/**
+ * A 6-char CONTRACTING OFFICE code as it prefixes a PIID / solicitation number — DoD DoDAACs (W912PL) AND
+ * civilian office codes that start with a digit (VA NCO 8 = 36C248, HHS 75N…). isValidDodaac rejects the
+ * civilian form, so VA buying offices could not be targeted at all (VA report 2026-11-22). Requires at least
+ * one letter and one digit, so a numeric fragment or a word is never treated as an office.
+ */
+export function isValidOfficeCode(code: string | null | undefined): boolean {
+  const c = String(code || '').toUpperCase().trim();
+  return /^[A-Z0-9]{6}$/.test(c) && /[A-Z]/.test(c) && /\d/.test(c);
+}
+
+/** PostgREST `.or()` over solicitation-number prefixes for explicit office codes ('' when none valid). */
+export function officePrefixOrExpr(codes: readonly string[], max = MAX_DODAAC_PREFIX_CODES): string {
+  const seen = new Set<string>();
+  const parts: string[] = [];
+  for (const raw of codes) {
+    const c = String(raw || '').toUpperCase().trim();
+    if (!isValidOfficeCode(c) || seen.has(c)) continue;
+    seen.add(c);
+    parts.push(`${DODAAC_PREFIX_COLUMN}.ilike.${c}%`);
+    if (parts.length >= max) break;
+  }
+  return parts.join(',');
+}

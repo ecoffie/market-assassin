@@ -126,6 +126,8 @@ interface ReportLike {
       office: string | null;
       people: Array<{ name: string; role: string; email: string; office: string | null }>;
       total: number;
+      basis?: 'market_awarding_offices' | 'department_roster';
+      office_codes?: string[];
     } | null;
     agency_detail: unknown;
     set_aside_gap: unknown;
@@ -317,9 +319,12 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
   const contactsHtml = contacts && contacts.people.length
     ? section(
         'Who to call',
-        `Real points of contact at ${esc(contacts.agency)}${contacts.office ? ` · ${esc(contacts.office)}` : ''} — the buyer's small-business and contracting people${
-          contacts.total > contacts.people.length ? `. Showing ${contacts.people.length} of ${num(contacts.total)}.` : '.'
-        }`,
+        (contacts.basis === 'market_awarding_offices'
+          ? `Contracting staff at the offices that awarded this market's expiring contracts (office ${esc((contacts.office_codes || []).join(', '))}) — the people who post those offices' solicitations`
+          : contacts.basis === 'department_roster'
+            ? `General contacts at ${esc(contacts.agency)} — <strong>not specific to this market or location</strong>: no in-scope contract identified a contracting office to anchor on`
+            : `Real points of contact at ${esc(contacts.agency)}${contacts.office ? ` · ${esc(contacts.office)}` : ''} — the buyer's small-business and contracting people`)
+          + (contacts.total > contacts.people.length ? `. Showing ${contacts.people.length} of ${num(contacts.total)}.` : '.'),
         table(
           ['Name', 'Role', 'Office', 'Email'],
           contacts.people.map((p) => [

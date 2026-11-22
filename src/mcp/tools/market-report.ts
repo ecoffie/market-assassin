@@ -27,6 +27,7 @@ import { detectUndercount } from '@/lib/market/undercount-signal';
 import { resolveMarketScope, filtersForScope, fetchSpendingCategory, buildSpendingFilters } from '@/lib/market/spend-query';
 import { expiringContracts } from '@/mcp/tools/expiring-contracts';
 import { queryFederalContacts } from '@/lib/gov-contacts/contact-roster';
+import { isValidOfficeCode } from '@/lib/gov-contacts/dodaac-prefix';
 import { displayContactName } from '@/lib/gov-contacts/contact-quality';
 import { agencyForecasts } from '@/mcp/tools/forecasts';
 import { getAgencySpendingDetailTool } from '@/mcp/tools/agency-spending-detail';
@@ -230,6 +231,13 @@ export interface MarketReportContacts {
   people: Array<{ name: string; role: string; email: string; office: string | null }>;
   /** Total matched (before the display cap) so truncation is explicit. */
   total: number;
+  /**
+   * WHY these people. 'market_awarding_offices' = staff who post solicitations for the contracting
+   * offices that awarded this market's in-scope expiring contracts (office_codes = PIID prefixes).
+   * 'department_roster' = the agency's general roster — NOT specific to this market or state.
+   */
+  basis?: 'market_awarding_offices' | 'department_roster';
+  office_codes?: string[];
 }
 
 /**
@@ -401,6 +409,22 @@ async function unionSpendingCategory(
   return [...merged.values()]
     .sort((a, b) => b.amount - a.amount)
     .slice(0, limit);
+}
+
+
+/**
+ * The contracting offices behind a market: the 6-char office prefix of each in-scope contract's PIID
+ * (DoD DoDAAC or civilian code, e.g. 36C248), most frequent first, at most 3. Orders contribute their
+ * own PIID prefix (the ordering office). Codes that are not office-shaped are skipped.
+ */
+export function marketOfficeCodes(contracts: Array<Record<string, unknown>>, max = 3): string[] {
+  const counts = new Map<string, number>();
+  for (const c of contracts) {
+    const code = String(c.piid ?? '').toUpperCase().trim().slice(0, 6);
+    if (!isValidOfficeCode(code)) continue;
+    counts.set(code, (counts.get(code) ?? 0) + 1);
+  }
+  return [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, max).map(([c]) => c);
 }
 
 export async function generateMarketReport(input: MarketReportInput): Promise<MarketReportResult> {
@@ -631,28 +655,47 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
   const contactAgency = agency || topAgencies[0]?.name || '';
   const CONTACTS_CAP = 6;
   let contactsSection: MarketReportContacts | null = null;
-  if (contactAgency) {
+  const toPeople = (rows: Awaited<ReturnType<typeof queryFederalContacts>>['contacts']) => rows
+    .filter((c) => (c.contact_email || '').includes('@'))
+    .map((c) => ({
+      // The roster appends phone/DSN junk to the name on 12.8% of rows ("Stephen
+      // Weaver6142923131", "Natalya RadykDSN312-850-4033"). This cleaner used to live ONLY
+      // here, so the report showed clean names while every other surface showed the raw
+      // pollution. It is now the shared contract.
+      name: displayContactName(c.contact_fullname) || '',
+      role: c.role_category_label || c.contact_title || c.role || '',
+      email: c.contact_email || '',
+      office: c.derived_office || c.sub_agency || null,
+    }))
+    .filter((p) => p.name && p.email)
+    .slice(0, CONTACTS_CAP);
+  // 1) The offices that actually award THIS market: the contracting-office prefix of the in-scope
+  //    expiring contracts' PIIDs (already scoped by NAICS/keyword, agency and state). The department
+  //    roster ranked by recency returned Army Corps staff in Mobile/Pittsburgh for a GA janitorial
+  //    report and generic VA staff for a VA construction report (2026-11-22).
+  const officeCodes = marketOfficeCodes((recompetesR.value?.contracts ?? []) as Array<Record<string, unknown>>);
+  if (officeCodes.length) {
+    const roster = (await guard(queryFederalContacts({ officeCodes, limit: CONTACTS_CAP * 3 }))).value;
+    const people = toPeople(roster?.contacts ?? []);
+    if (people.length) {
+      contactsSection = {
+        agency: contactAgency || String((recompetesR.value?.contracts?.[0] as { awarding_agency?: string } | undefined)?.awarding_agency || ''),
+        office: people[0].office, people, total: roster?.total ?? people.length,
+        basis: 'market_awarding_offices', office_codes: officeCodes,
+      };
+    }
+  }
+  // 2) Fallback: the agency's general roster, labelled as such (not market- or state-specific).
+  if (!contactsSection && contactAgency) {
     const roster = (await guard(queryFederalContacts({ agency: contactAgency, limit: CONTACTS_CAP * 3 }))).value;
-    const people = (roster?.contacts ?? [])
-      .filter((c) => (c.contact_email || '').includes('@'))
-      .map((c) => ({
-        // The roster appends phone/DSN junk to the name on 12.8% of rows ("Stephen
-        // Weaver6142923131", "Natalya RadykDSN312-850-4033"). This cleaner used to live ONLY
-        // here, so the report showed clean names while every other surface showed the raw
-        // pollution. It is now the shared contract.
-        name: displayContactName(c.contact_fullname) || '',
-        role: c.role_category_label || c.contact_title || c.role || '',
-        email: c.contact_email || '',
-        office: c.derived_office || c.sub_agency || null,
-      }))
-      .filter((p) => p.name && p.email)
-      .slice(0, CONTACTS_CAP);
+    const people = toPeople(roster?.contacts ?? []);
     if (people.length) {
       contactsSection = {
         agency: contactAgency,
         office: people[0].office,
         people,
         total: roster?.total ?? people.length,
+        basis: 'department_roster',
       };
     }
   }
