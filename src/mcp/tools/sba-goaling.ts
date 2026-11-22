@@ -16,7 +16,7 @@
  * Wraps the pure src/lib/usaspending/agency-spending-detail.ts (USASpending only, no LLM).
  * tier: metered, credits: 10. `_meta` always ships; `_ai_hint` OFF by default.
  */
-import { getAgencySpendingDetail } from '@/lib/usaspending/agency-spending-detail';
+import { getAgencySpendingDetail, setAsideIncompleteReason } from '@/lib/usaspending/agency-spending-detail';
 import { mcpFlags } from '@/lib/mcp/flags';
 
 export interface SbaGoalingInput {
@@ -65,6 +65,8 @@ export interface SbaGoalingResult {
     recipient_small_business_share: number | null;
     meets_small_business_goal: boolean | null; // null = unknown (unmatched); NOT false=failed (FM-U03)
     basis: string;
+    /** Set when a set-aside bucket lookup failed: result_state becomes 'partial'. Billing unchanged. */
+    incomplete_reason?: string;
   };
 }
 
@@ -115,6 +117,7 @@ export async function getSbaGoalingShare(input: SbaGoalingInput): Promise<SbaGoa
       recipient_small_business_share: detail.recipient_small_business_share,
       meets_small_business_goal: meetsSb,
       basis: BASIS,
+      ...(grounded && setAsideIncompleteReason(detail.set_aside_breakdown) ? { incomplete_reason: setAsideIncompleteReason(detail.set_aside_breakdown)! } : {}),
     },
   };
 
