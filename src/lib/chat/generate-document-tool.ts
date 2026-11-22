@@ -213,7 +213,7 @@ const CSV_MIME = 'text/csv; charset=utf-8';
  * the longer latest answer). Uploaded text in the planner is a prompt-injection surface, so it is given
  * only on the turns that need it — and on those turns create_document is the only write tool.
  */
-const DOC_VERB = /\b(?:create|make|write\s+up|export|download|save|generate|produce|draft|build|turn\s+(?:this|that|it)\s+into|put\s+(?:this|that|it)\s+(?:in|into)|give\s+me)\b/i;
+const DOC_VERB = /\b(?:create|make|write\s+up|export|download|save|generate|produce|draft|build|turn\s+(?:this|that|it|these|those)(?:\s+[a-z]+){0,3}\s+into|put\s+(?:this|that|it|these|those)(?:\s+[a-z]+){0,3}\s+(?:in|into)|give\s+me)\b/i;
 const DOC_NOUN = /\b(?:document|doc|docx|report|pdf|word(?:\s+(?:doc|file|document))?|file|capability\s+statement|cap\s+statement|brief|one[-\s]?pager|deliverable|white\s*paper|excel|spreadsheet|xlsx|csv)\b/i;
 export function isDocumentCreationRequest(customerWords: string): boolean {
   const t = (customerWords || '').slice(0, 2000);
@@ -355,7 +355,7 @@ export function makeGenerateDocumentTool(deps: GenerateDocumentDeps) {
     // Requested sections (executive summary, risks, actions, sources): the file must carry what the customer asked
     // for, not only the chat answer. Built from the document's own statements; never a new fact. A completed model
     // that would not validate is discarded (the document is never broken to add a section).
-    let requestedMissing: RequestedSectionKey[] = [];
+    let requestedMissing: string[] = [];
     let requestedAdded: RequestedSectionKey[] = [];
     if (deps.requestedSections?.length) {
       const ensured = ensureRequestedSections(model, deps.requestedSections);
@@ -366,7 +366,7 @@ export function makeGenerateDocumentTool(deps: GenerateDocumentDeps) {
       } else {
         requestedMissing = [...ensured.missing, ...(ensured.added.length ? ensured.added : [])];
       }
-      console.info('[create_document] requested_sections', JSON.stringify({ requested: deps.requestedSections.map((r) => r.key), present: ensured.present, added: requestedAdded, missing: requestedMissing }));
+      console.info('[create_document] requested_sections', JSON.stringify({ requested: deps.requestedSections.map((r) => (r.key === 'named' ? r.label : r.key)), present: ensured.present, added: requestedAdded, missing: requestedMissing }));
     }
 
     const text = docModelText(model);
@@ -466,7 +466,7 @@ export function makeGenerateDocumentTool(deps: GenerateDocumentDeps) {
       ...(spreadsheetNote ? { spreadsheet_note: spreadsheetNote } : {}),
       ...(repeats.length ? { repeated_sentences: repeats.length } : {}),
       ...(fmpWarnings.length ? { fmp_warnings: fmpWarnings } : {}),
-      ...(deps.requestedSections?.length ? { requested_sections: { requested: deps.requestedSections.map((r) => r.key), added: requestedAdded, missing: requestedMissing } } : {}),
+      ...(deps.requestedSections?.length ? { requested_sections: { requested: deps.requestedSections.map((r) => (r.key === 'named' ? r.label : r.key)), added: requestedAdded, missing: requestedMissing } } : {}),
       diagnostics,
       note: 'Saved privately to the Vault (Documents → Generated). Under this answer the user gets an "Open report" card (on the Map the report also opens in a reading pane beside the chat). Tell them they can read it there, open Export in the report for PDF/Word/Excel/CSV, ask you for changes (a new version is saved, the old one is kept), or find it under Documents → Generated. Do not paste download links or list format buttons in the chat text.'
         + (unverified.length ? ` ${unverified.length} statement(s) are labeled "Unverified — no source"; say so.` : '')

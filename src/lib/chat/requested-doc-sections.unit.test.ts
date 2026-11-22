@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { ensureRequestedSections, requestedDocSections, requestedSectionsPlannerNote, requestedSectionsMissingNote } from './requested-doc-sections';
+import { ensureRequestedSections, requestedDocSections, requestedSectionsPlannerNote, requestedSectionsMissingNote, routeSectionedReport, sectionsPackagedReportLacks, packagedReportGapNote } from './requested-doc-sections';
+import { isDocumentCreationRequest } from './generate-document-tool';
 import type { DocModel } from '@/lib/documents/model';
 
 const keys = (t: string) => requestedDocSections(t).map((r) => r.key);
@@ -69,5 +70,64 @@ describe('ensureRequestedSections', () => {
     expect(r.missing).toEqual(['sources']);
     expect(r.model).toBe(uncited);
     expect(requestedSectionsMissingNote(r.missing)).toMatch(/no statement in it cites a source/);
+  });
+});
+
+const REPRO = 'Turn this research into a professional market intelligence report with an executive summary, agency analysis, opportunity pipeline, incumbent research, risks, recommended actions and sources.';
+
+describe('the Claude Local repro prompt', () => {
+  it('is a document request ("turn this research into ... report")', () => {
+    expect(isDocumentCreationRequest(REPRO)).toBe(true);
+    expect(isDocumentCreationRequest('Turn these findings into a PDF')).toBe(true);
+    expect(isDocumentCreationRequest('Turn this into a report')).toBe(true);
+    // still not a document request
+    expect(isDocumentCreationRequest('Turn left at the research park and tell me about VA spending')).toBe(false);
+  });
+
+  it('reads every named section: the four known kinds, then the rest in the customer\'s words', () => {
+    expect(requestedDocSections(REPRO)).toEqual([
+      { key: 'executive_summary', label: 'Executive summary' },
+      { key: 'risks', label: 'Risks' },
+      { key: 'actions', label: 'Actions' },
+      { key: 'sources', label: 'Sources' },
+      { key: 'named', label: 'Agency analysis' },
+      { key: 'named', label: 'Opportunity pipeline' },
+      { key: 'named', label: 'Incumbent research' },
+    ]);
+  });
+
+  it('the packaged template lacks all but the agency analysis (its Agency deep-dive covers that)', () => {
+    expect(sectionsPackagedReportLacks(requestedDocSections(REPRO)).map((r) => r.label)).toEqual(['Executive summary', 'Risks', 'Actions', 'Sources', 'Opportunity pipeline', 'Incumbent research']);
+  });
+});
+
+describe('routeSectionedReport', () => {
+  const requested = requestedDocSections(REPRO);
+  it('research in chat + document tool → document', () => {
+    expect(routeSectionedReport({ requested, asksForReport: true, createAvailable: true, hasPriorResearch: true }).route).toBe('document');
+  });
+  it('first turn → packaged with a plain gap note; no document tool → same, different reason', () => {
+    const first = routeSectionedReport({ requested, asksForReport: true, createAvailable: true, hasPriorResearch: false });
+    expect(first).toMatchObject({ route: 'packaged_with_gap_note', reason: 'no_prior_research' });
+    const none = routeSectionedReport({ requested, asksForReport: true, createAvailable: false, hasPriorResearch: true });
+    expect(none).toMatchObject({ route: 'packaged_with_gap_note', reason: 'no_document_tool' });
+    if (first.route === 'packaged_with_gap_note') expect(packagedReportGapNote(first)).toMatch(/do not include Executive summary, Risks, Actions, Sources, Opportunity pipeline, Incumbent research; never present it as the report they asked for/);
+  });
+  it('no report asked, no sections named, or only sections the template carries → unchanged', () => {
+    expect(routeSectionedReport({ requested, asksForReport: false, createAvailable: true, hasPriorResearch: true }).route).toBe('none');
+    expect(routeSectionedReport({ requested: [], asksForReport: true, createAvailable: true, hasPriorResearch: true }).route).toBe('none');
+    expect(routeSectionedReport({ requested: requestedDocSections('a comprehensive market research report with competitive landscape and forecasts'), asksForReport: true, createAvailable: true, hasPriorResearch: true }).route).toBe('none');
+  });
+});
+
+describe('named sections in the document', () => {
+  it('a named section is present when a heading covers it, otherwise reported missing (never built)', () => {
+    const m = { schema: 'mindy.doc/1', title: 'T', date: '2026-11-22', sources: [{ id: 's1', kind: 'usaspending', label: 'U' }], sections: [
+      { id: 'a', heading: 'Opportunities in the pipeline', blocks: [{ type: 'paragraph', id: 'p', text: 'x', claim: 'fact', cites: ['s1'] }] },
+    ] } as DocModel;
+    const r = ensureRequestedSections(m, requestedDocSections('a report with opportunity pipeline and incumbent research'));
+    expect(r.present).toEqual(['Opportunity pipeline']);
+    expect(r.missing).toEqual(['Incumbent research']);
+    expect(r.model).toBe(m);
   });
 });

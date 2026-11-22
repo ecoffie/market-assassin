@@ -55,13 +55,54 @@ const SPECS: readonly SectionSpec[] = [
   },
 ];
 
-export interface RequestedSection { key: RequestedSectionKey; label: string }
+/**
+ * A section the customer asked for. The four known kinds can be completed from the document's own statements;
+ * any other named section ('named': "agency analysis", "opportunity pipeline") is only ever checked for and
+ * reported missing, never built.
+ */
+export interface RequestedSection { key: RequestedSectionKey | 'named'; label: string }
 
-/** The sections the customer's own words ask the document to include, in a fixed order. Nothing is guessed. */
+const STOP = new Set(['a', 'an', 'the', 'and', 'or', 'of', 'for', 'to', 'in', 'on', 'with', 'our', 'my', 'your', 'their', 'section', 'sections', 'full', 'detailed', 'short', 'brief', 'clear', 'key', 'recommended']);
+/** "with an executive summary, agency analysis, ... and sources" after a document word, same sentence. */
+const SECTION_LIST = /\b(?:report|document|doc|pdf|brief|deliverable|white\s*paper|memo|write[-\s]?up|plan|profile)\b[^.?!\n]{0,80}?\b(?:with|including|that\s+(?:has|includes|covers)|covering|containing)\s+([^.?!\n]{3,400})/i;
+
+function namedSections(text: string): string[] {
+  const m = SECTION_LIST.exec(text);
+  if (!m) return [];
+  return m[1]
+    .split(/\s*,\s*(?:and\s+|or\s+)?|\s*;\s*|\s+and\s+|\s+plus\s+/i)
+    .map((x) => x.trim().replace(/^(?:an?|the|some|all|any)\s+/i, '').replace(/\s+sections?$/i, '').replace(/[)"'\s]+$/, ''))
+    .filter((x) => /^[a-z][a-z0-9&/' -]*$/i.test(x) && x.split(/\s+/).length <= 5);
+}
+
+const labelOf = (phrase: string) => phrase.charAt(0).toUpperCase() + phrase.slice(1);
+
+/**
+ * The sections the customer's own words ask the document to include. Known kinds come first in a fixed order,
+ * then any other section the customer listed after "with" / "including", in their words. Nothing is guessed.
+ */
 export function requestedDocSections(customerWords: string): RequestedSection[] {
   const text = String(customerWords || '');
   if (!text.trim()) return [];
-  return SPECS.filter((s) => s.asked.test(text)).map(({ key, label }) => ({ key, label }));
+  const known: RequestedSection[] = SPECS.filter((s) => s.asked.test(text)).map(({ key, label }) => ({ key, label }));
+  const named: RequestedSection[] = [];
+  for (const phrase of namedSections(text)) {
+    if (SPECS.some((s) => s.asked.test(phrase))) continue; // a known kind, already listed
+    if (!significantWords(phrase).length) continue;
+    if (named.some((n) => n.label.toLowerCase() === phrase.toLowerCase())) continue;
+    named.push({ key: 'named', label: labelOf(phrase) });
+  }
+  return [...known, ...named];
+}
+
+function significantWords(phrase: string): string[] {
+  return phrase.toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 2 && !STOP.has(w));
+}
+
+/** A heading covers a named section when it shares a significant word with it (stem match: "opportunities" ~ "opportunity"). */
+function headingCovers(heading: string, label: string): boolean {
+  const h = significantWords(heading).map((w) => w.slice(0, 6));
+  return significantWords(label).some((w) => h.includes(w.slice(0, 6)));
 }
 
 /** Planner instruction for a create_document turn, or null when the customer named no section. */
@@ -79,12 +120,12 @@ export function requestedSectionsPlannerNote(requested: readonly RequestedSectio
 
 export interface EnsureRequestedSectionsResult {
   model: DocModel;
-  /** Requested sections the doc_model already had. */
-  present: RequestedSectionKey[];
-  /** Requested sections the host assembled from the document's own statements. */
+  /** Requested sections the doc_model already had (known keys; a named section by its label). */
+  present: string[];
+  /** Requested sections the host assembled from the document's own statements (known keys only). */
   added: RequestedSectionKey[];
-  /** Requested sections that could not be included from the document's evidence. */
-  missing: RequestedSectionKey[];
+  /** Requested sections that are not in the document (known keys; a named section by its label). */
+  missing: string[];
 }
 
 type Unit = { claim?: Claim; cites?: string[]; critical?: boolean; origin?: string; text: string };
@@ -145,6 +186,11 @@ export function ensureRequestedSections(model: DocModel, requested: readonly Req
   const front: DocSection[] = [];
   const back: DocSection[] = [];
   for (const r of requested) {
+    if (r.key === 'named') {
+      const covered = model.sections.some((s) => (s.blocks ?? []).length > 0 && headingCovers(String(s.heading || ''), r.label));
+      (covered ? result.present : result.missing).push(r.label);
+      continue;
+    }
     const spec = SPECS.find((s) => s.key === r.key)!;
     if (r.key === 'sources') {
       const ids = new Set((model.sources ?? []).map((s) => s.id));
@@ -180,11 +226,66 @@ export function ensureRequestedSections(model: DocModel, requested: readonly Req
 }
 
 /** One sentence for the tool result when something requested is not in the file; '' when nothing is missing. */
-export function requestedSectionsMissingNote(missing: readonly RequestedSectionKey[]): string {
+export function requestedSectionsMissingNote(missing: readonly string[]): string {
   if (!missing.length) return '';
-  const labels = missing.map((k) => SPECS.find((s) => s.key === k)!.label);
+  const labels = missing.map((k) => SPECS.find((s) => s.key === k)?.label ?? k);
   const sources = missing.includes('sources');
   return ` The customer asked for ${labels.join(', ')} in the document, but ${labels.length === 1 ? 'it is' : 'they are'} NOT in the saved file`
-    + (sources ? ' (no statement in it cites a source, so it has no Sources list)' : ' (this conversation\'s evidence had nothing to build it from)')
+    + (sources ? ' (no statement in it cites a source, so it has no Sources list)' : '')
     + '. Say so plainly in the answer and offer a new version; do not present the chat answer as if it were in the file.';
+}
+
+/** Section headings the packaged generate_market_report always produces (its fixed template; Data Core owns it). */
+export const PACKAGED_REPORT_SECTIONS = ['How this market was measured', 'Market composition', 'Who is buying', 'Who to call', 'Competitive landscape', 'Recompetes', 'Forecasts', 'Agency deep-dive'] as const;
+
+/**
+ * Requested sections the packaged market report's fixed template does not carry. Executive summary, risks,
+ * actions and sources are never in it; a named section counts as carried only when a template heading covers it.
+ */
+export function sectionsPackagedReportLacks(requested: readonly RequestedSection[]): RequestedSection[] {
+  return requested.filter((r) => r.key !== 'named' || !PACKAGED_REPORT_SECTIONS.some((h) => headingCovers(h, r.label)));
+}
+
+export type SectionedReportRoute =
+  /** Build the report with create_document from this conversation's research; the packaged report is not offered. */
+  | { route: 'document'; lacking: RequestedSection[] }
+  /** create_document cannot run this turn: the packaged report may run, and the answer must say what it lacks. */
+  | { route: 'packaged_with_gap_note'; lacking: RequestedSection[]; reason: 'no_document_tool' | 'no_prior_research' }
+  | { route: 'none' };
+
+/**
+ * Routing for "a professional report with sections X, Y, Z" (Claude Local repro 2026-11-22): the packaged
+ * market report has a fixed template, so it can never be presented as fulfilling a request for sections it does
+ * not carry. With create_document available and research already in this conversation, the turn builds the
+ * report as a document. Otherwise (Ask Mindy runs one planner round, so a first-turn ask cannot both research and
+ * write the file) the packaged report may run and the answer states plainly which requested sections it lacks.
+ */
+export function routeSectionedReport(opts: { requested: readonly RequestedSection[]; asksForReport: boolean; createAvailable: boolean; hasPriorResearch: boolean }): SectionedReportRoute {
+  if (!opts.asksForReport || !opts.requested.length) return { route: 'none' };
+  const lacking = sectionsPackagedReportLacks(opts.requested);
+  if (!lacking.length) return { route: 'none' };
+  if (!opts.createAvailable) return { route: 'packaged_with_gap_note', lacking, reason: 'no_document_tool' };
+  if (!opts.hasPriorResearch) return { route: 'packaged_with_gap_note', lacking, reason: 'no_prior_research' };
+  return { route: 'document', lacking };
+}
+
+/** Answer-model note when the packaged report ran for a sectioned request it cannot fulfil. */
+export function packagedReportGapNote(r: Extract<SectionedReportRoute, { route: 'packaged_with_gap_note' }>): string {
+  const labels = r.lacking.map((x) => x.label).join(', ');
+  return [
+    `REQUESTED SECTIONS NOT IN THE PACKAGED REPORT: the customer asked for a report with ${labels}.`,
+    `If you present the packaged market report, say plainly that its fixed sections (${PACKAGED_REPORT_SECTIONS.join(', ')}) do not include ${labels}; never present it as the report they asked for.`,
+    r.reason === 'no_prior_research'
+      ? 'Offer, as the next step, to turn this research into a document that carries every section they asked for.'
+      : 'A document with those sections cannot be created here; give the requested sections in the chat answer and say they are not in the hosted report.',
+  ].join(' ');
+}
+
+/** Planner note on a 'document' route turn: build the report as a file, from the research already in this chat. */
+export function sectionedReportPlannerNote(requested: readonly RequestedSection[]): string {
+  return [
+    `SECTIONED REPORT: the customer asked for a report with these sections: ${requested.map((r) => r.label).join(', ')}.`,
+    'The packaged market report has a fixed template without them, so it is not offered this turn. Call create_document ONCE and build the report from the research already in this conversation (the latest answer and earlier tool results), one section per requested item, in their order, with the Executive summary first when asked.',
+    'Every figure cites a source from that research; a section the research cannot support says plainly what could not be established.',
+  ].join(' ');
 }
