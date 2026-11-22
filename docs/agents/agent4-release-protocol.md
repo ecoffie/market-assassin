@@ -42,36 +42,43 @@ Fenced block tagged `agent4-release`:
 ## The release driver: `scripts/agent-release.mts`
 - **Stateless, one step per run, then exit.** It never sleeps. The caller schedules the next run.
   1. **A merge awaiting verification?** It finds one from a `merged` record with no `released`/`verify_failed` record, or from a lock naming a merged PR, which covers a crash between merge and record.
-     - If production's build stamp (`<!-- maps-account-build:<sha> -->` on `/opportunity-map`) contains the merge, it runs the production checks, records the result, labels the PR `agent4:released` (or `agent4:blocked`) and releases the lock.
+     - Production's build stamp is the first `maps-account-build:<sha>` on `/opportunity-map?cb=<random>`; an empty stamp means unknown. If production serves a commit that **contains** the merge (the merge commit is an ancestor of the live stamp; main keeps moving), it runs the production checks, records the result, labels the PR `agent4:released` (or `agent4:blocked`) and releases the lock.
      - Otherwise it waits.
      - **It never merges again in this state.**
   2. **Otherwise,** it takes the oldest eligible PR and gates it:
      - review record valid for the exact head;
-     - CI `verify` green on that head;
-     - mergeable;
-     - production == `main`;
-     - the merged tree type-checks (in a throwaway worktree under `.agent-release/`).
-     - Then it takes the lock, merges **pinned to the reviewed SHA** (`sha=`), records it and exits.
+     - CI `verify` green on that head (skipped runs ignored);
+     - mergeable (polled up to about 60 s while GitHub computes it);
+     - production == `main` (otherwise it waits for other deploys to settle);
+     - the merged tree type-checks (in a throwaway worktree under `.agent-release/`);
+     - the **production checks pass on the live deploy before merging** (a failure waits; it isn't an attempt).
+     - Then it takes the lock, merges **pinned to the reviewed SHA** (`sha=`, merge method `merge`), records it and exits.
 - **Serialization:**
   - Nothing merges while any merge awaits verification.
   - On top of that there's an **atomic lock**, the git ref `refs/agent4/release-lock`. It points at a parentless commit whose message is `{owner, pr, sha, expires_at}`.
   - Creating a ref that already exists fails, so taking the lock is a compare-and-swap.
   - An expired lock is taken over only after state is re-verified.
-- **Eligibility:** open, non-draft, base `main`, a builder branch (`claude/*` but never `claude/team-*`), not `agent4:blocked`.
+- **Eligibility:** open, non-draft, base `main`, not `agent4:blocked`, **listed in `scripts/agent-release.allow.json`** (PR numbers or exact branch names, maintained by Agent 4), **and** a valid review record. Branch prefixes alone are never enough: builders use `feat/`, `fix/`, `docs/`, `chore/` and `claude/`. `claude/team-*` (Branden's team) is excluded even if listed.
+- **Production checks** (read-only, no redirect following, 30–60 s timeouts, never `/api/cron/*`); any failure means FAIL:
+  - build stamp: the expected SHA is a prefix of the live stamp;
+  - `GET /agencies/va` → 301/307/308 with a Location containing `department-of-veterans-affairs`;
+  - `GET` → 200 for `/`, `/opportunity-map`, `/pricing`, `/mcp/setup` and `/agencies/department-of-veterans-affairs`;
+  - `GET https://mcp.getmindy.ai/.well-known/oauth-authorization-server` → 200;
+  - `POST https://mcp.getmindy.ai/mcp` with `{}` → 401, 400 or 406 (auth required; never 200 or 5xx).
 - **Failed attempts:** CI red, conflict, type-check failure or a refused merge count as failed attempts **for that head**. At 3, the PR is blocked. A new reviewed head starts again from zero.
 - **No vercel commands, ever.**
-- **Modes:**
+- **Modes (Eric, 2026-11-22):**
   - **`--dry-run` is the default.** It prints the decision and changes nothing on GitHub.
-  - **`--execute`** applies it.
-  - Unattended (scheduled) execution stays **off** until Eric decides.
+  - **`--execute`** applies it, **only in attended runs from Agent 4's session**.
+  - **Unattended merges stay disabled** until a separate reviewer identity and branch protection exist. Nothing schedules `--execute`.
 
 ## Subscription hand-over
 1. The builder subscribes to its PR while building, and fixes CI and review comments.
 2. On handoff (`pr-handoff.mts` output sent to Agent 4, label `agent4:ready`), the builder **unsubscribes**, and Agent 4 subscribes.
 3. After release the PR closes, and subscriptions end on their own.
 
-## Fallback sweep
-If events are missed, Agent 4 may run the driver every 10 minutes as a sweep. A sweep with nothing actionable prints `idle`/`wait` and exits at once. It does nothing else.
+## Fallback sweep (recovery only)
+GitHub events (reviews, CI results, merges) are the primary trigger. If one is missed, Agent 4 may run the driver as a **recovery sweep every 15 minutes** (Eric, 2026-11-22), in dry-run unless Agent 4 is attending. A sweep with nothing actionable prints `idle`/`wait` and exits at once, with no extra work.
 
 ## Dry-run first
 Every change to this process starts in dry-run. Compare the printed decisions with what Agent 4 would do by hand before any `--execute` run is trusted.
