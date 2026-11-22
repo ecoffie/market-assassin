@@ -48,6 +48,12 @@ export interface RecompeteRowAnnotations {
    */
   potential_total_value: number | null;
   ceiling_basis: CeilingBasis;
+  /**
+   * Present ONLY when the stored likelihood is overridden: a one-time construction project is
+   * 'not_recurring' (one-time-project.ts). Otherwise the stored value passes through untouched.
+   */
+  recompete_likelihood?: typeof NOT_RECURRING;
+  recompete_likelihood_basis?: string;
 }
 
 type AnnotatableRow = {
