@@ -277,7 +277,7 @@ export function packagedReportGapNote(r: Extract<SectionedReportRoute, { route: 
     `If you present the packaged market report, say plainly that its fixed sections (${PACKAGED_REPORT_SECTIONS.join(', ')}) do not include ${labels}; never present it as the report they asked for.`,
     r.reason === 'no_prior_research'
       ? 'Offer, as the next step, to turn this research into a document that carries every section they asked for.'
-      : 'A document with those sections cannot be created here; give the requested sections in the chat answer and say they are not in the hosted report.',
+      : 'File generation is not available here, so say plainly that the full report with those sections cannot be produced as a file; give the requested sections in the chat answer and say they are not in the hosted report.',
   ].join(' ');
 }
 

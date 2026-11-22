@@ -164,6 +164,6 @@ describe('sectioned report request (Claude Local repro)', () => {
     plannerArgs = null;
     const r = await ask(PRIOR_RESEARCH);
     expect(r.tools).not.toContain('create_document');
-    expect(answerSystems.join('\n')).toMatch(/REQUESTED SECTIONS NOT IN THE PACKAGED REPORT[\s\S]*cannot be created here/);
+    expect(answerSystems.join('\n')).toMatch(/REQUESTED SECTIONS NOT IN THE PACKAGED REPORT[\s\S]*the full report with those sections cannot be produced as a file/);
   });
 });
