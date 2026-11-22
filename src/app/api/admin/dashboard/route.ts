@@ -6,13 +6,12 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { loadBootcampAttendees } from '@/lib/bootcamp/attendee-list';
 import { getReadClient, getCountClient } from '@/lib/supabase/server-clients';
 import { kv } from '@vercel/kv';
 import { isExcludedFromMetrics } from '@/lib/mindy/campaign-exclusions';
 import { hasCustomNaics as hasCustomNaicsLib } from '@/lib/mindy/upgrade-intent';
 import { hasCustomProfile } from '@/lib/ghl/tag-sync';
-import fs from 'fs';
-import path from 'path';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -41,7 +40,6 @@ const PRO_TIER_PRODUCTS = [
   'pro-giant-bundle',
 ];
 const PROFILE_REMINDER_LAST_RUN_KEY = 'admin:profile-reminder:last-run';
-const BOOTCAMP_ATTENDEE_FILE = path.join(process.cwd(), 'data/bootcamp-attendees-to-enroll.txt');
 
 // This whole dashboard route is a PURE READ (no inserts/updates) of already-synced
 // data → point it at the read replica so its heavy full-table scans don't compete
@@ -292,7 +290,7 @@ async function getBootcampRolloutCached() {
   } catch { /* KV miss → compute live */ }
   const fresh = await getBootcampRollout();
   // Only cache a real result (attendees found) — not an errored/empty fallback.
-  if (fresh && fresh.totalAttendees > 0) {
+  if (fresh && fresh.totalBootcampUsers > 0) {
     try { await kv.set(BOOTCAMP_CACHE_KEY, fresh, { ex: BOOTCAMP_TTL_SECONDS }); } catch { /* non-fatal */ }
   }
   return fresh;
@@ -300,14 +298,17 @@ async function getBootcampRolloutCached() {
 
 function emptyBootcampRollout() {
   return {
-    totalAttendees: 0,
+    // Attendee-derived figures need the private attendee list (BOOTCAMP_ATTENDEE_FILE). Without it
+    // they are UNAVAILABLE (null / 'unavailable'), never 0 — enrolled users are not attendees.
+    attendeeList: 'unavailable' as 'available' | 'unavailable',
+    totalAttendees: null as number | null,
     totalBootcampUsers: 0,
     invitationsSent: 0,
-    invitationsRemaining: 0,
+    invitationsRemaining: null as number | null,
     profilesCompleted: 0,
     profileCompletionRate: '0%',
     readyForAlerts: 0,
-    conversionRate: '0%',
+    conversionRate: 'unavailable',
     lastInvitationSent: null as string | null,
     // treatment_type buckets from the 2026-06-30 cleanup. NOTE: this label went
     // stale — many needs_setup users have since configured a profile. Kept for
@@ -341,13 +342,10 @@ async function getBootcampRollout() {
       invitation_source?: string | null;
     }> | null = null;
 
-    if (fs.existsSync(BOOTCAMP_ATTENDEE_FILE)) {
-      const attendeeEmails = Array.from(new Set(
-        fs.readFileSync(BOOTCAMP_ATTENDEE_FILE, 'utf8')
-          .split(/\r?\n/)
-          .map(email => email.toLowerCase().trim())
-          .filter(email => email && email.includes('@') && !email.includes(' '))
-      ));
+    const attendeeList = loadBootcampAttendees();
+    if (attendeeList.ok) {
+      const attendeeEmails = attendeeList.emails;
+      rollout.attendeeList = 'available';
       rollout.totalAttendees = attendeeEmails.length;
       bootcampUsers = [];
 
@@ -369,7 +367,7 @@ async function getBootcampRollout() {
       // matches 8,803 rows today — so the fallback used to compute the reignite audience
       // (configuredReal / needsSetupReal) from the first 1,000 and report it as the whole
       // population. The PRIMARY path above already chunks by 500; this branch, which runs
-      // whenever data/bootcamp-attendees-to-enroll.txt is absent from the deploy, did not.
+      // whenever the private attendee list (BOOTCAMP_ATTENDEE_FILE) is unavailable, did not.
       // Measured 2026-08-22 while auditing every admin dashboard for the same
       // exact-vs-sampled defect found on Competition Health.
       const PAGE = 1000;
@@ -400,7 +398,7 @@ async function getBootcampRollout() {
       if (fallbackError) console.error('[dashboard] bootcamp fallback query failed:', fallbackError.message);
       const fallbackUsers = data || [];
       bootcampUsers = fallbackUsers;
-      rollout.totalAttendees = fallbackUsers.length;
+      // No attendee list: enrolled users are counted as users, never as attendees.
     }
 
     if (bootcampUsers) {
@@ -448,11 +446,11 @@ async function getBootcampRollout() {
       }
       rollout.treatmentActivated = rollout.treatmentAlerts + rollout.treatmentBriefings;
 
-      rollout.invitationsRemaining = Math.max(rollout.totalAttendees - rollout.invitationsSent, 0);
+      rollout.invitationsRemaining = rollout.totalAttendees === null ? null : Math.max(rollout.totalAttendees - rollout.invitationsSent, 0);
       rollout.profileCompletionRate = rollout.invitationsSent > 0
         ? `${Math.round((rollout.profilesCompleted / rollout.invitationsSent) * 100)}%`
         : '0%';
-      rollout.conversionRate = rollout.totalAttendees > 0
+      rollout.conversionRate = rollout.totalAttendees === null ? 'unavailable' : rollout.totalAttendees > 0
         ? `${Math.round((rollout.readyForAlerts / rollout.totalAttendees) * 100)}%`
         : '0%';
     }

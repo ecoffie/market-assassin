@@ -36,22 +36,22 @@ Use `ANNELLE-SIKANDER-QUALIFIED-CUSTOMER-OUTREACH.csv` as the working list. The 
 
 **Email List (16 Ultimate Bundle Buyers):**
 
-1. bobby@24hrc.us
-2. willie.smiley@spasmileytrucking.com
-3. andrew@millpondresearch.com
-4. kwesi.acquah@connectdotssolution.com
-5. oswald.kingsleyllc@gmail.com
-6. info@cfpsolutions.net
-7. jcameron@cameroncommerce.com
-8. lloyd.lythcott@gmail.com
-9. jdawsonwilliams@gmail.com
-10. anufund@yahoo.com
-11. jareddickinson13@outlook.com
-12. ibadji@badjinyllc.com
-13. whit1stborn@aol.com
-14. tiffan@problemcompany.org
-15. greg@phoenixstudioslouisville.com
-16. ana@ttaindustries.com
+1. [email removed]
+2. [email removed]
+3. [email removed]
+4. [email removed]
+5. [email removed]
+6. [email removed]
+7. [email removed]
+8. [email removed]
+9. [email removed]
+10. [email removed]
+11. [email removed]
+12. [email removed]
+13. [email removed]
+14. [email removed]
+15. [email removed]
+16. [email removed]
 
 **Email Template:**
 

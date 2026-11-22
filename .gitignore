@@ -87,3 +87,17 @@ tmp/full-open-reconcile/
 
 # Diligence register run outputs (workbooks, raw USASpending downloads) — never commit
 .claude/diligence/
+
+# Private operational data never belongs in this public repository. Keep it in $MINDY_PRIVATE_DIR
+# (scripts/lib/private-path.js); src/lib/repo-hygiene/tracked-private-data.unit.test.ts blocks it.
+tasks/cache/
+*customers*.csv
+*customers*.json
+*subscriber*.csv
+*subscriber*.json
+*attendees*.csv
+*attendees*.txt
+*outreach*.csv
+*unmatched*.json
+scripts/rollback_*.sql
+/"email"

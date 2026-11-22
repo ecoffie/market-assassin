@@ -30,26 +30,26 @@ const ENTITLED = (email: string, access = 'beta_preview') => ({ email, briefings
 describe('findEntitlementGaps — the real 2026-07-31 accounts', () => {
   it('flags a paying, active, targeted customer who is not receiving', async () => {
     const r = await findEntitlementGaps(stub({
-      user_profiles: [{ email: 'lisamarshall63@yahoo.com' }],
+      user_profiles: [{ email: 'fixture-member-1@example.com' }],
       user_notification_settings: [
-        { user_email: 'lisamarshall63@yahoo.com', briefings_enabled: false, is_active: true, naics_codes: ['541330','541611','541990'], keywords: [], total_alerts_sent: 45 },
+        { user_email: 'fixture-member-1@example.com', briefings_enabled: false, is_active: true, naics_codes: ['541330','541611','541990'], keywords: [], total_alerts_sent: 45 },
       ],
-      purchases: [PAID('lisamarshall63@yahoo.com', 600000, 'Mindy Teams — Annual')],
-      customer_classifications: [ENTITLED('lisamarshall63@yahoo.com')],
+      purchases: [PAID('fixture-member-1@example.com', 600000, 'Mindy Teams — Annual')],
+      customer_classifications: [ENTITLED('fixture-member-1@example.com')],
     }));
     expect(r.actionable).toHaveLength(1);
-    expect(r.actionable[0].email).toBe('lisamarshall63@yahoo.com');
+    expect(r.actionable[0].email).toBe('fixture-member-1@example.com');
     expect(r.actionable[0].paidCents).toBe(600000);
     expect(r.actionable[0].alertsSent).toBe(45);
   });
 
   it('EXCLUDES an opted-out account (is_active=false) — re-enabling is a spam complaint', async () => {
     const r = await findEntitlementGaps(stub({
-      user_profiles: [{ email: 'ronnie.mccoy1@gmail.com' }],
+      user_profiles: [{ email: 'fixture-member-2@example.com' }],
       user_notification_settings: [
-        { user_email: 'ronnie.mccoy1@gmail.com', briefings_enabled: false, is_active: false, naics_codes: ['541512'], keywords: ['cyber'], total_alerts_sent: 66 },
+        { user_email: 'fixture-member-2@example.com', briefings_enabled: false, is_active: false, naics_codes: ['541512'], keywords: ['cyber'], total_alerts_sent: 66 },
       ],
-      purchases: [PAID('ronnie.mccoy1@gmail.com', 14900)],
+      purchases: [PAID('fixture-member-2@example.com', 14900)],
     }));
     expect(r.actionable).toHaveLength(0);
     expect(r.optedOut).toBe(1);
@@ -57,11 +57,11 @@ describe('findEntitlementGaps — the real 2026-07-31 accounts', () => {
 
   it('EXCLUDES an untargeted account — a briefing would be generic', async () => {
     const r = await findEntitlementGaps(stub({
-      user_profiles: [{ email: 'jagomez55@aol.com' }],
+      user_profiles: [{ email: 'fixture-member-3@example.com' }],
       user_notification_settings: [
-        { user_email: 'jagomez55@aol.com', briefings_enabled: false, is_active: true, naics_codes: [], keywords: [], total_alerts_sent: 0 },
+        { user_email: 'fixture-member-3@example.com', briefings_enabled: false, is_active: true, naics_codes: [], keywords: [], total_alerts_sent: 0 },
       ],
-      purchases: [PAID('jagomez55@aol.com', 149000)],
+      purchases: [PAID('fixture-member-3@example.com', 149000)],
     }));
     expect(r.actionable).toHaveLength(0);
     expect(r.untargeted).toBe(1);
@@ -91,11 +91,11 @@ describe('findEntitlementGaps — the real 2026-07-31 accounts', () => {
 
   it('is silent when everyone entitled is enabled (the post-fix state)', async () => {
     const r = await findEntitlementGaps(stub({
-      user_profiles: [{ email: 'venkat.veera@xcelligen.com' }],
+      user_profiles: [{ email: 'fixture-member-4@example.com' }],
       user_notification_settings: [
-        { user_email: 'venkat.veera@xcelligen.com', briefings_enabled: true, is_active: true, naics_codes: ['541512'], keywords: ['cyber'], total_alerts_sent: 2 },
+        { user_email: 'fixture-member-4@example.com', briefings_enabled: true, is_active: true, naics_codes: ['541512'], keywords: ['cyber'], total_alerts_sent: 2 },
       ],
-      purchases: [PAID('venkat.veera@xcelligen.com', 14900)],
+      purchases: [PAID('fixture-member-4@example.com', 14900)],
     }));
     expect(r.actionable).toHaveLength(0);
     expect(r.totalDiverged).toBe(0);
@@ -124,11 +124,11 @@ describe('findEntitlementGaps — the real 2026-07-31 accounts', () => {
 describe('the classification gate — why a flag-only fix can be a no-op', () => {
   it('marks an account with NO classification row as blocked on entitlement, not on the flag', async () => {
     const r = await findEntitlementGaps(stub({
-      user_profiles: [{ email: 'venkat.veera@xcelligen.com' }],
+      user_profiles: [{ email: 'fixture-member-4@example.com' }],
       user_notification_settings: [
-        { user_email: 'venkat.veera@xcelligen.com', briefings_enabled: false, is_active: true, naics_codes: ['541512'], keywords: ['cyber'], total_alerts_sent: 12 },
+        { user_email: 'fixture-member-4@example.com', briefings_enabled: false, is_active: true, naics_codes: ['541512'], keywords: ['cyber'], total_alerts_sent: 12 },
       ],
-      purchases: [PAID('venkat.veera@xcelligen.com', 14900)],
+      purchases: [PAID('fixture-member-4@example.com', 14900)],
       customer_classifications: [],
     }));
     expect(r.actionable).toHaveLength(1);
@@ -141,12 +141,12 @@ describe('the classification gate — why a flag-only fix can be a no-op', () =>
 
   it("treats briefings_access='none' as NOT entitled", async () => {
     const r = await findEntitlementGaps(stub({
-      user_profiles: [{ email: 'itanalysts767@gmail.com' }],
+      user_profiles: [{ email: 'fixture-member-5@example.com' }],
       user_notification_settings: [
-        { user_email: 'itanalysts767@gmail.com', briefings_enabled: false, is_active: true, naics_codes: ['541330'], keywords: [], total_alerts_sent: 3 },
+        { user_email: 'fixture-member-5@example.com', briefings_enabled: false, is_active: true, naics_codes: ['541330'], keywords: [], total_alerts_sent: 3 },
       ],
-      purchases: [PAID('itanalysts767@gmail.com', 14900)],
-      customer_classifications: [{ email: 'itanalysts767@gmail.com', briefings_access: 'none', briefings_expiry: null }],
+      purchases: [PAID('fixture-member-5@example.com', 14900)],
+      customer_classifications: [{ email: 'fixture-member-5@example.com', briefings_access: 'none', briefings_expiry: null }],
     }));
     expect(r.actionable[0].blocker).toBe('both');
     expect(r.blockedOnEntitlement).toBe(1);

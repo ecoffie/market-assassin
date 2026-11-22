@@ -18,6 +18,7 @@
  * rather than padded with generic copy. No fabricated stats.
  */
 import type { Metadata } from 'next';
+import { siteShareImages } from '@/lib/seo/share-image';
 import Link from 'next/link';
 import MemberAwareCta from '@/components/MemberAwareCta';
 import { notFound } from 'next/navigation';
@@ -166,6 +167,7 @@ export async function generateMetadata({
       description: trimmed,
       type: 'article',
       url: `https://getmindy.ai/naics/${resolvedCode}`,
+      images: siteShareImages(),
     },
     keywords: [
       `naics ${resolvedCode}`,

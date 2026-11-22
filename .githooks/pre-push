@@ -493,14 +493,16 @@ fi
 
 # 11) Repair-ledger coverage. HARD half: every recorded fix's proof anchor must still resolve (a
 #     vanished anchor = a revert). WARN half: a substantive src/ feat|fix push that adds no ledger
-#     row is flagged (never blocks — refactors/reverts/merges legitimately add none).
+#     entry (docs/repair-ledger/<date>-<slug>.md) is flagged (never blocks — refactors/reverts/merges
+#     legitimately add none). Rows appended to the frozen archive print an ℹ note.
 echo -e "  ${BOLD}11/13${NC} repair-ledger coverage…"
 if node scripts/audit-ledger-coverage.mjs > $PREPUSH_LOG_DIR/ledger.log 2>&1; then
   echo -e "      ${GREEN}✓ ledger anchors intact${NC}"
   grep -E "^⚠" $PREPUSH_LOG_DIR/ledger.log > /dev/null 2>&1 && { \
-    echo -e "      ${YEL}⚠ this push may be missing a REPAIR-LEDGER.md row:${NC}"; \
+    echo -e "      ${YEL}⚠ this push may be missing a ledger entry (docs/repair-ledger/<date>-<slug>.md):${NC}"; \
     grep -E "^    •" $PREPUSH_LOG_DIR/ledger.log | head -6 | sed 's/^/      /'; \
-    echo -e "      ${YEL}  (not blocking — add a row w/ a proof anchor, or ignore for a refactor/revert)${NC}"; }
+    echo -e "      ${YEL}  (not blocking — add an entry file w/ a proof anchor, or ignore for a refactor/revert)${NC}"; }
+  grep -E "^ℹ" $PREPUSH_LOG_DIR/ledger.log | sed 's/^ℹ /      ℹ /' || true
 else
   echo -e "      ${RED}✗ a recorded fix's proof anchor VANISHED (possible revert) — push blocked${NC}"
   cat $PREPUSH_LOG_DIR/ledger.log | tail -12 | sed 's/^/        /'

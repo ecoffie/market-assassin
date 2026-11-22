@@ -18,6 +18,7 @@
  * penalty risk and we don't have real ones yet.
  */
 import type { Metadata } from 'next';
+import { siteShareImages } from '@/lib/seo/share-image';
 import SimplePricing from '@/components/public-site/pricing/SimplePricing';
 import { appPricingFaqs } from '@/components/public-site/pricing/faqs';
 // Server component, so the credit constants are imported directly — the same values
@@ -59,6 +60,7 @@ export const metadata: Metadata = {
       'Same federal market intelligence as the $15K/yr enterprise tools, at a price small business can actually pay.',
     type: 'website',
     url: 'https://getmindy.ai/pricing',
+    images: siteShareImages(),
   },
 };
 

@@ -10,7 +10,6 @@ import { join } from 'node:path';
 import { TextDecoder as NodeTextDecoder, TextEncoder as NodeTextEncoder } from 'node:util';
 import { JSDOM } from 'jsdom';
 import { SAFE_MARKDOWN_SCRIPT } from '@/lib/chat/safe-markdown';
-import { splitViewPreamble } from '@/lib/chat/intent-compiler';
 
 const MAP = readFileSync(join(__dirname, 'route.ts'), 'utf8');
 function drawerScript(): string {
@@ -129,7 +128,10 @@ describe('follow-up chips: derived, and only under the latest answer', () => {
     expect(rows[0].textContent).not.toMatch(/Who are the contacts\?|Set-aside breakdown|Write a capability statement|Add to my pipeline/);
   });
   it('a second answer removes the first answer’s chips; only the latest answer has chips', async () => {
-    const t = boot({ tokens: [['first'], ['second']], suggestions: [['A1', 'A2'], ['B1']] });
+    // Answers must clear the outcome floor (≥80 chars) or follow-ups stay off.
+    const a1 = 'First answer with enough substance that follow-up chips are allowed after this outcome. ';
+    const a2 = 'Second answer with enough substance that follow-up chips are allowed after this outcome.';
+    const t = boot({ tokens: [[a1], [a2]], suggestions: [['A1', 'A2'], ['B1']] });
     await t.ask('q1');
     await t.ask('q2');
     const rows = t.chipRows();
@@ -138,24 +140,32 @@ describe('follow-up chips: derived, and only under the latest answer', () => {
     expect(rows[0].closest('.amk-msg')).toBe(t.bubbles().at(-1)!.closest('.amk-msg'));
   });
   it('no chips when the endpoint fails or returns none', async () => {
-    const a = boot({ tokens: [['x']], suggestions: ['fail'] });
+    const long = 'A finished answer long enough that follow-ups would fire if suggestions returned. ';
+    const a = boot({ tokens: [[long]], suggestions: ['fail'] });
     await a.ask('q');
     expect(a.chipRows()).toHaveLength(0);
-    const b = boot({ tokens: [['x']], suggestions: [[]] });
+    const b = boot({ tokens: [[long]], suggestions: [[]] });
     await b.ask('q');
     expect(b.chipRows()).toHaveLength(0);
   });
   it('clicking a chip asks it and clears the chips', async () => {
-    const t = boot({ tokens: [['first'], ['second']], suggestions: [['Follow up please'], []] });
+    const long = 'First answer with enough substance that follow-up chips are allowed after this outcome. ';
+    const t = boot({ tokens: [[long], ['second']], suggestions: [['Follow up please'], []] });
     await t.ask('q1');
     (t.chipRows()[0].querySelector('button') as HTMLButtonElement).click();
     await new Promise((r) => setTimeout(r, 0));
     expect(String(t.chat.at(-1)!.message)).toContain('Follow up please');
   });
+  it('short status answers do not generate follow-up chips', async () => {
+    const t = boot({ tokens: [['Working…']], suggestions: [['Should not appear']] });
+    await t.ask('q');
+    expect(t.suggestionCalls).toHaveLength(0);
+    expect(t.chipRows()).toHaveLength(0);
+  });
 });
 
 describe('narrow-panel display (answer first)', () => {
-  it('every question says display:narrow_panel; the message stays the view preface + the question only', async () => {
+  it('every question says display:narrow_panel; the message is the customer words only (no map preamble)', async () => {
     const t = boot({ tokens: [['a'], ['b']] });
     await t.ask('What janitorial work is open here?');
     await t.ask('And in Florida?');
@@ -163,11 +173,10 @@ describe('narrow-panel display (answer first)', () => {
     for (const c of t.chat) {
       const m = String(c.message);
       expect(m).not.toMatch(/Display:|narrow side panel/i);
-      const sp = splitViewPreamble(m);
-      expect(sp.view).toContain('[Current map view');
+      expect(m).not.toContain('[Current map view');
     }
-    expect(splitViewPreamble(String(t.chat[0].message)).rest).toBe('What janitorial work is open here?');
-    expect(splitViewPreamble(String(t.chat[1].message)).rest).toBe('And in Florida?');
+    expect(String(t.chat[0].message)).toBe('What janitorial work is open here?');
+    expect(String(t.chat[1].message)).toBe('And in Florida?');
   });
   it('history and the user bubble hold only what the user typed', async () => {
     const t = boot({ tokens: [['a'], ['b']] });

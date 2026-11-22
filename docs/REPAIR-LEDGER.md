@@ -1,5 +1,8 @@
 # Repair Ledger — the running tally of fixes (audit against reverts)
 
+> **Frozen archive (2026-11-22).** New entries go in [`docs/repair-ledger/`](repair-ledger/README.md),
+> one file per PR, so ledger rows never conflict. Rows here stay audited; never rewrite or delete them.
+
 **Why this exists (Eric, 2026-07-27):** "Earlier I saw Draw was fixed, now it's messed up
 again. What would help is a ledger of repairs — a running tally we can audit to make sure
 nothing reverted." Concurrent Claude sessions share one checkout and switch branches under
@@ -8,7 +11,7 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ## How to use it
 
-- **Every non-trivial fix/feature gets ONE row here, in the same commit as the fix.** No row =
+- **Every non-trivial fix/feature gets ONE entry file in `docs/repair-ledger/`, in the same commit as the fix.** No entry =
   not shipped, same rule as slash commands in CLAUDE.md.
 - Each row carries a **PROOF anchor**: an exact string that must be present (`grep`-able) in a
   named file. That's what makes the ledger *auditable* rather than a memory.
@@ -37,6 +40,12 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 | Date | Area | Fix | Proof anchor | Verified | Status |
 |---|---|---|---|---|---|
 | 2026-11-21 | MCP / saved-search-alerts | Confirmed recipient suppressions and invalid_saved_naics no longer make the drain `error` or HTTP 500. The drain decides the outcome once: attributed per-search failures with the rest evaluated are `partial`; run-level failures, or every search failing, are `error` — and readiness treats every non-2xx `error` as a whole-job failure (no second-guessing). Delivery readiness treats action-item-only runs (including legacy HTTP 500) as healthy, and does not upgrade an attributed `opportunity_query_failed` beside suppressions into a whole-job outage. Preview curls no longer self-report over the day's real outcome. Partial runs answer 503 (same as their self-report), and the dispatcher never replaces a route's terminal self-report with a cleaner/less specific record inside the 12s ack window (partial → success, or suppression summary → `error=null`). The watchdog reads action items off success runs, so the 🛡️ suppression Slack item still posts. Claude had told Mortgage Link1 that alert delivery was degraded with last success September 29. | `ACTION_ITEM_FAILURE_CLASSES` → `src/lib/saved-searches/alert-drain.ts`; `resolveDispatchFinal` → `src/lib/cron/dispatch-final-status.ts` | `alert-drain.unit.test.ts` + `delivery-readiness.unit.test.ts` + `dispatch/dispatch-self-report-race.unit.test.ts` + `dispatcher-watchdog/cron-to-watchdog.unit.test.ts` | BUILT |
+
+## 2026-11-21 — USAJobs empty is not the funnels board
+
+| Date | Area | Fix | Proof anchor | Verified | Status |
+|---|---|---|---|---|---|
+| 2026-11-21 | Data Core / job postings | A confirmed empty USAJobs read stays on USAJobs with a real zero. An API error stays unavailable. Only a missing key falls through to the funnels feed. A missing posted date is not stamped 1970. | `customerJobBoardChoice` → `src/lib/jobs/usajobs-direct.ts` | `usajobs-direct.unit.test.ts` | BUILT, NOT MERGED |
 
 ## 2026-11-20 — Scorecard second slot confirms before it publishes
 
@@ -1967,3 +1976,4 @@ Canonical row = freshest `last_synced_at` → `CONT_AWD_` id → lowest `contrac
 | 2026-11-21 | Map Markets page (/opportunity-map/market): fits a phone, amounts back on screen | The agency and industry lists (`.hubgrid`) used plain `1fr` tracks, which cannot shrink below a nowrap title's full width: 1046px of page on 320/390px phones, every dollar amount off-screen, and the event pop-up close button out of reach. Changed to `repeat(2,minmax(0,1fr))` / `minmax(0,1fr)`, so the existing ellipsis works. | `.hubgrid` → `src/app/opportunity-map/market/route.ts` | `markets-phone-width.unit.test.ts` (3; 2 red pre-fix); 1,477 Map tests; browser: page == viewport on iPhone SE / 13, Pixel 7 (before 1046); 0 of 24 amounts off-screen; pop-up close tappable; 2 columns kept at 768 and 1366 | PR |
 | 2026-11-21 | Product pages: the tab row and its Get Access / Download Free button fit a phone | ProductPageAppSumo (13 product pages: /expiring-contracts, /market-assassin, /ai-prompts, /tribal-list, …) rendered Overview · Features · Pricing · Reviews · [Get Access / Download Free] as one non-wrapping row with px-6 + gap-8: 475–493px on a 320px iPhone SE, the button off-screen and every page overflowing (shrunk to fit on phones). Row now wraps with phone spacing (px-4 / gap-x-5 / pb-3 below sm, desktop spacing unchanged). | `pb-3 sm:pb-0 flex flex-wrap gap-x-5 sm:gap-x-8` → `src/components/ProductPageAppSumo.tsx` | `product-page-tab-row-phone.unit.test.ts` (3; 2 red pre-fix); browser: 13 pages × iPhone SE / 13 / desktop = 39 checks, 0 overflow, CTA on-screen; desktop row pixel-identical to main (54px, same line, same x) | PR |
 | 2026-11-21 | Map (phone): the pin-colour legend is visible above the results bar | #mapLegend (Open Now / Coming Back / Coming Soon) sits at bottom:12px; on phones the fixed results bar covers the bottom of the map and route.ts lifts only Leaflet controls, so the legend was entirely hidden on iPhone SE / 13 / 15 Pro Max and Pixel 7. Phone rules now place it above the attribution row (108px), wrapping before the zoom control, with the tile notice moved above it (164px, narrowed to clear the zoom control). | `.mapwrap .maplegend{bottom:108px!important` → `src/app/opportunity-map/route.ts` | `legend-visible-on-phone.unit.test.ts` (5; 4 red pre-fix); 1,487 Map tests; browser with tiles blocked on iPhone SE / 13 / 15 Pro Max, Pixel 7: legend in view, 0 new overlaps among legend, tile notice, attribution, zoom, bar, Save, Draw; tablet and desktop unchanged | PR |
+| 2026-11-22 | Repository hygiene: internal working files removed; private-data check added | Removes internal working files that should not be in the repository. Scripts and two admin routes that used them now read private inputs from outside the repository (MINDY_PRIVATE_DIR / BOOTCAMP_ATTENDEE_FILE / CLASSIFY_V2_* env) and refuse without them; the bootcamp rollout cron returns a refused outcome and sends nothing, and the admin dashboard reports attendee-derived figures as unavailable, never 0. A blocking unit check over tracked files prevents recurrence, with .gitignore entries to match. | `export const MAX_REAL_EMAILS = 5;` → `src/lib/repo-hygiene/tracked-private-data.ts` | tracked-private-data.unit.test.ts (9; fails on main), attendee-list (5), bootcamp cron refusal (3), dashboard unavailable guard (4), classify-v2 private inputs (3) | PR (draft; RED review) |

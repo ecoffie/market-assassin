@@ -1,3 +1,74 @@
+### Ask forces packaged market research without the word “report” — 2026-11-21
+
+**What shipped.** `isMarketResearchRequest` now matches “comprehensive/full market research …” and “comprehensive MR …” even when the customer omits “report”. That turns on `forceMarketReport` → `generate_market_report` on the first turn.
+
+**Why it matters.** Map Ask acceptance (“comprehensive MR for Koamana Build”) answered in chat until the user insisted on a document — the force gate never fired because the signal required the word “report”.
+
+**Proof.** Unit table in `current-find.unit.test.ts` (`comprehensive market research for Koamana Build`, `comprehensive MR for Koamana Build`, `full market research on roofing` → true; bare “do you offer market research?” → false).
+
+
+### Ask FMP drops boat-pier / gymnasium forecasts for highway firms — 2026-11-21
+
+**What shipped.** Civil forecast pathway filter no longer treats pier “deck replacement” as highway civil (bare `deck` removed; waterfront titles like Boat Forces Piers are excluded). Clara Barton / GWMP forecasts still qualify. `pathwayNaicsFit` also zeros pier/wharf/boat-forces titles for 2373xx primaries (same class as dredging).
+
+**Why it matters.** A 237310 highway profile was ranking DHS boat-pier forecasts beside Inspection MATOC — wrong market for the speaking/demo story.
+
+**Proof.** Unit: `keeps Clara Barton forecasts and drops gymnasium / boat-pier forecasts for a 237310 firm`; `pathwayNaicsFit` zeros Boat Forces pier titles for 237310.
+
+
+### Ask report Export in the open pane (Claude/ChatGPT pattern) — 2026-11-21
+
+**What shipped.** Map Ask “Open report” cards no longer show PDF/Word/Excel/CSV chips under the answer. Formats live behind one **Export** control in the open report pane (map) and in the /app report preview header. Host rewrite strips vault `/api/app/vault/documents/download` paths and fake download hosts from the chat text instead of appending them as bullets.
+
+**Why it matters.** Customers expect Claude/ChatGPT: open the document, then choose how to download — not four format buttons in the stream.
+
+**Proof.** Units: `ask-report-pane`, `generated-download-chips`, `chat-report-preview`, `rewriteFmpAnswerDownloadLinks`. Live after deploy: create_document → card has Open report only; pane/header Export → PDF/Word; answer text has no vault download URLs.
+
+
+### Ask FMP closer to Claude gold (named pathway lookups) — 2026-11-20
+
+**What shipped.** Pathways phase host-injects named SAM lookups (Inspection MATOC, Capitol Perimeter, JBAB MACC) plus GWMP/parkway forecasts alongside the civil FIND. Ranking is vehicle → sources sought → forecasts → at most one open RFQ. Bare MACC titles that name JBAB/Andrews in the body render as “JBAB and Andrews 8(a) MACC.”
+
+**Why it matters.** Report placement over the map was right; content still lagged Claude — open bridge RFQs filled the six pathways while JBAB, Capitol Perimeter, and GWMP forecasts never entered the tool results on a short name-only ask.
+
+**Proof.** Units: `fmp-writeup-grounding` + `current-find` supplemental pathway calls. Live after deploy: name-only RBA Ask → pathway #1 Inspection MATOC; pathways include Capitol and/or JBAB when active; not a HUMBOLT-led open-bid list.
+
+
+### Map Ask Mindy blank start (same rule as /app chat) — 2026-11-20
+
+**What shipped.** Opportunity Map Ask drawer opens blank (no starter chips). Follow-up chips only after a report/files outcome or a finished answer. Attach line says “Saved privately” (not “to your Vault”).
+
+**Why it matters.** The map sidebar was still coaching prompts and Vault language after /app chat went blank.
+
+**Proof.** `ask-input-prefill` + `card-chat-drawer` unit 23/23. Live: open Ask on the map → empty body, `amk-blank`; no “Who buys 541512” chips.
+
+
+### Ask Mindy blank start + pathway fit (no prompt ideas, no dredging false leads) — 2026-11-20
+
+**What shipped.** New Ask chats open blank (no starter prompt chips / how-to). Follow-up chips only after a real outcome (files, report, citations, or a finished answer). FMP pathway ranking zeros marine dredging/jetty for highway/bridge firms (237310) and prefers award-buyer affinity over sibling-NAICS noise.
+
+**Why it matters.** Customers asked for a blank screen and for Ask to pick the same kind of pathways Claude does (Eastern Federal Lands / inspection vehicles), not the first open 237990 dredging notices.
+
+**Proof.** Unit `fmp-writeup-grounding` 43/43 including dredging demotion. Live verify after deploy: empty Ask has `ask-mindy-blank`; cold RBA profile pathways must not lead with dredging/jetty.
+
+
+### Ask Mindy Federal Market Profile content parity (Claude gold) — 2026-11-20
+
+**What shipped.** Host-built FMP DocModels now assemble The read, metrics, multi-pathway detail, awards table, PAE, buyer pain, named contacts, and readiness from tool JSON — and Ask keeps a rich planner DocModel when it clears the FMP gate instead of always forcing the thin rescue shell. Agency names like Internal Revenue Service can no longer appear as person contacts.
+
+**Why it matters.** The Claude+MCP RBA profile bar is usable from Ask/Vault downloads, not a cover page with a one-paragraph pathways section.
+
+**Proof.** Unit 40/40 `fmp-writeup-grounding`. Live getmindy.ai Ask 2026-11-20 after `d418f4c95` / `dpl_…p8hkhllff`: Vault docx `37dc3e28-8ce2-49da-b10b-47a53d9f0ddb` + PDF `166673d9-87e6-4c77-8a1f-12c6414e59f9` — 6 pages / ~8.4k chars; sections The read → pathways → proven → PAE → pain → who-to-talk → readiness+DSBS; no IRS/DLA/set-aside-as-person; no tax-software/security bridge-contract pathways; NAICS 237310 + $42.5M grounded. Prior blank Ask PDF was 4 pages / ~2.5k chars.
+
+
+### Ask Mindy Federal Market Profile write-up (host-grounded Vault DocModel) — 2026-11-20
+
+**What shipped.** Company-first FMP phase machine ends in a host-built DocModel (`create_document`) that must pass structure + grounding (237310 / market $ / vehicle / DSBS / Navy PAE) and saves Word/PDF/xlsx/csv to Vault. Invented chat download URLs are stripped (Export lives in the open report pane — see 2026-11-21 Export entry), not pasted as vault path bullets.
+
+**Why it matters.** The Claude+MCP RBA Federal Market Profile quality bar is now an Ask Mindy deliverable customers can open from Vault, not a chat-only summary that drifts.
+
+**Proof.** Prod `dpl_9T32zZRwGGcz5oBkKrVftqLtFRPM` on getmindy.ai; cold Ask session `cafa394a-0d45-4971-aed8-5e241379dee5`; Vault doc `2050d353-cd4e-4cf3-afc5-c8694a0f1e60`; grade `.claude-tmp-rba-fmp-doc-grade-FINAL.json` pass=true; notices `fmp_create_document:host_doc_model_forced` + `answer_download_links_rewritten`.
+
 # Mindy — Marketing & Content Literature (June 2026 Feature Release)
 
 > **For the content/SEO team.** Every feature below is LIVE on getmindy.ai. Each
@@ -34,6 +105,28 @@ the response. Grounded in real government data, not generic AI.**
 SEO primary keywords: *government contracting software, GovCon AI, federal proposal
 writing software, recompete intelligence, SAM.gov alternative, USASpending search
 tool, federal market research.*
+
+---
+
+## Ask Mindy packaged market research (Nov 2026)
+
+**What:** On the Opportunity Map, Ask Mindy builds a comprehensive federal market
+research report with the **same one-shot packaged research engine** MCP agents use
+(`generate_market_report`) — Mindy IP, not a Claude-style ad-hoc tool chain. The
+report opens in the in-chat reading pane; Map filters no longer scope the chat.
+
+**Why:** Same federal data under MCP and Map Ask used to produce different quality
+because Ask assembled scraps into a document. Closing the orchestration gap is how
+Ask stays at (or above) Claude+MCP quality for market research.
+
+**SEO / content hooks:** AI federal market research report · GovCon market research
+in chat · SAM + USASpending market report · client-ready federal market brief.
+
+**Proof:** live `https://getmindy.ai/opportunity-map` serves `placeholder="Ask Mindy…"`,
+empty `ctxPreamble`, `market_report` SSE handler, and "Packaged research" pane copy
+(verified 2026-11-19 after deploy `dpl_3QqhR41H4VUStynt69N9uA2F211Y`). Policy unlock +
+forced `generate_market_report` on market-research asks in
+`src/lib/chat/chat-tool-policy.ts` / `tool-selection.ts` / `src/app/api/app/chat/route.ts`.
 
 ---
 
@@ -1274,8 +1367,8 @@ on hidden description field. Gate now matches email promise ("add keywords").
 **SEO:** N/A (conversion / alert onboarding)
 
 **Proof:** `user_engagement` Jun 12–13: 8 unique `alert_keyword_setup` clickers, 1 partial
-keyword save (`keytransportationsolutions@gmail.com`). Gate change clears users like
-`joanne.horowitz@xerox.com` (15 keywords, no description) from repeat red-banner CTAs.
+keyword save (`[email removed]`). Gate change clears users like
+`[email removed]` (15 keywords, no description) from repeat red-banner CTAs.
 
 
 ---
@@ -2790,7 +2883,7 @@ to the block verdict — known status never hides a real problem.
 registries (campaign-exclusions, advocate-accounts, partner-referrals);
 `computeVerdict()` short-circuits to an ok-level label for them (unless refunded).
 Verified live: westover105 → "Advocate — Sue Kranes — complimentary Pro" (no
-reason required); aj@cypherintel.com → "Comp / testimonial"; a random email still
+reason required); [email removed] → "Comp / testimonial"; a random email still
 warns + requires a source. Typecheck + full build pass.
 
 ---
@@ -6439,7 +6532,7 @@ an empty market. Recompetes are a later section, not a substitute for Open.
 **SEO.** Daily government contract alerts by NAICS / SAM.gov opportunity email
 that matches your market.
 
-**Proof.** Live replay 2026-09-13T13:41Z for `info@lwppropertysolutions.com`
+**Proof.** Live replay 2026-09-13T13:41Z for `[email removed]`
 (NAICS 561210 / 561720 / 561730 / 561790 / 238990). Old OR pull top titles:
 cubicle upgrade, UPS rental, shaft/tube/switch assembly, FLIR repair. Contract
 D: 30 distinctive hits inside the Open market — janitorial, grounds, facility
@@ -6509,9 +6602,9 @@ company evidence.
 government contracting market.
 
 **Proof.** Live matcher replay 2026-09-13. Radus
-(`john.simmons@radussoftware.com`, keyword `programming`): Peraton 541511
+(`[email removed]`, keyword `programming`): Peraton 541511
 leads; Booz Allen 541611 $211.8M is fifth and `inferred`. Kkurka
-(`kkurka@mac.com`) is `system_default` on every code — starter-market label.
+(`[email removed]`) is `system_default` on every code — starter-market label.
 541611 still wins when the profile has management-consulting evidence. Open D
 7/7. Tests: `src/lib/alerts/coming-back-to-market.unit.test.ts`.
 
@@ -7026,7 +7119,7 @@ no 504; representative drones capability completes grounded under 55s.
 
 **SEO.** Federal recompete alerts, contracts coming back to market, SAM.gov daily alerts vs expiring contracts, 6–18 month capture window.
 
-**Proof.** Live render 2026-09-17 (`scripts/render-coming-back-alert-examples.ts`) for five replay users — each HTML has both headings, Coming Back copy “not confirmed solicitations / prepare capture, not to bid today”, and no mixed Open/Recompete ids: 7hillstransportation@gmail.com Open Now janitorial SAM + Coming Back Goodwill CDC $38.8M / ServiceSource FBI $33.0M (561720, lead_6_18); americanpatriot1872@pm.me Open Now + Coming Back Saliense $24.7M (541512); civelladante@gmail.com roofing distinctive miss retains 238160/236220 (RQ-WM Jordan JV $239.7M, under the existing $250M teaming line); diannewilsoncontact@gmail.com Arrow Arc $32.1M (541910); wednel.joseph@gmail.com generic “construction” does not expand the stored 236220 market. Units: `coming-back-to-market.unit.test.ts` (window order, omit <3 months, miss keeps market, generic does not expand, hit-count not primary), `alert-mode.unit.test.ts` (Coming Back HTML has no “currently soliciting” / “Open Now”), `population-contract.unit.test.ts` (`OPEN_NOW_HEADING`). MINDY-006/007 overlay + preserve-enrichment restored onto this branch so the deploy does not revert them.
+**Proof.** Live render 2026-09-17 (`scripts/render-coming-back-alert-examples.ts`) for five replay users — each HTML has both headings, Coming Back copy “not confirmed solicitations / prepare capture, not to bid today”, and no mixed Open/Recompete ids: [email removed] Open Now janitorial SAM + Coming Back Goodwill CDC $38.8M / ServiceSource FBI $33.0M (561720, lead_6_18); [email removed] Open Now + Coming Back Saliense $24.7M (541512); [email removed] roofing distinctive miss retains 238160/236220 (RQ-WM Jordan JV $239.7M, under the existing $250M teaming line); [email removed] Arrow Arc $32.1M (541910); [email removed] generic “construction” does not expand the stored 236220 market. Units: `coming-back-to-market.unit.test.ts` (window order, omit <3 months, miss keeps market, generic does not expand, hit-count not primary), `alert-mode.unit.test.ts` (Coming Back HTML has no “currently soliciting” / “Open Now”), `population-contract.unit.test.ts` (`OPEN_NOW_HEADING`). MINDY-006/007 overlay + preserve-enrichment restored onto this branch so the deploy does not revert them.
 
 ---
 
@@ -7691,3 +7784,23 @@ the notices. Test: `federal-events-ranking.unit.test.ts`.
 **Honest scope.** Spreadsheet export uses the document's table blocks (or a Summary sheet when there are none). CSV cells are formula-injection safe. Still behind the Vault generated-files flag.
 
 **Proof.** `render-spreadsheet.ts` + `create_document` W4 path; sample deliverables in the release package.
+
+## Ask Mindy shows the report in the chat, not just a download (2026-11-20)
+
+**What.** When Ask Mindy builds a Federal Market Profile (or any saved document, or a packaged market report), the report opens right in the conversation, above the answer, with the pathways, awards and "The read" visible. Download PDF / Word buttons sit underneath as the secondary action.
+
+**Why it matters.** Customers used to get only download buttons and never saw the data in chat, so a stale file from an earlier run looked like the answer. Reading the report in place means what you see is what you download.
+
+**Honest scope.** The on-screen report is the saved document rendered by the same engine as the PDF and Word files. Older chats keep their older files; ask again to get the current report.
+
+**Proof.** `ChatReportPreview` + `/api/app/vault/documents/preview`; `chat-report-preview.unit.test.tsx`, `mindy-chat-report-preview.unit.test.tsx`, and the rich-model extraction test in `fmp-writeup-grounding.unit.test.ts`.
+
+## Ask Mindy FMP: gold pathways, named POCs, single download chips (2026-11-20)
+
+**What.** Federal Market Profile reports now keep vehicle / sources-sought / Clara Barton forecast pathways ahead of open RFQs, pull named notice points of contact via solicitation lookup, show the PAE section when DoD buyers appear in tool results (not only when the customer typed "defense"), and show one PDF and one Word download chip instead of five duplicates.
+
+**Why it matters.** A name-only Ask for a civil firm was landing open Sacramento bids and "Firm Fixed Price" as contacts while the gold Claude report had Inspection MATOC → JBAB → Capitol → Clara Barton and named POCs. Duplicate download chips also crushed the report title.
+
+**Honest scope.** Host DocModel + pathway supplements + map/preview chip dedupe. Competitor "where it leads" geography still depends on contractor tool fields when present.
+
+**Proof.** `buildFmpPathwaySupplementalCalls` (Clara Barton / GWMP forecasts + `lookup_solicitation` for gold sols); `enrichPathwayTitle` + open-RFQ cap; `fmpDefenseBuyersAppearFromEvidence`; `cleanFiles` / preview sibling dedupe; `fmp-writeup-grounding.unit.test.ts`.

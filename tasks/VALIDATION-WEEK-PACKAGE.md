@@ -12,7 +12,7 @@
 |----------|----------|---------|
 | [COACH-LIVESTREAM-SCRIPT.md](./COACH-LIVESTREAM-SCRIPT.md) | Ryan, Zach, Randie | 2 questions to ask on livestream |
 | [SIKANDER-CALL-SCRIPT.md](./SIKANDER-CALL-SCRIPT.md) | Sikander | Phone interview script |
-| [VALIDATION-TRACKING-FORM-SIKANDER.csv](./VALIDATION-TRACKING-FORM-SIKANDER.csv) | Sikander | Track phone call responses |
+| [VALIDATION-TRACKING-FORM-SIKANDER.csv (private; not in the repository)](./VALIDATION-TRACKING-FORM-SIKANDER.csv) | Sikander | Track phone call responses |
 | [VALIDATION-TRACKING-FORM-COACHES.csv](./VALIDATION-TRACKING-FORM-COACHES.csv) | Coaches | Track livestream responses |
 
 ---
@@ -108,31 +108,31 @@
 
 Annelle's outreach list (Ultimate Giant purchasers):
 
-1. bobby@24hrc.us
-2. willie.smiley@spasmileytrucking.com
-3. andrew@millpondresearch.com
-4. kwesi.acquah@connectdotssolution.com
-5. oswald.kingsleyllc@gmail.com
-6. info@cfpsolutions.net
-7. jcameron@cameroncommerce.com
-8. lloyd.lythcott@gmail.com
-9. jdawsonwilliams@gmail.com
-10. anufund@yahoo.com
-11. jareddickinson13@outlook.com
-12. ibadji@badjinyllc.com
-13. whit1stborn@aol.com
-14. tiffan@problemcompany.org
-15. greg@phoenixstudioslouisville.com
-16. ana@ttaindustries.com
-17. antcaruso22@gmail.com
-18. cforekoya@gmail.com
-19. lisa@primebrokerllc.com
-20. founder@siemable.com
-21. kydun00@yahoo.com
-22. fernando.mercado@venerandavalor.com
-23. kenworthbudd@yahoo.com
-24. hello@eganrose.com
-25. peter@valorgovcon.com
+1. [email removed]
+2. [email removed]
+3. [email removed]
+4. [email removed]
+5. [email removed]
+6. [email removed]
+7. [email removed]
+8. [email removed]
+9. [email removed]
+10. [email removed]
+11. [email removed]
+12. [email removed]
+13. [email removed]
+14. [email removed]
+15. [email removed]
+16. [email removed]
+17. [email removed]
+18. [email removed]
+19. [email removed]
+20. [email removed]
+21. [email removed]
+22. [email removed]
+23. [email removed]
+24. [email removed]
+25. [email removed]
 
 **Email Template for Annelle:**
 

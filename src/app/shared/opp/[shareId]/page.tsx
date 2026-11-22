@@ -1,4 +1,6 @@
 import type { Metadata } from 'next';
+import { notFound } from 'next/navigation';
+import { lookupOpportunityShare } from '@/lib/share/opportunity-share-lookup';
 import SharedOpportunityClient from './SharedOpportunityClient';
 
 // Dynamic link-preview (OpenGraph) — the viral payload. When someone shares a
@@ -90,6 +92,13 @@ function fmtDate(d: string): string {
   }
 }
 
-export default function Page() {
+export default async function Page(
+  { params }: { params: Promise<{ shareId: string }> },
+) {
+  const { shareId } = await params;
+  // A dead link must answer HTTP 404, not a 200 "not found" card (soft 404).
+  // Only a confirmed miss 404s; an unknown lookup (DB error) still renders the
+  // client, which shows its own error state.
+  if ((await lookupOpportunityShare(shareId)) === 'missing') notFound();
   return <SharedOpportunityClient />;
 }

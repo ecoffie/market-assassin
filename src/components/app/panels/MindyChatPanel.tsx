@@ -8,7 +8,7 @@
  * resumable history).
  *
  * Layout: thin header → scrolling message list (auto-scroll on new) →
- * sticky input row. Empty state shows 4 starter prompt chips.
+ * sticky input row. Empty state is blank (no starter prompt ideas).
  *
  * Streaming render: tokens flush into the in-progress assistant
  * bubble as they arrive. After the stream emits `citations`, those
@@ -21,10 +21,10 @@ import { Menu, MessageCircle, BookOpen, Lock, FileText, X } from 'lucide-react';
 import type { AppTier, AppPanel } from '../UnifiedSidebar';
 import { authedFetch } from '../authHeaders';
 import { ChatAttachments } from '../chat/ChatAttachments';
-import { GeneratedDownloadChips, type GeneratedDownloadFile } from '../chat/GeneratedDownloadChips';
+import type { GeneratedDownloadFile } from '../chat/GeneratedDownloadChips';
+import { ChatReportPreview, type ChatInlineReport } from '../chat/ChatReportPreview';
 import { useVaultCapabilities } from '../chat/useVaultCapabilities';
 import { UpgradeModal } from '../UpgradeModal';
-import { DEFAULT_STARTER_PROMPTS } from '@/lib/chat/starter-prompts';
 import { renderSafeMarkdown } from '@/lib/chat/safe-markdown';
 import { startProposalFromNotice } from '@/lib/chat/start-proposal';
 import {
@@ -81,6 +81,8 @@ interface ChatMessage {
   /** W2: create_document files saved this turn — in-chat download chips mint signed URLs on click. */
   deliverables?: GeneratedDownloadFile[];
   deliverablePdfNote?: string | null;
+  /** Packaged generate_market_report: the rendered report HTML, read in the chat (not persisted in History). */
+  report?: ChatInlineReport;
 }
 
 
@@ -90,10 +92,15 @@ interface ChatMessage {
 // chat history readable without a backfill migration. Also collapses
 // any trailing space or double-space the strip leaves behind.
 export function renderMessageContent(content: string, asMarkdown = false) {
+  // Export lives in the open report pane — never show vault download paths as chat bullets.
   const cleaned = content
     .replace(/\s*\[→\s*[^\]]+\]\s*/g, ' ')
+    .replace(/^\s*[-*•]\s*(?:\[[^\]]*\]\()?\/?api\/app\/vault\/documents\/download[^\n)]*\)?\s*$/gim, '')
+    .replace(/(?:https?:\/\/[^\s)]+)?\/api\/app\/vault\/documents\/download\?[^\s)]+/gi, '')
     .replace(/ {2,}/g, ' ')
-    .replace(/ ([.,;:!?])/g, '$1');
+    .replace(/ ([.,;:!?])/g, '$1')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
   if (!asMarkdown) return <span className="whitespace-pre-wrap [overflow-wrap:anywhere]">{cleaned}</span>;
   // Assistant answers: the shared SAFE renderer (src/lib/chat/safe-markdown.ts) HTML-escapes the model text
   // first and only then writes its own markup for a small markdown subset (http(s) links only), so this
@@ -175,29 +182,6 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
     inputRef.current?.focus();
   }, []);
 
-  // Empty-state starter chips. Seeded with the generic v2 set (showcases the Data
-  // Core tools: pipeline · live SAM · contractor intel · Vault); swapped for a
-  // profile-personalized set once /api/app/chat/suggestions returns (their real
-  // NAICS, whether they have pursuits). Never blocks — falls back to generic.
-  const [starterPrompts, setStarterPrompts] = useState<string[]>(DEFAULT_STARTER_PROMPTS);
-  useEffect(() => {
-    if (!email) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await authedFetch(`/api/app/chat/suggestions?email=${encodeURIComponent(email)}`, email);
-        if (!res.ok) return;
-        const data = await res.json();
-        if (!cancelled && Array.isArray(data?.prompts) && data.prompts.length) {
-          setStarterPrompts(data.prompts);
-        }
-      } catch {
-        // keep the generic set on any failure
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [email]);
-
   // Track whether we've already consumed a voice-pivot seed for this
   // mount so React StrictMode's double-invoke can't fire it twice.
   const seedHandledRef = useRef(false);
@@ -276,6 +260,10 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
       const decoder = new TextDecoder();
       let leftover = '';
       let finalContent = ''; // full answer text — used to fetch contextual follow-ups
+      // Follow-ups only after a real outcome: a downloadable/report, or a finished
+      // Q&A answer. Never invent "what next?" chips while the turn is still gathering.
+      let sawOutcome = false;
+      let turnErrored = false;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -302,6 +290,7 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
                 (f) => f && typeof f.document_id === 'string' && typeof f.format === 'string',
               );
               if (files.length) {
+                sawOutcome = true;
                 setMessages(prev => prev.map(m =>
                   m.id === assistantMsg.id
                     ? {
@@ -312,19 +301,29 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
                     : m
                 ));
               }
+            } else if (evt.type === 'market_report' && typeof evt.html === 'string' && evt.html) {
+              sawOutcome = true;
+              const report: ChatInlineReport = {
+                html: evt.html,
+                title: typeof evt.title === 'string' && evt.title ? evt.title : 'Market report',
+                url: typeof evt.url === 'string' ? evt.url : null,
+              };
+              setMessages(prev => prev.map(m => m.id === assistantMsg.id ? { ...m, report } : m));
             } else if (evt.type === 'sources' && evt.ledger && typeof evt.ledger === 'object') {
               setMessages(prev => prev.map(m =>
                 m.id === assistantMsg.id ? { ...m, ledger: evt.ledger } : m
               ));
             } else if (evt.type === 'citations' && Array.isArray(evt.sources)) {
+              if (evt.sources.length) sawOutcome = true;
               setMessages(prev => prev.map(m =>
                 m.id === assistantMsg.id ? { ...m, citations: evt.sources } : m
               ));
-            } else if ((evt.type === 'notice' || evt.type === 'truncated') && typeof evt.message === 'string') {
+            } else if ((evt.type === 'notice' || evt.type === 'progress') && typeof evt.message === 'string') {
               setMessages(prev => prev.map(m =>
                 m.id === assistantMsg.id ? { ...m, notices: [...(m.notices || []), evt.message] } : m
               ));
             } else if (evt.type === 'error') {
+              turnErrored = true;
               setMessages(prev => prev.map(m =>
                 m.id === assistantMsg.id
                   // B2: only messages from the fixed customer-safe table are displayed verbatim.
@@ -342,10 +341,10 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
         }
       }
 
-      // Contextual "what next?" chips — fetched AFTER the answer completes so
-      // they never add latency to the response. Fire-and-forget; no chips on any
-      // failure. Skipped for empty/errored answers.
-      if (finalContent.trim().length > 0) {
+      // Contextual "what next?" chips — only after an outcome lands (files, report,
+      // citations, or a finished Q&A answer). Never while the turn failed or is empty.
+      const answerOutcome = !turnErrored && finalContent.trim().length >= 80;
+      if (sawOutcome || answerOutcome) {
         authedFetch('/api/app/chat/suggestions', email, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -681,60 +680,17 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
                 Upgrade to Pro to chat
               </button>
             </div>
-            <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-3 opacity-50 pointer-events-none">
-              {starterPrompts.map((prompt: string) => (
-                <div
-                  key={prompt}
-                  className="text-left rounded-lg border border-surface bg-ground/50 p-4"
-                >
-                  <div className="text-sm text-ink-soft">{prompt}</div>
-                </div>
-              ))}
-            </div>
           </div>
         ) : messages.length === 0 ? (
-          <div className="max-w-2xl mx-auto pt-12">
-            <div className="text-center mb-8">
-              <MessageCircle className="h-10 w-10 mx-auto mb-3 text-accent" strokeWidth={1.5} />
-              <h2 className="text-xl font-semibold text-white mb-1">Ask in plain English</h2>
-              <p className="text-sm text-muted max-w-lg mx-auto">
-                Type a question the way you would ask a colleague. Mindy looks things up and can turn the answer into a downloadable Word, PDF, Excel, or CSV file.
-              </p>
-            </div>
-            <ol className="mb-8 space-y-3 rounded-xl border border-surface bg-ground/40 p-4 text-left" data-testid="ask-mindy-how-to">
-              <li className="flex gap-3 text-sm text-slate-200">
-                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 text-xs font-semibold text-emerald-300">1</span>
-                <span><span className="font-medium text-white">Attach</span> a capability statement or RFP (optional) using the paperclip below.</span>
-              </li>
-              <li className="flex gap-3 text-sm text-slate-200">
-                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 text-xs font-semibold text-emerald-300">2</span>
-                <span><span className="font-medium text-white">Ask</span> what you need — for example, “Who buys my kind of work?” or “Write a strategy brief I can download.”</span>
-              </li>
-              <li className="flex gap-3 text-sm text-slate-200">
-                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 text-xs font-semibold text-emerald-300">3</span>
-                <span><span className="font-medium text-white">Download</span> the green buttons under Mindy’s answer, or find the files later in Documents.</span>
-              </li>
-            </ol>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {starterPrompts.map((prompt: string) => (
-                <button
-                  key={prompt}
-                  onClick={() => sendMessage(prompt)}
-                  disabled={isStreaming}
-                  className="text-left rounded-lg border border-surface bg-ground/50 hover:border-purple-500/40 hover:bg-purple-500/5 transition-colors p-4 group disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <div className="text-sm text-slate-200 group-hover:text-white">{prompt}</div>
-                </button>
-              ))}
-            </div>
-          </div>
+          // Blank start — no starter chips, no how-to, no prompt ideas. The input is the product.
+          <div className="flex-1" data-testid="ask-mindy-blank" aria-hidden />
         ) : (
           <div className="max-w-3xl mx-auto space-y-6">
             {messages.map(msg => (
               <div key={msg.id} className={msg.role === 'user' ? 'flex justify-end' : 'flex justify-start'}>
                 <div className={msg.role === 'user'
                   ? 'max-w-[80%] rounded-2xl rounded-tr-md bg-surface border border-hairline px-4 py-3'
-                  : 'max-w-[85%]'
+                  : (msg.report || msg.deliverables?.length) ? 'w-full' : 'max-w-[85%]'
                 }>
                   {msg.role === 'assistant' && (
                     <div className="flex items-center gap-2 mb-1.5">
@@ -743,6 +699,13 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
                         <span className="inline-block w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse" />
                       )}
                     </div>
+                  )}
+                  {/* Report first; Export lives in the open pane header (Claude/ChatGPT), not under the answer. */}
+                  {msg.role === 'assistant' && !msg.isStreaming && !msg.errored && email && msg.report && (
+                    <ChatReportPreview email={email} inline={msg.report} files={msg.deliverables} pdfNote={msg.deliverablePdfNote} />
+                  )}
+                  {msg.role === 'assistant' && !msg.isStreaming && !msg.errored && email && !msg.report && !!msg.deliverables?.length && (
+                    <ChatReportPreview email={email} files={msg.deliverables} pdfNote={msg.deliverablePdfNote} />
                   )}
                   <div className={`text-[14.5px] leading-relaxed ${msg.errored ? 'text-red-300' : msg.role === 'user' ? 'text-slate-100' : 'text-slate-200'}`}>
                     {msg.content
@@ -753,13 +716,6 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
                         ? <span className="text-faint italic">Thinking…</span>
                         : null}
                   </div>
-                  {msg.role === 'assistant' && !!msg.deliverables?.length && !msg.isStreaming && email && (
-                    <GeneratedDownloadChips
-                      email={email}
-                      files={msg.deliverables}
-                      pdfNote={msg.deliverablePdfNote}
-                    />
-                  )}
                   {msg.role === 'assistant' && !!msg.citations?.length && !msg.isStreaming && (
                     <div className="mt-3 pt-3 border-t border-surface/50">
                       <div className="text-[10px] font-semibold tracking-wider text-faint mb-1.5">SOURCES</div>
