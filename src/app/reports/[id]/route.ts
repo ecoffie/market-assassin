@@ -2,7 +2,7 @@
  * GET /reports/<id> — the hosted, client-ready market report.
  *
  * This is the deliverable Sue SENDS a client: a public, self-contained, Mindy-branded
- * page (with a Save-as-PDF button). Served as a route handler rather than a React page
+ * page (with a Download PDF link to ./pdf). Served as a route handler rather than a React page
  * because `renderMarketReportHtml` already emits a complete <!doctype html> document —
  * wrapping it in a Next layout would nest documents.
  *
@@ -13,7 +13,7 @@
  */
 import { NextResponse } from 'next/server';
 import { getMarketReport } from '@/lib/market/report-store';
-import { renderMarketReportHtml } from '@/lib/market/market-report-html';
+import { renderStoredReportHtml } from '@/lib/market/stored-report-html';
 
 export const dynamic = 'force-dynamic';
 
@@ -44,10 +44,8 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
 
   let html: string;
   try {
-    html = renderMarketReportHtml({
-      ...(report.payload as Record<string, unknown>),
-      generated_for: report.client_name ?? (report.payload as { generated_for?: string | null }).generated_for ?? null,
-    } as Parameters<typeof renderMarketReportHtml>[0]);
+    // Same renderer as the PDF download (./pdf), so the file matches the page.
+    html = renderStoredReportHtml(report, { pdfUrl: `/reports/${id}/pdf` });
   } catch (err) {
     console.error('[reports] render failed for', id, err);
     return notFound();
