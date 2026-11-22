@@ -114,9 +114,10 @@ const SET_ASIDE_COPY: Record<Exclude<SetAsideKind, 'unknown' | 'other'>, SetAsid
   },
   vosb: {
     kind: 'vosb',
-    label: 'Veteran-Owned set-aside',
-    explanation: 'For eligible veteran-owned small businesses.',
-    audience: "Who it's for: Eligible veteran-owned small businesses",
+    // SAM.gov: VSA/VSS are "specific to Department of Veterans Affairs" (Vets First) — never government-wide.
+    label: 'Veteran-Owned set-aside (VA only)',
+    explanation: 'Veteran-owned set-asides are used by the Department of Veterans Affairs (Vets First), for eligible veteran-owned small businesses. Other agencies do not use this set-aside.',
+    audience: "Who it's for: Eligible veteran-owned small businesses, at the Department of Veterans Affairs",
     program: 'vosb',
   },
 };

@@ -63,7 +63,8 @@ export const SET_ASIDE_CHIP: Record<string, string> = {
   SDVOSBC: 'SDVOSB', SDVOSBS: 'SDVOSB',
   WOSB: 'WOSB', WOSBSS: 'WOSB', EDWOSB: 'EDWOSB', EDWOSBSS: 'EDWOSB',
   // VA-only (Vets First) codes per SAM.gov; VSS (VA sole source) was missing and fell through to "Full & open".
-  VSA: 'VOSB (VA)', VSS: 'VOSB (VA)', VSB: 'VOSB (VA)',
+  VSA: 'VOSB (VA)', VSS: 'VOSB (VA)',
+  VSB: 'Very Small Business', // USASpending: VSB = "VERY SMALL BUSINESS" — never veteran-owned
   SBA: 'Total SB', SBP: 'Partial SB', SDB: 'SDB', ISBEE: 'Buy Indian',
 };
 

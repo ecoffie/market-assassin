@@ -1,5 +1,5 @@
 /**
- * Map set-aside split (2026-11-22): veteran-owned VSA/VSS/VSB get their own `VOSB` group, true SDVOSB
+ * Map set-aside split (2026-11-22): VA veteran-owned VSA/VSS get their own `VOSB` group (VSB = Very Small Business gets its own `VSB` group), true SDVOSB
  * codes get `SDVOSB_ONLY` — and the bare legacy key `'SDVOSB'` (stored unversioned in
  * saved_searches.filters, anon watches, localStorage and `?setAside=` links) keeps returning EXACTLY
  * the code list it always did. Never silently change what an existing saved search returns.
@@ -52,8 +52,9 @@ describe('legacy SDVOSB filter key — frozen, byte-identical to the pre-split e
 });
 
 describe('new keys', () => {
-  it('VOSB → VSA,VSS,VSB (VSS was in no list before)', () => {
-    expect(saExpr({ setAside: 'VOSB' })).toBe('set_aside_code.in.(VSA,VSS,VSB)');
+  it('VOSB → VSA,VSS only (VSS was in no list before; VSB is Very Small Business)', () => {
+    expect(saExpr({ setAside: 'VOSB' })).toBe('set_aside_code.in.(VSA,VSS)');
+    expect(saExpr({ setAside: 'VSB' })).toBe('set_aside_code.in.(VSB)');
   });
   it('SDVOSB_ONLY excludes every veteran-owned code', () => {
     const e = saExpr({ setAside: 'SDVOSB_ONLY' })!;
@@ -67,8 +68,9 @@ describe('new keys', () => {
 });
 
 describe('pin display bucket', () => {
-  it('VSA/VSS/VSB pins are VOSB; true SDVOSB codes stay SDVOSB', () => {
-    for (const c of ['VSA', 'VSS', 'VSB']) {
+  it('VSA/VSS pins are VOSB; VSB pins are Very Small Business; true SDVOSB codes stay SDVOSB', () => {
+    expect(setGroupKey('VSB')).toBe('VSB');
+    for (const c of ['VSA', 'VSS']) {
       expect(setGroupKey(c)).toBe('VOSB');
       expect(mapSetAside(c)).toEqual({ key: 'VOSB', open: false });
     }

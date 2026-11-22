@@ -60,7 +60,7 @@ const EMBED_CTA_JS = "<script>if(!window.openOppDrawer){window.openOppDrawer=fun
 
 // Our set-aside group key → the token the prototype's setKey()/cardHTML expect.
 const SET_TO_EVC: Record<string, string> = {
-  SDVOSB: 'SDVOSB', VOSB: 'VOSB', SB: 'SB', '8A': '8(a)', WOSB: 'WOSB', HZ: 'HUBZone', OTHER: 'Other', NONE: 'None',
+  SDVOSB: 'SDVOSB', VOSB: 'VOSB', VSB: 'VSB', SB: 'SB', '8A': '8(a)', WOSB: 'WOSB', HZ: 'HUBZone', OTHER: 'Other', NONE: 'None',
 };
 
 // Clean the raw department into a short, readable agency label for the card.
@@ -1691,7 +1691,7 @@ const WATCH_SCOPE_SCRIPT = '<script>' + WATCH_SCOPE_JS + '</script>';
 const SET_ALIASES_SCRIPT = '<script>window.__SET_ALIASES=' + JSON.stringify(LEGACY_SET_ALIASES) + ';</script>';
 const VIEWPORT_JS = `<script>
 (function(){
-  var SETMAP={SDVOSB:'SDVOSB',VOSB:'VOSB',SB:'SB','8A':'8(a)',WOSB:'WOSB',HZ:'HUBZone',OTHER:'Other',NONE:'None'};
+  var SETMAP={SDVOSB:'SDVOSB',VOSB:'VOSB',VSB:'VSB',SB:'SB','8A':'8(a)',WOSB:'WOSB',HZ:'HUBZone',OTHER:'Other',NONE:'None'};
   // Company set-aside chip colors — reuses the map's existing legend palette exactly (see
   // LEGEND_HTML): SDVOSB green, Small Biz blue, 8(a) purple, WOSB red, HUBZone amber.
   var SET_CHIP_COLOR={SDVOSB:'#22a06b',SB:'#3b82f6','8A':'#8b5cf6',WOSB:'#ef4444',HZ:'#f59e0b'};

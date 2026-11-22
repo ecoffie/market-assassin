@@ -14,7 +14,7 @@ describe('VOSB is labelled VA-only; SDVOSB stays distinct', () => {
     expect(SET_GROUPS.find((g) => g.key === 'VOSB')!.label).toBe('VOSB (VA only)');
     expect(SET_GROUPS.find((g) => g.key === 'SDVOSB_ONLY')!.label).toBe('SDVOSB');
     expect(setAsideFilterCodes('SDVOSB_ONLY')).toEqual(['SDVOSBC', 'SDVOSBS', 'SDVOSB']);
-    expect(setAsideFilterCodes('VOSB')).toEqual(['VSA', 'VSS', 'VSB']);
+    expect(setAsideFilterCodes('VOSB')).toEqual(['VSA', 'VSS']);
   });
   it('legacy saved SDVOSB filter is unchanged (no data migration)', () => {
     expect([...LEGACY_SDVOSB_FILTER_CODES]).toEqual(['SDVOSBC', 'SDVOSBS', 'VSA', 'VSB', 'SDVOSB']);

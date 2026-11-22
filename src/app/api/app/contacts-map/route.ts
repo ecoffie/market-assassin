@@ -549,7 +549,7 @@ export async function GET(request: NextRequest) {
   const saT = companySetAsideBuckets(p.get('setAside') || '');
   const setAside = saT.buckets;
   const setAsideNote = saT.unsupported.length
-    ? 'Veteran-owned (VOSB) is not a Players set-aside bucket — firms are not filtered by it.'
+    ? 'Veteran-owned (VOSB, VA only) and Very Small Business are not Players set-aside buckets — firms are not filtered by them.'
     : null;
   // Companies — searchRecipients honors naics on its rollup path (state+naics scoped together,
   // cheap); as of 2026-08-03 it ALSO honors agency (an awards-table scan when set — see

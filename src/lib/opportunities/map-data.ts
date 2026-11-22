@@ -144,13 +144,18 @@ export function resolvePinCoord(row: {
 /**
  * ⚠️ FROZEN — the code list the bare filter key `'SDVOSB'` has always expanded to. Saved searches
  * (`saved_searches.filters`), anon watches, localStorage and `?setAside=SDVOSB` links store that key
- * with no version, so it must keep returning EXACTLY these rows forever (it wrongly folds the
- * veteran-owned VSA/VSB in with true SDVOSB — kept on purpose; do not "fix" it). New selections use
- * `SDVOSB_ONLY` / `VOSB` below. 2026-11-22.
+ * with no version, so it must keep returning EXACTLY these rows (Eric: preserve legacy behaviour, no
+ * migration). It is a HISTORICAL MISCLASSIFICATION, kept only for saved-filter compatibility:
+ *   - VSA = "VETERAN SET ASIDE" (VA-only Veteran-Owned, not service-disabled), and
+ *   - VSB = "VERY SMALL BUSINESS" (not veteran-owned at all),
+ * neither of which is SDVOSB. New selections use `SDVOSB_ONLY` / `VOSB` / `VSB` below, which do NOT
+ * reproduce this list — a restored legacy filter keeps sending the legacy token until the user changes a
+ * set-aside box, which is what keeps its rows identical. 2026-11-22.
  */
 export const LEGACY_SDVOSB_FILTER_CODES: readonly string[] = Object.freeze(['SDVOSBC', 'SDVOSBS', 'VSA', 'VSB', 'SDVOSB']);
 
 /** Legacy filter keys no longer offered as a checkbox → the checkboxes a restore should tick. */
+// The closest current boxes for display only — NOT an equivalent code list (see LEGACY_SDVOSB_FILTER_CODES).
 export const LEGACY_SET_ALIASES: Record<string, string[]> = { SDVOSB: ['SDVOSB_ONLY', 'VOSB'] };
 
 /**
@@ -163,7 +168,7 @@ export function companySetAsideBuckets(raw: string): { buckets: string; unsuppor
   const unsupported: string[] = [];
   for (const t of raw.split(',').map((s) => s.trim().toUpperCase()).filter(Boolean)) {
     if (t === 'SDVOSB_ONLY') out.push('SDVOSB');
-    else if (t === 'VOSB') unsupported.push(t);
+    else if (t === 'VOSB' || t === 'VSB') unsupported.push(t); // no Players bucket for either
     else out.push(t);
   }
   return { buckets: [...new Set(out)].join(','), unsupported };
@@ -176,11 +181,11 @@ export function companySetAsideBuckets(raw: string): { buckets: string; unsuppor
  */
 export const SET_GROUPS: Array<{ key: string; label: string; color: string; codes: string[]; pin?: string }> = [
   { key: 'SDVOSB_ONLY', pin: 'SDVOSB', label: 'SDVOSB', color: '#10b981', codes: ['SDVOSBC', 'SDVOSBS', 'SDVOSB'] },
-  // SAM.gov (open.gsa.gov Get Opportunities API, Set-Aside Values): VSA = "Veteran-Owned Small Business Set-Aside
-  // (specific to Department of Veterans Affairs)", VSS = the VA sole source. A VA-only (Vets First) program —
-  // never present it as government-wide eligibility. 'VSB' is NOT a SAM code; it is matched only so legacy
-  // non-SAM tokens elsewhere in our code keep resolving (no rows are expected to carry it).
-  { key: 'VOSB', label: 'VOSB (VA only)', color: '#14b8a6', codes: ['VSA', 'VSS', 'VSB'] },
+  // Official meanings (pinned in set-aside-codes.unit.test.ts): VSA/VSS = Veteran-Owned Small Business
+  // set-aside / sole source, specific to the Department of Veterans Affairs (Vets First) — never
+  // government-wide. VSB = "Very Small Business" (USASpending), NOT veteran-owned: its own honest group.
+  { key: 'VOSB', label: 'VOSB (VA only)', color: '#14b8a6', codes: ['VSA', 'VSS'] },
+  { key: 'VSB', label: 'Very Small Business', color: '#64748b', codes: ['VSB'] },
   { key: 'SB', label: 'Small Business', color: '#3b82f6', codes: ['SBA', 'SBP', 'SB'] },
   { key: '8A', label: '8(a)', color: '#a855f7', codes: ['8A', '8AN', '8(A)'] },
   { key: 'WOSB', label: 'WOSB / EDWOSB', color: '#ef4444', codes: ['WOSB', 'WOSBSS', 'EDWOSB', 'EDWOSBSS'] },

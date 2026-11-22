@@ -116,7 +116,8 @@ export function setAsideToUsaspendingCodes(v: string | undefined): string[] | un
     SB: ['SBA', 'SBP'], SMALL: ['SBA', 'SBP'], 'SMALL BUSINESS': ['SBA', 'SBP'],
     '8A': ['8A', '8AN'], '8(A)': ['8A', '8AN'],
     SDVOSB: ['SDVOSBC', 'SDVOSBS'], SDVOSB_ONLY: ['SDVOSBC', 'SDVOSBS'], // map filter keys
-    VOSB: ['VSA', 'VSS'],
+    VOSB: ['VSA', 'VSS'], // VA-only Veteran-Owned (SAM.gov)
+    VSB: ['VSB'],         // Very Small Business (USASpending) — not veteran
     WOSB: ['WOSB', 'EDWOSB'], EDWOSB: ['WOSB', 'EDWOSB'],
     HZ: ['HZC', 'HZS'], HUBZONE: ['HZC', 'HZS'],
   };

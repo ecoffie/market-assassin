@@ -142,7 +142,7 @@ const SET_ASIDE_CODES: Record<SetAsideKey, string[]> = {
   edwosb: ['EDWOSB', 'EDWOSBSS'],
   hubzone: ['HZC', 'HZS'],
   sdvosb: ['SDVOSBC', 'SDVOSBS'],
-  vosb: ['VSA', 'VSS', 'VSB'], // VSS (VA sole source) was missing; VSB is not a SAM code (kept for legacy tokens)
+  vosb: ['VSA', 'VSS'], // VA-only Veteran-Owned set-aside / sole source. VSB is Very Small Business, NOT veteran.
   sdb: ['SDB'],
   sb: ['SBA', 'SBP'],
   isbee: ['ISBEE'],

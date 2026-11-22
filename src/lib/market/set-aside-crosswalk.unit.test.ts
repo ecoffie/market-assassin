@@ -28,7 +28,9 @@ describe('REAL under-served users gain their reserved lanes', () => {
 
   it('management@sanddmanagement — "Small Business" + vault [Small Business, VOSB]', () => {
     const after = eligibleSetAsidesCombined('Small Business', fromVault(['Small Business', 'VOSB']));
-    expect(after).toContain('VSB');
+    // VOSB = VA's VSA/VSS (SAM.gov). It used to map to VSB, which is "Very Small Business" — the wrong pool.
+    expect(after).toEqual(expect.arrayContaining(['VSA', 'VSS']));
+    expect(after).not.toContain('VSB');
   });
 
   it('rasheeda.smith24@ — vault "SDVOSB.WOSB" (crammed) still resolves both', () => {
