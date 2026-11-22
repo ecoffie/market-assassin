@@ -18,12 +18,17 @@ import { revalidatePath } from 'next/cache';
 import { LISTICLES } from '@/data/top-listicles';
 import { fetchTopForListicle } from '@/lib/bigquery/listicle-fetch';
 import { writeLeaderboardSnapshot } from '@/lib/leaderboards/snapshots';
+import { authorizeCronRequest } from '@/lib/cron/cron-request-auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 120;
 
 export async function GET(request: NextRequest) {
+  // Server-side authorization FIRST, before any read, write or send. Only the CRON_SECRET bearer the
+  // dispatcher sends runs this job; a caller-set header never does.
+  const auth = await authorizeCronRequest(request, { isTest: false });
+  if (!auth.ok) return auth.response;
   const only = new URL(request.url).searchParams.get('slug');
   // A ranking snapshot is a point-in-time of CURRENT rankings, so "today" (UTC) is
   // correct here — unlike day-summary crons that must look back at the closed day.

@@ -25,6 +25,7 @@ import {
   GEOCODE_SRC_COLS, planGeocodeWrites, coverageIsHealthy, COVERAGE_FLOOR_PCT,
   type GeocodeSrcRow,
 } from '@/lib/opportunities/geocode-open-opps';
+import { authorizeCronRequest } from '@/lib/cron/cron-request-auth';
 
 export const maxDuration = 300;
 export const dynamic = 'force-dynamic';
@@ -38,6 +39,10 @@ function db() {
 }
 
 export async function GET(request: NextRequest) {
+  // Server-side authorization FIRST, before any read, write or send. Only the CRON_SECRET bearer the
+  // dispatcher sends runs this job; a caller-set header never does.
+  const auth = await authorizeCronRequest(request, { isTest: false });
+  if (!auth.ok) return auth.response;
   const p = new URL(request.url).searchParams;
   const dry = p.get('dry') === '1';
   const limit = Math.min(5000, Math.max(1, Number(p.get('limit')) || DEFAULT_LIMIT));

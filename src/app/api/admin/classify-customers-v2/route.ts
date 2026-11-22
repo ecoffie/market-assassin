@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { kv } from '@vercel/kv';
 import { writeFile } from 'fs/promises';
-import path from 'path';
 import {
   getAllContentGeneratorAccess,
   getAllDatabaseAccess,
@@ -10,6 +9,7 @@ import {
   getAllRecompeteAccess,
 } from '@/lib/access-codes';
 import { verifyAdminPassword } from '@/lib/admin-auth';
+import { getClassifyV2PrivateInputs, EMPTY_CLASSIFY_V2_LISTS, type ClassifyV2Lists } from '@/lib/admin/classify-v2-private-inputs';
 
 export const runtime = 'nodejs';
 
@@ -17,7 +17,6 @@ const PAGE_SIZE = 1000;
 const PREVIEW_NOW = new Date('2026-04-29T12:00:00.000Z');
 const PHASE_1_BETA_END = '2026-06-30';
 const EXECUTION_REASON = 'phase_1_activation_campaign';
-const ROLLBACK_PATH = 'scripts/rollback_phase1_2026-04-30.sql';
 
 type Classification =
   | 'ultimate_giant'
@@ -142,53 +141,9 @@ const EVENT_PRICE_RANGES = [
   [49800, 50000],
 ] as const;
 
-const EXPECTED_INNER_CIRCLE_EMAILS = [
-  'bobby@24hrc.us',
-  'willie.smiley@spasmileytrucking.com',
-  'andrew@millpondresearch.com',
-  'antcaruso22@gmail.com',
-  'lisa@primebrokerllc.com',
-];
-
-const GRANDFATHERED_INNER_CIRCLE_EMAILS = new Set(EXPECTED_INNER_CIRCLE_EMAILS);
-
-const EXPLICIT_INTERNAL_TEAM_EMAILS = new Set([
-  'kashif6331@gmail.com',
-  'usamashraf2@gmail.com',
-  'evankoffdev@gmail.com',
-]);
-
-const EXPLICIT_COMP_TESTIMONIAL_EMAILS = new Set([
-  'aj@cypherintel.com',
-  'pa.joof@pjaygroup.com',
-  'dare2dreaminc615@gmail.com',
-  'olga@olaexecutiveconsulting.com',
-  'tavinalford@gmail.com',
-]);
-
-const VERIFICATION_SPOT_CHECK_EMAILS = [
-  'bobby@24hrc.us',
-  'willie.smiley@spasmileytrucking.com',
-  'andrew@millpondresearch.com',
-  'antcaruso22@gmail.com',
-  'lisa@primebrokerllc.com',
-  'kydun00@yahoo.com',
-  'bonitascott15@hotmail.com',
-  'colinn.me@gmail.com',
-  'contact@blenaitechnologies.com',
-  'fernando.mercado@venerandavalor.com',
-  'hello@eganrose.com',
-  'miazhudson@gmail.com',
-  'founder@siemable.com',
-  'info@cfpsolutions.net',
-  'jcameron@cameroncommerce.com',
-  '01waycontracting@gmail.com',
-  '7days.consulting19@gmail.com',
-  'allegrapena@gmail.com',
-  'eric@govcongiants.com',
-  'kashif6331@gmail.com',
-  'aj@cypherintel.com',
-];
+// Named customer lists are private inputs (src/lib/admin/classify-v2-private-inputs.ts), set per request
+// after the handler has confirmed every input is present. Never committed.
+let PRIVATE_LISTS: ClassifyV2Lists = EMPTY_CLASSIFY_V2_LISTS;
 
 function getSupabase() {
   return createClient(
@@ -229,11 +184,11 @@ function isSystemTestEmail(email: string) {
 }
 
 function isExplicitCompAccount(email: string) {
-  return EXPLICIT_COMP_TESTIMONIAL_EMAILS.has(email);
+  return PRIVATE_LISTS.compTestimonial.has(email);
 }
 
 function isExplicitInternalTeamAccount(email: string) {
-  return EXPLICIT_INTERNAL_TEAM_EMAILS.has(email);
+  return PRIVATE_LISTS.internalTeam.has(email);
 }
 
 function isValidCharge(charge: StripeChargeRow) {
@@ -297,7 +252,7 @@ function hasActiveInnerCircle(user: Omit<UnifiedUser, 'matches' | 'classificatio
 
   return hasCurrentInnerCircleSubscription
     || hasNewStructureCharge
-    || GRANDFATHERED_INNER_CIRCLE_EMAILS.has(user.email);
+    || PRIVATE_LISTS.expectedInnerCircle.includes(user.email);
 }
 
 function hasHistoricalInnerCircle(user: Omit<UnifiedUser, 'matches' | 'classification' | 'reason' | 'accessPreview'>) {
@@ -804,6 +759,16 @@ export async function GET(request: NextRequest) {
     }, { status: 400 });
   }
 
+  // Private inputs first: refuse before reading or writing anything when one is missing.
+  const inputs = getClassifyV2PrivateInputs(process.env, mode);
+  if (!inputs.ok) {
+    return NextResponse.json({
+      error: 'Private classification inputs are not configured, so nothing was read or changed.',
+      missing: inputs.missing,
+    }, { status: 503 });
+  }
+  PRIVATE_LISTS = inputs.lists;
+
   try {
     const supabase = getSupabase();
     const [
@@ -953,11 +918,11 @@ export async function GET(request: NextRequest) {
       contentEnginePatternCandidates: classifiedUsers
         .filter(user => isContentEngine(user.kv.contentTier))
         .map(summarizeUser),
-      expectedInnerCircleAudit: EXPECTED_INNER_CIRCLE_EMAILS.map(email => {
+      expectedInnerCircleAudit: PRIVATE_LISTS.expectedInnerCircle.map(email => {
         const user = classifiedUsers.find(candidate => candidate.email === email);
         return user ? summarizeUser(user) : { email, missingFromUnifiedUniverse: true };
       }),
-      spotChecks: VERIFICATION_SPOT_CHECK_EMAILS.map(email => {
+      spotChecks: PRIVATE_LISTS.spotChecks.map(email => {
         const user = classifiedUsers.find(candidate => candidate.email === email);
         return user ? summarizeUser(user) : { email, missingFromUnifiedUniverse: true };
       }),
@@ -1018,7 +983,7 @@ export async function GET(request: NextRequest) {
         insertedProfileEmails,
         executeId
       );
-      const rollbackAbsolutePath = path.join(process.cwd(), ROLLBACK_PATH);
+      const rollbackAbsolutePath = inputs.rollbackPath!;
       await writeFile(rollbackAbsolutePath, rollbackSql, 'utf8');
 
       const errors: Array<{ step: string; email?: string; error: string }> = [];

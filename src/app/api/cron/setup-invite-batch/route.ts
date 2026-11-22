@@ -19,6 +19,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { sendSetupInvite } from '@/lib/mindy/account-setup';
 import { isCampaignExcludedEmail } from '@/lib/mindy/campaign-exclusions';
+import { authorizeCronRequest } from '@/lib/cron/cron-request-auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -117,6 +118,10 @@ async function fetchAlreadyInvited(supabase: SupabaseClient): Promise<Set<string
 }
 
 export async function GET(request: NextRequest) {
+  // Server-side authorization FIRST, before any read, write or send. Only the CRON_SECRET bearer the
+  // dispatcher sends runs this job; a caller-set header never does.
+  const auth = await authorizeCronRequest(request, { isTest: false });
+  if (!auth.ok) return auth.response;
   const url = new URL(request.url);
   const execute = url.searchParams.get('mode') === 'execute';
   const limit = Math.max(1, Math.min(200, Number(url.searchParams.get('limit') || 50)));

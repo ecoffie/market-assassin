@@ -231,10 +231,12 @@ interface DashboardData {
     }>;
   };
   bootcampRollout?: {
-    totalAttendees?: number;
+    /** null = the private attendee list is unavailable (never shown as 0). */
+    attendeeList?: 'available' | 'unavailable';
+    totalAttendees?: number | null;
     totalBootcampUsers: number;
     invitationsSent: number;
-    invitationsRemaining: number;
+    invitationsRemaining: number | null;
     profilesCompleted: number;
     profileCompletionRate: string;
     readyForAlerts: number;
@@ -2169,7 +2171,9 @@ export default function AdminDashboard() {
                   <span className="text-gray-300 text-sm font-mono">
                     {rolloutDone
                       ? `Complete — ${bc.invitationsSent.toLocaleString()} sent`
-                      : `${bc.invitationsSent.toLocaleString()} sent, ${bc.invitationsRemaining.toLocaleString()} left`}
+                      : bc.invitationsRemaining === null
+                        ? `${bc.invitationsSent.toLocaleString()} sent, remaining unavailable (attendee list not loaded)`
+                        : `${bc.invitationsSent.toLocaleString()} sent, ${bc.invitationsRemaining.toLocaleString()} left`}
                   </span>
                 </div>
                 {bc.lastInvitationSent && (

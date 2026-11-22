@@ -13,9 +13,10 @@
  * Every row is a real transaction (real amount, real generated_internal_id →
  * usaspending.gov/award/<id> proof) — grounded.
  */
-import { NextResponse } from 'next/server';
+import { NextResponse, type NextRequest } from 'next/server';
 import { revalidatePath } from 'next/cache';
 import { getWriteClient } from '@/lib/supabase/server-clients';
+import { authorizeCronRequest } from '@/lib/cron/cron-request-auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -37,7 +38,11 @@ interface TxnRow {
   generated_internal_id: string | null;
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  // Server-side authorization FIRST, before any read, write or send. Only the CRON_SECRET bearer the
+  // dispatcher sends runs this job; a caller-set header never does.
+  const auth = await authorizeCronRequest(request, { isTest: false });
+  if (!auth.ok) return auth.response;
   const end = new Date();
   const start = new Date(end.getTime() - WINDOW_DAYS * 86400_000);
   const day = (d: Date) => d.toISOString().slice(0, 10);

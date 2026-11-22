@@ -9,7 +9,7 @@ user reproduces the capability-match pattern below.
 
 ## What triggered the investigation
 
-A user (Maria Vazquez, `abcrossfit@hotmail.com`) reported during a live session that her
+A user (Maria Vazquez, `[email removed]`) reported during a live session that her
 credits were "all used up." She had 15 remaining — but had spent 85 of 100 in about five
 minutes, hit `rejected_no_credits` mid-session, and experienced it as a wall.
 
@@ -51,7 +51,7 @@ would not move the aggregate.
 
 **`capability_market_match` costs 100 credits — exactly equal to the signup grant.**
 
-Observed once (`coachbimpe2011@gmail.com`), verbatim from the ledger and call log:
+Observed once (`[email removed]`), verbatim from the ledger and call log:
 
 | time | event |
 |---|---|
@@ -99,16 +99,16 @@ issuance or counted as a paid grant in economics analysis.
 
 | | |
 |---|---|
-| `abcrossfit@hotmail.com` | +85 (her exact first-session spend) |
+| `[email removed]` | +85 (her exact first-session spend) |
 | 7 further day-1 wall users, never paid | **+555 total**, per-user amounts |
 | verified | 8 adjustments · balances reconcile · **no original debit modified** |
 
 **Deliberately NOT restored:**
 
-* `coachbimpe2011@gmail.com` — never returned, and 100 credits back into the same
+* `[email removed]` — never returned, and 100 credits back into the same
   structure would let them repeat the identical one-call trial. Recovery here is an
   outreach decision, not a ledger one.
-* `rochbuf@gmail.com` — spent 5 credits, then made 97 calls. Not the same case.
+* `[email removed]` — spent 5 credits, then made 97 calls. Not the same case.
 * 6 users who hit the day-1 wall and **later converted to paid** — restoring theirs would
   be a discount, not a recovery.
 

@@ -162,7 +162,7 @@ async function generateInvitations() {
   );
   const csvContent = [csvHeader, ...csvRows].join('\n');
 
-  const csvPath = 'scripts/active_subscriber_invitations_2026-04-28.csv';
+  const csvPath = require('./lib/private-path').privatePath('active_subscriber_invitations.csv'); // eslint-disable-line @typescript-eslint/no-require-imports
   fs.writeFileSync(csvPath, csvContent);
   console.log(`\nCSV saved to: ${csvPath}`);
 
@@ -219,7 +219,7 @@ GovCon Giants
 
   // Save JSON for programmatic use
   fs.writeFileSync(
-    'scripts/active_subscriber_invitations_2026-04-28.json',
+    require('./lib/private-path').privatePath('active_subscriber_invitations.json'), // eslint-disable-line @typescript-eslint/no-require-imports
     JSON.stringify(invitations, null, 2)
   );
   console.log('\nJSON also saved for programmatic use');
