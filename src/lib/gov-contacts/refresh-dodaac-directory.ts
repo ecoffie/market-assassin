@@ -57,7 +57,8 @@ export function buildDirectoryRecords(
   }
   return [...ids.values()].map((id) => {
     const t = totals.get(id.code)!;
-    if (id.identity_basis === 'conflicting') conflictingOut?.add(id.code);
+    // department_only nulls the sub-agency, so an authoritative (SAM/curated) row is protected the same way.
+    if (id.identity_basis !== 'majority') conflictingOut?.add(id.code);
     return {
       dodaac: id.code,
       office_name: cleanName(id.code, id.name ?? t.anyName ?? id.code),

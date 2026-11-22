@@ -24,7 +24,13 @@ export interface OfficeIdentityCandidate {
   n: number | string;
 }
 
-export type OfficeIdentityBasis = 'majority' | 'conflicting';
+/**
+ * majority        — one (department, sub-agency) pair holds >= OFFICE_IDENTITY_MIN_SHARE: both kept.
+ * department_only — no pair does, but one DEPARTMENT does: the department is kept, the sub-agency is unknown
+ *                   (Agent 4 / Eric review, 2026-11-22: only the ambiguous level is nulled).
+ * conflicting     — not even the department reaches the threshold: agency and sub-agency unknown.
+ */
+export type OfficeIdentityBasis = 'majority' | 'department_only' | 'conflicting';
 
 export interface OfficeIdentity {
   code: string;
@@ -34,6 +40,8 @@ export interface OfficeIdentity {
   identity_basis: OfficeIdentityBasis;
   /** Share of the code's rows held by the leading (agency, sub_agency) pair, 0–1. */
   agency_share: number;
+  /** Share held by the leading DEPARTMENT (all its sub-agencies together), 0–1. */
+  department_share: number;
   /** The leading pair even when it falls short of the threshold (evidence only — never displayed as the agency). */
   leader: { agency: string | null; sub_agency: string | null };
   /** The second (agency, sub_agency) pair and its share — the evidence a later correction needs. */
@@ -74,13 +82,27 @@ export function voteOfficeIdentity(candidates: OfficeIdentityCandidate[]): Map<s
     const share = top.n / total;
     const majority = share >= OFFICE_IDENTITY_MIN_SHARE;
     const topName = [...top.names.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0]?.[0] ?? null;
+    // Department vote, separately: sum every pair under the same department.
+    const depts = new Map<string, { agency: string | null; n: number; names: Map<string, number> }>();
+    for (const p of pairs.values()) {
+      const k = (p.agency || '').toUpperCase();
+      const d = depts.get(k) ?? { agency: p.agency, n: 0, names: new Map() };
+      d.n += p.n;
+      for (const [nm, c] of p.names) d.names.set(nm, (d.names.get(nm) ?? 0) + c);
+      depts.set(k, d);
+    }
+    const topDept = [...depts.values()].sort((a, b) => b.n - a.n || String(a.agency).localeCompare(String(b.agency)))[0];
+    const deptShare = topDept.n / total;
+    const deptOnly = !majority && !!topDept.agency && deptShare >= OFFICE_IDENTITY_MIN_SHARE;
+    const deptName = deptOnly ? [...topDept.names.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0]?.[0] ?? null : null;
     out.set(code, {
       code,
       // The name is only trustworthy with the identity it belongs to.
-      name: majority ? topName : null,
-      agency: majority ? top.agency : null,
+      name: majority ? topName : deptOnly ? deptName : null,
+      agency: majority ? top.agency : deptOnly ? topDept.agency : null,
       sub_agency: majority ? top.sub : null,
-      identity_basis: majority ? 'majority' : 'conflicting',
+      identity_basis: majority ? 'majority' : deptOnly ? 'department_only' : 'conflicting',
+      department_share: Math.round(deptShare * 1000) / 1000,
       agency_share: Math.round(share * 1000) / 1000,
       leader: { agency: top.agency, sub_agency: top.sub },
       runner_up: ranked[1] ? { agency: ranked[1].agency, sub_agency: ranked[1].sub, share: Math.round((ranked[1].n / total) * 1000) / 1000 } : null,
@@ -99,8 +121,8 @@ export const CONFLICT_EVIDENCE_SAMPLE = 25;
  */
 export function conflictEvidenceSample(ids: Map<string, OfficeIdentity>) {
   return [...ids.values()]
-    .filter((i) => i.identity_basis === 'conflicting')
+    .filter((i) => i.identity_basis !== 'majority')
     .sort((a, b) => b.rows - a.rows || a.code.localeCompare(b.code))
     .slice(0, CONFLICT_EVIDENCE_SAMPLE)
-    .map((i) => ({ code: i.code, leader: i.leader, leader_share: i.agency_share, runner_up: i.runner_up, rows: i.rows }));
+    .map((i) => ({ code: i.code, basis: i.identity_basis, leader: i.leader, leader_share: i.agency_share, department_share: i.department_share, runner_up: i.runner_up, rows: i.rows }));
 }

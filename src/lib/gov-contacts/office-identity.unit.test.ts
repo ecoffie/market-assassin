@@ -109,3 +109,37 @@ describe('bounded conflict evidence (no schema change)', () => {
     expect(sample[0]).toMatchObject({ leader: { agency: CBP.agency }, leader_share: 0.6, runner_up: { agency: FTC.agency, share: 0.4 }, rows: 100 });
   });
 });
+
+describe('department kept when only the sub-agency is ambiguous (review of #2301)', () => {
+  const DHS_ICE = { code: '70CDCR', name: 'ICE DETENTION', agency: 'Department of Homeland Security', sub_agency: 'U.S. Immigration and Customs Enforcement' };
+  const DHS_CBP = { ...DHS_ICE, name: 'CBP OFFICE', sub_agency: 'U.S. Customs and Border Protection' };
+  const DOJ = { ...DHS_ICE, name: 'DOJ OFFICE', agency: 'Department of Justice', sub_agency: 'Federal Bureau of Prisons' };
+  it('no pair >= 80% but the department is: department kept, sub-agency unknown', () => {
+    const id = voteOfficeIdentity([{ ...DHS_ICE, n: 50 }, { ...DHS_CBP, n: 45 }, { ...DOJ, n: 5 }]).get('70CDCR')!;
+    expect(id.identity_basis).toBe('department_only');
+    expect(id.agency).toBe('Department of Homeland Security');
+    expect(id.sub_agency).toBeNull();
+    expect(id.department_share).toBe(0.95);
+    expect(id.agency_share).toBe(0.5);
+  });
+  it('department below 80% too: fully conflicting', () => {
+    const id = voteOfficeIdentity([{ ...DHS_ICE, n: 40 }, { ...DHS_CBP, n: 30 }, { ...DOJ, n: 30 }]).get('70CDCR')!;
+    expect(id.identity_basis).toBe('conflicting');
+    expect(id.agency).toBeNull();
+  });
+  it('a pair majority is unchanged', () => {
+    expect(voteOfficeIdentity([{ ...DHS_ICE, n: 90 }, { ...DOJ, n: 10 }]).get('70CDCR')!.identity_basis).toBe('majority');
+  });
+  it('the directory protects authoritative rows for department_only codes too', async () => {
+    const { preserveAuthoritativeAgency } = await import('./refresh-dodaac-directory');
+    const conflicting = new Set<string>();
+    const recs = buildDirectoryRecords([
+      { dodaac: '70CDCR', office_name: 'ICE', agency: DHS_ICE.agency, sub_agency: DHS_ICE.sub_agency, award_count: 50, total_obligated: 1 },
+      { dodaac: '70CDCR', office_name: 'CBP', agency: DHS_CBP.agency, sub_agency: DHS_CBP.sub_agency, award_count: 45, total_obligated: 1 },
+    ], 't', conflicting);
+    expect(recs[0]).toMatchObject({ agency: 'Department of Homeland Security', sub_agency: null });
+    expect([...conflicting]).toEqual(['70CDCR']);
+    const kept = preserveAuthoritativeAgency(recs, conflicting, new Map([['70CDCR', { dodaac: '70CDCR', source: 'sam_hierarchy', agency: 'HOMELAND SECURITY, DEPARTMENT OF', sub_agency: 'U.S. IMMIGRATION AND CUSTOMS ENFORCEMENT' }]]));
+    expect(kept[0]).toMatchObject({ source: 'sam_hierarchy', sub_agency: 'U.S. IMMIGRATION AND CUSTOMS ENFORCEMENT' });
+  });
+});
