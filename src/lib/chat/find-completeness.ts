@@ -66,6 +66,7 @@ export interface ComingBackItemLite {
   description?: string | null;
   value_label?: string | null;
   potential_total_value?: number | string | null;
+  total_obligation?: number | string | null;
   current_end?: string | null;
   location_label?: string | null;
   contract_id?: string | null;
@@ -109,7 +110,8 @@ function fmtDate(iso: string | null | undefined): string {
 /** Direct rows in presentation order: competed / not established first (value desc), then not competed. */
 export function prioritizedComingBack(items: ComingBackItemLite[]): ComingBackItemLite[] {
   const direct = items.filter((i) => i.evidence_class === 'DIRECT_MATCH');
-  const value = (i: ComingBackItemLite) => Number(i.potential_total_value) || 0;
+  // Ceiling when established, else the obligated amount (an unknown ceiling is not a $0 contract).
+  const value = (i: ComingBackItemLite) => Number(i.potential_total_value) || Number(i.total_obligation) || 0;
   const restricted = (i: ComingBackItemLite) => (i.competition?.class === 'not_competed' ? 1 : 0);
   return [...direct].sort((a, b) => restricted(a) - restricted(b) || value(b) - value(a));
 }

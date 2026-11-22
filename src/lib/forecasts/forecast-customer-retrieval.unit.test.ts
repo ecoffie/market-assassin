@@ -85,12 +85,15 @@ describe('forecast customer retrieval', () => {
     expect(result.forecasts[0]).toMatchObject({
       external_id: 'F2027076057',
       agency: 'DHS',
-      source_url: DHS_ERA_FORECASTS_URL,
+      // The stored ERA API endpoint is never shown as a link: the documented DHS listing page, scoped as such.
+      source_url: 'https://apfs-cloud.dhs.gov/forecast/',
+      source_link_scope: 'source_listing',
       as_of: SYNCED,
       as_of_basis: 'last_synced_at',
       naics_code: '488310',
     });
     expect(result.forecasts[0].title).toBe('Singapore Pier and Shoreside Support');
+    expect(row!.source_url).toBe(DHS_ERA_FORECASTS_URL); // provenance kept in storage
   });
 
   it('a missing sync clock stays unavailable for Ask Mindy and the tool', () => {

@@ -265,7 +265,7 @@ const MORE_FILTERS = '<div class="mfwrap">'
   + '<div class="mf-sec mf-value mfv-recompete" id="mfValueSec" style="display:none">Contract value</div>'
   + '<div class="mf-range mf-value mfv-recompete" id="mfValueRange" style="display:none">'
   +   '<label class="mf-field"><span>Min</span><select class="mf-in" id="mfValueMin"><option value="">No min</option><option value="25000">$25K</option><option value="100000">$100K</option><option value="1000000">$1M</option><option value="5000000">$5M</option><option value="10000000">$10M</option><option value="25000000">$25M</option><option value="100000000">$100M</option></select></label>'
-  +   '<span class="mf-dash">\\u2013</span>'
+  +   '<span class="mf-dash">–</span>'
   +   '<label class="mf-field"><span>Max</span><select class="mf-in" id="mfValueMax"><option value="">No max</option><option value="1000000">$1M</option><option value="5000000">$5M</option><option value="10000000">$10M</option><option value="25000000">$25M</option><option value="100000000">$100M</option><option value="500000000">$500M</option></select></label>'
   + '</div>'
   + '<select class="mf-value mfv-recompete" id="mfValue" style="display:none" hidden></select>'
@@ -10956,8 +10956,10 @@ const ASK_MINDY_CSS =
   + '.amk-exp-menu{position:relative}.amk-exp-toggle{border:1px solid #dde3ec;background:#fff;color:#334155;font:600 12px Inter,system-ui,sans-serif;border-radius:8px;padding:5px 12px;cursor:pointer}.amk-exp-toggle:hover{background:#f1f5f9}.amk-exp-toggle[aria-expanded="true"]{background:#f1f5f9}'
   + '.amk-exp-panel{position:absolute;right:0;top:calc(100% + 4px);z-index:5;min-width:160px;padding:6px;border:1px solid #dde3ec;border-radius:10px;background:#fff;box-shadow:0 8px 24px rgba(15,23,42,.12);display:flex;flex-direction:column;gap:2px}'
   + '.amk-exp-panel[hidden]{display:none!important}.amk-exp-panel button{border:0;background:transparent;color:#334155;font:600 12px Inter,system-ui,sans-serif;border-radius:7px;padding:8px 10px;cursor:pointer;text-align:left}.amk-exp-panel button:hover{background:#f1f5f9}.amk-exp-panel button:disabled{opacity:.6;cursor:default}'
+  + '.amk-rep-err{flex:none;margin:0;padding:8px 14px;border-bottom:1px solid #fde2e2;background:#fef2f2;color:#b91c1c;font:500 12.5px Inter,system-ui,sans-serif}.amk-rep-err[hidden]{display:none}'
+  + '.amk-rep-note{font:500 11.5px Inter,system-ui,sans-serif;color:#64748b;max-width:220px;text-align:right}'
   + '.amk-rep-x{border:0;background:none;color:#8595a6;cursor:pointer;font:400 24px/1 Inter,system-ui,sans-serif;padding:0 4px}'
-  + '.amk-rep-body{position:relative;flex:1;min-height:0;background:#f4f6fa}.amk-rep-f{position:absolute;inset:0;width:100%;height:100%;border:0;background:#fff}'
+  + '.amk-rep-body{position:relative;flex:1;min-height:0;background:#f4f6fa;overflow:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}.amk-rep-f{position:absolute;inset:0;width:100%;height:100%;border:0;background:#fff}'
   + '.amk-rep-msg{position:absolute;inset:0;display:none;align-items:center;justify-content:center;flex-direction:column;gap:10px;text-align:center;padding:24px;font:500 13.5px Inter,system-ui,sans-serif;color:#475569;background:#fff}'
   + '.amk-rep-msg button{border:1px solid #bcd3fb;background:#eaf1fe;color:#1d4ed8;font:600 12px Inter,system-ui,sans-serif;border-radius:8px;padding:7px 12px;cursor:pointer}'
   + '.amk-repbtn{flex:none;border:1px solid #bcd3fb;background:#eaf1fe;color:#1d4ed8;font:600 11.5px Inter,system-ui,sans-serif;border-radius:8px;padding:5px 10px;cursor:pointer;align-self:flex-start}'
@@ -11135,7 +11137,7 @@ const ASK_MINDY_JS = `<script>(function(){
   // display:'narrow_panel'. The server adds the presentation rule (answer first, short sections) to the answer
   // prompt as a SYSTEM note (src/lib/chat/display-hint.ts). It is never part of the message, so it is never
   // stored as the customer's words or read as their intent (review F3).
-  function setOpen(o){ ov.classList.toggle('show',o); drawer.classList.toggle('show',o); drawer.setAttribute('aria-hidden',o?'false':'true'); if(o){ syncAttached(); if(!body.children.length){ if(oppCtx)greetCard(); else greet(); } setTimeout(function(){ input&&input.focus(); },220);
+  function setOpen(o){ ov.classList.toggle('show',o); drawer.classList.toggle('show',o); drawer.setAttribute('aria-hidden',o?'false':'true'); if(o){ syncAttached(); if(!body.children.length){ if(oppCtx)greetCard(); else greet(); } setTimeout(function(){ if(input&&!repIsOpen()) input.focus(); },220);
     // Return later: the report left open comes back with the drawer (view mode only; card chat is about one notice).
     if(oppCtx){ repHide(false); } else { var rs=repRead(); if(rs){ rep=Object.assign({},rep||{},rs); if(rs.open) repOpen(rs.id); } syncRepBtn(); } }
     else { repHide(false); } }
@@ -11266,32 +11268,69 @@ const ASK_MINDY_JS = `<script>(function(){
   function authHdrs(){ return withWorkspace({'x-mi-auth-token':tok()||'','x-user-email':email()}); }
   // Download one saved file: the existing Vault route mints a 60-second signed URL (attachment).
   // Claude/ChatGPT pattern: formats live behind Export in the OPEN report pane — never on the chat card.
+  function repError(text){ var E=ensurePane(); E.err.textContent=text||''; E.err.hidden=!text; }
   function exportFile(file,btn){
-    var label=btn.textContent; btn.disabled=true; btn.textContent='Preparing...';
+    var label=btn.textContent; btn.disabled=true; btn.textContent='Preparing...'; repError('');
     fetch('/api/app/vault/documents/download?email='+encodeURIComponent(email())+'&id='+encodeURIComponent(file.document_id),{headers:authHdrs()})
       .then(function(r){ return r.ok?r.json():null; },function(){ return null; })
-      .then(function(d){ if(d&&d.url){ try{ if(window.__track) window.__track('tool_use','map_report_export',{format:file.format}); }catch(e){} location.href=d.url; } else btn.textContent='Try again'; },function(){ btn.textContent='Try again'; })
+      .then(function(d){ if(d&&d.url){ try{ if(window.__track) window.__track('tool_use','map_report_export',{format:file.format}); }catch(e){} location.href=d.url; } else { btn.textContent='Try again'; repError('The '+FMT_LABEL[file.format]+' file could not be prepared. Try again, or reopen the report from your Vault.'); } },function(){ btn.textContent='Try again'; repError('The file could not be prepared. Check your connection and try again.'); })
       .then(function(){ btn.disabled=false; if(btn.textContent==='Preparing...') btn.textContent=label; });
   }
-  function exportMenu(files,host){
-    host.innerHTML=''; if(!files.length) return;
+  // Packaged market report: a real PDF from /reports/<id>/pdf (same renderer as the hosted page). Fetched
+  // here, OUTSIDE the script-less preview frame, and saved as a file; a failure shows the server's message.
+  var REPORT_ID_RX=/^[A-Za-z0-9_-]{16,64}$/;
+  function downloadReportPdf(reportId,btn){
+    var label=btn.textContent; btn.disabled=true; btn.textContent='Preparing PDF...'; repError('');
+    var fail=function(msg){ btn.textContent='Try again'; repError(msg||'The PDF could not be created. Try again in a minute.'); };
+    fetch('/reports/'+encodeURIComponent(reportId)+'/pdf',{headers:{Accept:'application/pdf, application/json'}})
+      .then(function(r){
+        var ct=r.headers.get('content-type')||'';
+        if(r.ok&&ct.indexOf('application/pdf')===0){
+          var m=/filename="([^"]+)"/.exec(r.headers.get('content-disposition')||'');
+          return r.blob().then(function(b){
+            if(!b||!b.size){ fail(); return; }
+            var u=URL.createObjectURL(b), a=document.createElement('a'); a.href=u; a.download=(m&&m[1])||'market-report.pdf';
+            a.setAttribute('data-testid','amk-report-pdf-link'); document.body.appendChild(a); a.click();
+            setTimeout(function(){ URL.revokeObjectURL(u); if(a.parentNode) a.parentNode.removeChild(a); },1000);
+            btn.textContent=label;
+            try{ if(window.__track) window.__track('tool_use','map_report_export',{format:'pdf',source:'market_report'}); }catch(e){}
+          });
+        }
+        return r.json().then(function(j){ fail(j&&typeof j.message==='string'?j.message:''); },function(){ fail(); });
+      },function(){ fail('The PDF could not be downloaded. Check your connection and try again.'); })
+      .then(function(){ btn.disabled=false; if(btn.textContent==='Preparing PDF...') btn.textContent=label; });
+  }
+  // items: [{label, fmt, run(btn)}]
+  function exportMenu(items,host){
+    host.innerHTML=''; if(!items.length) return;
     var wrap=document.createElement('div'); wrap.className='amk-exp-menu'; wrap.setAttribute('data-testid','amk-export-menu');
     var toggle=document.createElement('button'); toggle.type='button'; toggle.className='amk-exp-toggle'; toggle.setAttribute('data-testid','amk-export-toggle'); toggle.setAttribute('aria-expanded','false'); toggle.textContent='Export';
     var panel=document.createElement('div'); panel.className='amk-exp-panel'; panel.hidden=true; panel.setAttribute('role','menu');
-    files.forEach(function(f){
-      var b=document.createElement('button'); b.type='button'; b.setAttribute('data-fmt',f.format); b.setAttribute('role','menuitem'); b.textContent=FMT_LABEL[f.format];
-      b.onclick=function(){ exportFile(f,b); panel.hidden=true; toggle.setAttribute('aria-expanded','false'); };
+    items.forEach(function(it){
+      var b=document.createElement('button'); b.type='button'; b.setAttribute('data-fmt',it.fmt); b.setAttribute('role','menuitem'); b.textContent=it.label;
+      b.onclick=function(){ it.run(b); panel.hidden=true; toggle.setAttribute('aria-expanded','false'); };
       panel.appendChild(b);
     });
     toggle.onclick=function(){ var open=panel.hidden; panel.hidden=!open; toggle.setAttribute('aria-expanded',open?'true':'false'); };
     wrap.appendChild(toggle); wrap.appendChild(panel); host.appendChild(wrap);
   }
+  function fileItems(files){ return files.map(function(f){ return {label:FMT_LABEL[f.format],fmt:f.format,run:function(b){ exportFile(f,b); }}; }); }
+  // Preview HTML goes into the script-less frame. Its own "Save as PDF" button (window.print) cannot run
+  // there, so it is hidden; Export in the pane header is the working path.
+  function repSetDoc(E,html){
+    var hide='<style>.pdfbtn{display:none!important}</style>';
+    E.f.srcdoc=/<[/]head>/i.test(html)?html.replace(/<[/]head>/i,hide+'</head>'):hide+html;
+    E.f.style.visibility='visible'; E.msg.style.display='none'; repError('');
+  }
   function ensurePane(){
     if(repEls) return repEls;
     var el=document.createElement('aside'); el.className='amk-rep'; el.id='amkRep'; el.setAttribute('aria-hidden','true'); el.setAttribute('role','dialog'); el.setAttribute('aria-label','Report'); el.setAttribute('data-testid','amk-report-pane');
-    el.innerHTML='<div class="amk-rep-hd"><button type="button" class="amk-rep-back">Back to chat</button><div class="amk-rep-tt"><b class="amk-rep-t"></b><span class="amk-rep-v"></span></div><div class="amk-rep-exp"></div><button type="button" class="amk-rep-x" aria-label="Close report">&times;</button></div><div class="amk-rep-body"><iframe class="amk-rep-f" sandbox="" title="Report"></iframe><div class="amk-rep-msg"></div></div>';
+    el.innerHTML='<div class="amk-rep-hd"><button type="button" class="amk-rep-back">Back to chat</button><div class="amk-rep-tt"><b class="amk-rep-t"></b><span class="amk-rep-v"></span></div><div class="amk-rep-exp"></div><button type="button" class="amk-rep-x" aria-label="Close report">&times;</button></div><p class="amk-rep-err" role="alert" data-testid="amk-report-error" hidden></p><div class="amk-rep-body"><iframe class="amk-rep-f" sandbox="" title="Report"></iframe><div class="amk-rep-msg"></div></div>';
     document.body.appendChild(el);
-    repEls={el:el,t:el.querySelector('.amk-rep-t'),v:el.querySelector('.amk-rep-v'),exp:el.querySelector('.amk-rep-exp'),f:el.querySelector('.amk-rep-f'),msg:el.querySelector('.amk-rep-msg')};
+    repEls={el:el,t:el.querySelector('.amk-rep-t'),v:el.querySelector('.amk-rep-v'),exp:el.querySelector('.amk-rep-exp'),f:el.querySelector('.amk-rep-f'),msg:el.querySelector('.amk-rep-msg'),err:el.querySelector('.amk-rep-err')};
+    // Keyboard reading: once a report has loaded, focus moves into it so Space / Page Down / arrows scroll it
+    // (focus used to stay in the chat box, so the keys typed there and the report never moved).
+    repEls.f.addEventListener('load',function(){ if(repIsOpen()&&repEls.f.style.visibility==='visible'){ try{ repEls.f.focus(); }catch(e){} } });
     el.querySelector('.amk-rep-x').onclick=function(){ repHide(true); };
     el.querySelector('.amk-rep-back').onclick=function(){ repHide(true); };
     return repEls;
@@ -11327,10 +11366,10 @@ const ASK_MINDY_JS = `<script>(function(){
         if(seq!==repSeq) return; // a newer open (a revision) replaced this one
         if(j&&j.gone){ if(rep&&rep.id===id){ rep=null; repWrite(); } repMessage('This report is no longer available. Ask Mindy to create it again.'); syncRepBtn(); return; }
         if(!j||!j.success||typeof j.html!=='string') throw new Error('preview shape');
-        E.f.srcdoc=j.html; E.f.style.visibility='visible'; E.msg.style.display='none';
+        repSetDoc(E,j.html);
         E.t.textContent=String(j.title||'Report'); E.v.textContent='Version '+(j.version||1)+' - saved in your Vault';
         var files=cleanFiles(j.files); if(!files.length&&rep) files=cleanFiles(rep.files);
-        exportMenu(files,E.exp);
+        exportMenu(fileItems(files),E.exp);
         rep=Object.assign({},rep||{},{email:em,ws:wsKey(),id:id,title:String(j.title||''),version:j.version||1,files:files,open:true}); repWrite();
         try{ if(window.__track) window.__track('tool_use','map_report_open',{version:j.version||1}); }catch(e){}
       })
@@ -11358,10 +11397,17 @@ const ASK_MINDY_JS = `<script>(function(){
     var url=typeof ev.url==='string'?ev.url:'';
     var E=ensurePane(), seq=++repSeq;
     E.el.classList.add('show'); E.el.setAttribute('aria-hidden','false');
-    E.f.srcdoc=html; E.f.style.visibility='visible'; E.msg.style.display='none';
+    repSetDoc(E,html);
     E.t.textContent=title; E.v.textContent=url?'Packaged market report \\u00b7 shareable':'Packaged market report';
-    E.exp.innerHTML='';
-    if(url){ var a=document.createElement('a'); a.href=url; a.target='_blank'; a.rel='noopener'; a.textContent='Open hosted link'; a.style.cssText='font-size:12px;color:#93c5fd;margin-right:8px'; E.exp.appendChild(a); }
+    var reportId=typeof ev.report_id==='string'&&REPORT_ID_RX.test(ev.report_id)?ev.report_id:'';
+    function mrExport(){
+      var E3=ensurePane();
+      // PDF only: the one format this report has a real export for. Without a saved copy there is nothing to render.
+      exportMenu(reportId?[{label:'Download PDF',fmt:'pdf',run:function(b){ downloadReportPdf(reportId,b); }}]:[],E3.exp);
+      if(!reportId){ var n=document.createElement('span'); n.className='amk-rep-note'; n.setAttribute('data-testid','amk-report-no-export'); n.textContent='This report was not saved, so it cannot be downloaded. Ask Mindy to create it again.'; E3.exp.appendChild(n); }
+      if(url){ var a=document.createElement('a'); a.href=url; a.target='_blank'; a.rel='noopener'; a.textContent='Open hosted link'; a.style.cssText='font:600 12px Inter,system-ui,sans-serif;color:#1d4ed8;margin-left:4px'; E3.exp.appendChild(a); }
+    }
+    mrExport();
     syncRepBtn();
     var w=document.createElement('div'); w.className='amk-repcard'; w.setAttribute('data-testid','amk-report-card');
     w.innerHTML='<div class="amk-repcard-t"><b></b><span></span></div><button type="button" class="amk-repcard-open">Open report</button>';
@@ -11369,7 +11415,7 @@ const ASK_MINDY_JS = `<script>(function(){
     w.querySelector('span').textContent='Packaged research \\u00b7 same engine as MCP';
     w.querySelector('.amk-repcard-open').onclick=function(){
       var E2=ensurePane(); E2.el.classList.add('show'); E2.el.setAttribute('aria-hidden','false');
-      if(seq===repSeq||E2.f.srcdoc){ E2.f.srcdoc=html; E2.f.style.visibility='visible'; E2.msg.style.display='none'; E2.t.textContent=title; }
+      if(seq===repSeq||E2.f.srcdoc){ repSetDoc(E2,html); E2.t.textContent=title; mrExport(); }
     };
     aEl.appendChild(w); body.scrollTop=body.scrollHeight;
     try{ if(window.__track) window.__track('tool_use','map_market_report_open',{}); }catch(e){}

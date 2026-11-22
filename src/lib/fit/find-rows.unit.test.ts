@@ -49,9 +49,10 @@ describe('findRowToFitResult', () => {
   it('maps a coming-back row: value fallback order, current end, office, null set-aside unknown', () => {
     expect(findRowToFitResult(BACK)).toEqual({
       kind: 'coming_back', title: 'Administrative Clerk Support', naics: '561320', buyerAgency: 'Department of the Army',
-      state: 'TN', value: 2_100_000, date: days(300), dateKind: 'current_end', buyerOffice: 'Department of the Army',
+      state: 'TN', value: 900_000, date: days(300), dateKind: 'current_end', buyerOffice: 'Department of the Army',
     });
-    expect(findRowToFitResult({ ...BACK, potential_total_value: null })).toMatchObject({ value: 900_000 });
+    // Obligated first (compared with the largest past award, also obligated); the ceiling only when obligated is absent.
+    expect(findRowToFitResult({ ...BACK, total_obligation: null })).toMatchObject({ value: 2_100_000 });
     expect(findRowToFitResult({ ...BACK, potential_total_value: null, total_obligation: 0 })).not.toHaveProperty('value');
   });
 
