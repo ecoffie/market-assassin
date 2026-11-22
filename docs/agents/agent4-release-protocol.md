@@ -56,8 +56,9 @@ Fenced block tagged `agent4-release`:
 - **Serialization:**
   - Nothing merges while any merge awaits verification.
   - On top of that there's an **atomic lock**, the git ref `refs/agent4/release-lock`. It points at a parentless commit whose message is `{owner, pr, sha, expires_at}`.
-  - Creating a ref that already exists fails, so taking the lock is a compare-and-swap.
-  - An expired lock is taken over only after state is re-verified.
+  - Creating a ref that already exists fails, so taking a free lock is a compare-and-swap.
+  - **Taking over an expired lock is atomic too.** The ref is updated with `force=false` to a new lock commit whose parent is the expired lock commit, so it's a fast-forward only from that exact commit. Of two simultaneous takeovers exactly one wins, and the other gets a non-fast-forward (422) and exits. The lock is never deleted and recreated.
+  - **Reconcile first.** Before taking over (and on every run), the driver reconciles from GitHub state, not the lock alone. Any merged PR named by the lock, carrying a `merged` record, or allowlisted with its latest review record naming its merged head, and without a `released`/`verify_failed`/`blocked` record, is verified first. No other PR merges until it's resolved.
 - **Eligibility:** open, non-draft, base `main`, not `agent4:blocked`, **listed in `scripts/agent-release.allow.json`** (PR numbers or exact branch names, maintained by Agent 4), **and** a valid review record. Branch prefixes alone are never enough: builders use `feat/`, `fix/`, `docs/`, `chore/` and `claude/`. `claude/team-*` (Branden's team) is excluded even if listed.
 - **Production checks** (read-only, no redirect following, 30–60 s timeouts, never `/api/cron/*`); any failure means FAIL:
   - build stamp: the expected SHA is a prefix of the live stamp;
