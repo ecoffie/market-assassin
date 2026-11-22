@@ -338,6 +338,14 @@ export function transformEntity(raw: Record<string, unknown>): SAMEntity {
 /**
  * Search for entities in SAM.gov
  */
+/** Delay before the single transient retry in searchEntities (short: the caller is waiting). */
+export const SAM_TRANSIENT_RETRY_DELAY_MS = 400;
+
+/** 5xx and network failures (reported as 500 by makeSAMRequest) may succeed on a second try; 4xx never will. */
+export function isTransientSamError(status: number | undefined): boolean {
+  return typeof status === 'number' && status >= 500 && status <= 599;
+}
+
 export async function searchEntities(
   params: EntitySearchParams
 ): Promise<EntitySearchResult> {
@@ -431,16 +439,31 @@ export async function searchEntities(
   // paying user as a fact about the world.
   const keyUnusable = (st?: number) => st === 429 || st === 401 || st === 403;
 
+  let activeConfig = config;
   if (keyUnusable(result.error?.status)) {
     const pool = getAllDistinctSAMKeys().filter((k) => k !== config.apiKey);
     for (const key of pool) {
       console.warn(`[SAM Entity] key unusable (${result.error?.status}) — failing over (${pool.indexOf(key) + 1}/${pool.length})`);
+      activeConfig = { ...config, apiKey: key };
       result = await makeSAMRequest<{
         entityData: Record<string, unknown>[];
         totalRecords: number;
-      }>({ ...config, apiKey: key }, '/entities', queryParams);
+      }>(activeConfig, '/entities', queryParams);
       if (!keyUnusable(result.error?.status)) break;
     }
+  }
+
+  // ONE retry for a TRANSIENT failure (5xx / network) before giving up on live SAM (Ask Mindy Backend Spec:
+  // "retry live SAM.gov before using the mirror"). Without it a single blip sent lookup_sam_entity straight to
+  // the local registry, labelled degraded. Exactly one retry, same key: the key quota is shared. A 4xx
+  // (bad request / not found) and an unusable key are answers or quota problems, never retried here.
+  if (isTransientSamError(result.error?.status)) {
+    console.warn(`[SAM Entity] transient failure (${result.error?.status}) — retrying once`);
+    await new Promise((r) => setTimeout(r, SAM_TRANSIENT_RETRY_DELAY_MS));
+    result = await makeSAMRequest<{
+      entityData: Record<string, unknown>[];
+      totalRecords: number;
+    }>(activeConfig, '/entities', queryParams);
   }
 
   if (result.error) {
