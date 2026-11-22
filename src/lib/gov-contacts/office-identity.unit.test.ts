@@ -95,3 +95,17 @@ describe('a conflicting vote never erases more authoritative attribution', () =>
     expect(out.find((r) => r.dodaac === 'N00189')!.agency).toBe('Department of Defense');
   });
 });
+
+describe('bounded conflict evidence (no schema change)', () => {
+  it('keeps the leader, its share and the runner-up for conflicting codes only, capped', async () => {
+    const { conflictEvidenceSample, CONFLICT_EVIDENCE_SAMPLE } = await import('./office-identity');
+    const many = Array.from({ length: 40 }, (_, i) => [
+      { ...CBP, code: `C${String(i).padStart(5, '0')}`, n: 60 },
+      { ...FTC, code: `C${String(i).padStart(5, '0')}`, n: 40 },
+    ]).flat();
+    const sample = conflictEvidenceSample(voteOfficeIdentity([...many, { ...CBP, n: 99 }]));
+    expect(sample).toHaveLength(CONFLICT_EVIDENCE_SAMPLE);
+    expect(sample.some((x) => x.code === '70B01C')).toBe(false);
+    expect(sample[0]).toMatchObject({ leader: { agency: CBP.agency }, leader_share: 0.6, runner_up: { agency: FTC.agency, share: 0.4 }, rows: 100 });
+  });
+});

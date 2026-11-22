@@ -34,6 +34,10 @@ export interface OfficeIdentity {
   identity_basis: OfficeIdentityBasis;
   /** Share of the code's rows held by the leading (agency, sub_agency) pair, 0–1. */
   agency_share: number;
+  /** The leading pair even when it falls short of the threshold (evidence only — never displayed as the agency). */
+  leader: { agency: string | null; sub_agency: string | null };
+  /** The second (agency, sub_agency) pair and its share — the evidence a later correction needs. */
+  runner_up: { agency: string | null; sub_agency: string | null; share: number } | null;
   rows: number;
 }
 
@@ -78,8 +82,25 @@ export function voteOfficeIdentity(candidates: OfficeIdentityCandidate[]): Map<s
       sub_agency: majority ? top.sub : null,
       identity_basis: majority ? 'majority' : 'conflicting',
       agency_share: Math.round(share * 1000) / 1000,
+      leader: { agency: top.agency, sub_agency: top.sub },
+      runner_up: ranked[1] ? { agency: ranked[1].agency, sub_agency: ranked[1].sub, share: Math.round((ranked[1].n / total) * 1000) / 1000 } : null,
       rows: total,
     });
   }
   return out;
+}
+
+export const CONFLICT_EVIDENCE_SAMPLE = 25;
+
+/**
+ * Bounded vote evidence for conflicting codes (largest first): office codes and agency names only — no
+ * customer data. Lands in the refresh's response body and one log line (runtime-log retention), never in a
+ * table; at most CONFLICT_EVIDENCE_SAMPLE entries.
+ */
+export function conflictEvidenceSample(ids: Map<string, OfficeIdentity>) {
+  return [...ids.values()]
+    .filter((i) => i.identity_basis === 'conflicting')
+    .sort((a, b) => b.rows - a.rows || a.code.localeCompare(b.code))
+    .slice(0, CONFLICT_EVIDENCE_SAMPLE)
+    .map((i) => ({ code: i.code, leader: i.leader, leader_share: i.agency_share, runner_up: i.runner_up, rows: i.rows }));
 }

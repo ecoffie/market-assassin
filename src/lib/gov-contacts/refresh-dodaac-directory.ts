@@ -17,7 +17,7 @@
  *
  * Do NOT "simplify" this into an upsert — see the never-overwrite guard below.
  */
-import { voteOfficeIdentity } from './office-identity';
+import { voteOfficeIdentity, conflictEvidenceSample } from './office-identity';
 import { createClient } from '@supabase/supabase-js';
 import { bqQuery, BQ_TABLES } from '@/lib/bigquery/client';
 
@@ -95,7 +95,7 @@ export function preserveAuthoritativeAgency(
   });
 }
 
-export async function refreshDodaacDirectory(): Promise<{ offices: number; written: number; conflicting: number }> {
+export async function refreshDodaacDirectory(): Promise<{ offices: number; written: number; conflicting: number; conflict_evidence: ReturnType<typeof conflictEvidenceSample> }> {
   // One row per (code, name, agency, sub_agency): the office's agency is decided by majority vote
   // (office-identity.ts), never ANY_VALUE — that let one miskeyed transaction label CBP's 70B01C the FTC.
   const rows = await bqQuery<{
@@ -142,7 +142,13 @@ export async function refreshDodaacDirectory(): Promise<{ offices: number; writt
     if (error) throw new Error(`dodaac upsert: ${error.message}`);
     written += batch.length;
   }
-  return { offices: records.length, written, conflicting: conflicting.size };
+  // Bounded evidence for later correction (no schema change, Eric 2026-11-22): <= 25 codes, office codes
+  // and agency names only, in this result body and one runtime log line — never persisted to a table.
+  const conflict_evidence = conflictEvidenceSample(
+    voteOfficeIdentity(rows.map((r) => ({ code: r.dodaac, name: r.office_name, agency: r.agency, sub_agency: r.sub_agency, n: r.award_count }))),
+  );
+  console.log(`[refresh-dodaac-directory] ${conflicting.size} conflicting office codes of ${records.length}; sample: ${JSON.stringify(conflict_evidence)}`);
+  return { offices: records.length, written, conflicting: conflicting.size, conflict_evidence };
 }
 
 /**
