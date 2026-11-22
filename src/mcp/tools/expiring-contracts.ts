@@ -144,9 +144,20 @@ export interface ExpiringContractsToolResult {
      * `total` is the matched count (an upper bound by at most a few collapsed duplicates).
      */
     page?: { offset: number; limit: number; returned: number; total: number; has_more: boolean; next_offset: number | null };
+    /**
+     * Present when contracts ending within `months` were left out by default (no months_min given).
+     * excluded_count is an exact count with the same filters; null when that count failed (unknown, not 0).
+     */
+    near_term?: { months: number; excluded_count: number | null; include_with: 'months_min=0'; reason: string };
     result_state?: 'filter_not_applied';
   };
 }
+
+/**
+ * Minimum lead time for a pursuable recompete, in months. The same rule the Coming back alerts use
+ * (comingBackWindow in src/lib/alerts/coming-back-to-market.ts: lead < 3 months → excluded as too late).
+ */
+export const NEAR_TERM_DEFAULT_MONTHS = 3;
 
 export async function expiringContracts(
   input: ExpiringContractsToolInput,
@@ -187,19 +198,33 @@ export async function expiringContracts(
   }
   const pageLimit = Math.min(Math.max(Math.floor(Number(input.limit) || EXPIRING_DEFAULT_PAGE_SIZE), 1), 200);
   const pageOffset = Math.max(Math.floor(Number(input.offset) || 0), 0);
-  const res = await queryExpiringContracts({
+  // Contracts ending inside NEAR_TERM_DEFAULT_MONTHS are too late to pursue, yet soonest-first paging put
+  // them at the top (reported: a renewal list led by contracts ending tomorrow). With no months_min they are
+  // left out of the list and COUNTED in _meta.near_term — never silently dropped. A caller asking only
+  // about the near term (months_window <= the threshold) or passing months_min (0 includes them) is obeyed.
+  const nearTermDefault = input.months_min === undefined
+    && !(typeof input.months_window === 'number' && input.months_window <= NEAR_TERM_DEFAULT_MONTHS);
+  const baseFilters = {
     naicsCodes: naicsArg.codes.length ? naicsArg.codes : undefined,
     agency: input.agency,
     states: stateArg.codes.length ? stateArg.codes : undefined,
-    monthsWindow: input.months_window,
-    minMonthsWindow: input.months_min,
     minValue: input.min_value,
     maxValue: input.max_value,
     likelihood: input.likelihood,
     eligibleSetAsides: input.eligible_set_asides,
-    limit: pageLimit,
-    offset: pageOffset,
-  });
+  };
+  const [res, nearTerm] = await Promise.all([
+    queryExpiringContracts({
+      ...baseFilters,
+      monthsWindow: input.months_window,
+      minMonthsWindow: nearTermDefault ? NEAR_TERM_DEFAULT_MONTHS : input.months_min,
+      limit: pageLimit,
+      offset: pageOffset,
+    }),
+    nearTermDefault
+      ? queryExpiringContracts({ ...baseFilters, monthsWindow: NEAR_TERM_DEFAULT_MONTHS, limit: 1 })
+      : Promise.resolve(null),
+  ]);
   // B2 — orders under a vehicle are rolled up, not listed as recompetes. The parent's ordering
   // end is looked up (shared award-detail fetch, cached); failures stay UNKNOWN.
   const parentIds = res.contracts
@@ -230,6 +255,7 @@ export async function expiringContracts(
   if (input.agency) applied.agency = input.agency;
   if (res.window) applied.months_window = res.window.months;
   if (input.months_min !== undefined) applied.months_min = input.months_min;
+  else if (nearTermDefault) applied.months_min = NEAR_TERM_DEFAULT_MONTHS;
   if (input.min_value !== undefined) applied.min_value = input.min_value;
   if (input.max_value !== undefined) applied.max_value = input.max_value;
   if (input.likelihood) applied.likelihood = input.likelihood;
@@ -262,6 +288,14 @@ export async function expiringContracts(
       ignored_args: ignored,
       ...(res.window ? { window: res.window } : {}),
       ...(incomplete ? { incomplete_reason: incomplete } : {}),
+      ...(nearTerm ? {
+        near_term: {
+          months: NEAR_TERM_DEFAULT_MONTHS,
+          excluded_count: nearTerm.degraded ? null : nearTerm.total,
+          include_with: 'months_min=0' as const,
+          reason: `contracts ending within ${NEAR_TERM_DEFAULT_MONTHS} months are too late to pursue as a recompete and are not listed by default`,
+        },
+      } : {}),
       ...(!res.degraded ? {
         page: { offset: pageOffset, limit: pageLimit, returned: rowsReturned, total: res.total, has_more: hasMore, next_offset: nextOffset },
       } : {}),
