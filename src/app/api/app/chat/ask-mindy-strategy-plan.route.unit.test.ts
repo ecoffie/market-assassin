@@ -2,8 +2,8 @@
  * Federal Strategy Plan through the real route (ASK_MINDY_STRATEGY_PLAN, default off).
  *   - Flag off: a strategy ask is handled exactly as before (FIND contract; a report ask still forces the packaged
  *     market report).
- *   - Flag on for the verified email: the strategy-plan contract is the host contract, generate_market_report is
- *     neither offered nor forced, and the turn is traced as intent:strategy_plan.
+ *   - Flag on for the verified email: the EXISTING Federal Market Profile research workflow runs (phase machine)
+ *     with the general strategy contract in place of the RBA one, and the saved company profile opens the turn.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { plannerResponse, answerStream, isPlannerCall, readSse, chatRequest, withinMs, type SseEvent } from './__fixtures__/route-harness';
@@ -83,14 +83,19 @@ describe('Federal Strategy Plan route wiring', () => {
     expect(JSON.stringify(r.toolChoice)).toContain('generate_market_report');
   });
 
-  it('flag on (allowlist, this email): the strategy contract leads, and the market report is neither offered nor forced', async () => {
+  it('flag on (allowlist, this email): the existing research workflow runs with the strategy contract, profile first', async () => {
     process.env.ASK_MINDY_STRATEGY_PLAN = 'allowlist';
     process.env.ASK_MINDY_STRATEGY_PLAN_ALLOWLIST = EMAIL;
     const r = await ask(ASK);
     expect(r.system).toContain('FEDERAL STRATEGY PLAN');
-    expect(r.system).toContain('where the company stands -> where it should focus -> why those choices -> what to do next');
-    expect(r.plannerTools).not.toContain('generate_market_report');
+    expect(r.system).toContain('identity -> awards -> pathways -> vehicles -> market_size -> contacts -> web -> writeup');
+    // the RBA-specific contract is not used for a strategy ask
+    expect(r.system).not.toContain('FEDERAL MARKET PROFILE (company-first pathway report — not a keyword market-size report)');
+    // step 1: the saved profile (or why it is unavailable) opens the research
+    expect(r.system).toMatch(/COMPANY PROFILE/);
+    // the phase machine owns order: the packaged market report is not forced up front
     expect(JSON.stringify(r.toolChoice ?? '')).not.toContain('generate_market_report');
+    expect(r.plannerTools).not.toContain('generate_market_report');
   });
 
   it('flag on, but another email: unchanged', async () => {

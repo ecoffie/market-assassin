@@ -162,7 +162,7 @@ export function filterToolsForTurn<T extends { function?: Record<string, unknown
   defs: T[],
   customerText: string,
   priorCustomerText?: string | null,
-  /** strategyPlan: an Ask Mindy strategy-plan turn (flag-gated by the caller): no packaged market report. */
+  /** strategyPlan: an Ask Mindy strategy-plan turn (flag-gated by the caller): runs the FMP research pipeline. */
   opts: { strategyPlan?: boolean } = {},
 ): {
   defs: T[];
@@ -172,7 +172,8 @@ export function filterToolsForTurn<T extends { function?: Record<string, unknown
   marketResearch: boolean;
   federalMarketProfile: boolean;
 } {
-  const federalMarketProfile = isFederalMarketProfileRequest(customerText);
+  // A strategy-plan turn runs the same company-first research pipeline as the Federal Market Profile.
+  const federalMarketProfile = isFederalMarketProfileRequest(customerText) || !!opts.strategyPlan;
   // FMP takes precedence: skip the open-opportunity / CURRENT_FIND offer stripping (the profile
   // prompt names "sources sought" but must keep search_sam + expiring/vehicle tools), and do not
   // force packaged keyword generate_market_report (wrong product shape vs pathway profile).
@@ -206,14 +207,6 @@ export function filterToolsForTurn<T extends { function?: Record<string, unknown
         return false;
       }
       return true;
-    });
-  }
-  // Strategy plan: the deliverable is an argued plan written with create_document, never the keyword market report.
-  if (opts.strategyPlan) {
-    kept = kept.filter((d) => {
-      if (String(d.function?.name ?? '') !== MARKET_REPORT_TOOL) return true;
-      if (!removed.includes(MARKET_REPORT_TOOL)) removed.push(MARKET_REPORT_TOOL);
-      return false;
     });
   }
   return { defs: kept, removed, intent, openOnly, marketResearch, federalMarketProfile };
@@ -765,12 +758,28 @@ export function federalMarketProfileMarketSizeNote(customerText: string): string
  * Rotates profile states by `marketReportCount` so dup-fingerprint cannot stall the phase
  * (measured 2026-11-20: second generate_market_report reused VA args → skipped → budget stop).
  */
+/**
+ * The company a strategy-plan turn is about (Ask Mindy, ASK_MINDY_STRATEGY_PLAN), from the saved company profile.
+ * When present, the FMP host builders use THIS company's work, codes and states and never the RBA civil defaults
+ * (237310, "highway bridge heavy civil"), which exist only for the Federal Market Profile benchmark ask.
+ */
+export interface FmpCompanyContext {
+  legalName?: string;
+  /** What the company does, in its own words (profile keywords / capabilities). */
+  workPhrase?: string;
+  /** Primary NAICS from the profile; award-history NAICS still wins when present. */
+  naics?: string;
+  states?: string[];
+}
+
 export function buildFmpNextMarketReportArgs(
   customerText: string,
   marketReportCount: number,
-  opts?: { awardNaics?: string | null },
+  opts?: { awardNaics?: string | null; company?: FmpCompanyContext | null },
 ): Record<string, unknown> {
-  const states = extractProfileStates(customerText);
+  const company = opts?.company ?? null;
+  const textStates = extractProfileStates(customerText);
+  const states = textStates.length ? textStates : (company?.states ?? []);
   const state = states.length
     ? states[Math.min(Math.max(0, marketReportCount), states.length - 1)]
     : undefined;
@@ -780,11 +789,16 @@ export function buildFmpNextMarketReportArgs(
   if (state) args.state = state;
   if (naics && naics.length >= 3 && !BUILDINGS_NAICS.has(naics) && !BUILDINGS_NAICS.has(naics.slice(0, 3))) {
     args.naics = naics;
+  } else if (company) {
+    // Strategy plan: what the company wins (award NAICS, above) or its own primary code. Never a civil default.
+    const own = (company.naics || '').replace(/\D/g, '').slice(0, 6);
+    if (own.length >= 3) args.naics = own;
   } else {
     // Cold RBA / heavy civil default when awards named bridges/roads but planner omitted NAICS.
     args.naics = '237310';
   }
-  if (identity.legalName) args.client_name = identity.legalName;
+  const clientName = identity.legalName || company?.legalName;
+  if (clientName) args.client_name = clientName;
   return args;
 }
 
@@ -826,15 +840,21 @@ export function extractAwardGeographyStates(toolContents: readonly string[]): st
  */
 export function buildFmpPathwayFindArgs(
   customerText: string,
-  opts?: { awardStates?: readonly string[] },
+  opts?: { awardStates?: readonly string[]; company?: FmpCompanyContext | null; plannerQuery?: string | null },
 ): Record<string, unknown> {
+  const company = opts?.company ?? null;
   const textStates = extractProfileStates(customerText);
   const awardStates = (opts?.awardStates || [])
     .map((s) => normalizeStateCode(String(s).trim()) || '')
     .filter(Boolean);
-  const states = textStates.length ? textStates : [...new Set(awardStates)];
+  const states = textStates.length ? textStates : company?.states?.length ? company.states : [...new Set(awardStates)];
+  // Strategy plan: the planner's query (it read the company's work), else the company's own work phrase, else the
+  // customer's words. The civil query is for the Federal Market Profile benchmark only.
+  const query = company
+    ? (opts?.plannerQuery?.trim() || company.workPhrase?.trim() || customerText.trim().slice(0, 200))
+    : derivePathwaySearchQuery(customerText);
   const args: Record<string, unknown> = {
-    query: derivePathwaySearchQuery(customerText),
+    query,
     limit_per_horizon: 15,
   };
   if (states.length) args.location = states.join(',');

@@ -14,13 +14,17 @@
  *      a follow-up email, a first step for every move;
  *   7. a structure that fits the assignment (a plan, a day-by-day schedule, a market map), never a fixed report.
  *
- * What it replaces for these asks: the packaged keyword market report (fixed market-size sections) and the generic
- * "executive summary + opportunity list + evidence tables" document shape.
+ * How it runs: on the EXISTING research workflow established by the RBA analysis, the Federal Market Profile phase
+ * machine (identity -> awards -> pathways -> vehicles -> market_size -> contacts -> web -> writeup), with this
+ * contract in place of the RBA-specific one and the saved company profile as the first input. The write-up is a
+ * create_document DocModel, so preview and export are the existing ones.
  *
  * strategyPlanCheck() is the structural check used to evaluate a plan: it reads the document's argument (is every
  * table interpreted, does every focus say why, does every move have a first step), not its formatting.
  */
 import { flagMode } from '@/lib/vault/flags';
+import type { FmpCompanyContext } from '@/lib/chat/tool-selection';
+import type { CompanyProfile } from './company-profile';
 
 export const STRATEGY_PLAN_ENV = 'ASK_MINDY_STRATEGY_PLAN';
 export const STRATEGY_PLAN_ALLOWLIST_ENV = 'ASK_MINDY_STRATEGY_PLAN_ALLOWLIST';
@@ -54,35 +58,81 @@ export function isStrategyPlanRequest(customerText: string): boolean {
   return STRATEGY_PLAN_SIGNAL.test(String(customerText || ''));
 }
 
-/** The host contract injected for a strategy-plan turn (replaces the FIND contract for that turn). */
+/**
+ * The host contract for a strategy-plan turn. It replaces the RBA-specific Federal Market Profile contract on these
+ * turns and rides the same server-enforced phase machine (fmp-phase-machine.ts):
+ * identity -> awards -> pathways -> vehicles -> market_size -> contacts -> web -> writeup.
+ * Eric's reporting doctrine is stated once here, for any company.
+ */
 export const STRATEGY_PLAN_CHAT_CONTRACT = [
-  'FEDERAL STRATEGY PLAN (a plan for THIS company and THIS objective; an argument, not a market report):',
-  'The plan must make one case the customer can act on without a consultant: where the company stands -> where it should focus -> why those choices -> what to do next, starting this week.',
+  'FEDERAL STRATEGY PLAN (company-first research, then an argued plan; not a keyword market report):',
+  'The plan makes one case the customer can act on without a consultant: where the company stands -> where it should focus -> why -> which pathways and buyers matter -> what to do over the next 90 days.',
+  '- PHASE PLAN (server-enforced): identity -> awards -> pathways -> vehicles -> market_size -> contacts -> web -> writeup. The server offers only unlocked phases and forces the next required call. A PHASE PLAN note names the current phase.',
+  '- Identity: use the saved COMPANY PROFILE note (legal name, UEI) with lookup_sam_entity / search_contractors. Never guess a company from a nickname.',
+  '- Awards decide the market: get_contractor_award_history (and get_contractor_profile) shows what the company actually wins. Award NAICS outrank the registered NAICS list. No awards is a fact to state, not a gap to fill.',
+  '- Company-supplied facts (capabilities, bonding, equipment, certifications, constraints) come only from the COMPANY PROFILE note and the customer\'s own words, labeled as company-stated. Never invent them.',
+  '- Pathways before open bids: contract vehicles (IDIQ, MATOC, GSA Schedule, BPA), sources sought and market research notices, forecasts, recompetes, and direct awards where the company is eligible. find_opportunities and search_sam_opportunities with the company\'s own work words and states; lookup_solicitation / get_solicitation_documents for named vehicles; get_agency_forecasts.',
+  '- Vehicles: for each vehicle that matters, search_past_contracts / search_idv_contracts (task orders) and get_award_detail for holders, ceilings, end dates and set-asides.',
+  '- Market size supports the choice; it is never the deliverable. generate_market_report runs per state with the award NAICS.',
+  '- Contacts and policy: notice contacts first, then lookup_federal_osbp / search_federal_contacts; get_legislation_status for legislation that affects these buyers (status only). Never invent a name, email or phone.',
+  '- Outside Mindy: search_web for the agency problems, policy and budget context that change a choice. Quote returned snippets with URLs; if search is unavailable, say so as a known gap.',
   '',
-  'Research (existing tools, company first; stop when more research would not change a choice):',
-  '- Objective. Restate what the customer actually asked for in one line. If they asked for something specific first (a review of their capability statement, a plan for one event or one pursuit), that comes first in the plan.',
-  '- Where they stand: the saved company profile above, then lookup_sam_entity / search_contractors for registration, then get_contractor_award_history (and get_contractor_profile) for what they actually win. No awards is a fact to state, not a gap to fill.',
-  '- Where demand is for THEIR work: find_opportunities with their own words; get_agency_forecasts and get_expiring_contracts for planned buys and current holders; understand_customer or get_agency_intel for what the leading buyers are struggling with. Keep a finding only if it changes which buyer, vehicle or move you recommend.',
-  '- Who to talk to: notice contacts first, then lookup_federal_osbp / search_federal_contacts. Never invent a name, email or phone.',
-  '- Do not call generate_market_report for this plan: a market-size report is not the deliverable.',
+  'Write the plan with create_document (it is previewed and exported as PDF and Word). Use these headings (the server\'s write-up check reads them), dropping any section the research did not support:',
+  '1. "Executive summary": the objective in one line, then the short version of the argument.',
+  '2. "About the company: where <company> stands": registration, what it actually wins (award NAICS, buyers, prime vs sub), vehicles, company-stated facts. Cited.',
+  '3. "Pathways in priority order: where to focus": two to four pathways and buyers, ranked, each with why it fits THIS company and the evidence. This is the first section after the two above.',
+  '4. "Why these and not others": what was considered and set aside, and why.',
+  '5. "Buyer pain points": what these buyers are under pressure to fix, and what it means for <company> (cited; include policy context that changes the choice).',
+  '6. "Who to talk to and what to say": named contact, why approach them, and the question to ask.',
+  '7. "Readiness checklist": SAM and DSBS / SBA profile fixes (now -> why it matters -> change to), including DSBS keywords.',
+  '8. "Next 90 days": Move -> First step -> Why first -> By when, three to six moves in order.',
   '',
-  'Write the plan with create_document. Choose the sections that fit the objective; drop any section the research did not support. Typical spine:',
-  '1. Summary: the objective in one line, then the short version of the argument (where they stand, the two to four focuses, the first move).',
-  '2. Where <company> stands: registration, what they win, vehicles, certifications as the records show them. Facts only, cited.',
-  '3. Where to focus: two to four chosen buyers, programs, vehicles or partners, ranked. Each one says why it fits THIS company, with the evidence.',
-  '4. Why these and not others: what you considered and set aside (too large, wrong set-aside, no incumbent opening, outside their work), so the customer trusts the choice.',
-  '5. Buyer problems or money shifts ONLY when they change the choice: a From -> To table must have a "What it means for <company>" column.',
-  '6. Fix now (when the research found problems): a table of What it says now -> Why it matters -> Change to, so the customer can copy the correction.',
-  '7. First moves: a table of Move -> First step -> Why first (and By when when known). Three to five moves, in order. Include the exact words where they help: the one-line pitch, the question to ask each named contact, the email to send.',
-  '8. What not to do / open items, when the evidence calls for it.',
-  '',
-  'Rules for every section:',
-  '- Every table carries an interpretation column (Why it fits, Why it matters, What it means, Why first, Change to). A table of numbers alone is not allowed.',
-  '- Never a list of opportunities without a recommendation for each; never a generic action plan ("network", "build relationships", "monitor SAM") without the named office, person or document and the first step.',
-  '- Recommendations are labeled recommendation and tied to the facts that support them. Facts cite their source. Unknown stays unknown.',
-  '- Do not repeat the chat answer as the document; the document is the plan. In chat, give two or three lines and the link.',
-  '- Plain English for a busy owner. No em dashes. No grades or scores for the company. No Mindy plans or prices.',
+  'Rules: every table carries an interpretation column (why it fits, why it matters, what it means, the question, the first step); no list of opportunities without a recommendation for each; no generic moves; recommendations are labeled and tied to facts; unknown stays unknown; no grades or scores for the company; no Mindy plans, prices or upsells; plain English, no em dashes. In chat, give two or three lines and the document link; do not repeat the plan.',
 ].join('\n');
+
+/** The saved company profile as the strategy turn's FIRST input (step 1 and step 3). */
+export interface StrategyProfileInput {
+  status: 'ok' | 'refused' | 'unavailable';
+  profile?: CompanyProfile;
+}
+
+/** The host note that opens a strategy turn: who the company is, from its authorized saved profile. */
+export function strategyProfileNote(input: StrategyProfileInput): string {
+  if (input.status !== 'ok' || !input.profile) {
+    return input.status === 'refused'
+      ? 'COMPANY PROFILE: not used this turn (the acting workspace could not be confirmed). Identify the company only from the customer\'s own words; do not ask for a UEI before giving value.'
+      : 'COMPANY PROFILE: unavailable this turn (it could not be read; it is not empty). Identify the company from the customer\'s own words and say that saved profile facts could not be used.';
+  }
+  const p = input.profile;
+  const line = (label: string, v: string | undefined | null) => (v ? `- ${label}: ${v}` : null);
+  const pp = p.pastPerformance;
+  const lines = [
+    'COMPANY PROFILE (saved, authorized workspace; company-stated unless a tool confirms it):',
+    line('Legal name', p.companyName),
+    line('UEI', p.uei),
+    line('Registered NAICS (award history decides what they actually win)', p.naicsCodes?.join(', ')),
+    line('Works in', p.states?.join(', ')),
+    line('Target agencies (preferences)', p.targetAgencies?.join(', ')),
+    line('Certifications (self-reported, not verified)', p.certifications?.map((c) => c.name).join(', ')),
+    line('Contract vehicles held (company-stated)', p.vehiclesHeld?.join(', ')),
+    line('Capabilities (company keywords)', p.keywords?.slice(0, 12).join(', ')),
+    pp ? `- Past performance on file: ${pp.primeCount} as prime, ${pp.subCount} as sub${pp.buyerAgencies.length ? `; buyers ${pp.buyerAgencies.slice(0, 6).join(', ')}` : ''}` : null,
+    p.unknown.length ? `- Not in the profile (unknown, not zero): ${p.unknown.join(', ')}` : null,
+    p.unavailable?.length ? `- Could not be read this turn (unavailable, not empty): ${p.unavailable.join(', ')}` : null,
+  ].filter(Boolean);
+  return lines.join('\n');
+}
+
+/** The company context the FMP host builders use on a strategy turn (no RBA civil defaults). */
+export function strategyCompanyContext(input: StrategyProfileInput): FmpCompanyContext {
+  const p = input.status === 'ok' ? input.profile : undefined;
+  return {
+    ...(p?.companyName ? { legalName: p.companyName } : {}),
+    ...(p?.keywords?.length ? { workPhrase: p.keywords.slice(0, 4).join(' ') } : {}),
+    ...(p?.naicsCodes?.length ? { naics: p.naicsCodes[0] } : {}),
+    ...(p?.states?.length ? { states: p.states.slice(0, 3) } : {}),
+  };
+}
 
 // ── Structural check (evaluation) ───────────────────────────────────────────────────────────────────────────────
 
@@ -99,9 +149,9 @@ export interface StrategyPlanCheck {
   warnings: string[];
 }
 
-const STANDING = /\b(stands?|starting\s+point|today|current\s+position|profile|record|readiness)\b/i;
-const FOCUS = /\b(focus|priorit|where\s+to|top\s+buyers|targets?|pathways?|opportunit\w*|who\s+to\s+(?:talk|meet|contact)|buyers?)\b/i;
-const MOVES = /\b(first\s+moves?|next\s+(?:steps?|moves?)|action\s+plan|what\s+to\s+do|first\s+\d+\s+days|plan\s+of\s+action|schedule|day\s+\d)\b/i;
+const STANDING = /\b(stands?|starting\s+point|current\s+position|about\s+the\s+company|company\s+profile|track\s+record)\b/i;
+const FOCUS = /\b(focus|priorit|where\s+to\s+(?:focus|start|compete)|top\s+buyers|targets?|pathways?|opportunit\w*)\b/i;
+const MOVES = /\b(first\s+moves?|next\s+(?:steps?|moves?|\d+\s+days)|action\s+plan|what\s+to\s+do|first\s+\d+\s+days|\d+[- ]day\s+plan|plan\s+of\s+action|schedule|day\s+\d)\b/i;
 const NOT_CHOSEN = /\b(not\s+(?:to\s+)?(?:do|pursue|chase|now)|set\s+aside|deprioriti|why\s+these|avoid|skip|instead|what\s+not)\b/i;
 const INTERPRET_COL = /\b(why|means?|matters?|fit|change\s+to|first\s+step|next\s+step|how\s+to|use\s+it|action|ask|question|what\s+to\s+say|recommend)\b/i;
 const FIRST_STEP_COL = /\b(first\s+step|how|next\s+step|what\s+to\s+do|ask|question)\b/i;
