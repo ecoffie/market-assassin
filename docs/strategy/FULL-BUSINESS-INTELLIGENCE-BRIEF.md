@@ -578,11 +578,11 @@ Traffic → Free Tools → MI SaaS ($149/mo) → Enterprise expansion
 #### Channel 3: 1:1 Customer Interviews (5-10)
 
 **Priority Interview List (Ultimate Bundle Buyers):**
-1. bobby@24hrc.us
-2. willie.smiley@spasmileytrucking.com
-3. andrew@millpondresearch.com
-4. kwesi.acquah@connectdotssolution.com
-5. info@cfpsolutions.net
+1. [email removed]
+2. [email removed]
+3. [email removed]
+4. [email removed]
+5. [email removed]
 
 **The Two Questions (Wealth GENIUS Framework):**
 
@@ -664,8 +664,8 @@ These people found and purchased with ZERO formal announcement:
 
 | Product | Price | Buyer | Insight |
 |---------|-------|-------|---------|
-| **Alert Pro** | $19/mo | altonseth@gmail.com | Willing to pay for alerts |
-| **Market Intelligence** | $49/mo | jhennings@footprintsfloors.com | Willing to pay for MI |
+| **Alert Pro** | $19/mo | [email removed] | Willing to pay for alerts |
+| **Market Intelligence** | $49/mo | [email removed] | Willing to pay for MI |
 
 **This is significant:** People are buying alerting/intelligence products without being sold to. The demand exists organically.
 
