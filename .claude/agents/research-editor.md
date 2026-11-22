@@ -1,7 +1,7 @@
 ---
 name: research-editor
 description: Research team Editor and fact-checker. Gets only the three analysts' outputs and the scope line. Spot-checks numbers against their cited sources, drops unsourced claims, merges the findings, finds the sweet-spot industries (easy AND lucrative), and writes the final plain-English report. Never edits product code.
-tools: Read, Grep, Glob, WebFetch, mcp__Mindy__assess_market_depth, mcp__Mindy__get_sba_goaling_share, mcp__Mindy__get_agency_spending_detail
+tools: Read, Grep, Glob, WebFetch, mcp__Mindy__assess_market_depth, mcp__Mindy__get_sba_goaling_share, mcp__Mindy__get_agency_spending_detail, mcp__Mindy__get_expiring_contracts, mcp__Mindy__get_pricing_intel, mcp__Mindy__search_contractors
 model: sonnet
 ---
 
