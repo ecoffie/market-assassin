@@ -15,6 +15,7 @@
  * Breadcrumbs sit above the H1 for both SEO and human navigation.
  */
 import type { Metadata } from 'next';
+import { siteShareImages } from '@/lib/seo/share-image';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import {
@@ -67,6 +68,13 @@ export async function generateMetadata({
       description: trimmedDef,
       type: 'article',
       url: `https://getmindy.ai/glossary/${term.slug}`,
+      images: siteShareImages(),
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: `${term.term} — Federal Contracting Glossary | Mindy`,
+      description: trimmedDef,
+      images: siteShareImages(),
     },
     keywords: [
       term.term.toLowerCase(),
