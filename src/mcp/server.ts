@@ -509,7 +509,7 @@ server.registerTool(
       keyword: z.string().optional().describe('Search term, e.g. "broadband".'),
       agency: z.string().optional().describe('Top-level agency code, e.g. "DOD"/"HHS" (client-side prefix filter).'),
       category: z.string().optional().describe('Grants.gov funding category code, e.g. "HL"/"ST".'),
-      status: z.enum(['posted', 'forecasted', 'closed', 'archived']).optional().describe('Status (default posted).'),
+      status: z.enum(['posted', 'forecasted', 'closed', 'archived']).optional().describe('Status. Omit to search posted AND forecasted.'),
       limit: z.number().int().min(1).max(100).optional().describe('Max results (default 25).'),
     },
   },
