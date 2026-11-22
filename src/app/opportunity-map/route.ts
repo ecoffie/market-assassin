@@ -16,7 +16,7 @@ import { INDUSTRY_PRESETS } from '@/lib/industry-presets';
 import { decodeFSC } from '@/lib/codes/fsc';
 import { DIBBS_MAP_ENABLED } from '@/lib/dibbs/availability';
 import { OPPORTUNITY_MAP_TEMPLATE } from './template-html';
-import { buildOppShareMeta, fetchOppShareRow, isNoticeId, renderOppShareHead } from '@/lib/opportunities/share-metadata';
+import { applyMapHead, buildOppShareMeta, fetchOppShareRow, isNoticeId, renderOppShareHead } from '@/lib/opportunities/share-metadata';
 import { ACCOUNT_MENU_CSS, ACCOUNT_MENU_JS } from './account-menu';
 import { siteTopHtml, SITE_NAV_CSS } from '@/lib/public-site/site-nav';
 import { MP_ACCOUNT_OVERRIDES_CSS, mpTokenDeclarations } from '@/lib/public-site/css';
@@ -11892,10 +11892,10 @@ export async function GET(request: NextRequest) {
     html = html.replace('__AGENCY_PRESETS__', () => JSON.stringify(AGENCY_PRESETS));
     html = html.replace('__FSC_PRESETS__', () => JSON.stringify(FSC_PRESETS));
   }
-  // Object-specific social metadata for a shared opportunity. Unknown/missing notice → the page stays
-  // exactly as before (generic title); the authenticated Maps experience is untouched either way.
+  // Object-specific social metadata for a shared opportunity. Unknown/missing notice → the default
+  // map head (title, description, canonical, og/twitter); the authenticated Maps experience is untouched.
   const shareHead = await shareHeadP;
-  if (shareHead) html = repl(html, '<title>Mindy Map</title>', shareHead);
+  html = applyMapHead(html, shareHead, reqUrl.origin);
   // ?shell=app — this map inside the signed-in app's shell (/app?panel=map). Hides ONLY .zhead/.zrail
   // and adds the parent bridge; data, boot and fetch behaviour are untouched (see app-shell.ts).
   // Never for ?embed= (a different, static mode with its own boot rules).
