@@ -57,6 +57,7 @@ import {
   entitySyncOutcome,
 } from '@/lib/sam/entity-sync-outcome';
 import { runDecisionMakersSync } from '@/lib/gov-contacts/buyer-contact-run';
+import { hasValidCronSecret } from '@/lib/cron/cron-request-auth';
 
 // The contacts drain runs under a soft wall-clock budget (budgetMs, default 210s). Without an
 // explicit ceiling the platform default would kill the run BEFORE the checkpoint write at the
@@ -267,8 +268,8 @@ export async function GET(request: NextRequest) {
   // (2026-09-15T02:00:27Z) — registered, enabled, firing on time, and unable to authenticate.
   // Matches the shape used by every other dispatcher-run job (see fco-roster-watch).
   const auth = request.headers.get('authorization');
-  const isVercelCron = request.headers.get('x-vercel-cron') === '1';
-  const isDispatcher = Boolean(process.env.CRON_SECRET) && auth === `Bearer ${process.env.CRON_SECRET}`;
+  const isVercelCron = hasValidCronSecret(request);
+  const isDispatcher = Boolean(process.env.CRON_SECRET) && hasValidCronSecret(request);
   const password = searchParams.get('password');
   if (!isVercelCron && !isDispatcher && password !== ADMIN_PASSWORD) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

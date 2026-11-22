@@ -26,6 +26,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getRotatedSAMKey } from '@/lib/sam/utils';
 import { samHtmlToText } from '@/lib/sam/description-text';
+import { hasValidCronSecret } from '@/lib/cron/cron-request-auth';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -53,7 +54,7 @@ function authorized(request: NextRequest): boolean {
     if (auth === `Bearer ${cronSecret}`) return true;
   }
   // Vercel's own cron user agent header (best effort).
-  if (request.headers.get('x-vercel-cron')) return true;
+  if (hasValidCronSecret(request)) return true;
   // Manual trigger from a browser or curl.
   const password = new URL(request.url).searchParams.get('password');
   return password === process.env.ADMIN_PASSWORD;

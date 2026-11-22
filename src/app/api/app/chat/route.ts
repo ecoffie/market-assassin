@@ -35,7 +35,8 @@ import { hasProAccess } from '@/lib/access/resolve-access';
 // anything not related to the data core we should remove. No one wants to learn here").
 // Ask Mindy now answers ONLY from the live federal Data Core tools; the teaching-chunk +
 // podcast retrieval (retrieveRagContext / retrievePodcastEpisodes) is gone entirely.
-import { loadBidderProfile, formatProfileForPrompt } from '@/lib/proposal/loaders';
+import { loadBidderProfileResult, formatProfileForPrompt } from '@/lib/proposal/loaders';
+import { contractIdentityNote, contractEvidence, contractEvidenceNote, priorAwardIds } from '@/lib/chat/contract-evidence';
 import { isUserOverBudget, recordLlmUsage } from '@/lib/llm/usage-cost';
 import { makeTier0Tools, TIER0_TOOL_DEFS, TIER0_TOOL_NAMES } from '@/lib/chat/tier0-tools';
 import { makeMyDocumentsTool, MY_DOCUMENTS_TOOL_DEF, FIND_MY_DOCUMENTS } from '@/lib/chat/my-documents-tool';
@@ -110,6 +111,11 @@ import {
 } from '@/lib/chat/fmp-writeup-grounding';
 import { CURRENT_FIND_CHAT_CONTRACT } from '@/lib/mcp/potato-journey';
 import { ASK_MINDY_RULES_LAYER, askMindyRulesEnabledFor, askMindyRulesPromptBlock, rulesLayerFindContract } from '@/lib/chat/ask-mindy-rules';
+import { askMindyRecipesEnabledFor } from '@/lib/ask-mindy/flags';
+import { loadCompanyProfile } from '@/lib/ask-mindy/company-profile';
+import { fitRankingNote, rankFindResult } from '@/lib/ask-mindy/compose';
+/** How long the answer waits for the company profile before skipping the ranking note (value first). */
+const FIT_PROFILE_WAIT_MS = 1500;
 import { findCompletionFooter, comingBackListLeadsWithNotCompeted, type FindResultWithItems } from '@/lib/chat/find-completeness';
 import { inferredCodeDisclosure } from '@/lib/chat/code-disclosure';
 import { getNaics } from '@/lib/codes/lookup';
@@ -687,10 +693,23 @@ export async function POST(request: NextRequest) {
         // Unresolved workspace → NO profile (the private tools refuse too): a coach acting for a
         // client must never get an answer built on their own profile.
         const profileEmail = vaultEmailFor(actingScope);
-        const profile: BidderProfile = profileEmail ? await loadBidderProfile(profileEmail) : {};
+        // Ask Mindy fit ranking (ASK_MINDY_RECIPES, default off; src/lib/ask-mindy/compose.ts). Off → nothing is
+        // loaded and no note is added. On → the company profile loads in parallel through the strict acting
+        // scope only (never a raw email); a refused or failed load just means no ranking note (value first).
+        const fitRankingOn = !cardCtx && askMindyRecipesEnabledFor(auth.email);
+        const fitProfileP = fitRankingOn ? loadCompanyProfile(actingScope).catch(() => null) : null;
+        // The profile's STATUS is kept (2026-11-22): a failed read used to look exactly like an empty profile, so
+        // the answer treated a known company as unknown and asked again for details given earlier.
+        const profileResult = profileEmail ? await loadBidderProfileResult(profileEmail) : null;
+        const profile: BidderProfile = profileResult?.profile ?? {};
         const { rec: noticeRecord, origin: noticeOrigin, mention: mentionedNotice, facts: noticeFacts } = await noticeP;
         cardRecord = noticeRecord;
-        const userProfileBlock = formatProfileForPrompt(profile);
+        const userProfileBlock = formatProfileForPrompt(profile) + (
+          !profileEmail
+            ? '\n\nCOMPANY PROFILE NOT USED this turn: the acting workspace could not be confirmed, so no saved company profile applies. Say so if fit matters; use only what the customer has said in this conversation, and do not ask again for details they already gave.'
+            : profileResult?.status === 'unavailable'
+              ? '\n\nCOMPANY PROFILE UNAVAILABLE this turn: the saved profile could not be read (it is NOT empty). Do not treat the company as unknown and do not ask the customer to re-enter details they already gave in this conversation. Use what they said here, and say that fit could not be checked against their saved profile.'
+              : '');
         const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
         // F1: CURRENT_FIND contract (shared with MCP P2). Federal Market Profile replaces it for that
         // ask — "sources sought" in a pathway profile must not flip into FIND-first open-bid framing.
@@ -774,6 +793,9 @@ export async function POST(request: NextRequest) {
           .filter((l): l is SourceLedger => !!l)
           .slice(0, 3);
         const ledgerSystemNotes = ledgerNotes(splitViewPreamble(message).rest || message, priorLedgers);
+        // A contract number earlier answers showed as an award is looked up by that exact id (36C24825C0020).
+        const contractIdNote = contractIdentityNote(splitViewPreamble(message).rest || message, priorLedgers);
+        if (contractIdNote) ledgerSystemNotes.push(contractIdNote);
         for (const n of ledgerSystemNotes) messages.push({ role: 'system', content: n });
         // "Revise that document" (Agent 4 prod test 2026-11-17): with ONE tool round, the planner must write the
         // revised doc_model in the same call, so the document it refers to is loaded here — from the signed
@@ -2210,6 +2232,30 @@ export async function POST(request: NextRequest) {
         // budget is downgraded from gpt-4o to gpt-4o-mini — never blocked, just a
         // cheaper model. Protects the $149 margin now that chat leads with gpt-4o.
         // (Resolved once above for the tool round; reuse to avoid a second budget read.)
+        // Ask Mindy fit ranking note: only when the flag is on AND find_opportunities ran this turn. It orders and
+        // explains the results the tool already returned (shared scorer bands, no second filter); it never blocks
+        // the answer: a slow, refused or failed profile load skips the note.
+        if (fitProfileP && findResult) {
+          const loaded = await withTimeout(fitProfileP, FIT_PROFILE_WAIT_MS, 'fit_profile').catch(() => null);
+          if (loaded && loaded.status === 'ok') {
+            const note = fitRankingNote(rankFindResult(findResult as unknown as Parameters<typeof rankFindResult>[0], loaded.profile));
+            if (note) {
+              messages.push({ role: 'system', content: note });
+              turnTrace.notices.push('fit_ranking_note');
+            }
+          } else {
+            turnTrace.notices.push(`fit_ranking_skipped:${loaded ? loaded.reason : 'profile_unavailable'}`);
+          }
+        }
+        // Contract evidence guard (2026-11-22, 36C24825C0020): facts about a contract the customer named come only
+        // from a record of that exact id; a result about a different record, or sources that disagree, are stated,
+        // and pursuit advice is blocked while holder, value or end date is unresolved. The customer's two previous
+        // messages count, so "is it worth pursuing?" stays tied to the contract they just asked about.
+        {
+          const focus = [splitViewPreamble(message).rest || message, ...history.filter((x) => x.role === 'user').slice(-2).map((x) => splitViewPreamble(String(x.content || '')).rest || String(x.content || ''))].join('\n');
+          const evidenceNote = contractEvidenceNote(contractEvidence(focus, turnSources.map((x) => ({ tool: x.tool, status: x.status, content: x.content })), priorAwardIds(priorLedgers)));
+          if (evidenceNote) { messages.push({ role: 'system', content: evidenceNote }); turnTrace.notices.push('contract_evidence_note'); }
+        }
         const chatModel = chatModelEarly;
         const streamFrom = (url: string, key: string, model: string, msgs: unknown[], signal: AbortSignal) => fetch(url, {
           method: 'POST', signal,

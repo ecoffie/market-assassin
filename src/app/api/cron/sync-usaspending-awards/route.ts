@@ -11,6 +11,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { hasValidCronSecret } from '@/lib/cron/cron-request-auth';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 const USASPENDING_API = 'https://api.usaspending.gov/api/v2/search/spending_by_award';
@@ -138,7 +139,7 @@ export async function GET(request: NextRequest) {
   const naicsParam = searchParams.get('naics'); // Optional: specific NAICS codes
 
   const isAuthorized =
-    password === ADMIN_PASSWORD || cronSecret === process.env.CRON_SECRET;
+    password === ADMIN_PASSWORD || hasValidCronSecret(request);
 
   if (!isAuthorized) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

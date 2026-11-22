@@ -20,6 +20,7 @@ import { INDUSTRY_PRESETS } from '@/lib/industry-presets';
 import { verifyAdminPassword } from '@/lib/admin-auth';
 import { checkAdminRateLimit, getClientIP, rateLimitResponse } from '@/lib/rate-limit';
 import { reportCronOutcome } from '@/lib/cron-self-report';
+import { hasValidCronSecret } from '@/lib/cron/cron-request-auth';
 
 export const maxDuration = 300; // 5 minutes
 
@@ -193,9 +194,9 @@ export async function GET(request: NextRequest) {
   const mode = searchParams.get('mode') || 'preview';
 
   // Auth: Either Vercel cron, bearer token, or password
-  const isVercelCron = request.headers.get('x-vercel-cron') === '1';
+  const isVercelCron = hasValidCronSecret(request);
   const authHeader = request.headers.get('authorization');
-  const hasCronSecret = authHeader === `Bearer ${CRON_SECRET}`;
+  const hasCronSecret = hasValidCronSecret(request);
   const hasPassword = verifyAdminPassword(password);
 
   if (!isVercelCron && !hasCronSecret && !hasPassword) {

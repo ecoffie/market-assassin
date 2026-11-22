@@ -593,7 +593,7 @@ curl "$next_url"
 3. Then batch enroll remaining
 4. Save email list to permanent file (not /tmp)
 
-**File saved:** `data/bootcamp-attendees-to-enroll.txt` (8,804 emails)
+**File saved:** `$MINDY_PRIVATE_DIR/bootcamp-attendees-to-enroll.txt` (private; not in the repository) (8,804 emails)
 
 ---
 

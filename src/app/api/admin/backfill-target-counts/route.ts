@@ -28,6 +28,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { normalizeAgencyKey } from '@/lib/gov-contacts/agency-key';
 import { decodeDodaac } from '@/lib/gov-contacts/dodaac';
+import { hasValidCronSecret } from '@/lib/cron/cron-request-auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -40,7 +41,7 @@ function getSupabase() {
 function authed(request: NextRequest): boolean {
   const pw = request.nextUrl.searchParams.get('password');
   const bearer = request.headers.get('authorization')?.replace('Bearer ', '');
-  const isCron = request.headers.get('x-cron-dispatch') === '1'
+  const isCron = hasValidCronSecret(request)
     || (!!process.env.CRON_SECRET && bearer === process.env.CRON_SECRET);
   return (!!pw && pw === process.env.ADMIN_PASSWORD) || isCron;
 }
@@ -211,7 +212,7 @@ async function run(execute: boolean) {
 
 export async function GET(request: NextRequest) {
   if (!authed(request)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  const isCron = request.headers.get('x-cron-dispatch') === '1';
+  const isCron = hasValidCronSecret(request);
   const execute = isCron || request.nextUrl.searchParams.get('mode') === 'execute';
   return NextResponse.json(await run(execute));
 }

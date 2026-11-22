@@ -114,6 +114,9 @@ export function renderMessageContent(content: string, asMarkdown = false) {
   );
 }
 
+// At or above this width the history list sits beside the chat; below it, it starts closed and overlays.
+const PHONE_SIDEBAR_QUERY = '(min-width: 768px)';
+
 const MD_CLASSES = [
   'mindy-md [overflow-wrap:anywhere] break-words',
   '[&_p]:my-0 [&_p+p]:mt-2.5 [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:my-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:my-0.5 [&_li>ul]:my-1',
@@ -163,6 +166,10 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
   const [sessions, setSessions] = useState<Array<{ id: string; title: string | null; message_count: number; updated_at: string }>>([]);
   const [loadingSession, setLoadingSession] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  // Phones: the 240px history list starts closed and, when opened, overlays the chat instead of squeezing it
+  // (open by default it left an 80–150px chat column and widened the page past the screen).
+  const isPhoneWidth = useCallback(() => typeof window !== 'undefined' && typeof window.matchMedia === 'function' && !window.matchMedia(PHONE_SIDEBAR_QUERY).matches, []);
+  useEffect(() => { if (isPhoneWidth()) setSidebarOpen(false); }, [isPhoneWidth]);
   // Document drawer state: when set, opens RagDocDrawer with the
   // requested mindy_rag_documents.id loaded from /api/app/rag-doc.
   const [drawerDocId, setDrawerDocId] = useState<string | null>(null);
@@ -348,7 +355,8 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
         authedFetch('/api/app/chat/suggestions', email, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, message: text, answer: finalContent }),
+          // The customer's earlier messages, so a next step never asks for something already said (2026-11-22).
+          body: JSON.stringify({ email, message: text, answer: finalContent, earlier: historyForServer.filter((h) => h.role === 'user').slice(-6).map((h) => customerText(String(h.content || ''))) }),
         })
           .then(r => r.json())
           .then(d => {
@@ -418,11 +426,12 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
           };
         }));
         setSessionId(sid);
+        if (isPhoneWidth()) setSidebarOpen(false);
       }
     } catch { /* non-fatal */ } finally {
       setLoadingSession(false);
     }
-  }, [email, loadingSession, sessionId]);
+  }, [email, loadingSession, sessionId, isPhoneWidth]);
 
   // Drop a Map selection the customer explicitly dismissed (chip X / New chat) so remount does not re-attach it.
   const clearMapSelectedOpp = useCallback(() => {
@@ -436,8 +445,9 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
     setAttachedOpp(null);
     try { sessionStorage.removeItem(LAST_CHAT_SESSION_KEY); } catch { /* unavailable */ }
     clearMapSelectedOpp();
+    if (isPhoneWidth()) setSidebarOpen(false);
     inputRef.current?.focus();
-  }, [clearMapSelectedOpp]);
+  }, [clearMapSelectedOpp, isPhoneWidth]);
 
   // Delete a conversation from history.
   const deleteSession = useCallback(async (sid: string) => {
@@ -552,10 +562,11 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
   }
 
   return (
-    <div className="flex h-[calc(100vh-73px)] bg-ground-deep text-white">
+    // dvh tracks the visible area under mobile browser toolbars (100vh is taller than what is on screen).
+    <div className="relative flex h-[calc(100dvh-73px)] bg-ground-deep text-white">
       {/* Conversation history sidebar */}
       {sidebarOpen && (
-        <aside className="w-60 shrink-0 border-r border-surface bg-ground/40 flex flex-col">
+        <aside className="absolute inset-y-0 left-0 z-20 w-60 max-w-[85%] shadow-xl bg-ground-deep md:static md:max-w-none md:shadow-none md:bg-ground/40 shrink-0 border-r border-surface flex flex-col">
           <div className="p-3 shrink-0">
             <button
               onClick={startNewChat}
@@ -598,9 +609,9 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
       {/* Main chat column */}
       <div className="flex flex-col flex-1 min-w-0">
       {/* Header */}
-      <header className="px-6 py-3 border-b border-surface bg-ground-deep/95 backdrop-blur shrink-0">
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
+      <header className="px-4 md:px-6 py-3 [@media(max-height:500px)]:py-1.5 border-b border-surface bg-ground-deep/95 backdrop-blur shrink-0">
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+          <div className="flex items-center gap-3 min-w-0">
             <button
               onClick={() => setSidebarOpen(o => !o)}
               className="inline-flex items-center text-muted hover:text-white p-1 rounded hover:bg-surface transition-colors"
@@ -614,7 +625,7 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
                 <h1 className="inline-flex items-center gap-1.5 text-lg font-semibold"><MessageCircle className="h-5 w-5 shrink-0 text-accent" strokeWidth={2} /> Mindy Chat</h1>
                 <span className="text-[10px] font-semibold tracking-wider px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">BETA</span>
               </div>
-              <p className="text-xs text-faint mt-0.5">
+              <p className="text-xs text-faint mt-0.5 [@media(max-height:500px)]:hidden">
                 Ask anything about federal contracting. Mindy cites her sources from your 8-year knowledge base.
               </p>
             </div>
@@ -655,7 +666,7 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
       </header>
 
       {/* Message list */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto px-6 py-6">
+      <div ref={scrollRef} data-testid="chat-scroll" className="flex-1 min-h-[7rem] overflow-y-auto px-4 md:px-6 py-6 [@media(max-height:500px)]:py-3">
         {isFree && messages.length === 0 ? (
           // Pro-locked empty state — Mindy Chat retrieves from the proprietary
           // knowledge base, so it's a Pro feature. Show the value + a CTA.
@@ -805,7 +816,7 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
       </div>
 
       {/* Input */}
-      <div className="px-6 py-4 border-t border-surface bg-ground-deep shrink-0">
+      <div className="px-4 md:px-6 py-4 [@media(max-height:500px)]:py-2 border-t border-surface bg-ground-deep shrink-0">
         <div className="max-w-3xl mx-auto">
           {attachedOpp && (
             <div data-testid="attached-opp" className="mb-2 flex items-center gap-2 rounded-lg border border-purple-500/30 bg-purple-500/10 px-3 py-1.5 text-[12.5px] text-purple-100">
@@ -866,7 +877,7 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
               )}
             </div>
           </div>
-          <div className="mt-2 flex items-center justify-between text-[11px] text-faint">
+          <div className="mt-2 flex items-center justify-between text-[11px] text-faint [@media(max-height:500px)]:hidden">
             <span>Press <span className="text-muted font-mono">Enter</span> to send, <span className="text-muted font-mono">Shift + Enter</span> for a new line</span>
             <span>{input.length} / 2000</span>
           </div>

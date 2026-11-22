@@ -21,7 +21,7 @@ describe('internal billing canary accounts', () => {
   });
 
   it('does not exclude a real customer', () => {
-    expect(isExcludedFromMetrics('mgbuilders311@gmail.com')).toBe(false);
+    expect(isExcludedFromMetrics('fixture-member-1@example.com')).toBe(false);
     expect(isExcludedFromMetrics(null)).toBe(false);
   });
 });
