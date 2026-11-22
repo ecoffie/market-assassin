@@ -238,7 +238,7 @@ export default function ProductPageAppSumo({
 
       {/* Product Nav */}
       <div className="border-b border-(--mp-line) bg-(--mp-surface)">
-        <div className="max-w-7xl mx-auto px-6 flex gap-8 items-center">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 pb-3 sm:pb-0 flex flex-wrap gap-x-5 sm:gap-x-8 items-center">
           <a href="#overview" className="py-4 text-sm font-semibold border-b-2 border-(--mp-navy) text-(--mp-navy)">Overview</a>
           <a href="#features" className="py-4 text-(--mp-muted) text-sm font-medium border-b-2 border-transparent hover:border-(--mp-line) hover:text-(--mp-ink)">Features</a>
           <a href="#pricing" className="py-4 text-(--mp-muted) text-sm font-medium border-b-2 border-transparent hover:border-(--mp-line) hover:text-(--mp-ink)">Pricing</a>

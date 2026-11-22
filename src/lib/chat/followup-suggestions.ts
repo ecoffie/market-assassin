@@ -10,6 +10,7 @@
  * latency to the answer itself. Fails soft to [] — no chips is fine.
  */
 import { callLLM } from '@/lib/llm/call-llm';
+import { NEXT_STEP_SYSTEM_PROMPT, filterNextSteps } from '@/lib/chat/next-step-buttons';
 
 // When Mindy redirected an off-topic question, there's no useful "next action".
 // Substring-only (catches "I'm" / "I am" and any lead-in), matching the chat
@@ -22,7 +23,8 @@ const OFF_TOPIC_MARKERS = [
 export async function generateFollowups(
   userMessage: string,
   assistantAnswer: string,
-  opts?: { userEmail?: string | null },
+  /** rulesLayer: the Ask Mindy rules layer is on for this verified caller (next-step-buttons.ts). */
+  opts?: { userEmail?: string | null; rulesLayer?: boolean },
 ): Promise<string[]> {
   const answer = (assistantAnswer || '').trim();
   // Too short to be a real answer (error/empty), or an off-topic redirect → skip.
@@ -38,7 +40,7 @@ export async function generateFollowups(
       json: true,
       maxTokens: 220,
       temperature: 0.4,
-      system:
+      system: opts?.rulesLayer ? NEXT_STEP_SYSTEM_PROMPT :
         'You suggest the NEXT action a federal-contracting user would take after Mindy\'s answer. ' +
         'Mindy can: look up named buying-office contacts, open live SAM solicitations, contractor/incumbent intel, ' +
         'agency spending, GSA CALC pricing, draft outreach emails, and run bid/no-bid analysis. Mindy cannot save, track or add anything to a pipeline or target list from chat — never suggest that. ' +
@@ -54,11 +56,12 @@ export async function generateFollowups(
     });
     const parsed = JSON.parse(text) as { suggestions?: unknown };
     const arr = Array.isArray(parsed?.suggestions) ? parsed.suggestions : [];
-    return arr
+    const cleaned = arr
       .filter((s): s is string => typeof s === 'string' && s.trim().length > 0)
       .map((s) => s.trim().replace(/^[-*\d.)\s]+/, '').replace(/\.+$/, '')) // strip list bullets / trailing period (keep ?)
-      .filter((s) => s.length > 2 && s.length <= 80)
-      .slice(0, 3);
+      .filter((s) => s.length > 2 && s.length <= (opts?.rulesLayer ? 100 : 80));
+    // Rules layer: keep only buttons that name an item from THIS answer (spec section 8).
+    return opts?.rulesLayer ? filterNextSteps(cleaned, answer) : cleaned.slice(0, 3);
   } catch {
     return []; // fail soft — no chips
   }

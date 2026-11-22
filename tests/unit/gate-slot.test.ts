@@ -5,7 +5,7 @@
  */
 import { describe, it, expect, afterEach } from 'vitest';
 import { spawn } from 'node:child_process';
-import { mkdtempSync, rmSync, existsSync, readdirSync } from 'node:fs';
+import { mkdtempSync, rmSync, existsSync, readdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
@@ -23,7 +23,26 @@ function bash(script: string, env: Record<string, string>): Promise<{ code: numb
     p.on('close', (code) => resolve({ code: code ?? -1, out }));
   });
 }
+/** Like bash(), but its output can be read while it is still running. */
+function bashLive(script: string, env: Record<string, string>): { out: () => string; done: Promise<{ code: number; out: string }> } {
+  let out = '';
+  const done = new Promise<{ code: number; out: string }>((resolve) => {
+    const p = spawn('bash', ['-c', `. "${SCRIPT}"; ${script}`], { env: { ...process.env, ...env } });
+    p.stdout.on('data', (b) => { out += b; });
+    p.stderr.on('data', (b) => { out += b; });
+    p.on('close', (code) => resolve({ code: code ?? -1, out }));
+  });
+  return { out: () => out, done };
+}
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+/** Poll (bounded) until a running process has printed `re`. */
+async function waitForOutput(read: () => string, re: RegExp, timeoutMs = 10_000): Promise<void> {
+  const t0 = Date.now();
+  while (!re.test(read())) {
+    if (Date.now() - t0 > timeoutMs) throw new Error(`timed out waiting for output ${re}; have: ${read().slice(-200)}`);
+    await wait(50);
+  }
+}
 /** Slots currently held: a slot dir whose pid file has been written (acquire is complete). */
 function heldSlots(dir: string): string[] {
   return readdirSync(dir).filter((n) => n.startsWith('slot-') && existsSync(path.join(dir, n, 'pid')));
@@ -41,22 +60,33 @@ describe('gate-slot: queue, never skip', () => {
   it('a run that cannot get a slot within the timeout is BLOCKED (exit 1), not skipped', async () => {
     const dir = slotDir();
     const env = { MINDY_GATE_SLOT_DIR: dir, MINDY_GATE_SLOTS: '1', MINDY_GATE_SLOT_POLL_S: '0.1' };
-    const holder = bash('gate_slot_acquire && sleep 3', env);
+    // The holder keeps its slot until the test releases it (same reason as below: no fixed-sleep window to miss).
+    const go = path.join(dir, 'go');
+    const holder = bash(`gate_slot_acquire && while [ ! -f "${go}" ]; do sleep 0.1; done; gate_slot_release`, env);
     await waitForHeld(dir, 1);
     const second = await bash('gate_slot_acquire', { ...env, MINDY_GATE_SLOT_TIMEOUT_S: '1' });
     expect(second.code).toBe(1);
     expect(second.out).toMatch(/BLOCKED \(fail closed\)/);
+    writeFileSync(go, '');
     expect((await holder).code).toBe(0);
   }, 15_000);
 
   it('two slots admit two concurrent runs; a third waits until one finishes', async () => {
     const dir = slotDir();
     const env = { MINDY_GATE_SLOT_DIR: dir, MINDY_GATE_SLOTS: '2', MINDY_GATE_SLOT_POLL_S: '0.1' };
-    const a = bash('gate_slot_acquire && sleep 4; gate_slot_release', env);
-    const b = bash('gate_slot_acquire && sleep 4; gate_slot_release', env);
+    // Holders keep their slot until the test says so (a "go" file), not for a fixed `sleep 4`: on a loaded CI
+    // runner the test could miss a 4 s window entirely ("timed out waiting for 2 held slot(s); have 0").
+    const go = path.join(dir, 'go');
+    const hold = `gate_slot_acquire && while [ ! -f "${go}" ]; do sleep 0.1; done; gate_slot_release`;
+    const a = bash(hold, env);
+    const b = bash(hold, env);
     await waitForHeld(dir, 2);
     expect(heldSlots(dir)).toHaveLength(2);
-    const c = await bash('gate_slot_acquire && echo GOT', { ...env, MINDY_GATE_SLOT_TIMEOUT_S: '15' });
+    const cRun = bashLive('gate_slot_acquire && echo GOT', { ...env, MINDY_GATE_SLOT_TIMEOUT_S: '15' });
+    // c must be queued behind the two holders before any slot frees up.
+    await waitForOutput(cRun.out, /waiting for a gate slot \(2 in use/);
+    writeFileSync(go, '');
+    const c = await cRun.done;
     expect(c.code).toBe(0);
     expect(c.out).toMatch(/GOT/);
     // It had to wait: the script prints this only when every slot was taken on its first try.
