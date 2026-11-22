@@ -120,6 +120,10 @@ export interface SolicitationIncumbentResult {
     incumbent_finding: IncumbentFinding;
     /** Present whenever no incumbent is identified: what that does and does not mean. */
     absence_note?: string;
+    /** 'mentioned_only': the notice found only mentions the queried id; it is not that notice (see MENTIONED_ONLY_NOTE). */
+    notice_identity?: 'identity' | 'mentioned_only';
+    /** The notice that only mentions the queried id (reference only; never this identifier's facts). */
+    mentioned_in?: { notice_id: string; solicitation_number: string | null; notice_type: string | null };
   };
 }
 
@@ -136,14 +140,35 @@ export const INCUMBENT_ABSENCE_NOTES: Record<Exclude<IncumbentFinding, 'identifi
   candidate_not_confirmed: 'A prior award looks similar but the evidence does not identify it as the incumbent. Say the incumbent could not be confirmed; do not name the candidate as the incumbent, and do not say there is no incumbent.',
   not_found: 'No prior award was found on USASpending for this solicitation. That is a search result, not proof there is no incumbent: the work may be new, or the predecessor contract may be recorded under another number, title or code. Say Mindy could not identify an incumbent; never say there is no incumbent or that the work is new.',
   search_failed: 'The prior-award search failed, so whether there is an incumbent is unknown. Say the lookup was unavailable; never say there is no incumbent.',
-  notice_not_found: 'The solicitation itself was not found, so no incumbent could be looked up. Never say there is no incumbent.',
+  notice_not_found: 'The solicitation itself was not found, so no incumbent could be looked up. If the identifier is a contract (award) number rather than a solicitation number, look it up with get_award_detail. Never say there is no incumbent.',
 };
+
+/** When the only notice found merely mentions the queried identifier (it is not that notice's number). */
+export const MENTIONED_ONLY_NOTE = 'No solicitation has this number. A different notice only mentions it, so that notice is not this identifier and its prior-award guess is NOT the incumbent of the queried identifier. If the identifier is a contract (award) number, look it up with get_award_detail and use only that record for its holder, value and dates. Never present another award as this contract.';
 
 export function incumbentFinding(p: { noticeFound: boolean; degraded: boolean; grounded: boolean; candidate: boolean }): IncumbentFinding {
   if (p.grounded) return 'identified';
   if (!p.noticeFound) return p.degraded ? 'search_failed' : 'notice_not_found';
   if (p.candidate) return 'candidate_not_confirmed';
   return p.degraded ? 'search_failed' : 'not_found';
+}
+
+/** Compare identifiers by letters and digits only, case-insensitive ("36C248-25-C-0020" == "36C24825C0020"). */
+export function normalizeIdentifier(s: string): string {
+  return s.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+}
+
+/**
+ * Is this notice the queried identifier itself, or a notice that only MENTIONS it (description match)?
+ * Only identity may name an incumbent: a contract number mentioned in an award notice is not that notice.
+ */
+export function noticeIdentity(query: string, notice: Pick<ResolvedNotice, 'notice_id' | 'solicitation_number' | 'notice_ids' | 'matched_by'>): 'identity' | 'mentioned_only' {
+  const want = normalizeIdentifier(query);
+  if (!want) return 'mentioned_only';
+  if (notice.solicitation_number && normalizeIdentifier(notice.solicitation_number) === want) return 'identity';
+  const ids = [notice.notice_id, ...(notice.notice_ids ?? [])].map((x) => normalizeIdentifier(String(x || '')));
+  if (ids.includes(want)) return 'identity';
+  return 'mentioned_only';
 }
 
 function isUuid(s: string): boolean {
@@ -316,13 +341,14 @@ async function fromSamPublic(q: string): Promise<ResolvedNotice | null> {
     if (!res.ok) return null;
     const j = await res.json();
     const results = j?._embedded?.results || [];
-    const want = q.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
-    const matched = results.filter((r: { solicitationNumber?: string; _id?: string }) => {
-      const sol = String(r.solicitationNumber || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
-      const id = String(r._id || '').replace(/-/g, '').toLowerCase();
-      return sol === want || id === want.toLowerCase() || sol.includes(want);
-    });
-    const pool = matched.length ? matched : results;
+    // IDENTITY ONLY (2026-11-22, 36C24825C0020): the public index is full-text, so a contract number also
+    // hits the award notice that MENTIONS it. Taking the top hit (the old fallback) or a partial match turned
+    // contract 36C24825C0020 into solicitation 36C24824R0177 and named another award as its incumbent. A
+    // notice is used only when its solicitation number or notice id IS the query; otherwise nothing.
+    const want = normalizeIdentifier(q);
+    const pool = results.filter((r: { solicitationNumber?: string; _id?: string }) =>
+      normalizeIdentifier(String(r.solicitationNumber || '')) === want ||
+      String(r._id || '').replace(/-/g, '').toLowerCase() === want.toLowerCase());
     const mapped: ResolvedNotice[] = [];
     for (const opp of pool) {
       const noticeId = String(opp._id || '').replace(/-/g, '');
@@ -762,6 +788,28 @@ export function summarizeSolicitationIncumbent(
 export async function resolveSolicitationIncumbent(query: string): Promise<SolicitationIncumbentResult> {
   const q = query.trim();
   const { notice, degraded: noticeDegraded } = await resolveSamNotice(q);
+  const identity = notice ? noticeIdentity(q, notice) : undefined;
+  if (notice && identity === 'mentioned_only') {
+    // The queried id is not this notice: never run the prior-award guess for it, never name an incumbent.
+    return {
+      queried: q,
+      notice: null,
+      incumbent: null,
+      prior_awards: [],
+      summary: `No solicitation is numbered ${q}. Notice ${notice.solicitation_number || notice.notice_id} only mentions it, so it is not this identifier; no incumbent is named.`,
+      _meta: {
+        grounded_notice: false,
+        grounded_incumbent: false,
+        degraded: noticeDegraded,
+        notice_source: notice.source,
+        matched_by: notice.matched_by ?? null,
+        notice_identity: 'mentioned_only',
+        mentioned_in: { notice_id: notice.notice_id, solicitation_number: notice.solicitation_number, notice_type: notice.notice_type },
+        incumbent_finding: 'notice_not_found',
+        absence_note: MENTIONED_ONLY_NOTE,
+      },
+    };
+  }
   let prior: PriorAwardHit[] = [];
   let predDegraded = false;
   if (notice) {
@@ -803,6 +851,7 @@ export async function resolveSolicitationIncumbent(query: string): Promise<Solic
       notice_ids: notice?.notice_ids,
       incumbent_certainty: grounding.certainty,
       incumbent_reason: grounding.reason,
+      ...(identity ? { notice_identity: identity } : {}),
       ...findingMeta(incumbentFinding({ noticeFound: !!notice, degraded: noticeDegraded || predDegraded, grounded: grounding.grounded, candidate: !!incumbent })),
     },
   };
