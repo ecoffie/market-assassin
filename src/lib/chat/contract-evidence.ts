@@ -150,29 +150,32 @@ export function answeredFor(results: readonly TurnResultLike[]): Set<string> {
   return out;
 }
 
-/** Solicitation-tool results that answered for an identifier but describe different records. */
+/**
+ * Incumbent answers whose NOTICE is not the queried identifier (Agent 4 review): the notice found is a different
+ * solicitation, or the tool said the notice only mentions the id. The incumbent award ALWAYS has its own PIID, so a
+ * different award id alone is never a substitution. lookup_solicitation is not checked here: its identity rules
+ * (MATCHED_CANDIDATE, customer RFP aliases) are the frozen Solicitation Truth contract.
+ */
 export function substitutions(results: readonly TurnResultLike[], asked: readonly string[]): Substitution[] {
   const want = new Set(asked);
   const out: Substitution[] = [];
   for (const r of results) {
-    if (!r.tool || !SOLICITATION_TOOLS.has(r.tool)) continue;
+    if (r.tool !== 'get_solicitation_incumbent') continue;
     const j = parse(r.content);
     if (!j) continue;
-    const q = normId(String(j.queried ?? j.query ?? ''));
+    const q = normId(String(j.queried ?? ''));
     if (!q || !want.has(q)) continue;
-    const describes = new Set<string>();
     const notice = j.notice as Record<string, unknown> | null | undefined;
+    const meta = (j._meta ?? {}) as Record<string, unknown>;
     const sol = notice && str(notice.solicitation_number);
-    if (sol && normId(sol) !== q) describes.add(`solicitation ${sol}`);
+    const mentioned = meta.notice_identity === 'mentioned_only' ? (meta.mentioned_in as Record<string, unknown> | undefined) : undefined;
+    const otherNotice = sol && normId(sol) !== q ? sol : mentioned ? str(mentioned.solicitation_number) ?? str(mentioned.notice_id) : undefined;
+    if (!otherNotice) continue;
+    const describes = [`solicitation ${otherNotice}`];
     const inc = j.incumbent as Record<string, unknown> | null | undefined;
     const award = inc && str(inc.awardId);
-    if (award && normId(award) !== q) describes.add(`award ${award}${str(inc!.recipientName) ? ` (${safe(String(inc!.recipientName))})` : ''}`);
-    const items = Array.isArray(j.items) ? (j.items as Array<Record<string, unknown>>) : [];
-    for (const it of items) {
-      const ids = (Array.isArray(it.identifiers) ? it.identifiers : []).map((x) => normId(String(x)));
-      if (ids.length && !ids.includes(q)) describes.add(`notice ${String((it.identifiers as unknown[])[0])}`);
-    }
-    if (describes.size) out.push({ asked: q, tool: r.tool, describes: [...describes] });
+    if (award && normId(award) !== q) describes.push(`award ${award}${str(inc!.recipientName) ? ` (${safe(String(inc!.recipientName))})` : ''}`);
+    out.push({ asked: q, tool: r.tool, describes });
   }
   return out;
 }
@@ -196,8 +199,13 @@ export interface ContractEvidence {
 /**
  * Per identifier the customer named. `message` may include the customer's recent earlier messages, so "is it worth
  * pursuing?" after "tell me about 36C24825C0020" is still checked against that contract.
+ *
+ * Holder, value and end date are required ONLY of identifiers known to be contract AWARDS: shown as awards by an
+ * earlier answer (`priorAwards`, from the signed ledger), or returned as an award record of that exact id by a tool
+ * this turn. A solicitation number has no holder or value, so it is never pursuit-blocked for lacking them (Agent 4
+ * review, W912DY26R0012).
  */
-export function contractEvidence(message: string, results: readonly TurnResultLike[]): ContractEvidence[] {
+export function contractEvidence(message: string, results: readonly TurnResultLike[], priorAwards: ReadonlyMap<string, string> = new Map()): ContractEvidence[] {
   const asked = contractIdsIn(message);
   if (!asked.length) return [];
   const recs = contractRecords(results);
@@ -206,8 +214,9 @@ export function contractEvidence(message: string, results: readonly TurnResultLi
   return asked.flatMap((id) => {
     const verified = recs.filter((r) => r.id === id);
     const substituted = subs.filter((s) => s.asked === id);
+    const isAward = priorAwards.has(id) || verified.some((r) => AWARD_RECORD_TOOLS.has(r.tool) || r.tool === 'find_opportunities');
     // Nothing this turn looked it up: the answer is not about its facts (history and earlier notes still apply).
-    if (!verified.length && !substituted.length && !answered.has(id)) return [];
+    if (!verified.length && !substituted.length && !(isAward && answered.has(id))) return [];
     const disagreements: string[] = [];
     const holders = verified.filter((r) => r.holder);
     for (const r of holders.slice(1)) if (!sameHolder(r.holder!, holders[0].holder!)) disagreements.push(`holder: ${safe(holders[0].holder!)} (${holders[0].tool}) vs ${safe(r.holder!)} (${r.tool})`);
@@ -216,9 +225,11 @@ export function contractEvidence(message: string, results: readonly TurnResultLi
     const ends = verified.filter((r) => r.end);
     for (const r of ends.slice(1)) if (r.end !== ends[0].end) disagreements.push(`end date: ${ends[0].end} (${ends[0].tool}) vs ${r.end} (${r.tool})`);
     const unresolved: ContractEvidence['unresolved'] = [];
-    if (!holders.length) unresolved.push('holder');
-    if (!vals.length) unresolved.push('value');
-    if (!ends.length) unresolved.push('end date');
+    if (isAward) {
+      if (!holders.length) unresolved.push('holder');
+      if (!vals.length) unresolved.push('value');
+      if (!ends.length) unresolved.push('end date');
+    }
     return [{ id, verified, substituted, disagreements, unresolved }];
   });
 }

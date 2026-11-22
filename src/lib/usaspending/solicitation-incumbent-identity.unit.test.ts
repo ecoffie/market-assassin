@@ -8,12 +8,18 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('@/lib/sam/resolve-solicitation', async (orig) => ({
-  ...(await orig<typeof import('@/lib/sam/resolve-solicitation')>()),
-  resolveCanonicalSolicitation: vi.fn(async () => null), // not in our cache, as in production
-}));
+const cache = vi.hoisted(() => ({ hit: null as null | Record<string, unknown> }));
+vi.mock('@/lib/sam/resolve-solicitation', async (orig) => {
+  const real = await orig<typeof import('@/lib/sam/resolve-solicitation')>();
+  return {
+    ...real,
+    // Not in our cache (as in production for 36C24825C0020) unless a test sets cache.hit.
+    resolveCanonicalSolicitation: vi.fn(async () => (cache.hit ? {} : null)),
+    toResolvedNoticeFields: vi.fn((c: unknown) => (cache.hit ? cache.hit : real.toResolvedNoticeFields(c as never))),
+  };
+});
 
-import { noticeIdentity, normalizeIdentifier, resolveSamNotice, resolveSolicitationIncumbent, MENTIONED_ONLY_NOTE } from './solicitation-incumbent';
+import { isAwardShapedPiid, noticeIdentity, normalizeIdentifier, resolveSamNotice, resolveSolicitationIncumbent, MENTIONED_ONLY_NOTE } from './solicitation-incumbent';
 
 const AWARD_NOTICE_HIT = {
   _id: 'a0931c2de70f4f32a4d183c3a1ce84c2',
@@ -30,6 +36,7 @@ const fetchMock = vi.fn();
 const savedKeys = { a: process.env.SAM_API_KEY, b: process.env.SAM_GOV_API_KEY };
 
 beforeEach(() => {
+  cache.hit = null;
   delete process.env.SAM_API_KEY;
   delete process.env.SAM_GOV_API_KEY;
   fetchMock.mockReset();
@@ -94,5 +101,38 @@ describe('noticeIdentity', () => {
   });
   it('the mentioned-only note forbids presenting another award as the contract', () => {
     expect(MENTIONED_ONLY_NOTE).toMatch(/Never present another award as this contract/);
+  });
+});
+
+describe('Agent 4 review (c): the frozen customer-RFP alias path keeps resolving (#1557/#1558)', () => {
+  const aliasNotice = { notice_id: 'f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0', solicitation_number: 'N0017425R0001', notice_ids: ['f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0'], matched_by: 'description_identifier' as const, source: 'cache' as const };
+  it('a customer RFP alias found by description match is the family identity', () => {
+    expect(noticeIdentity('N0017426R1003', aliasNotice)).toBe('identity');
+  });
+  it('a CONTRACT number found in a cached notice text is still not that notice', () => {
+    expect(noticeIdentity('36C24825C0020', aliasNotice)).toBe('mentioned_only');
+  });
+  it('isAwardShapedPiid: award letters only', () => {
+    expect(isAwardShapedPiid('36C24825C0020')).toBe(true);
+    expect(isAwardShapedPiid('W912DY21C0044')).toBe(true);
+    expect(isAwardShapedPiid('N0017426R1003')).toBe(false);
+    expect(isAwardShapedPiid('W912DY26Q0012')).toBe(false);
+  });
+});
+
+describe('Agent 4 review (c), end to end: an alias still reaches the prior-award search', () => {
+  it('a customer RFP alias matched by description resolves its notice and runs the incumbent search', async () => {
+    cache.hit = {
+      notice_id: 'f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0', solicitation_number: 'N0017425R0001', title: 'Example family solicitation',
+      agency: 'DEPT OF THE NAVY', department: 'DEPT OF DEFENSE', naics_code: '541330', psc_code: 'R425', set_aside: null,
+      notice_type: 'Solicitation', posted_date: '2026-09-01', response_deadline: '2026-12-01', ui_link: null,
+      matched_by: 'description_identifier', notice_ids: ['f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0'], version_count: 1, status: 'open',
+    };
+    fetchMock.mockImplementation(async () => new Response(JSON.stringify({ results: [] }), { status: 200 }));
+    const r = await resolveSolicitationIncumbent('N0017426R1003');
+    expect(r.notice?.solicitation_number).toBe('N0017425R0001');
+    expect(r._meta.notice_identity).toBe('identity');
+    expect(r._meta.incumbent_finding).not.toBe('notice_not_found');
+    expect(fetchMock.mock.calls.some(([u]) => String(u).includes('usaspending'))).toBe(true);
   });
 });

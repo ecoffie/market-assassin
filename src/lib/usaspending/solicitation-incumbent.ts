@@ -162,13 +162,29 @@ export function normalizeIdentifier(s: string): string {
  * Is this notice the queried identifier itself, or a notice that only MENTIONS it (description match)?
  * Only identity may name an incumbent: a contract number mentioned in an award notice is not that notice.
  */
-export function noticeIdentity(query: string, notice: Pick<ResolvedNotice, 'notice_id' | 'solicitation_number' | 'notice_ids' | 'matched_by'>): 'identity' | 'mentioned_only' {
+export function noticeIdentity(query: string, notice: Pick<ResolvedNotice, 'notice_id' | 'solicitation_number' | 'notice_ids' | 'matched_by' | 'source'>): 'identity' | 'mentioned_only' {
   const want = normalizeIdentifier(query);
   if (!want) return 'mentioned_only';
   if (notice.solicitation_number && normalizeIdentifier(notice.solicitation_number) === want) return 'identity';
   const ids = [notice.notice_id, ...(notice.notice_ids ?? [])].map((x) => normalizeIdentifier(String(x || '')));
   if (ids.includes(want)) return 'identity';
+  // The cache's description match is the frozen family identity (#1557/#1558): a customer RFP alias such as
+  // N0017426R1003 is a confirmed identifier of its family and keeps resolving. Only a CONTRACT number found in a
+  // notice's text is refused there: a contract is never the notice that mentions it (36C24825C0020).
+  if (notice.source === 'cache' && notice.matched_by === 'description_identifier') {
+    return isAwardShapedPiid(want) ? 'mentioned_only' : 'identity';
+  }
   return 'mentioned_only';
+}
+
+/**
+ * A FAR 4.1603 award PIID: 6-character office code, 2-digit fiscal year, an AWARD instrument letter in position 9
+ * (C contract, D indefinite-delivery contract, F task or delivery order, P purchase order), then the serial.
+ * Solicitation letters (R, Q, B, T...) are never award-shaped. Shape only says "this is a contract number"; it
+ * never decides which record a number belongs to.
+ */
+export function isAwardShapedPiid(id: string): boolean {
+  return /^[A-Z0-9]{6}\d{2}[CDFP][A-Z0-9]{4,8}$/.test(normalizeIdentifier(id));
 }
 
 function isUuid(s: string): boolean {

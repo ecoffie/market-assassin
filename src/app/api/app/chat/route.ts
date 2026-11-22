@@ -36,7 +36,7 @@ import { hasProAccess } from '@/lib/access/resolve-access';
 // Ask Mindy now answers ONLY from the live federal Data Core tools; the teaching-chunk +
 // podcast retrieval (retrieveRagContext / retrievePodcastEpisodes) is gone entirely.
 import { loadBidderProfileResult, formatProfileForPrompt } from '@/lib/proposal/loaders';
-import { contractIdentityNote, contractEvidence, contractEvidenceNote } from '@/lib/chat/contract-evidence';
+import { contractIdentityNote, contractEvidence, contractEvidenceNote, priorAwardIds } from '@/lib/chat/contract-evidence';
 import { isUserOverBudget, recordLlmUsage } from '@/lib/llm/usage-cost';
 import { makeTier0Tools, TIER0_TOOL_DEFS, TIER0_TOOL_NAMES } from '@/lib/chat/tier0-tools';
 import { makeMyDocumentsTool, MY_DOCUMENTS_TOOL_DEF, FIND_MY_DOCUMENTS } from '@/lib/chat/my-documents-tool';
@@ -2228,7 +2228,7 @@ export async function POST(request: NextRequest) {
         // messages count, so "is it worth pursuing?" stays tied to the contract they just asked about.
         {
           const focus = [splitViewPreamble(message).rest || message, ...history.filter((x) => x.role === 'user').slice(-2).map((x) => splitViewPreamble(String(x.content || '')).rest || String(x.content || ''))].join('\n');
-          const evidenceNote = contractEvidenceNote(contractEvidence(focus, turnSources.map((x) => ({ tool: x.tool, status: x.status, content: x.content }))));
+          const evidenceNote = contractEvidenceNote(contractEvidence(focus, turnSources.map((x) => ({ tool: x.tool, status: x.status, content: x.content })), priorAwardIds(priorLedgers)));
           if (evidenceNote) { messages.push({ role: 'system', content: evidenceNote }); turnTrace.notices.push('contract_evidence_note'); }
         }
         const chatModel = chatModelEarly;
