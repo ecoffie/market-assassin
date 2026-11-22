@@ -48,3 +48,12 @@ describe('agency deep-dive renders shares in their real units', () => {
     expect(text(render({ ...VA, small_business_share: null }))).toContain('set-aside-code share unavailable');
   });
 });
+
+describe('a failed set-aside lookup (null) is unavailable, never a de-obligation', () => {
+  it('renders unavailable for both amount and share', () => {
+    const failed = { ...VA, set_aside_breakdown: [...VA.set_aside_breakdown, { label: 'HUBZone', amount: null, pct_of_total: null }] };
+    const t = text(render(failed));
+    expect(t).toMatch(/HUBZone unavailable unavailable/);
+    expect(t).not.toMatch(/HUBZone [^|]*net de-obligation/);
+  });
+});
