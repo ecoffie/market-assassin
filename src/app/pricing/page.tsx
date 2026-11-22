@@ -18,6 +18,7 @@
  * penalty risk and we don't have real ones yet.
  */
 import type { Metadata } from 'next';
+import { siteShareImages } from '@/lib/seo/share-image';
 import SimplePricing from '@/components/public-site/pricing/SimplePricing';
 import { appPricingFaqs } from '@/components/public-site/pricing/faqs';
 // Server component, so the credit constants are imported directly — the same values
@@ -42,7 +43,7 @@ const creditPlans = SUBSCRIPTION_PLANS.filter((p) => p.id !== 'agency').map((p) 
 export const metadata: Metadata = {
   title: 'Pricing — Pro, Team and Enterprise | Mindy',
   description:
-    'Pro at $149/mo, Team at $499/mo, both with a 14-day free trial. Save up to 33% billed annually. 100x cheaper than GovWin.',
+    'Pro at $149/mo, Team at $499/mo, both with a 14-day free trial. Save up to 33% billed annually. GovWin runs $15K–$50K/yr.',
   alternates: {
     canonical: 'https://getmindy.ai/pricing',
   },
@@ -59,6 +60,7 @@ export const metadata: Metadata = {
       'Same federal market intelligence as the $15K/yr enterprise tools, at a price small business can actually pay.',
     type: 'website',
     url: 'https://getmindy.ai/pricing',
+    images: siteShareImages(),
   },
 };
 

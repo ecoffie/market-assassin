@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
+import { siteShareImages } from '@/lib/seo/share-image';
 import {
   BLOG_POSTS,
   getBlogPost,
@@ -76,11 +77,13 @@ export async function generateMetadata({
       modifiedTime: post.updatedAt,
       authors: [post.author],
       tags: post.tags,
+      images: siteShareImages(),
     },
     twitter: {
       card: 'summary_large_image',
       title: post.title,
       description: post.description,
+      images: siteShareImages(),
     },
   };
 }

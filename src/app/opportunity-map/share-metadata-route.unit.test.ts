@@ -1,7 +1,6 @@
 /**
  * GUARD — a shared `/opportunity-map?opp=<notice_id>` serves object-specific social metadata
- * SERVER-SIDE (crawlers never run the map's JS), and every other request is byte-for-byte the
- * page it was before.
+ * SERVER-SIDE (crawlers never run the map's JS); every other request gets the default map head.
  *
  * Production before (2026-09-23, facebookexternalhit / LinkedInBot / Twitterbot / curl, all 200, no
  * redirect, no auth wall): zero og:/twitter: tags and `<title>Mindy Map</title>` — the root cause
@@ -9,6 +8,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
+import { MAP_DEFAULT_TITLE } from '@/lib/opportunities/share-metadata';
 
 vi.mock('@/lib/opportunities/map-data', async (orig) => ({
   ...(await orig<typeof import('@/lib/opportunities/map-data')>()),
@@ -49,6 +49,7 @@ describe('/opportunity-map share metadata', () => {
     expect(fetchOppShareRow).toHaveBeenCalledWith(MOWER.notice_id);
     expect(head).toContain('<title>CES Hillside Mower — Government Opportunity</title>');
     expect(head).not.toContain('<title>Mindy Map</title>');
+    expect(head).not.toContain(MAP_DEFAULT_TITLE); // the share head wins over the defaults
     expect(head).toContain('<meta property="og:title" content="CES Hillside Mower — Government Opportunity">');
     expect(head).toContain(`<meta property="og:image" content="https://getmindy.ai/opportunity-map/og/${MOWER.notice_id}">`);
     expect(head).toContain('<meta name="twitter:card" content="summary_large_image">');
@@ -56,24 +57,36 @@ describe('/opportunity-map share metadata', () => {
     expect((head.match(/<title>/g) || []).length).toBe(1);
   });
 
-  it('plain /opportunity-map is unchanged (no DB read, generic title)', async () => {
+  // Generic = the default map head (2026-11-22). Before, a plain visit shipped only
+  // `<title>Mindy Map</title>` with no description/canonical/og/twitter — a bare card when shared.
+  const expectGenericHead = (head: string) => {
+    expect(head).toContain(`<title>${MAP_DEFAULT_TITLE}</title>`);
+    expect(head).toContain('<meta name="description" content="');
+    expect(head).toContain('<link rel="canonical" href="https://getmindy.ai/opportunity-map">');
+    expect(head).toContain(`<meta property="og:title" content="${MAP_DEFAULT_TITLE}">`);
+    expect(head).toContain('<meta property="og:image" content="https://getmindy.ai/opengraph-image">');
+    expect(head).toContain('<meta name="twitter:card" content="summary_large_image">');
+    expect(head).not.toContain('<title>Mindy Map</title>');
+    // never an opportunity-specific card
+    expect(head).not.toContain('/opportunity-map/og/');
+    expect(head).not.toContain('Government Opportunity');
+    expect((head.match(/<title>/g) || []).length).toBe(1);
+  };
+
+  it('plain /opportunity-map → default map head (no DB read)', async () => {
     const html = await get('');
     expect(fetchOppShareRow).not.toHaveBeenCalled();
-    expect(headOf(html)).toContain('<title>Mindy Map</title>');
-    expect(headOf(html)).not.toContain('og:title');
+    expectGenericHead(headOf(html));
   });
 
-  it('unknown notice → generic page, never a fabricated card', async () => {
+  it('unknown notice → default map head, never a fabricated card', async () => {
     impl = async () => null;
-    const head = headOf(await get('?opp=ffffffffffffffffffffffffffffffff'));
-    expect(head).toContain('<title>Mindy Map</title>');
-    expect(head).not.toContain('og:title');
+    expectGenericHead(headOf(await get('?opp=ffffffffffffffffffffffffffffffff')));
   });
 
-  it('a DB error degrades to the generic page (the map still loads)', async () => {
+  it('a DB error degrades to the default map head (the map still loads)', async () => {
     impl = async () => { throw new Error('boom'); };
-    const head = headOf(await get(`?opp=${MOWER.notice_id}`));
-    expect(head).toContain('<title>Mindy Map</title>');
+    expectGenericHead(headOf(await get(`?opp=${MOWER.notice_id}`)));
   });
 
   it('non-notice ids (forecast fc-…) and embed never trigger a read', async () => {

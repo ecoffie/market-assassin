@@ -58,7 +58,7 @@ export interface ForecastsToolResult {
     /** Every requested agency the forecast data cannot answer for, with the reason. Never counted as zero. */
     coverage_gaps?: ForecastCoverageGap[];
     result_state?: 'unavailable';
-    /** Freshness per agency among the returned rows (stalest first). Each row also carries as_of + source_url. */
+    /** Freshness per agency among the returned rows (stalest first). Each row also carries as_of + source_url, scoped by source_link_scope: no publisher gives a per-forecast URL, so it is a listing page, a whole-feed file, a related solicitation, or null — never the record. */
     sources: ForecastSourceFreshness[];
     /** Agencies whose newest returned row is older than 45 days (or of unknown age). */
     stale_sources: string[];

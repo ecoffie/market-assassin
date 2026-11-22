@@ -357,7 +357,7 @@ describe('closed opportunities: honest label, own sitemap child', () => {
   it('related links are OPEN-only and scoped in the query before the limit (NAICS, then agency)', async () => {
     const open = (i: number, extra: Record<string, unknown> = {}) => ({
       notice_id: `O${i}xyzxyz`, title: `Custodial services ${i}`, department: 'VA', notice_type: 'Solicitation',
-      response_deadline: '2026-12-20T00:00:00Z', naics_code: '561720', ...extra,
+      response_deadline: '2026-12-20T00:00:00Z', naics_code: '561720', description: 'd'.repeat(250), ...extra,
     });
     m.oppPages = [
       { data: [], error: null }, // NAICS scope: nothing open
@@ -374,7 +374,7 @@ describe('closed opportunities: honest label, own sitemap child', () => {
     ]));
     expect(agencyCall.filters).toContain('eq:department|VA');
     // The scope is applied BEFORE the limit: the limit is the last thing on the request.
-    expect(agencyCall.filters[agencyCall.filters.length - 1]).toBe('limit:12');
+    expect(agencyCall.filters[agencyCall.filters.length - 1]).toBe('limit:24');
   });
 
   it('a related-links read error renders no block (null), not a "none found" list', async () => {

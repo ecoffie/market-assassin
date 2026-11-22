@@ -24,6 +24,7 @@ import {
   renderKeywordSetupNudgeHtml,
   renderMindyV10PromoHtml,
 } from '@/lib/alerts/email-promo';
+import { hasValidCronSecret } from '@/lib/cron/cron-request-auth';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let _supabase: any = null;
@@ -661,7 +662,7 @@ export async function POST(request: NextRequest) {
   const authHeader = request.headers.get('authorization');
   const adminPassword = request.nextUrl.searchParams.get('password');
   const hasAdminPassword = adminPassword === (process.env.ADMIN_PASSWORD);
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}` && !hasAdminPassword) {
+  if (!hasValidCronSecret(request) && !hasAdminPassword) {
     if (process.env.NODE_ENV === 'production') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -685,9 +686,9 @@ export async function GET(request: NextRequest) {
   const force = request.nextUrl.searchParams.get('force') === 'true' || isCatchup;
 
   // Check if this is a Vercel cron request
-  const isVercelCron = request.headers.get('x-vercel-cron') === '1';
+  const isVercelCron = hasValidCronSecret(request);
   const authHeader = request.headers.get('authorization');
-  const hasCronSecret = authHeader === `Bearer ${process.env.CRON_SECRET}`;
+  const hasCronSecret = hasValidCronSecret(request);
   const adminPassword = request.nextUrl.searchParams.get('password');
   const hasAdminPassword = adminPassword === (process.env.ADMIN_PASSWORD);
 

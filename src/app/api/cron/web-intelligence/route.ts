@@ -19,6 +19,7 @@ import {
   cleanExpiredCache,
   WebIntelUserProfile,
 } from '@/lib/briefings/web-intel';
+import { hasValidCronSecret } from '@/lib/cron/cron-request-auth';
 
 const BATCH_SIZE = 10; // Process users in batches
 const MAX_USERS_PER_RUN = 100; // Safety limit
@@ -26,7 +27,7 @@ const MAX_USERS_PER_RUN = 100; // Safety limit
 export async function GET(request: Request) {
   // Verify cron secret for Vercel
   const authHeader = request.headers.get('authorization');
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!hasValidCronSecret(request)) {
     // Allow in development
     if (process.env.NODE_ENV === 'production') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

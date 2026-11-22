@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { randomUUID } from 'node:crypto';
 import { verifyAdminPassword } from '@/lib/admin-auth';
 import { alert, refreshDb } from '@/lib/awards-refresh';
+import { hasValidCronSecret } from '@/lib/cron/cron-request-auth';
 
 /**
  * Awards retention — a SEPARATE, BOUNDED maintenance operation.
@@ -30,7 +31,7 @@ const MAX_BATCHES = 60; // 120k rows/run — bounded work, never an open-ended l
 
 function authed(req: NextRequest): boolean {
   const a = req.headers.get('authorization');
-  if (process.env.CRON_SECRET && a === `Bearer ${process.env.CRON_SECRET}`) return true;
+  if (process.env.CRON_SECRET && hasValidCronSecret(req)) return true;
   return verifyAdminPassword(req.nextUrl.searchParams.get('password'));
 }
 

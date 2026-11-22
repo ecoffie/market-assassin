@@ -33,6 +33,7 @@ import { createClient } from '@supabase/supabase-js';
 import { sendOpsAlert } from '@/lib/ops-alert';
 import { findMismatches, type StripeSub } from '@/lib/billing/paid-entitlement';
 import { MCP_CHANNEL_OR_FILTER } from '@/lib/mcp/channel-filter';
+import { hasValidCronSecret } from '@/lib/cron/cron-request-auth';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -260,8 +261,8 @@ async function checkBriefingEntitlements(sb: ReturnType<typeof getSupabase>): Pr
 
 export async function GET(request: NextRequest) {
   const password = request.nextUrl.searchParams.get('password');
-  const isCron = Boolean(request.headers.get('x-vercel-cron'))
-    || request.headers.get('authorization') === `Bearer ${process.env.CRON_SECRET}`;
+  const isCron = hasValidCronSecret(request)
+    || hasValidCronSecret(request);
   if (!isCron && password !== process.env.ADMIN_PASSWORD) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }

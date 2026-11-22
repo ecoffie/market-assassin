@@ -113,6 +113,6 @@ describe('generateFollowups', () => {
 describe('suggestions route wiring', () => {
   it('passes the rules-layer flag for the verified email', () => {
     const route = readFileSync(join(__dirname, '../../app/api/app/chat/suggestions/route.ts'), 'utf8');
-    expect(route).toMatch(/generateFollowups\(message, answer, \{ userEmail: auth\.email, rulesLayer: askMindyRulesEnabledFor\(auth\.email\) \}\)/);
+    expect(route).toMatch(/generateFollowups\(message, answer, \{ userEmail: auth\.email, rulesLayer: askMindyRulesEnabledFor\(auth\.email\), earlier \}\)/);
   });
 });

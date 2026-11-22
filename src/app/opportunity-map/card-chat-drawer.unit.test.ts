@@ -156,7 +156,7 @@ describe('sign-in and the existing map-view chat', () => {
     await t.settle();
     expect(t.calls[0]).toMatchObject({ email: 'new@example.com', message: 'When is it due?', context: { kind: 'opportunity', notice_id: NID } });
   });
-  it('opening the general drawer leaves card mode and keeps the view preamble, with no context', async () => {
+  it('opening the general drawer leaves card mode and sends customer words only (no map preamble)', async () => {
     const t = boot();
     (t.w.__askAboutOpp as (o: unknown) => void)(OPP);
     (t.w.openAskMindy as (s?: string) => void)();
@@ -165,7 +165,7 @@ describe('sign-in and the existing map-view chat', () => {
     (t.doc.getElementById('amkSend') as HTMLButtonElement).click();
     await t.settle();
     expect(t.calls[0]).not.toHaveProperty('context');
-    expect(String(t.calls[0].message)).toContain('[Current map view');
+    expect(String(t.calls[0].message)).toBe('Who buys the most here?');
   });
 });
 
@@ -278,10 +278,10 @@ describe('charge once per question: the browser reuses a question\'s turn id', (
   });
 
   it('an answer that failed on the server is not kept as pending (asking again is a new, free-until-answered question)', async () => {
-    const t = boot({ replies: [{ events: [{ type: 'session', sessionId: S }, { type: 'error', message: 'Mindy could not answer right now.' }, { type: 'done' }] }] });
+    const t = boot({ replies: [{ events: [{ type: 'session', sessionId: S }, { type: 'error', message: "Mindy couldn't answer right now. Nothing was wrong with your question. Please try again in a moment." }, { type: 'done' }] }] });
     (t.w.__askAboutOpp as (o: unknown) => void)(OPP);
     await askCard(t, 'When is it due?');
-    expect(t.body().textContent).toContain('Mindy could not answer right now.');
+    expect(t.body().textContent).toContain("Mindy couldn't answer right now. Nothing was wrong with your question. Please try again in a moment."); // a customer-safe message (customer-errors.ts) is shown as is
     expect(pending(t)).toBeNull();
   });
 });

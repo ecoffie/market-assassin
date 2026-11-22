@@ -10,7 +10,7 @@
 
 ## Before You Start
 
-1. Open `VALIDATION-TRACKING-FORM-SIKANDER.csv`
+1. Open `VALIDATION-TRACKING-FORM-SIKANDER.csv` (private; not in the repository)
 2. Annelle will tell you who replied and scheduled calls
 3. Have the two questions in front of you (print this page)
 4. Have a way to write exact quotes (not paraphrasing)
@@ -74,7 +74,7 @@
 
 ## After Each Call
 
-1. **Immediately** fill in `VALIDATION-TRACKING-FORM-SIKANDER.csv`
+1. **Immediately** fill in `VALIDATION-TRACKING-FORM-SIKANDER.csv` (private; not in the repository)
 2. Write their exact words — not your summary
 3. Note anything surprising in the "Notable Quotes" column
 4. Text Eric if something major comes up

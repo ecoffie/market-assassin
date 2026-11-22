@@ -12,6 +12,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getRotatedSAMKey } from '@/lib/sam/utils';
+import { hasValidCronSecret } from '@/lib/cron/cron-request-auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -47,7 +48,7 @@ export async function GET(request: NextRequest) {
   // Cron auth: Vercel cron sends the CRON_SECRET; also allow the admin password.
   const auth = request.headers.get('authorization') || '';
   const pw = request.nextUrl.searchParams.get('password');
-  const ok = (process.env.CRON_SECRET && auth === `Bearer ${process.env.CRON_SECRET}`)
+  const ok = (process.env.CRON_SECRET && hasValidCronSecret(request))
     || pw === (process.env.ADMIN_PASSWORD);
   if (!ok) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 

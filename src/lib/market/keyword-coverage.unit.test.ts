@@ -337,3 +337,18 @@ describe('coverage lead share is not market identity (BQ work-text)', () => {
     expect(f.naics_codes).toBeUndefined();
   });
 });
+
+describe('buildMarketFilter — sections search what the headline measured (VA report 2026-11-22)', () => {
+  it('a phrase measured through curated alternates searches those terms, literal first', () => {
+    const f = buildMarketFilter({
+      coverage: { keyword: 'hospital construction renovation', identityResolvedVia: ['roofing', 'masonry', 'concrete'], pinnedPscCodes: null } as unknown as Parameters<typeof buildMarketFilter>[0]['coverage'],
+    })!;
+    expect(f.keywords).toEqual(['hospital construction renovation', 'roofing', 'masonry', 'concrete']);
+    expect(f.mode).toBe('keyword');
+    expect(f.rankingLabel).toMatch(/measured via 3 curated trade terms/);
+  });
+  it('a literal that measured itself is unchanged', () => {
+    const f = buildMarketFilter({ coverage: { keyword: 'roofing', pinnedPscCodes: null } as unknown as Parameters<typeof buildMarketFilter>[0]['coverage'] })!;
+    expect(f.keywords).toEqual(['roofing']);
+  });
+});

@@ -224,3 +224,51 @@ describe('PRESENT — forecast set-aside is a category or "Not stated"', () => {
     expect(r.deliverable.html).toContain('Not stated');
   });
 });
+
+describe('forecasts are scoped to the measured market and the agency (reported: VA construction report had no forecasts)', () => {
+  it('a literal phrase that measured nothing is not used as a forecast title filter; the subject NAICS and agency are', async () => {
+    const { agencyForecasts } = await import('@/mcp/tools/forecasts');
+    const mock = agencyForecasts as unknown as ReturnType<typeof vi.fn>;
+    mock.mockClear();
+    const { getAgencySpendingDetailTool } = await import('@/mcp/tools/agency-spending-detail');
+    const { getSbaGoalingShare } = await import('@/mcp/tools/sba-goaling');
+    (getAgencySpendingDetailTool as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({ _meta: { grounded: false } });
+    (getSbaGoalingShare as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({ _meta: { grounded: false } });
+    await generateMarketReport({ keyword: 'building construction and renovation', agency: 'Department of Veterans Affairs' });
+    const args = mock.mock.calls[0][0] as Record<string, unknown>;
+    expect(args.keyword).toBeUndefined();
+    expect(args.naics).toBe('236220,237310');
+    expect(args.agency).toBe('Department of Veterans Affairs');
+  });
+});
+
+describe('Who to call is anchored on the offices that award this market (VA / GA reports 2026-11-22)', () => {
+  it('the contacts query uses the in-scope contracts\' office prefixes, most frequent first, and labels the basis', async () => {
+    const { queryFederalContacts } = await import('@/lib/gov-contacts/contact-roster');
+    const mock = queryFederalContacts as unknown as ReturnType<typeof vi.fn>;
+    mock.mockClear();
+    mock.mockResolvedValueOnce({ contacts: [{ contact_fullname: 'Pat Example', contact_email: 'pat@example.gov', role_category_label: 'Contracting Officer', derived_office: 'Office FA5004' }], total: 1 });
+    const r = await generateMarketReport({ keyword: 'building construction and renovation' });
+    expect(mock.mock.calls[0][0]).toMatchObject({ officeCodes: ['FA5004'] });
+    expect(r.sections.contacts).toMatchObject({ basis: 'market_awarding_offices', office_codes: ['FA5004'] });
+  });
+});
+
+describe('marketOfficeCodes', () => {
+  it('takes the 6-char PIID prefix (civilian or DoD), skips non-office shapes, ranks by frequency', async () => {
+    const { marketOfficeCodes } = await import('./market-report');
+    expect(marketOfficeCodes([{ piid: '36C24825C0020' }, { piid: '36C24826C0003' }, { piid: 'W912EQ25C0001' }, { piid: 'ABCDEF' }, { piid: '123456' }, { piid: null }]))
+      .toEqual(['36C248', 'W912EQ']);
+  });
+});
+
+describe('contact rows name their contracting office and code (Claude Local, 2026-11-22)', () => {
+  it('office reads "NAME (CODE)" when the roster derived a directory-known office code', async () => {
+    const { queryFederalContacts } = await import('@/lib/gov-contacts/contact-roster');
+    const mock = queryFederalContacts as unknown as ReturnType<typeof vi.fn>;
+    mock.mockClear();
+    mock.mockResolvedValueOnce({ contacts: [{ contact_fullname: 'Pat Example', contact_email: 'pat@example.gov', role_category_label: 'Contracting Officer', derived_office: 'Network Contract Office 8', office_code: '36C248' }], total: 1 });
+    const r = await generateMarketReport({ keyword: 'building construction and renovation' });
+    expect(r.sections.contacts?.people[0]).toMatchObject({ office: 'Network Contract Office 8 (36C248)', office_code: '36C248' });
+  });
+});

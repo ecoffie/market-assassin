@@ -181,22 +181,22 @@ These are your best customers. They already spent $997-$1,497.
 
 | Email | Product | Interview Date | Notes |
 |-------|---------|----------------|-------|
-| bobby@24hrc.us | Ultimate | | |
-| willie.smiley@spasmileytrucking.com | Ultimate | | |
-| andrew@millpondresearch.com | Ultimate | | |
-| kwesi.acquah@connectdotssolution.com | Ultimate | | |
-| oswald.kingsleyllc@gmail.com | Ultimate | | |
-| info@cfpsolutions.net | Ultimate | | |
-| jcameron@cameroncommerce.com | Ultimate | | |
-| lloyd.lythcott@gmail.com | Ultimate | | |
-| jdawsonwilliams@gmail.com | Ultimate | | |
-| anufund@yahoo.com | Ultimate | | |
-| jareddickinson13@outlook.com | Ultimate | | |
-| ibadji@badjinyllc.com | Ultimate | | |
-| whit1stborn@aol.com | Ultimate | | |
-| tiffan@problemcompany.org | Ultimate | | |
-| greg@phoenixstudioslouisville.com | Ultimate | | |
-| ana@ttaindustries.com | Ultimate | | |
+| [email removed] | Ultimate | | |
+| [email removed] | Ultimate | | |
+| [email removed] | Ultimate | | |
+| [email removed] | Ultimate | | |
+| [email removed] | Ultimate | | |
+| [email removed] | Ultimate | | |
+| [email removed] | Ultimate | | |
+| [email removed] | Ultimate | | |
+| [email removed] | Ultimate | | |
+| [email removed] | Ultimate | | |
+| [email removed] | Ultimate | | |
+| [email removed] | Ultimate | | |
+| [email removed] | Ultimate | | |
+| [email removed] | Ultimate | | |
+| [email removed] | Ultimate | | |
+| [email removed] | Ultimate | | |
 
 ### Priority 2: OH Pro Buyers (18 people)
 

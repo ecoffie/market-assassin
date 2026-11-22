@@ -43,32 +43,48 @@ async function waitForOutput(read: () => string, re: RegExp, timeoutMs = 10_000)
     await wait(50);
   }
 }
+/**
+ * A holder: acquires a slot, prints HELD, keeps it until the test creates `go`, then releases.
+ * `held` resolves on the HELD event (not a wall-clock poll). If the process exits first, it REJECTS with the
+ * holder's own output, so a holder that failed (a fork error under load, a script error) is reported at
+ * once instead of surfacing as "timed out waiting for 2 held slot(s); have 1" (#2260, #2320, #2348).
+ */
+function holder(env: Record<string, string>, go: string): { held: Promise<void>; done: Promise<{ code: number; out: string }> } {
+  let out = '';
+  let onHeld!: () => void;
+  let onFail!: (e: Error) => void;
+  let isHeld = false;
+  const held = new Promise<void>((res, rej) => { onHeld = res; onFail = rej; });
+  const done = new Promise<{ code: number; out: string }>((resolve) => {
+    const p = spawn('bash', ['-c', `. "${SCRIPT}"; gate_slot_acquire || exit 1; echo HELD; while [ ! -f "${go}" ]; do sleep 0.1; done; gate_slot_release`], { env: { ...process.env, ...env } });
+    const read = (b: Buffer) => { out += b; if (!isHeld && /^HELD$/m.test(out)) { isHeld = true; onHeld(); } };
+    p.stdout.on('data', read);
+    p.stderr.on('data', read);
+    p.on('close', (code) => {
+      if (!isHeld) onFail(new Error(`holder exited (code ${code}) before acquiring a slot; output: ${out.slice(-300) || '(none)'}`));
+      resolve({ code: code ?? -1, out });
+    });
+  });
+  return { held, done };
+}
+
 /** Slots currently held: a slot dir whose pid file has been written (acquire is complete). */
 function heldSlots(dir: string): string[] {
   return readdirSync(dir).filter((n) => n.startsWith('slot-') && existsSync(path.join(dir, n, 'pid')));
 }
-/** Poll (bounded) instead of a fixed sleep: CI runners start background processes at unpredictable speed. */
-async function waitForHeld(dir: string, n: number, timeoutMs = 10_000): Promise<void> {
-  const t0 = Date.now();
-  while (heldSlots(dir).length < n) {
-    if (Date.now() - t0 > timeoutMs) throw new Error(`timed out waiting for ${n} held slot(s); have ${heldSlots(dir).length}`);
-    await wait(50);
-  }
-}
-
 describe('gate-slot: queue, never skip', () => {
   it('a run that cannot get a slot within the timeout is BLOCKED (exit 1), not skipped', async () => {
     const dir = slotDir();
     const env = { MINDY_GATE_SLOT_DIR: dir, MINDY_GATE_SLOTS: '1', MINDY_GATE_SLOT_POLL_S: '0.1' };
     // The holder keeps its slot until the test releases it (same reason as below: no fixed-sleep window to miss).
     const go = path.join(dir, 'go');
-    const holder = bash(`gate_slot_acquire && while [ ! -f "${go}" ]; do sleep 0.1; done; gate_slot_release`, env);
-    await waitForHeld(dir, 1);
+    const h = holder(env, go);
+    await h.held;
     const second = await bash('gate_slot_acquire', { ...env, MINDY_GATE_SLOT_TIMEOUT_S: '1' });
     expect(second.code).toBe(1);
     expect(second.out).toMatch(/BLOCKED \(fail closed\)/);
     writeFileSync(go, '');
-    expect((await holder).code).toBe(0);
+    expect((await h.done).code).toBe(0);
   }, 15_000);
 
   it('two slots admit two concurrent runs; a third waits until one finishes', async () => {
@@ -77,10 +93,10 @@ describe('gate-slot: queue, never skip', () => {
     // Holders keep their slot until the test says so (a "go" file), not for a fixed `sleep 4`: on a loaded CI
     // runner the test could miss a 4 s window entirely ("timed out waiting for 2 held slot(s); have 0").
     const go = path.join(dir, 'go');
-    const hold = `gate_slot_acquire && while [ ! -f "${go}" ]; do sleep 0.1; done; gate_slot_release`;
-    const a = bash(hold, env);
-    const b = bash(hold, env);
-    await waitForHeld(dir, 2);
+    const a = holder(env, go);
+    const b = holder(env, go);
+    // Event-driven: both holders announce HELD; a holder that dies first fails the test with its output.
+    await Promise.all([a.held, b.held]);
     expect(heldSlots(dir)).toHaveLength(2);
     const cRun = bashLive('gate_slot_acquire && echo GOT', { ...env, MINDY_GATE_SLOT_TIMEOUT_S: '15' });
     // c must be queued behind the two holders before any slot frees up.
@@ -91,8 +107,21 @@ describe('gate-slot: queue, never skip', () => {
     expect(c.out).toMatch(/GOT/);
     // It had to wait: the script prints this only when every slot was taken on its first try.
     expect(c.out).toMatch(/waiting for a gate slot \(2 in use/);
-    await Promise.all([a, b]);
+    const [ra, rb] = await Promise.all([a.done, b.done]);
+    expect(ra.code).toBe(0);
+    expect(rb.code).toBe(0);
   }, 30_000);
+
+  it('a holder that dies before acquiring fails the wait AT ONCE with its own output (no blind timeout)', async () => {
+    const dir = slotDir();
+    const blocker = path.join(dir, 'not-a-dir');
+    writeFileSync(blocker, ''); // a FILE where the slot dir should be → mkdir -p fails → acquire returns 1
+    const t0 = Date.now();
+    const h = holder({ MINDY_GATE_SLOT_DIR: path.join(blocker, 'slots'), MINDY_GATE_SLOTS: '1' }, path.join(dir, 'go'));
+    await expect(h.held).rejects.toThrow(/holder exited \(code 1\) before acquiring a slot; output: .*cannot create/s);
+    expect(Date.now() - t0).toBeLessThan(5_000);
+    expect((await h.done).code).toBe(1);
+  }, 15_000);
 
   it('a slot whose owner died is reclaimed', async () => {
     const dir = slotDir();

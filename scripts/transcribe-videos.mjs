@@ -25,13 +25,13 @@
  *   # transcribe them to the cache dir (this is where Whisper $ is spent):
  *   ACCESS_TOKEN="ya29...." node scripts/transcribe-videos.mjs --folder=<PILOT_FOLDER_ID> --apply
  *   # then ingest the cache into RAG (the existing Phase-1 path):
- *   node scripts/ingest-vault-docs.js --from-cache=tasks/cache/videos --apply
+ *   node scripts/ingest-vault-docs.js --from-cache=$MINDY_PRIVATE_DIR/cache/videos --apply
  *
  * FLAGS:
  *   --folder=<id>       REQUIRED — Drive folder id (recurses subfolders)
  *   --resourcekey=<k>   old-style (0B…) shared-folder resource key, if needed
  *   --apply             actually download + transcribe (default: DRY-RUN = list only)
- *   --cache=<dir>       output cache dir (default: tasks/cache/videos)
+ *   --cache=<dir>       output cache dir (absolute; default: $MINDY_PRIVATE_DIR/cache/videos)
  *   --limit=N           stop after N videos (pilot / testing)
  *   --doctype=<t>       doc_type stamped into the cache json
  *                       (course_video | bootcamp_replay | webinar_replay; default bootcamp_replay)
@@ -46,6 +46,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, '..');
@@ -58,7 +59,9 @@ const has = (name) => ARGS.includes(`--${name}`);
 const APPLY = has('apply');
 const FOLDER = arg('folder') || process.env.VIDEO_FOLDER_ID || '';
 const ROOT_RESOURCE_KEY = arg('resourcekey') || process.env.VIDEO_RESOURCE_KEY || '';
-const CACHE_DIR = path.isAbsolute(arg('cache')) ? arg('cache') : path.join(ROOT, arg('cache', 'tasks/cache/videos'));
+// Transcripts are private: an explicit absolute --cache, else $MINDY_PRIVATE_DIR/cache/videos (never the repository).
+const { privatePath } = createRequire(import.meta.url)('./lib/private-path.js');
+const CACHE_DIR = path.isAbsolute(arg('cache')) ? arg('cache') : privatePath('cache', 'videos');
 const LIMIT = Number(arg('limit')) || Infinity;
 const DOC_TYPE = arg('doctype', 'bootcamp_replay');
 const KEEP_AUDIO = has('keep-audio');

@@ -15,6 +15,7 @@ import { createClient } from '@supabase/supabase-js';
 import { runFcoWatch } from '@/lib/forecasts/fco-watch-run';
 import { sendOpsAlert } from '@/lib/ops-alert';
 import { shouldSendAlert, fingerprint } from '@/lib/ops-alert-dedup';
+import { hasValidCronSecret } from '@/lib/cron/cron-request-auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -24,7 +25,7 @@ export async function GET(request: NextRequest) {
   const auth = request.headers.get('authorization');
   const pw = request.nextUrl.searchParams.get('password');
   const authorized =
-    auth === `Bearer ${process.env.CRON_SECRET}` || pw === process.env.ADMIN_PASSWORD;
+    hasValidCronSecret(request) || pw === process.env.ADMIN_PASSWORD;
   if (!authorized) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
   // DRY = ZERO persistent writes: no clocks, no alert state, no alert send.

@@ -2,6 +2,12 @@ import { assertNoLegacyDestinations } from '@/lib/email/legacy-destination-guard
 import { Resend } from 'resend';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { createSecureAccessUrl } from '@/lib/access-links';
+import { appendEmailUtm } from '@/lib/engagement';
+
+// Where a PAYING customer lands from a purchase email: the product (the Map). Not
+// /market-intelligence — that is an upgrade page (plan cards + trial links) whose email box
+// routes to legacy /briefings (src/lib/email/legacy-destination-guard.ts).
+const MINDY_PRODUCT_URL = 'https://getmindy.ai/opportunity-map';
 
 // Resend is the ONLY Mindy product-email provider. There is no fallback: the old
 // Office365 SMTP fallback authenticated as a govcongiants.com mailbox, so a Resend
@@ -1325,7 +1331,7 @@ export async function sendBundleEmail({
         { name: 'Recompete Tracker', link: 'https://getmindy.ai/recompete', description: '6,900+ expiring contracts to pursue' },
         { name: 'Market Assassin Standard', link: 'https://getmindy.ai/market-assassin', description: 'Strategic market intelligence reports' },
         { name: 'Content Reaper', link: 'https://getmindy.ai/content-generator', description: 'AI-powered LinkedIn content generator' },
-        { name: 'Mindy AI - 1 Year Access', link: 'https://getmindy.ai/market-intelligence', description: 'Daily federal opportunity intelligence and briefings included for 1 year' },
+        { name: 'Mindy AI - 1 Year Access', link: MINDY_PRODUCT_URL, description: 'Daily federal opportunity intelligence and briefings included for 1 year' },
       ],
     },
     'pro-giant-bundle': {
@@ -1335,7 +1341,7 @@ export async function sendBundleEmail({
         { name: 'Recompete Tracker', link: 'https://getmindy.ai/recompete', description: '6,900+ expiring contracts to pursue' },
         { name: 'Market Assassin Standard', link: 'https://getmindy.ai/market-assassin', description: 'Strategic market intelligence reports' },
         { name: 'Content Reaper', link: 'https://getmindy.ai/content-generator', description: 'AI-powered LinkedIn content generator' },
-        { name: 'Mindy AI - 1 Year Access', link: 'https://getmindy.ai/market-intelligence', description: 'Daily federal opportunity intelligence and briefings included for 1 year' },
+        { name: 'Mindy AI - 1 Year Access', link: MINDY_PRODUCT_URL, description: 'Daily federal opportunity intelligence and briefings included for 1 year' },
       ],
     },
     'ultimate': {
@@ -1346,7 +1352,7 @@ export async function sendBundleEmail({
         { name: 'Recompete Tracker', link: 'https://getmindy.ai/recompete', description: '6,900+ expiring contracts to pursue' },
         { name: 'Market Assassin Premium', link: 'https://getmindy.ai/market-assassin', description: 'All 8 strategic intelligence reports' },
         { name: 'Opportunity Hunter Pro', link: 'https://getmindy.ai/opportunity-hunter', description: 'Find agencies that buy what you sell' },
-        { name: 'Mindy AI - Lifetime Access', link: 'https://getmindy.ai/market-intelligence', description: 'Daily federal opportunity intelligence and briefings included for life' },
+        { name: 'Mindy AI - Lifetime Access', link: MINDY_PRODUCT_URL, description: 'Daily federal opportunity intelligence and briefings included for life' },
       ],
     },
     'ultimate-govcon-bundle': {
@@ -1357,12 +1363,19 @@ export async function sendBundleEmail({
         { name: 'Recompete Tracker', link: 'https://getmindy.ai/recompete', description: '6,900+ expiring contracts to pursue' },
         { name: 'Market Assassin Premium', link: 'https://getmindy.ai/market-assassin', description: 'All 8 strategic intelligence reports' },
         { name: 'Opportunity Hunter Pro', link: 'https://getmindy.ai/opportunity-hunter', description: 'Find agencies that buy what you sell' },
-        { name: 'Mindy AI - Lifetime Access', link: 'https://getmindy.ai/market-intelligence', description: 'Daily federal opportunity intelligence and briefings included for life' },
+        { name: 'Mindy AI - Lifetime Access', link: MINDY_PRODUCT_URL, description: 'Daily federal opportunity intelligence and briefings included for life' },
       ],
     },
   };
 
-  const bundleInfo = bundleContents[bundle] || bundleContents['starter'];
+  const selected = bundleContents[bundle] || bundleContents['starter'];
+  // Tag our product link so the bundle email's effect on activation is measurable.
+  const bundleInfo = {
+    ...selected,
+    tools: selected.tools.map((t) => (t.link === MINDY_PRODUCT_URL
+      ? { ...t, link: appendEmailUtm(t.link, { campaign: 'bundle_welcome', content: bundle }) }
+      : t)),
+  };
 
   const toolsHtml = bundleInfo.tools.map(tool => `
     <tr>
@@ -1485,6 +1498,7 @@ export async function sendMarketIntelligenceWelcomeEmail({
   customerName?: string;
 }): Promise<boolean> {
   const setupLink = await createSecureAccessUrl(to, 'preferences');
+  const openMindyUrl = appendEmailUtm(MINDY_PRODUCT_URL, { campaign: 'paid_welcome', content: 'open_mindy' });
 
   return sendEmail({
     to,
@@ -1504,7 +1518,7 @@ export async function sendMarketIntelligenceWelcomeEmail({
         <p>Hi${customerName ? ` ${customerName}` : ''},</p>
         <p>Your GovCon Giants Mindy AI purchase is active. Use your purchase email, <strong>${to}</strong>, to access your dashboard and briefings.</p>
         <p style="margin: 28px 0;">
-          <a href="https://getmindy.ai/market-intelligence" style="background: #1e40af; color: white; padding: 14px 22px; border-radius: 8px; text-decoration: none; font-weight: 700;">Open Mindy AI</a>
+          <a href="${openMindyUrl}" style="background: #1e40af; color: white; padding: 14px 22px; border-radius: 8px; text-decoration: none; font-weight: 700;">Open Mindy AI</a>
         </p>
         <div style="background: #f0fdf4; border: 1px solid #86efac; border-radius: 8px; padding: 18px; margin: 24px 0;">
           <strong>Set up your briefing preferences</strong>
@@ -1521,7 +1535,7 @@ Hi${customerName ? ` ${customerName}` : ''},
 Your GovCon Giants Mindy AI purchase is active.
 
 Access Mindy AI:
-https://getmindy.ai/market-intelligence
+${openMindyUrl}
 
 Set up briefing preferences:
 ${setupLink}
