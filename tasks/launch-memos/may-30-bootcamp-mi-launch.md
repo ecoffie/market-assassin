@@ -206,7 +206,7 @@ After May 30, customers should be able to:
 ## Appendix: Qualified Customer Lists
 
 ### Eric's Founder Call List (14 contacts)
-See: `data/eric-founder-calls-20260515.csv`
+See: `$MINDY_PRIVATE_DIR/eric-founder-calls-20260515.csv` (private; not in the repository)
 
 Top 3:
 1. founder@siemable.com (Score 110, $1,546 spent)
@@ -214,7 +214,7 @@ Top 3:
 3. sylwiak@hjgovcontractingcorp.com (Score 110, $1,000 spent)
 
 ### Annelle/Sikander Outreach List (14 contacts)
-See: `data/annelle-sikander-outreach-list-20260515.csv`
+See: `$MINDY_PRIVATE_DIR/annelle-sikander-outreach-list-20260515.csv` (private; not in the repository)
 
 All 14 contacts are 10-10 candidates with score 85+ recommended for deep investment.
 

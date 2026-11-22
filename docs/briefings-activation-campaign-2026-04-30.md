@@ -22,8 +22,8 @@ Campaign clarification:
 
 Source files:
 
-- `scripts/briefings_activation_segments_2026-04-30.csv`
-- `scripts/briefings_activation_segments_2026-04-30.json`
+- `$MINDY_PRIVATE_DIR/briefings_activation_segments_2026-04-30.csv` (private; not in the repository)
+- `$MINDY_PRIVATE_DIR/briefings_activation_segments_2026-04-30.json` (private; not in the repository)
 
 | Cohort | Variant 1: account/audience ready | Variant 2: setup needed | Personal email | Total |
 |---|---:|---:|---:|---:|

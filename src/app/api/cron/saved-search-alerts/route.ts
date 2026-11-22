@@ -77,6 +77,7 @@ import {
 import { dueSavedSearchFrequenciesAt, isSavedSearchDueAt } from '@/lib/saved-searches';
 import { storedNaicsValidity } from '@/lib/saved-searches/stored-naics';
 import { isStatementTimeout } from '@/lib/opportunities/search-failure';
+import { authorizeCronRequest } from '@/lib/cron/cron-request-auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -554,6 +555,10 @@ async function evaluateCanonicalForecast(
 // buildEmail (the Target-card email) lives in a lib so it's testable + offline-previewable.
 
 export async function GET(request: NextRequest) {
+  // Server-side authorization FIRST, before any read, write or send. Only the CRON_SECRET bearer the
+  // dispatcher sends (or verified admin auth for a preview run) runs this job; a caller-set header never does.
+  const auth = await authorizeCronRequest(request, { isTest: request.nextUrl.searchParams.get('mode') === 'preview' });
+  if (!auth.ok) return auth.response;
   const preview = request.nextUrl.searchParams.get('mode') === 'preview';
   const dispatcherRun = request.headers.get('x-cron-dispatch') === '1';
   const batchSize = Math.min(

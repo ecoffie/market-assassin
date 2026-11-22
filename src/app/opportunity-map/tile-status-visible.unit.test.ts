@@ -34,7 +34,7 @@ describe('the tile-status notice is readable on every screen', () => {
 
   it('phone: is lifted over the bottom results bar and the attribution, like the Leaflet controls', () => {
     const controls = px(/'\.mapwrap \.leaflet-bottom\{bottom:(\d+)px!important\}'/, route, 'phone .leaflet-bottom lift');
-    const notice = px(/'\.mapwrap \.tilestatus\{bottom:(\d+)px!important\}'/, route, 'phone .tilestatus lift');
+    const notice = px(/'\.mapwrap \.tilestatus\{bottom:(\d+)px!important[;}]/, route, 'phone .tilestatus lift');
     // The attribution sits at the controls' offset and is ~18px tall: clear it with a small gap.
     expect(notice).toBeGreaterThanOrEqual(controls + 24);
     // Both rules must live in the same (phone) block, i.e. next to each other.

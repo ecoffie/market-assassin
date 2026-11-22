@@ -12,15 +12,15 @@ import {
   refreshSamOfficeNames,
   refreshOfficeEarlySignal,
 } from '@/lib/gov-contacts/refresh-dodaac-directory';
+import { hasValidCronSecret } from '@/lib/cron/cron-request-auth';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 120;
 
 function authorized(request: NextRequest): boolean {
-  if (request.headers.get('x-vercel-cron') === '1') return true;
-  if (request.headers.get('x-cron-dispatch') === '1') return true;
-  const auth = request.headers.get('authorization');
-  if (auth && auth === `Bearer ${process.env.CRON_SECRET}`) return true;
+  // Only the CRON_SECRET bearer (constant-time, false when unset) or the admin password. A caller-set
+  // header (x-vercel-cron / x-cron-dispatch) never authorizes.
+  if (hasValidCronSecret(request)) return true;
   const pw = new URL(request.url).searchParams.get('password');
   if (pw && pw === (process.env.ADMIN_PASSWORD)) return true;
   return false;

@@ -8,6 +8,7 @@ import {
   type RefreshOutcome, type RefreshTelemetry,
 } from '@/lib/awards-refresh';
 import { enqueueBuild, alertOnStuckJobs, alertOnFailedJobs, alertOnQueuedJobs } from '@/lib/awards-build-jobs';
+import { hasValidCronSecret } from '@/lib/cron/cron-request-auth';
 
 /**
  * Durable awards refresh cron.
@@ -27,7 +28,7 @@ export const maxDuration = 55; // check only — the worker owns the long build
 
 function authed(req: NextRequest): boolean {
   const auth = req.headers.get('authorization');
-  if (process.env.CRON_SECRET && auth === `Bearer ${process.env.CRON_SECRET}`) return true;
+  if (process.env.CRON_SECRET && hasValidCronSecret(req)) return true;
   return verifyAdminPassword(req.nextUrl.searchParams.get('password'));
 }
 

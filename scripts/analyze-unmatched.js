@@ -169,10 +169,10 @@ async function deepAnalysis() {
   }));
 
   require('fs').writeFileSync(
-    'scripts/unmatched_customers_detailed.json',
+    require('./lib/private-path').privatePath('unmatched_customers_detailed.json'), // eslint-disable-line @typescript-eslint/no-require-imports
     JSON.stringify(unmatchedList, null, 2)
   );
-  console.log('\nSaved unmatched customer list to scripts/unmatched_customers_detailed.json');
+  console.log('\nSaved unmatched customer list to the private directory: unmatched_customers_detailed.json');
 }
 
 deepAnalysis().catch(console.error);

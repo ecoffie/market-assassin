@@ -24,6 +24,7 @@
  * does not allow.
  */
 import type { Metadata } from 'next';
+import { siteShareImages } from '@/lib/seo/share-image';
 import PublicHeader from '@/components/public-site/PublicHeader';
 import { PRO_TRIAL_MONTHLY } from '@/components/public-site/pricing/app-plan-links';
 import HomeTrialClicks from './HomeTrialClicks';
@@ -41,6 +42,13 @@ export const metadata: Metadata = {
     description: 'Live federal opportunities, recompetes, forecasts and the players behind them. Start a 14-day free trial.',
     type: 'website',
     url: 'https://getmindy.ai',
+    images: siteShareImages(),
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Mindy — Find, win and keep federal contracts',
+    description: 'Live federal opportunities, recompetes, forecasts and the players behind them. Start a 14-day free trial.',
+    images: siteShareImages(),
   },
 };
 

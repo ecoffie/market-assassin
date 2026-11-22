@@ -1,9 +1,12 @@
 const fs = require('fs');
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { privatePath } = require('./lib/private-path');
 const path = require('path');
 const { createClient } = require('@supabase/supabase-js');
 
 const ROOT = path.resolve(__dirname, '..');
-const ROLLBACK_PATH = path.join(ROOT, 'scripts', 'rollback_briefings_entitlement_sync_2026-04-30.sql');
+// Rollback SQL holds customer rows: written to the private directory, never the repository.
+const ROLLBACK_PATH = privatePath('rollback_briefings_entitlement_sync.sql');
 const ENTITLED_ACCESS = new Set(['lifetime', '1_year', '6_month', 'subscription', 'beta_preview']);
 
 function loadEnv(filename) {

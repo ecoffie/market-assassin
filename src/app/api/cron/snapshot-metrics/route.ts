@@ -23,6 +23,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getReadClient, getWriteClient, getCountClient } from '@/lib/supabase/server-clients';
 import { isExcludedFromMetrics } from '@/lib/mindy/campaign-exclusions';
+import { authorizeCronRequest } from '@/lib/cron/cron-request-auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -58,6 +59,10 @@ async function fetchAll<T>(q: (from: number, to: number) => PromiseLike<{ data: 
 }
 
 export async function GET(request: NextRequest) {
+  // Server-side authorization FIRST, before any read, write or send. Only the CRON_SECRET bearer the
+  // dispatcher sends runs this job; a caller-set header never does.
+  const auth = await authorizeCronRequest(request, { isTest: false });
+  if (!auth.ok) return auth.response;
   const supabase = sbRead();
   const url = new URL(request.url);
 

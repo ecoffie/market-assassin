@@ -10,7 +10,7 @@ import { describe, it, expect } from 'vitest';
 
 interface ClickRow { user_email: string; created_at: string }
 // A tiny stand-in for isExcludedFromMetrics (staff domain + a known testimonial address).
-const isExcluded = (email: string) => email.endsWith('@govcongiants.com') || email === 'aj@cypherintel.com';
+const isExcluded = (email: string) => email.endsWith('@govcongiants.com') || email === 'fixture-member-1@example.com';
 
 function computeConverter(clickRows: ClickRow[], mapReachedEmails: string[], windowDays: number) {
   const reached = new Set(mapReachedEmails.map((e) => e.toLowerCase()).filter((e) => !isExcluded(e)));
@@ -81,11 +81,11 @@ describe('email → map converter — click grouping + reach + rate', () => {
   it('staff / testimonial clickers AND arrivals are excluded', () => {
     const rows: ClickRow[] = [
       { user_email: 'staff@govcongiants.com', created_at: '2026-08-01T09:00:00Z' }, // staff
-      { user_email: 'aj@cypherintel.com', created_at: '2026-08-01T09:00:00Z' },      // testimonial
+      { user_email: 'fixture-member-1@example.com', created_at: '2026-08-01T09:00:00Z' },      // testimonial
       { user_email: 'real@customer.com', created_at: '2026-08-01T09:00:00Z' },       // real
     ];
     // The excluded emails also appear in the arrival set — must not leak into mapReached either.
-    const c = computeConverter(rows, ['staff@govcongiants.com', 'aj@cypherintel.com', 'real@customer.com'], 7);
+    const c = computeConverter(rows, ['staff@govcongiants.com', 'fixture-member-1@example.com', 'real@customer.com'], 7);
     expect(c.clicks).toBe(1);                                       // only the real click counts
     expect(c.clickers).toBe(1);
     expect(c.mapReached).toBe(1);                                   // real@customer reached
