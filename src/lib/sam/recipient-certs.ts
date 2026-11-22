@@ -123,14 +123,41 @@ export async function getCachedCerts(ueis: string[]): Promise<Map<string, Recipi
  * record). Never throws: a SAM/DB failure logs and returns null so the backfill can keep draining.
  */
 export async function refreshCertForUei(uei: string): Promise<RecipientCert | null> {
-  if (!uei) return null;
+  return (await refreshCertForUeiDetailed(uei)).cert;
+}
+
+/**
+ * True when SAM's entity API said EVERY key is unusable (429 quota exhausted, or 401/403 rejected) —
+ * the `SAM entity lookup unavailable` throw in entity-api.ts. That is a fleet-wide condition, not a
+ * fact about one UEI: every further call in the same run will fail the same way.
+ */
+export function isSamKeysUnavailableError(e: unknown): boolean {
+  return e instanceof Error && /SAM entity lookup unavailable/i.test(e.message);
+}
+
+/**
+ * refreshCertForUei plus WHY it failed. `samUnavailable` = every SAM key was unusable, so the caller
+ * (the drain loop) must stop instead of spending the shared key quota customers' lookup_sam_entity
+ * calls need. Never throws.
+ */
+export async function refreshCertForUeiDetailed(
+  uei: string,
+): Promise<{ cert: RecipientCert | null; samUnavailable: boolean }> {
+  if (!uei) return { cert: null, samUnavailable: false };
   let entity;
   try {
     entity = await getEntityByUEI(uei);
   } catch (e) {
     console.error(`[recipient-certs] SAM lookup failed for ${uei}:`, (e as Error).message);
-    return null;
+    return { cert: null, samUnavailable: isSamKeysUnavailableError(e) };
   }
+  return { cert: await upsertCertFromEntity(uei, entity), samUnavailable: false };
+}
+
+async function upsertCertFromEntity(
+  uei: string,
+  entity: Awaited<ReturnType<typeof getEntityByUEI>>,
+): Promise<RecipientCert | null> {
   const is8a = entity ? !!entity.has8a : false;
   const isSdvosb = entity ? !!entity.hasSDVOSB : false;
   const isWosb = entity ? !!entity.hasWOSB : false;
@@ -291,6 +318,8 @@ export async function certBackfillQueue(limit: number): Promise<string[]> {
  */
 export async function drainCertBackfill(opts: { limit: number; rateMs?: number; budgetMs?: number }): Promise<{
   harvestedFromCache: number; attempted: number; certified: number; noCert: number; failed: number; budgetSpent: boolean;
+  /** True when the run STOPPED early because SAM reported every key unusable (429/401/403). */
+  samUnavailable: boolean;
 }> {
   const rateMs = opts.rateMs ?? 6500;   // ~9/min, under SAM's 10/min
   const budgetMs = opts.budgetMs ?? 240_000;
@@ -300,15 +329,23 @@ export async function drainCertBackfill(opts: { limit: number; rateMs?: number; 
   // fetched. This is the rule Eric had to keep re-stating; now the code does it by default.
   const { harvested: harvestedFromCache } = await harvestCertsFromCache();
   const queue = await certBackfillQueue(opts.limit); // now excludes the just-harvested (fresh) UEIs
-  let certified = 0, noCert = 0, failed = 0, attempted = 0, budgetSpent = false;
+  let certified = 0, noCert = 0, failed = 0, attempted = 0, budgetSpent = false, samUnavailable = false;
   for (let i = 0; i < queue.length; i++) {
     if (Date.now() - started > budgetMs - rateMs) { budgetSpent = true; break; }
     attempted++;
-    const c = await refreshCertForUei(queue[i]);
+    const { cert: c, samUnavailable: keysDown } = await refreshCertForUeiDetailed(queue[i]);
     if (c === null) failed++;
     else if (!c.found) noCert++;
     else certified++;
+    // CIRCUIT BREAKER: every SAM key is rate-limited/rejected. Each further call would try every key
+    // again and fail the same way, burning the SHARED quota customers' lookup_sam_entity calls need
+    // (2026-11-22: ~36 calls/run kept hammering SAM after the first all-keys-429). Stop the batch.
+    if (keysDown) {
+      samUnavailable = true;
+      console.error(`[recipient-certs] SAM keys unusable — stopping backfill after ${attempted} attempt(s)`);
+      break;
+    }
     if (i < queue.length - 1) await new Promise((r) => setTimeout(r, rateMs));
   }
-  return { harvestedFromCache, attempted, certified, noCert, failed, budgetSpent };
+  return { harvestedFromCache, attempted, certified, noCert, failed, budgetSpent, samUnavailable };
 }
