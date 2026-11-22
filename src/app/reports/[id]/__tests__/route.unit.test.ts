@@ -55,7 +55,9 @@ describe('GET /reports/[id]', () => {
     expect(html.startsWith('<!doctype html>')).toBe(true);
     expect(html).toContain('drones');
     expect(html).toContain('Powered by'); // Mindy footer = the distribution play
-    expect(html).toContain('window.print()'); // Save-as-PDF path
+    // A real PDF download (./pdf), not the browser's print dialog.
+    expect(html).toContain(`href="/reports/${REPORT.id}/pdf" download>Download PDF</a>`);
+    expect(html).not.toContain('window.print()');
   });
 
   it('uses the stored client_name in the header (Sue prepared this FOR someone)', async () => {

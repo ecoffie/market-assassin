@@ -28,6 +28,7 @@ import { parseAppDeepLink } from '@/lib/app/deep-link-params';
 import { MAP_SHELL_HOME_EVENT, isMapShellPanel } from '@/lib/app/map-shell';
 import { KNOWN_PANELS } from '@/lib/app/known-panels';
 import TrialOfferBanner from '@/components/app/TrialOfferBanner';
+import { TRIAL_CTA_LABEL } from '@/lib/public-site/trial-cta';
 
 /** The shared account-menu script (map + public pages) without its <script> wrapper. */
 const ACCOUNT_MENU_SCRIPT = ACCOUNT_MENU_JS.replace(/^<script>/, '').replace(/<\/script>[\s\S]*$/, '');
@@ -1111,7 +1112,7 @@ function AppDashboard() {
                     href="/pricing"
                     className="flex-1 py-2 px-4 rounded-md text-sm font-medium text-center transition-colors text-gray-400 hover:text-white"
                   >
-                    Start for free
+                    {TRIAL_CTA_LABEL}
                   </a>
                 )}
               </div>

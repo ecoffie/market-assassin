@@ -5,6 +5,7 @@
  */
 import Link from 'next/link';
 import MemberAwareCta from '@/components/MemberAwareCta';
+import { TRIAL_CTA_LABEL } from '@/lib/public-site/trial-cta';
 import type { FacetOpp } from '@/lib/seo/facets';
 
 const SITE_URL = 'https://getmindy.ai';
@@ -134,7 +135,7 @@ export default function FacetPage({
           <div className="mt-4">
             <MemberAwareCta appearance="public" memberHref="/app" memberLabel="Open Mindy →">
               <Link href="/pricing" className="inline-block bg-(--mp-navy) hover:bg-(--mp-navy-hover) text-white font-semibold rounded-lg px-5 py-2.5 text-sm">
-                Start for free →
+                {TRIAL_CTA_LABEL} →
               </Link>
             </MemberAwareCta>
           </div>

@@ -37,6 +37,7 @@ import { hasProAccess } from '@/lib/access/resolve-access';
 // podcast retrieval (retrieveRagContext / retrievePodcastEpisodes) is gone entirely.
 import { loadBidderProfileResult, formatProfileForPrompt } from '@/lib/proposal/loaders';
 import { contractIdentityNote, contractEvidence, contractEvidenceNote, priorAwardIds } from '@/lib/chat/contract-evidence';
+import { askMindyStrategyPlanEnabledFor, isStrategyPlanRequest, STRATEGY_PLAN_CHAT_CONTRACT, strategyPlanCheck, strategyProfileNote, strategyCompanyContext, type StrategyProfileInput } from '@/lib/ask-mindy/strategy-plan';
 import { isUserOverBudget, recordLlmUsage } from '@/lib/llm/usage-cost';
 import { makeTier0Tools, TIER0_TOOL_DEFS, TIER0_TOOL_NAMES } from '@/lib/chat/tier0-tools';
 import { makeMyDocumentsTool, MY_DOCUMENTS_TOOL_DEF, FIND_MY_DOCUMENTS } from '@/lib/chat/my-documents-tool';
@@ -55,6 +56,7 @@ import { customerErrorMessage } from '@/lib/chat/customer-errors';
 import { boundToolResult, perResultBudget } from '@/lib/chat/bound-tool-result';
 import {
   filterToolsForTurn,
+  type FmpCompanyContext,
   enforceFindArgs,
   enforceMarketReportArgs,
   enforceFederalMarketProfileIdentityArgs,
@@ -111,6 +113,11 @@ import {
 } from '@/lib/chat/fmp-writeup-grounding';
 import { CURRENT_FIND_CHAT_CONTRACT } from '@/lib/mcp/potato-journey';
 import { ASK_MINDY_RULES_LAYER, askMindyRulesEnabledFor, askMindyRulesPromptBlock, rulesLayerFindContract } from '@/lib/chat/ask-mindy-rules';
+import { askMindyRecipesEnabledFor } from '@/lib/ask-mindy/flags';
+import { loadCompanyProfile } from '@/lib/ask-mindy/company-profile';
+import { fitRankingNote, rankFindResult } from '@/lib/ask-mindy/compose';
+/** How long the answer waits for the company profile before skipping the ranking note (value first). */
+const FIT_PROFILE_WAIT_MS = 1500;
 import { findCompletionFooter, comingBackListLeadsWithNotCompeted, type FindResultWithItems } from '@/lib/chat/find-completeness';
 import { inferredCodeDisclosure } from '@/lib/chat/code-disclosure';
 import { getNaics } from '@/lib/codes/lookup';
@@ -688,6 +695,11 @@ export async function POST(request: NextRequest) {
         // Unresolved workspace → NO profile (the private tools refuse too): a coach acting for a
         // client must never get an answer built on their own profile.
         const profileEmail = vaultEmailFor(actingScope);
+        // Ask Mindy fit ranking (ASK_MINDY_RECIPES, default off; src/lib/ask-mindy/compose.ts). Off → nothing is
+        // loaded and no note is added. On → the company profile loads in parallel through the strict acting
+        // scope only (never a raw email); a refused or failed load just means no ranking note (value first).
+        const fitRankingOn = !cardCtx && askMindyRecipesEnabledFor(auth.email);
+        const fitProfileP = fitRankingOn ? loadCompanyProfile(actingScope).catch(() => null) : null;
         // The profile's STATUS is kept (2026-11-22): a failed read used to look exactly like an empty profile, so
         // the answer treated a known company as unknown and asked again for details given earlier.
         const profileResult = profileEmail ? await loadBidderProfileResult(profileEmail) : null;
@@ -710,13 +722,27 @@ export async function POST(request: NextRequest) {
         // layout and gets only the rules (truth, writing), never the top-picks answer format.
         const rulesLayer = askMindyRulesEnabledFor(auth.email);
         const customerAskForContract = splitViewPreamble(message).rest || message;
-        const federalMarketProfileAsk = !cardCtx && isFederalMarketProfileRequest(customerAskForContract);
+        const fmpTextAsk = !cardCtx && isFederalMarketProfileRequest(customerAskForContract);
+        // Federal Strategy Plan (ASK_MINDY_STRATEGY_PLAN, default off; src/lib/ask-mindy/strategy-plan.ts): a plan for
+        // this company runs the EXISTING Federal Market Profile research workflow (phase machine, write-up validator,
+        // create_document preview/export) with the general strategy contract and the saved company profile as its
+        // first input. Off -> this turn is exactly as before.
+        const strategyPlanAsk = !cardCtx && !fmpTextAsk && askMindyStrategyPlanEnabledFor(auth.email) && isStrategyPlanRequest(customerAskForContract);
+        const federalMarketProfileAsk = fmpTextAsk || strategyPlanAsk;
+        const strategyProfile: StrategyProfileInput | null = strategyPlanAsk
+          ? await loadCompanyProfile(actingScope)
+            .then((r): StrategyProfileInput => (r.status === 'ok' ? { status: 'ok', profile: r.profile } : { status: 'refused' }))
+            .catch((): StrategyProfileInput => ({ status: 'unavailable' }))
+          : null;
+        const strategyCompany: FmpCompanyContext | null = strategyProfile ? strategyCompanyContext(strategyProfile) : null;
         const findContract = rulesLayer ? rulesLayerFindContract() : CURRENT_FIND_CHAT_CONTRACT;
         const hostContract = cardCtx
           ? ''
-          : federalMarketProfileAsk
-            ? `\n\n${FEDERAL_MARKET_PROFILE_CHAT_CONTRACT}`
-            : `\n\n${findContract}`;
+          : strategyPlanAsk
+            ? `\n\n${STRATEGY_PLAN_CHAT_CONTRACT}`
+            : federalMarketProfileAsk
+              ? `\n\n${FEDERAL_MARKET_PROFILE_CHAT_CONTRACT}`
+              : `\n\n${findContract}`;
         const rulesBlock = !rulesLayer ? '' : federalMarketProfileAsk ? `\n\n${ASK_MINDY_RULES_LAYER}` : `\n\n${askMindyRulesPromptBlock()}`;
         const systemPrompt = SYSTEM_PROMPT_TEMPLATE.replace('{today}', today).replace('{userProfile}', userProfileBlock)
           + hostContract
@@ -786,6 +812,8 @@ export async function POST(request: NextRequest) {
         // A contract number earlier answers showed as an award is looked up by that exact id (36C24825C0020).
         const contractIdNote = contractIdentityNote(splitViewPreamble(message).rest || message, priorLedgers);
         if (contractIdNote) ledgerSystemNotes.push(contractIdNote);
+        // Strategy plan step 1: the authorized company profile (or why it is not available) opens the research.
+        if (strategyProfile) ledgerSystemNotes.push(strategyProfileNote(strategyProfile));
         for (const n of ledgerSystemNotes) messages.push({ role: 'system', content: n });
         // "Revise that document" (Agent 4 prod test 2026-11-17): with ONE tool round, the planner must write the
         // revised doc_model in the same call, so the document it refers to is loaded here — from the signed
@@ -1057,7 +1085,16 @@ export async function POST(request: NextRequest) {
                     return r;
                   });
                 }
-                if (genDoc && n === CREATE_DOCUMENT) return genDoc.execute(a);
+                if (genDoc && n === CREATE_DOCUMENT) {
+                  // Strategy plan: record the plan's structural check (evaluation only; never blocks the save).
+                  if (strategyPlanAsk) {
+                    try {
+                      const check = strategyPlanCheck((a as { doc_model?: unknown }).doc_model as Parameters<typeof strategyPlanCheck>[0]);
+                      turnTrace.notices.push(check.pass ? 'strategy_plan_check:pass' : `strategy_plan_check:missing=${check.missing.length}`);
+                    } catch { turnTrace.notices.push('strategy_plan_check:unreadable'); }
+                  }
+                  return genDoc.execute(a);
+                }
                 return tier0Runtime.execute(n, a);
               },
             },
@@ -1076,7 +1113,8 @@ export async function POST(request: NextRequest) {
           const priorCustomerAsk = priorCustomerRaw
             ? (splitViewPreamble(String(priorCustomerRaw)).rest || String(priorCustomerRaw))
             : null;
-          const toolOffer = filterToolsForTurn(executor.offeredToolDefs(), customerAskForContract, priorCustomerAsk);
+          const toolOffer = filterToolsForTurn(executor.offeredToolDefs(), customerAskForContract, priorCustomerAsk, { strategyPlan: strategyPlanAsk });
+          if (strategyPlanAsk) turnTrace.notices.push('intent:strategy_plan');
           if (toolOffer.federalMarketProfile) turnTrace.notices.push('intent:federal_market_profile');
           if (toolOffer.marketResearch) turnTrace.notices.push('intent:market_research');
           // Industry codes the CUSTOMER typed (a planner-chosen code is not passed to find_opportunities).
@@ -1096,7 +1134,7 @@ export async function POST(request: NextRequest) {
           // unlocked phases so the model cannot jump to market size / web before awards.
           const fmpCatalogDefs = ALL_TOOL_DEFS;
           let fmpState: FmpPhaseState | null = toolOffer.federalMarketProfile
-            ? initialFmpPhaseState(splitViewPreamble(message).rest || message)
+            ? initialFmpPhaseState(splitViewPreamble(message).rest || message, strategyCompany ? { companyStates: strategyCompany.states ?? [] } : {})
             : null;
           let fmpPhaseForce: string | null = null;
           if (fmpState) {
@@ -1551,12 +1589,20 @@ export async function POST(request: NextRequest) {
                     tool: String(tc.function?.name || ''),
                     args: String(tc.function?.arguments ?? ''),
                   }));
+                // The defense construction-oversight (PAE) section is for construction firms (the RBA benchmark). On a
+                // strategy turn it applies only when the company's own work is construction (award or profile NAICS 23x).
+                const strategyDefenseSectionApplies = (evidence: FmpWriteupEvidence): boolean => {
+                  if (!strategyPlanAsk) return true;
+                  const awardNaics = (evidence as { dominantNaics?: string | null }).dominantNaics ?? '';
+                  return String(awardNaics).startsWith('23') || String(strategyCompany?.naics ?? '').startsWith('23');
+                };
                 const ensureFmpEvidence = (customerFmp: string): FmpWriteupEvidence => {
                   fmpEvidence = accumulateFmpEvidence(fmpToolContents, customerFmp);
                   if (fmpWriteupCtx) {
                     fmpWriteupCtx.requiredSnippets = requiredSnippetsForWriteup(fmpEvidence);
                     // Name-only asks omit "defense"/"PAE"; flip on once pathway buyers show DoD.
                     if (!fmpWriteupCtx.defenseBuyersAppear
+                      && strategyDefenseSectionApplies(fmpEvidence)
                       && fmpDefenseBuyersAppearFromEvidence(fmpEvidence)) {
                       fmpWriteupCtx.defenseBuyersAppear = true;
                     }
@@ -1571,7 +1617,7 @@ export async function POST(request: NextRequest) {
                     customerText: customerFmp,
                     defenseBuyersAppear: !!(fmpWriteupCtx?.defenseBuyersAppear)
                       || fmpDefenseBuyersAppear(customerFmp)
-                      || fmpDefenseBuyersAppearFromEvidence(evidence),
+                      || (strategyDefenseSectionApplies(evidence) && fmpDefenseBuyersAppearFromEvidence(evidence)),
                     requiredSnippets: fmpWriteupCtx?.requiredSnippets,
                   });
                   turnTrace.notices.push(resolved.notice);
@@ -1721,12 +1767,13 @@ export async function POST(request: NextRequest) {
                       return JSON.stringify(buildFmpNextMarketReportArgs(
                         customerFmpText,
                         fmpState.marketReportCount,
-                        { awardNaics: awardNaicsFromTools },
+                        { awardNaics: awardNaicsFromTools, company: strategyCompany },
                       ));
                     }
                     if (toolName === 'find_opportunities') {
                       return JSON.stringify(buildFmpPathwayFindArgs(customerFmpText, {
                         awardStates: awardStatesFromTools,
+                        company: strategyCompany,
                       }));
                     }
                     return '{}';
@@ -1786,6 +1833,7 @@ export async function POST(request: NextRequest) {
                         const parsed = JSON.parse(args || '{}') as Record<string, unknown>;
                         const next = buildFmpNextMarketReportArgs(customerFmpText, fmpState.marketReportCount, {
                           awardNaics: typeof parsed.naics === 'string' ? parsed.naics : awardNaicsFromTools,
+                          company: strategyCompany,
                         });
                         args = JSON.stringify({ ...parsed, ...next });
                         turnTrace.notices.push(`fmp_market_size_args_pinned:state=${String(next.state || '')}:naics=${String(next.naics || '')}`);
@@ -1797,6 +1845,8 @@ export async function POST(request: NextRequest) {
                         const parsed = JSON.parse(args || '{}') as Record<string, unknown>;
                         const next = buildFmpPathwayFindArgs(customerFmpText, {
                           awardStates: awardStatesFromTools,
+                          company: strategyCompany,
+                          plannerQuery: typeof parsed.query === 'string' ? parsed.query : null,
                         });
                         const merged: Record<string, unknown> = { ...parsed, ...next };
                         // Keep planner advanced filters except a buildings NAICS we already strip in enforce.
@@ -2222,6 +2272,21 @@ export async function POST(request: NextRequest) {
         // budget is downgraded from gpt-4o to gpt-4o-mini — never blocked, just a
         // cheaper model. Protects the $149 margin now that chat leads with gpt-4o.
         // (Resolved once above for the tool round; reuse to avoid a second budget read.)
+        // Ask Mindy fit ranking note: only when the flag is on AND find_opportunities ran this turn. It orders and
+        // explains the results the tool already returned (shared scorer bands, no second filter); it never blocks
+        // the answer: a slow, refused or failed profile load skips the note.
+        if (fitProfileP && findResult) {
+          const loaded = await withTimeout(fitProfileP, FIT_PROFILE_WAIT_MS, 'fit_profile').catch(() => null);
+          if (loaded && loaded.status === 'ok') {
+            const note = fitRankingNote(rankFindResult(findResult as unknown as Parameters<typeof rankFindResult>[0], loaded.profile));
+            if (note) {
+              messages.push({ role: 'system', content: note });
+              turnTrace.notices.push('fit_ranking_note');
+            }
+          } else {
+            turnTrace.notices.push(`fit_ranking_skipped:${loaded ? loaded.reason : 'profile_unavailable'}`);
+          }
+        }
         // Contract evidence guard (2026-11-22, 36C24825C0020): facts about a contract the customer named come only
         // from a record of that exact id; a result about a different record, or sources that disagree, are stated,
         // and pursuit advice is blocked while holder, value or end date is unresolved. The customer's two previous

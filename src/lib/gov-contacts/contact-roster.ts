@@ -20,7 +20,7 @@ import { deriveSubAgencyEvidence } from '@/lib/gov-contacts/derive-subagency';
 import { loadDodaacNames, dodaacCodesForAgency } from '@/lib/gov-contacts/dodaac-directory';
 import { osbpContactForAgency } from '@/lib/utils/command-info';
 import { isValidDodaac } from '@/lib/gov-contacts/agency-key';
-import { withDodaacPrefix, dodaacPrefixOrExpr } from '@/lib/gov-contacts/dodaac-prefix';
+import { withDodaacPrefix, dodaacPrefixOrExpr, officePrefixOrExpr } from '@/lib/gov-contacts/dodaac-prefix';
 import { agencySearchTargets } from '@/lib/gov-contacts/agency-search';
 import { isUsableContactCard, placeholderNameFilter, displayContactName } from '@/lib/gov-contacts/contact-quality';
 import { governmentBuyersOnly } from '@/lib/gov-contacts/contact-kind';
@@ -269,6 +269,11 @@ export interface ContactRosterInput {
   office?: string;
   role?: string;
   search?: string;
+  /**
+   * Explicit contracting-office codes (PIID / solicitation-number prefixes, civilian or DoD) — the most
+   * precise anchor: the people who post this office's solicitations. Takes precedence over agency/dodaac.
+   */
+  officeCodes?: string[];
   limit?: number;
   /** Prepend the agency's OSBP small-business contact (default true when agency given). */
   includeOsbp?: boolean;
@@ -276,7 +281,7 @@ export interface ContactRosterInput {
 
 export interface ContactRosterResult {
   contacts: FederalContact[];
-  anchor: 'dodaac' | 'agency-dodaac' | 'department' | 'search' | 'none';
+  anchor: 'office-code' | 'dodaac' | 'agency-dodaac' | 'department' | 'search' | 'none';
   total: number;
   emailableCount: number;
   degraded: boolean;
@@ -308,8 +313,10 @@ export async function queryFederalContacts(input: ContactRosterInput): Promise<C
     ? (await dodaacCodesForAgency(agency)).filter(isValidDodaac).slice(0, 60)
     : [];
   const resolved = agency && !validDodaac && agencyDodaacCodes.length === 0 ? resolveAgency(agency) : null;
+  const officeExpr = officePrefixOrExpr(input.officeCodes ?? []);
   let anchor: ContactRosterResult['anchor'] = search ? 'search' : 'none';
-  if (validDodaac) anchor = 'dodaac';
+  if (officeExpr) anchor = 'office-code';
+  else if (validDodaac) anchor = 'dodaac';
   else if (agencyDodaacCodes.length > 0) anchor = 'agency-dodaac';
   else if (agency) anchor = 'department';
 
@@ -351,7 +358,9 @@ export async function queryFederalContacts(input: ContactRosterInput): Promise<C
       q = q.or(parts.join(','));
     }
     // DoDAAC prefix via the shared, trigram-indexed predicate (dodaac-prefix.ts).
-    if (validDodaac) {
+    if (officeExpr) {
+      q = q.or(officeExpr);
+    } else if (validDodaac) {
       q = withDodaacPrefix(q, validDodaac);
     } else if (agencyDodaacCodes.length > 0) {
       q = q.or(dodaacPrefixOrExpr(agencyDodaacCodes));
