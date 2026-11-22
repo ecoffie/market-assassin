@@ -46,6 +46,18 @@ export const SET_ASIDE_BUCKETS: Array<{ label: string; codes: string[] }> = [
   { label: 'HUBZone', codes: ['HZC', 'HZS'] },
 ];
 
+// Veteran-Owned (VOSB) set-aside codes are VA-only (open.gsa.gov SAM set-aside table: VSA "Veteran-Owned
+// Small Business Set-Aside (specific to Department of Veterans Affairs)", VSS its sole source). A DISTINCT
+// bucket, never merged into SDVOSB, and only queried for VA: for any other agency the category does not
+// apply, so it is omitted rather than shown as $0. FY2026 live: VSA $33,153,515 + VSS −$2,350,278 net.
+export const VA_TOPTIER_CODE = '036';
+export const VA_VOSB_BUCKET: { label: string; codes: string[] } = { label: 'VOSB (VA only)', codes: ['VSA', 'VSS'] };
+
+/** The set-aside buckets that apply to this agency. VOSB only for VA (and never for a DoD sub-tier). */
+export function setAsideBucketsFor(toptierCode: string | null | undefined, subAgency?: string): Array<{ label: string; codes: string[] }> {
+  return toptierCode === VA_TOPTIER_CODE && !subAgency ? [...SET_ASIDE_BUCKETS, VA_VOSB_BUCKET] : SET_ASIDE_BUCKETS;
+}
+
 export interface AgencySpendingDetailInput {
   agency: string;
   fiscalYear?: number;
@@ -296,6 +308,7 @@ export async function getAgencySpendingDetail(input: AgencySpendingDetailInput):
   trace.push(`resolved "${input.agency}" → ${displayName}${sub ? ` (sub-tier under ${resolved.name})` : ''} (${resolved.toptierCode})`);
 
   const parentService = grain.spendingScope === 'PARENT_SERVICE';
+  const buckets = setAsideBucketsFor(resolved.toptierCode, sub);
 
   const [totalRows, subRows, recipientSbRows, ...bucketRows] = await Promise.all([
     spendingByCategory('awarding_agency', resolved.name, window, undefined, sub).catch((e) => { trace.push(`total: ${e.message}`); return null; }),
@@ -303,7 +316,7 @@ export async function getAgencySpendingDetail(input: AgencySpendingDetailInput):
       ? Promise.resolve([] as CategoryRow[])
       : spendingByCategory('awarding_subagency', resolved.name, window, undefined, sub).catch((e) => { trace.push(`subagency: ${e.message}`); return null; }),
     spendingByCategory('awarding_agency', resolved.name, window, undefined, sub, ['small_business']).catch((e) => { trace.push(`recipient_sb: ${e.message}`); return null; }),
-    ...SET_ASIDE_BUCKETS.map((b) =>
+    ...buckets.map((b) =>
       spendingByCategory('awarding_agency', resolved!.name, window, b.codes, sub).catch((e) => { trace.push(`${b.label}: ${e.message}`); return null; }),
     ),
   ]);
@@ -337,15 +350,22 @@ export async function getAgencySpendingDetail(input: AgencySpendingDetailInput):
 
   const { sub_agencies, sub_agency_structure } = classifySubAgencies(subRows, resolved.name, parentService, pct);
 
-  const set_aside_breakdown: SetAsideSlice[] = SET_ASIDE_BUCKETS.map((b, i) => {
+  // A small nonzero bucket keeps two decimals (VA VOSB is 0.034%): one decimal printed it as "0.0%".
+  const bucketPct = (n: number) => {
+    const p = total > 0 ? (n / total) * 100 : 0;
+    return p !== 0 && Math.abs(p) < 0.1 ? Math.round(p * 100) / 100 : pct(n);
+  };
+  const set_aside_breakdown: SetAsideSlice[] = buckets.map((b, i) => {
       const rows = bucketRows[i];
       // A failed bucket lookup is UNKNOWN — summing `null` rows to 0 printed "$0 / 0%" for a lookup that never answered.
       if (rows === null) return { label: b.label, codes: b.codes, amount: null, pct_of_total: null };
+      // Signed NET of de-obligations (VSS FY2026 is negative) — never clamped, never gross.
       const amount = rows.reduce((s, r) => s + (r.amount || 0), 0);
-      return { label: b.label, codes: b.codes, amount, pct_of_total: pct(amount) };
+      return { label: b.label, codes: b.codes, amount, pct_of_total: bucketPct(amount) };
     });
 
-  // The combined set-aside share is only known when every bucket answered.
+  // The combined set-aside share is only known when every bucket answered. It sums every applicable
+  // set-aside code, including VA's VOSB bucket (a set-aside code; FY2026 it moves 9.4% by 0.03 points).
   const anyBucketFailed = set_aside_breakdown.some((b) => b.amount === null);
   const sbTotal = set_aside_breakdown.reduce((s, b) => s + (b.amount ?? 0), 0);
   const set_aside_share = total <= 0 || anyBucketFailed ? null : Math.round((sbTotal / total) * 1000) / 10;
