@@ -20,7 +20,8 @@
  * This route launches Chromium, so it is listed in next.config.ts outputFileTracingIncludes.
  */
 import { NextResponse } from 'next/server';
-import { getMarketReport } from '@/lib/market/report-store';
+import { getMarketReport, linkStatus } from '@/lib/market/report-store';
+import { reportLinkGone } from '@/lib/market/report-link-gone';
 import { renderStoredReportHtml, reportPdfFileName } from '@/lib/market/stored-report-html';
 import { htmlToPdf } from '@/lib/pdf/launch-browser';
 import { getClientIP } from '@/lib/rate-limit';
@@ -97,6 +98,8 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
 
   const report = await getMarketReport(id);
   if (!report?.payload) return fail(req, '', { status: 404, error: 'not_found', message: MESSAGES.not_found });
+  // Revoked or expired link: 410 BEFORE Chromium starts (the id check and rate limit above still run first).
+  if (linkStatus(report) !== 'live') return reportLinkGone({ json: wantsJson(req) });
 
   let html: string;
   try {

@@ -112,4 +112,41 @@ describe('newReportId', () => {
   it('produces ids the route accepts', () => {
     expect(newReportId()).toMatch(/^[A-Za-z0-9_-]{16,64}$/);
   });
+
+  describe('link controls (revoked / expired → neutral 410)', () => {
+    const DAY = 86_400_000;
+    it('a revoked link answers 410 with neutral text: no report, subject, client or owner', async () => {
+      getMarketReport.mockResolvedValue({ ...REPORT, revoked_at: new Date().toISOString() });
+      const res = await GET(req, params(REPORT.id));
+      expect(res.status).toBe(410);
+      const html = await res.text();
+      expect(html).toContain('expired or was withdrawn by the person who shared it');
+      for (const leak of ['drones', 'Acme Corp', 'sue@example.com', 'DEPT OF DEFENSE']) expect(html).not.toContain(leak);
+      expect(res.headers.get('Cache-Control')).toContain('no-store');
+    });
+
+    it('an expired link answers the identical 410', async () => {
+      getMarketReport.mockResolvedValue({ ...REPORT, expires_at: new Date(Date.now() - DAY).toISOString() });
+      const expired = await GET(req, params(REPORT.id));
+      getMarketReport.mockResolvedValue({ ...REPORT, revoked_at: new Date().toISOString() });
+      const revoked = await GET(req, params(REPORT.id));
+      expect(expired.status).toBe(410);
+      expect(await expired.text()).toBe(await revoked.text());
+    });
+
+    it('a link with no expiry and not revoked (every existing link) still renders', async () => {
+      getMarketReport.mockResolvedValue({ ...REPORT, expires_at: null, revoked_at: null });
+      expect((await GET(req, params(REPORT.id))).status).toBe(200);
+    });
+
+    it('a future expiry still renders', async () => {
+      getMarketReport.mockResolvedValue({ ...REPORT, expires_at: new Date(Date.now() + DAY).toISOString() });
+      expect((await GET(req, params(REPORT.id))).status).toBe(200);
+    });
+
+    it('unknown ids keep the identical 404 (not 410)', async () => {
+      getMarketReport.mockResolvedValue(null);
+      expect((await GET(req, params('abc123abc123abc123abc1'))).status).toBe(404);
+    });
+  });
 });

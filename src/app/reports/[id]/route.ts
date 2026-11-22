@@ -12,7 +12,8 @@
  * to distinguish real ids, and we tell robots not to index it.
  */
 import { NextResponse } from 'next/server';
-import { getMarketReport } from '@/lib/market/report-store';
+import { getMarketReport, linkStatus } from '@/lib/market/report-store';
+import { reportLinkGone } from '@/lib/market/report-link-gone';
 import { renderStoredReportHtml } from '@/lib/market/stored-report-html';
 
 export const dynamic = 'force-dynamic';
@@ -41,6 +42,9 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
 
   const report = await getMarketReport(id);
   if (!report?.payload) return notFound();
+  // Revoked or expired link: a neutral 410, never the report. The owner still opens it through the
+  // authenticated owner view (/api/app/market-reports/<id>).
+  if (linkStatus(report) !== 'live') return reportLinkGone();
 
   let html: string;
   try {
