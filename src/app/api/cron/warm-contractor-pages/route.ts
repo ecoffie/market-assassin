@@ -46,6 +46,7 @@ import {
 } from '@/lib/seo/warm-priority';
 import { bqResultState } from '@/lib/bigquery/cache';
 import { seoCacheKeys } from '@/lib/bigquery/recipients';
+import { hasValidCronSecret } from '@/lib/cron/cron-request-auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -71,7 +72,7 @@ function authorized(request: NextRequest): boolean {
   // No `x-vercel-cron` header check: any client can send it. Vercel cron sends
   // `Authorization: Bearer CRON_SECRET` (set in production), as does the dispatcher.
   const auth = request.headers.get('authorization');
-  if (auth && auth === `Bearer ${process.env.CRON_SECRET}`) return true;
+  if (auth && hasValidCronSecret(request)) return true;
   const pw = request.nextUrl.searchParams.get('password');
   if (pw && pw === (process.env.ADMIN_PASSWORD)) return true;
   return false;

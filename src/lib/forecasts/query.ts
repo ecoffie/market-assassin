@@ -7,6 +7,7 @@
  * set-aside/agency aggregations, POC redaction, camelCase field renaming). Just
  * the filtered read of `agency_forecasts`, soonest-award first.
  */
+import { forecastLinkFields, type ForecastLinkScope } from './forecast-link';
 import { createClient } from '@supabase/supabase-js';
 import { resolveForecastAgencies, forecastAgencyOrExpr } from '@/lib/forecasts/agency-identity';
 
@@ -73,8 +74,13 @@ export interface ForecastRow {
   as_of_basis: 'last_synced_at' | 'unavailable';
   /** The database row clock. Not a source sync. Shown only under this name. */
   row_updated_at: string | null;
-  /** Where the row came from (agency forecast page / file), when recorded. */
+  /**
+   * A link a person can open, scoped honestly (source_link_scope): never an API endpoint, and never
+   * claimed to be the forecast record — no publisher provides one (forecast-link.ts).
+   */
   source_url: string | null;
+  source_link_scope: ForecastLinkScope;
+  source_link_label: string | null;
 }
 
 /** Per-source freshness of the rows returned, so an answer can say how current each agency's forecast is. */
@@ -137,7 +143,7 @@ export function forecastCustomerRow(r: Record<string, unknown>): ForecastRow {
     incumbent_name: clockString(r.incumbent_name),
     pop_state: clockString(r.pop_state),
     status: clockString(r.status),
-    source_url: clockString(r.source_url),
+    ...forecastLinkFields(r),
     ...clock,
   };
 }

@@ -27,6 +27,7 @@
  * (matches the contractor page TTL).
  */
 import type { Metadata } from 'next';
+import { siteShareImages } from '@/lib/seo/share-image';
 import MeetMindyStrip from '@/components/MeetMindyStrip';
 import BackToAppHeader from '@/components/BackToAppHeader';
 import Link from 'next/link';
@@ -61,11 +62,13 @@ export const metadata: Metadata = {
     url: 'https://getmindy.ai/contractors',
     type: 'website',
     siteName: 'Mindy',
+    images: siteShareImages(),
   },
   twitter: {
     card: 'summary_large_image',
     title: '290,000+ Federal Contractors — Award History Database | Mindy',
     description: 'Search 290,000+ federal contractors. Real USAspending data, FY2016-FY2026.',
+    images: siteShareImages(),
   },
 };
 
@@ -263,7 +266,7 @@ export default async function ContractorsIndexPage() {
                   {/* Grid of contractor links. Compact list-style
                       so each tier fits a few hundred without
                       overwhelming the page. */}
-                  <ul className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3 text-sm">
+                  <ul className="grid grid-cols-1 gap-1.5 sm:grid-cols-2 lg:grid-cols-3 text-sm">
                     {visible.map(({ c, target }) => {
                       return (
                         <li key={target}>

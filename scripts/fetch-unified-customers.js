@@ -1,4 +1,6 @@
 const fs = require('fs');
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { privatePath } = require('./lib/private-path');
 
 // Stripe API - requires STRIPE_SECRET_KEY env var
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
@@ -322,7 +324,7 @@ async function main() {
   }
 
   const csvContent = csvRows.join('\n');
-  const outputPath = 'scripts/paid_customers_unified_2026-04-28.csv';
+  const outputPath = privatePath('paid_customers_unified.csv');
   fs.writeFileSync(outputPath, csvContent);
 
   console.log('\nSaved to ' + outputPath);

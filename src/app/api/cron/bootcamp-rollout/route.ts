@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import fs from 'fs';
-import path from 'path';
 import { sendEmail } from '@/lib/send-email';
 import { MINDY_FROM_NAME, MINDY_SITE_URL, renderMindyEmailLogo } from '@/lib/mindy/email-branding';
+import { hasValidCronSecret } from '@/lib/cron/cron-request-auth';
+import { loadBootcampAttendees } from '@/lib/bootcamp/attendee-list';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -11,7 +11,6 @@ export const dynamic = 'force-dynamic';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 const DEFAULT_LIMIT = 200;
 const DEFAULT_NAICS: string[] = [];
-const ATTENDEE_FILE = path.join(process.cwd(), 'data/bootcamp-attendees-to-enroll.txt');
 
 type NotificationRow = {
   user_email: string;
@@ -31,21 +30,11 @@ function normalizeEmail(email: string) {
 }
 
 function isAuthorized(request: NextRequest) {
-  const isVercelCron = request.headers.get('x-vercel-cron') === '1';
+  const isVercelCron = hasValidCronSecret(request);
   const authHeader = request.headers.get('authorization');
-  const hasCronSecret = authHeader === `Bearer ${process.env.CRON_SECRET}`;
+  const hasCronSecret = hasValidCronSecret(request);
   const hasPassword = request.nextUrl.searchParams.get('password') === ADMIN_PASSWORD;
   return isVercelCron || hasCronSecret || hasPassword;
-}
-
-function loadAttendeeEmails() {
-  const raw = fs.readFileSync(ATTENDEE_FILE, 'utf8');
-  return Array.from(new Set(
-    raw
-      .split(/\r?\n/)
-      .map(normalizeEmail)
-      .filter(email => email && email.includes('@') && !email.includes(' '))
-  ));
 }
 
 async function fetchExistingRows(supabase: ReturnType<typeof getSupabase>, emails: string[]) {
@@ -163,9 +152,19 @@ export async function GET(request: NextRequest) {
     2000
   );
 
+  // The attendee list is a private input (BOOTCAMP_ATTENDEE_FILE, outside the repository). Without
+  // it this run REFUSES: it is never "0 attendees, done", and nothing is read, written or sent.
+  const attendees = loadBootcampAttendees();
+  if (!attendees.ok) {
+    return NextResponse.json(
+      { success: false, outcome: 'refused', reason: 'attendee_list_unavailable', detail: attendees.reason, sent: 0 },
+      { status: 503 },
+    );
+  }
+
   try {
     const supabase = getSupabase();
-    const attendeeEmails = loadAttendeeEmails();
+    const attendeeEmails = attendees.emails;
     const existingRows = await fetchExistingRows(supabase, attendeeEmails);
     const unsentExisting = attendeeEmails.filter(email => {
       const row = existingRows.get(email);

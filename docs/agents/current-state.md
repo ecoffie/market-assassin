@@ -50,11 +50,11 @@ window (confirmed live — `processed` climbs past 1,000, sends 931–1,044/day)
 (bump batch toward ~500 only when eligible nears ~3,000). 8,803 bootcamp attendees already
 invited (last batch May 21). Remaining enroll batches can proceed.
 
-**Action:** Enroll 8,804 bootcamp attendees from `data/bootcamp-attendees-to-enroll.txt`
+**Action:** Enroll 8,804 bootcamp attendees from `$MINDY_PRIVATE_DIR/bootcamp-attendees-to-enroll.txt` (private; not in the repository)
 
 ```bash
 # Run this after verifying alerts are working
-cat data/bootcamp-attendees-to-enroll.txt | while read email; do
+cat $MINDY_PRIVATE_DIR/bootcamp-attendees-to-enroll.txt | while read email; do
   curl -s -X POST "https://getmindy.ai/api/alerts/save-profile" \
     -H "Content-Type: application/json" \
     -d "{\"email\": \"$email\", \"naicsCodes\": [\"541512\", \"541611\", \"541330\"], \"businessType\": \"\", \"source\": \"free-signup\"}"

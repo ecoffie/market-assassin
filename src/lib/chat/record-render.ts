@@ -377,10 +377,14 @@ export function renderExpiringRecords(result: Rec, opts: { offset?: number; page
   } else if (retrieved === 0) {
     lines.push(`No expiring contracts or task orders match (${filters}). Source: Mindy recompete data (USASpending).`);
   } else {
-    lines.push(`${total} expiring record${total === 1 ? '' : 's'} match (${filters}). Source: Mindy recompete data (USASpending)${meta.window && (meta.window as Rec).as_of ? `, as of ${str((meta.window as Rec).as_of)}` : ''}.`);
+    // A capped retrieval says so right beside the total, and the agency breakdown is labeled as counted over the
+    // RETRIEVED rows only: it is never a breakdown of all matches (Data Core review, 2026-11-22).
+    const capped = retrieved < total;
+    lines.push(`${total} expiring record${total === 1 ? '' : 's'} match (${filters})${capped ? `; Mindy retrieved ${retrieved} of the ${total}` : ''}. Source: Mindy recompete data (USASpending)${meta.window && (meta.window as Rec).as_of ? `, as of ${str((meta.window as Rec).as_of)}` : ''}.`);
     const byAgency = new Map<string, number>();
     for (const r of records) { const a = title(str(r.awarding_agency)) || 'agency not recorded'; byAgency.set(a, (byAgency.get(a) ?? 0) + 1); }
-    lines.push(`By awarding agency: ${[...byAgency.entries()].sort((x, y) => y[1] - x[1] || (x[0] < y[0] ? -1 : 1)).map(([a, n]) => `${a} ${n}`).join('; ')}.`);
+    const breakdown = [...byAgency.entries()].sort((x, y) => y[1] - x[1] || (x[0] < y[0] ? -1 : 1)).map(([a, n]) => `${a} ${n}`).join('; ');
+    lines.push(capped ? `Among the ${retrieved} retrieved (of ${total}), by awarding agency: ${breakdown}.` : `By awarding agency: ${breakdown}.`);
     const flaggedRecs = records.filter((r) => describedPlaceConflict(str(r.description), str(r.place_of_performance_state)) || describedOtherWork(str(r.description), REQUESTED_LABELS));
     flaggedIdsOut = flaggedRecs.map((r) => str(r.piid) || str(r.contract_id));
     const exhaustiveNow = from === 1 && to === total && retrieved === total;

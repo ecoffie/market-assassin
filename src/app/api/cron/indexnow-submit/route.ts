@@ -25,6 +25,7 @@ import { SITE_URL } from '@/lib/seo/sitemap-sections';
 import {
   INDEXNOW_MAX, INDEXNOW_TYPES, familyUrls, nextSlice, type IndexNowType,
 } from '@/lib/seo/indexnow-families';
+import { hasValidCronSecret } from '@/lib/cron/cron-request-auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -32,7 +33,7 @@ export const maxDuration = 300;
 
 function authorized(request: NextRequest): boolean {
   const auth = request.headers.get('authorization');
-  if (process.env.CRON_SECRET && auth === `Bearer ${process.env.CRON_SECRET}`) return true;
+  if (process.env.CRON_SECRET && hasValidCronSecret(request)) return true;
   const pw = request.nextUrl.searchParams.get('password');
   return !!pw && !!process.env.ADMIN_PASSWORD && pw === process.env.ADMIN_PASSWORD;
 }

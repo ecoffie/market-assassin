@@ -27,7 +27,7 @@
 **Working files:**
 - `ANNELLE-SIKANDER-QUALIFIED-CUSTOMER-OUTREACH.csv` - current 60-person tracker in workspace root.
 - `ANNELLE-SIKANDER-CUSTOMER-QUALIFICATION-SCORING.md` - scoring model and first-batch logic.
-- `ANNELLE-SIKANDER-NEXT-OUTREACH-BATCH.csv` - first 20 scored contacts for immediate execution.
+- `ANNELLE-SIKANDER-NEXT-OUTREACH-BATCH.csv` (private; not in the repository) - first 20 scored contacts for immediate execution.
 
 ---
 
@@ -39,41 +39,41 @@
 
 | # | Email | Product | Paid | Priority |
 |---|-------|---------|------|----------|
-| 1 | trungh@lifestylesolarinc.com | White Glove BD Service | $6,000 | **TOP** |
-| 2 | peter@valorgovcon.com | Product Supplier Program | $997 | **TOP** |
-| 3 | founder@siemable.com | Ultimate Giant Bundle | $1,497 | **TOP** |
-| 4 | kydun00@yahoo.com | Ultimate Giant Bundle | $1,497 | **TOP** |
-| 5 | miazhud1111@gmail.com | Ultimate + Pro Giant Bundle | $1,497 | **TOP** |
-| 6 | coaching@familylifeenhancement.com | Federal Contractor Database | $497 | HIGH |
-| 7 | gmo003@hotmail.com | Recompete Contracts Tracker | $397 | HIGH |
-| 8 | brian.smith@ioausa.com | Recompete Contracts Tracker | $397 | HIGH |
-| 9 | rhendricks@horrangi.com | Tool Bundle + Recompete | $946 | HIGH |
-| 10 | mccraighead@digital-logicllc.com | Tool Bundle Upgrade | $500 | HIGH |
-| 11 | arthur@alphadevinc.com | Market Assassin Standard | $297 | HIGH |
-| 12 | jhennings@footprintsfloors.com | Market Intelligence | $49 | HIGH (MI buyer!) |
-| 13 | altonseth@gmail.com | Alert Pro | $19 | HIGH (Alert buyer!) |
+| 1 | [email removed] | White Glove BD Service | $6,000 | **TOP** |
+| 2 | [email removed] | Product Supplier Program | $997 | **TOP** |
+| 3 | [email removed] | Ultimate Giant Bundle | $1,497 | **TOP** |
+| 4 | [email removed] | Ultimate Giant Bundle | $1,497 | **TOP** |
+| 5 | [email removed] | Ultimate + Pro Giant Bundle | $1,497 | **TOP** |
+| 6 | [email removed] | Federal Contractor Database | $497 | HIGH |
+| 7 | [email removed] | Recompete Contracts Tracker | $397 | HIGH |
+| 8 | [email removed] | Recompete Contracts Tracker | $397 | HIGH |
+| 9 | [email removed] | Tool Bundle + Recompete | $946 | HIGH |
+| 10 | [email removed] | Tool Bundle Upgrade | $500 | HIGH |
+| 11 | [email removed] | Market Assassin Standard | $297 | HIGH |
+| 12 | [email removed] | Market Intelligence | $49 | HIGH (MI buyer!) |
+| 13 | [email removed] | Alert Pro | $19 | HIGH (Alert buyer!) |
 
 ### Priority 2: Ultimate Bundle Buyers (Previous Cohort)
 
 | # | Email | Product | Paid |
 |---|-------|---------|------|
-| 14 | obi@attendantsinc.com | Ultimate GovCon Bundle | $1,000 |
-| 15 | colinn.me@gmail.com | Ultimate GovCon Bundle | $1,000 |
-| 16 | fernando.mercado@venerandavalor.com | Ultimate GovCon Bundle | $1,000 |
-| 17 | yvette@sharpernewaxe.com | Ultimate GovCon Bundle | $1,000 |
-| 18 | contact@blenaitechnologies.com | Ultimate GovCon Bundle | $1,000 |
-| 19 | service@clarityserves.com | Ultimate GovCon Bundle | $1,000 |
-| 20 | sylwiak@hjgovcontractingcorp.com | Ultimate GovCon Bundle | $1,000 |
+| 14 | [email removed] | Ultimate GovCon Bundle | $1,000 |
+| 15 | [email removed] | Ultimate GovCon Bundle | $1,000 |
+| 16 | [email removed] | Ultimate GovCon Bundle | $1,000 |
+| 17 | [email removed] | Ultimate GovCon Bundle | $1,000 |
+| 18 | [email removed] | Ultimate GovCon Bundle | $1,000 |
+| 19 | [email removed] | Ultimate GovCon Bundle | $1,000 |
+| 20 | [email removed] | Ultimate GovCon Bundle | $1,000 |
 
 ### Priority 3: Recent Tool Buyers (Last 3 Months)
 
 | # | Email | Product | Paid |
 |---|-------|---------|------|
-| 21 | al@agclipperinc.com | Opportunity Hunter Pro | $49 |
-| 22 | jason.gunn5@yahoo.com | Opportunity Hunter Pro | $49 |
-| 23 | azubike@udokaenterprises.com | Recompete Contracts Tracker | $397 |
-| 24 | austin@durhambrandco.com | Federal Contractor Database | $497 |
-| 25 | jsumrall@diamondscaffold.com | Federal Contractor Database | $497 |
+| 21 | [email removed] | Opportunity Hunter Pro | $49 |
+| 22 | [email removed] | Opportunity Hunter Pro | $49 |
+| 23 | [email removed] | Recompete Contracts Tracker | $397 |
+| 24 | [email removed] | Federal Contractor Database | $497 |
+| 25 | [email removed] | Federal Contractor Database | $497 |
 
 **Total: 25 contacts**
 **Focus on Priority 1 first (13 contacts) — these are your highest-value recent customers.**

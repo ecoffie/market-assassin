@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { forecastWriterClient } from '@/lib/forecasts/writer';
 import { sendOpsAlert } from '@/lib/ops-alert';
 import { runNasaIngest } from '@/lib/forecasts/nasa-ingest';
+import { hasValidCronSecret } from '@/lib/cron/cron-request-auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -16,7 +17,7 @@ export const maxDuration = 300;
 export async function GET(request: NextRequest) {
   const auth = request.headers.get('authorization');
   const pw = request.nextUrl.searchParams.get('password');
-  if (auth !== `Bearer ${process.env.CRON_SECRET}` && pw !== process.env.ADMIN_PASSWORD) {
+  if (!hasValidCronSecret(request) && pw !== process.env.ADMIN_PASSWORD) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
   const apply = request.nextUrl.searchParams.get('dry') !== '1';

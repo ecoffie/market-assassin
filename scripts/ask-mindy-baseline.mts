@@ -8,6 +8,9 @@
  *
  *   npx tsx scripts/ask-mindy-baseline.mts --host http://localhost:3000 --email <staff pro> [--token <MI token>|MI_AUTH_TOKEN] [--out <dir>] [--only R1,R3]
  *   npx tsx scripts/ask-mindy-baseline.mts --regrade <dir>      # re-score saved runs, no LLM calls
+ *   npx tsx scripts/ask-mindy-baseline.mts --compare <beforeDir> <afterDir> [--md <file>]
+ *       # before/after grade table from two runs' summary.json (or the fixture's official baseline via
+ *       # --compare official <afterDir>); exits 1 on any regression — a regression blocks release
  *
  * - A partial is reported separately and never counted as a pass.
  * - Output goes OUTSIDE the repo by default (answers can carry customer-adjacent data).
@@ -18,6 +21,7 @@ import { readFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { grade, type Scenario, type ToolEvidence } from '../src/lib/chat/eval/grade';
+import { compareRuns, type GradeRow } from '../src/lib/chat/eval/compare';
 
 const arg = (k: string, d?: string) => {
   const i = process.argv.indexOf(`--${k}`);
@@ -86,6 +90,21 @@ function report(rows: Array<{ id: string; verdict: string; failures: string[]; p
   console.log(`\n${n('pass')} pass, ${n('partial')} partial, ${n('fail')} fail (partials are not passes)`);
   if (fixture.official_baseline) console.log(`official baseline: ${JSON.stringify(fixture.official_baseline.result)}`);
   return n('pass') === rows.length;
+}
+
+const compareIdx = process.argv.indexOf('--compare');
+if (compareIdx > -1) {
+  const [beforeArg, afterArg] = process.argv.slice(compareIdx + 1, compareIdx + 3);
+  if (!beforeArg || !afterArg) { console.error('Usage: --compare <beforeDir|official> <afterDir> [--md <file>]'); process.exit(2); }
+  const load = (d: string): GradeRow[] => d === 'official'
+    ? Object.entries(fixture.official_baseline?.per_scenario ?? {}).map(([id, verdict]) => ({ id, verdict: verdict as GradeRow['verdict'] }))
+    : (JSON.parse(readFileSync(join(d, 'summary.json'), 'utf8')) as { rows: GradeRow[] }).rows;
+  const c = compareRuns(load(beforeArg), load(afterArg));
+  console.log(c.table);
+  console.log(`\n${c.summary}`);
+  const md = arg('md');
+  if (md) writeFileSync(md, `${c.table}\n\n${c.summary}\n`);
+  process.exit(c.regressions.length ? 1 : 0);
 }
 
 const regrade = arg('regrade');

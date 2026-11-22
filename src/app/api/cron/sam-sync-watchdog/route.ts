@@ -20,6 +20,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { sendOpsAlert } from '@/lib/ops-alert';
+import { hasValidCronSecret } from '@/lib/cron/cron-request-auth';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
@@ -300,7 +301,7 @@ export async function GET(request: NextRequest) {
 
   // Allow cron or password auth
   const authHeader = request.headers.get('authorization');
-  const isCron = authHeader === `Bearer ${process.env.CRON_SECRET}`;
+  const isCron = hasValidCronSecret(request);
   const isAdmin = password === ADMIN_PASSWORD;
 
   if (!isCron && !isAdmin) {

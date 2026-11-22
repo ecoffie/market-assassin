@@ -6,13 +6,15 @@
  *   node scripts/batch-enroll-alerts.js --dry-run     # Preview only
  *   node scripts/batch-enroll-alerts.js               # Execute enrollment
  *
- * Enrolls users from data/bootcamp-attendees-to-enroll.txt into MI Free tier
+ * Enrolls users from the private attendee list ($MINDY_PRIVATE_DIR/bootcamp-attendees-to-enroll.txt) into MI Free tier
  * with default NAICS codes for daily alerts.
  *
  * Uses UPSERT with on_conflict to skip existing users.
  */
 
 const fs = require('fs');
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { privatePath } = require('./lib/private-path');
 const path = require('path');
 
 // Supabase config
@@ -35,7 +37,8 @@ async function main() {
   console.log('');
 
   // Read email list
-  const dataPath = path.join(__dirname, '../data/bootcamp-attendees-to-enroll.txt');
+  // Private input (never in the repository): MINDY_PRIVATE_DIR/bootcamp-attendees-to-enroll.txt
+  const dataPath = privatePath('bootcamp-attendees-to-enroll.txt');
   if (!fs.existsSync(dataPath)) {
     console.error(`File not found: ${dataPath}`);
     process.exit(1);

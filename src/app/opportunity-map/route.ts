@@ -16,7 +16,7 @@ import { INDUSTRY_PRESETS } from '@/lib/industry-presets';
 import { decodeFSC } from '@/lib/codes/fsc';
 import { DIBBS_MAP_ENABLED } from '@/lib/dibbs/availability';
 import { OPPORTUNITY_MAP_TEMPLATE } from './template-html';
-import { buildOppShareMeta, fetchOppShareRow, isNoticeId, renderOppShareHead } from '@/lib/opportunities/share-metadata';
+import { applyMapHead, buildOppShareMeta, fetchOppShareRow, isNoticeId, renderOppShareHead } from '@/lib/opportunities/share-metadata';
 import { ACCOUNT_MENU_CSS, ACCOUNT_MENU_JS } from './account-menu';
 import { siteTopHtml, SITE_NAV_CSS } from '@/lib/public-site/site-nav';
 import { MP_ACCOUNT_OVERRIDES_CSS, mpTokenDeclarations } from '@/lib/public-site/css';
@@ -265,7 +265,7 @@ const MORE_FILTERS = '<div class="mfwrap">'
   + '<div class="mf-sec mf-value mfv-recompete" id="mfValueSec" style="display:none">Contract value</div>'
   + '<div class="mf-range mf-value mfv-recompete" id="mfValueRange" style="display:none">'
   +   '<label class="mf-field"><span>Min</span><select class="mf-in" id="mfValueMin"><option value="">No min</option><option value="25000">$25K</option><option value="100000">$100K</option><option value="1000000">$1M</option><option value="5000000">$5M</option><option value="10000000">$10M</option><option value="25000000">$25M</option><option value="100000000">$100M</option></select></label>'
-  +   '<span class="mf-dash">\\u2013</span>'
+  +   '<span class="mf-dash">–</span>'
   +   '<label class="mf-field"><span>Max</span><select class="mf-in" id="mfValueMax"><option value="">No max</option><option value="1000000">$1M</option><option value="5000000">$5M</option><option value="10000000">$10M</option><option value="25000000">$25M</option><option value="100000000">$100M</option><option value="500000000">$500M</option></select></label>'
   + '</div>'
   + '<select class="mf-value mfv-recompete" id="mfValue" style="display:none" hidden></select>'
@@ -1107,6 +1107,13 @@ const ZLAYOUT_CSS = '<style>'
   // filter bar below (.ztop, z 1001) covered its top items on desktop (Eric 2026-11-13: "when i
   // click my icon on the top right i cant see the entire menu"). Phone already used 1100.
   + '.zhead{grid-area:zhead;position:relative;display:flex;flex-direction:column;background:#fff;z-index:1100;' + mpTokenDeclarations() + '}'
+  // The homepage ☰ menu (.mp-menu, site-nav.ts) opens INSIDE this header, so its own z-index is capped
+  // by the header's 1100. On a phone the map's bottom results sheet (#mToggle 1400), the selected-pin
+  // card (#mCard 1300) and Save search (1200) sat over the open menu and covered its last item, the
+  // "Start 14-day free trial" button (a tap hit the sheet instead). While that menu is open the header
+  // rises above the map's own chrome (incl. the listing drawer 1500 and map drawer 1600), and stays
+  // under user-opened overlays: Ask Mindy (2600) and the filter pop-overs (3000).
+  + 'html.mp-menu-open .zhead{z-index:1700!important}'
   // The phone-only row under the homepage bar that holds the map menu button. Hidden on desktop.
   + '.zh-maprow{display:none;align-items:center;gap:14px;border-bottom:1px solid var(--line);background:#fff}'
   // far-left icon rail — PINNED (position:fixed) so grid/overflow can never push it off-screen.
@@ -1298,6 +1305,11 @@ const ZLAYOUT_CSS = '<style>'
   // elements (#mHam/#mToggle/#mDrawer) render on every viewport but are display:none
   // above 640px (see the base rules just below, gated by the same breakpoint).
   + '#mHam,#mToggle,#mDrawer,#mScrim,#mCard{display:none}'
+  // A phone turned sideways is 568–930px wide, so the ≤640px block below misses it, and the event
+  // banner (hidden on the map on phones, Eric 2026-11-12, because it covered the map) came back:
+  // 123px of a 342–380px-tall screen, leaving 92–130px of map (iPhone 13 / 15 Pro Max / Pixel 7
+  // landscape). Same rule for short touch screens only — desktop windows and tablets keep the banner.
+  + '@media(max-height:500px) and (pointer:coarse){.zhead .mp-evb-band{display:none!important}}'
   + '@media(max-width:640px){'
   // 1) Grid → single column. zmap + zcards share ONE cell (row 3); we toggle which is
   //    visible. Header row stays; the ztop (search+filters) row stays full-width.
@@ -1348,6 +1360,17 @@ const ZLAYOUT_CSS = '<style>'
   +   'body.m-list .mapwrap{visibility:hidden!important;pointer-events:none!important}'
   // Map controls (zoom, legend, attribution) sit above the bottom bar.
   +   '.mapwrap .leaflet-bottom{bottom:86px!important}'
+  // The tile-status notice ("Map tiles blocked by your network…", template.html) is not a Leaflet
+  // control, so the rule above never lifted it: at its 44px it sat under this bar and the attribution
+  // (iPhone SE: 0 of 3 rows visible; iPhone 13 / Pixel 7: 1 of 3). Lift it over both.
+  +   '.mapwrap .tilestatus{bottom:164px!important;max-width:calc(100% - 104px)!important}'
+  // The pin-colour legend (#mapLegend, template.html: bottom 12px) is not a Leaflet control either, so it
+  // sat entirely under the bottom bar on every phone (Open Now / Coming Back / Coming Soon unexplained).
+  // It goes just above the attribution row, left side, capped so it wraps before the zoom control
+  // (which starts ~44px from the right edge); the tile notice above sits over the legend, narrowed to
+  // clear the zoom control too.
+  +   '.mapwrap .maplegend{bottom:108px!important;max-width:calc(100% - 76px)}'
+  +   '.mapwrap .maplegend .lg-grp{flex-wrap:wrap;column-gap:10px;row-gap:4px}'
   // The map's count pill is mirrored into the bottom bar (#mToggleCount, same words, including
   // "N not shown on map"), so it is hidden here rather than shown twice.
   +   '#mapCount{display:none!important}'
@@ -10918,6 +10941,33 @@ const ASK_MINDY_CSS =
   + '.amk-in textarea:focus{border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.12)}'
   + '.amk-send{flex:none;width:40px;height:40px;border:0;border-radius:11px;background:#2563eb;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center}'
   + '.amk-send:disabled{opacity:.45;cursor:default}.amk-send svg{width:18px;height:18px}'
+  + '.amk-stop{display:inline-block;margin-top:6px;border:1px solid #dde3ec;background:#fff;color:#334155;font:600 11.5px Inter,system-ui,sans-serif;border-radius:7px;padding:4px 10px;cursor:pointer}.amk-stop:hover{background:#f1f5f9}'
+  // ── In-chat REPORT PANE (create_document → read it here, no download). Sits beside the chat drawer on wide
+  // screens and over it on narrow ones. The report itself is the shared document engine's HTML in a
+  // script-less sandboxed iframe; Export menu lives in the open pane header.
+  + '.amk-rep{position:fixed;top:0;right:min(440px,94vw);height:100dvh;width:min(880px,calc(100vw - min(440px,94vw)));background:#fff;border-right:1px solid #e3e8ef;box-shadow:-10px 0 36px rgba(16,24,40,.14);z-index:2601;display:none;flex-direction:column}'
+  + '.amk-rep.show{display:flex}'
+  + '@media(max-width:900px){.amk-rep{right:0;width:100vw;z-index:2602}}'
+  + '.amk-rep-hd{display:flex;align-items:center;gap:10px;padding:11px 14px;border-bottom:1px solid #eef1f5;flex:none}'
+  + '.amk-rep-tt{flex:1;min-width:0;display:flex;flex-direction:column}.amk-rep-t{font:800 14.5px Inter,system-ui,sans-serif;color:#111c26;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;line-height:1.25}'
+  + '.amk-rep-v{font:500 11.5px Inter,system-ui,sans-serif;color:#64748b}'
+  + '.amk-rep-back{display:none;border:1px solid #dde3ec;background:#fff;color:#1d4ed8;font:600 12px Inter,system-ui,sans-serif;border-radius:8px;padding:6px 10px;cursor:pointer}'
+  + '@media(max-width:900px){.amk-rep-back{display:inline-block}}'
+  + '.amk-rep-exp{display:flex;align-items:center;gap:6px;flex:none;position:relative}.amk-rep-exp:empty{display:none}'
+  + '.amk-exp-menu{position:relative}.amk-exp-toggle{border:1px solid #dde3ec;background:#fff;color:#334155;font:600 12px Inter,system-ui,sans-serif;border-radius:8px;padding:5px 12px;cursor:pointer}.amk-exp-toggle:hover{background:#f1f5f9}.amk-exp-toggle[aria-expanded="true"]{background:#f1f5f9}'
+  + '.amk-exp-panel{position:absolute;right:0;top:calc(100% + 4px);z-index:5;min-width:160px;padding:6px;border:1px solid #dde3ec;border-radius:10px;background:#fff;box-shadow:0 8px 24px rgba(15,23,42,.12);display:flex;flex-direction:column;gap:2px}'
+  + '.amk-exp-panel[hidden]{display:none!important}.amk-exp-panel button{border:0;background:transparent;color:#334155;font:600 12px Inter,system-ui,sans-serif;border-radius:7px;padding:8px 10px;cursor:pointer;text-align:left}.amk-exp-panel button:hover{background:#f1f5f9}.amk-exp-panel button:disabled{opacity:.6;cursor:default}'
+  + '.amk-rep-err{flex:none;margin:0;padding:8px 14px;border-bottom:1px solid #fde2e2;background:#fef2f2;color:#b91c1c;font:500 12.5px Inter,system-ui,sans-serif}.amk-rep-err[hidden]{display:none}'
+  + '.amk-rep-note{font:500 11.5px Inter,system-ui,sans-serif;color:#64748b;max-width:220px;text-align:right}'
+  + '.amk-rep-x{border:0;background:none;color:#8595a6;cursor:pointer;font:400 24px/1 Inter,system-ui,sans-serif;padding:0 4px}'
+  + '.amk-rep-body{position:relative;flex:1;min-height:0;background:#f4f6fa;overflow:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}.amk-rep-f{position:absolute;inset:0;width:100%;height:100%;border:0;background:#fff}'
+  + '.amk-rep-msg{position:absolute;inset:0;display:none;align-items:center;justify-content:center;flex-direction:column;gap:10px;text-align:center;padding:24px;font:500 13.5px Inter,system-ui,sans-serif;color:#475569;background:#fff}'
+  + '.amk-rep-msg button{border:1px solid #bcd3fb;background:#eaf1fe;color:#1d4ed8;font:600 12px Inter,system-ui,sans-serif;border-radius:8px;padding:7px 12px;cursor:pointer}'
+  + '.amk-repbtn{flex:none;border:1px solid #bcd3fb;background:#eaf1fe;color:#1d4ed8;font:600 11.5px Inter,system-ui,sans-serif;border-radius:8px;padding:5px 10px;cursor:pointer;align-self:flex-start}'
+  + '.amk-repcard{margin-top:9px;border:1px solid #d3e2fc;background:#f5f9ff;border-radius:10px;padding:10px 12px;display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px}'
+  + '.amk-repcard-t{flex:1;min-width:150px;display:flex;flex-direction:column}.amk-repcard-t b{font:700 13px Inter,system-ui,sans-serif;color:#111c26;overflow-wrap:anywhere}.amk-repcard-t span{font:500 11.5px Inter,system-ui,sans-serif;color:#64748b}'
+  + '.amk-repcard-open{flex:none;border:0;background:#2563eb;color:#fff;font:700 12px Inter,system-ui,sans-serif;border-radius:8px;padding:7px 12px;cursor:pointer}'
+  + '@media(prefers-color-scheme:dark){.amk-repcard{background:#0d141d;border-color:#202b39}.amk-repcard-t b{color:#eaf1f8}}'
   + '.amk-up{text-align:center;padding:30px 20px}.amk-up h4{font:800 16px Inter;margin:0 0 6px;color:#111c26}.amk-up p{font:500 13px Inter;color:#6b7787;margin:0 0 14px}'
   + '.amk-up a{display:inline-block;background:#0a8f57;color:#fff;text-decoration:none;border-radius:10px;padding:10px 20px;font:700 13px Inter}'
   + '@media(prefers-color-scheme:dark){.amk{background:#111823}.amk-hd{border-color:#202b39}.amk-hd h3{color:#eaf1f8}.amk-msg.a{color:#eaf1f8}.amk-msg.a .bub{background:#0d141d;border-color:#202b39}.amk-msg.a .bub.md .md-h,.amk-msg.a .bub.md>p:first-child{color:#eaf1f8}.amk-msg.a .bub.md code{background:#18222f}.amk-msg.a .bub a{color:#7fb0ff}.amk-chips button{background:#0d141d;border-color:#202b39;color:#cdd8e4}.amk-foot{border-color:#202b39}.amk-in textarea{background:#0d141d;border-color:#202b39;color:#eaf1f8}.amk-empty b,.amk-up h4{color:#eaf1f8}.amk-act button{background:#122033;border-color:#1f3a5c}.amk-att{background:#122033;border-color:#1f3a5c;color:#cfe0ff}.amk-att .sp{background:#0d141d;border-color:#1f3a5c;color:#9ec2ff}.amk-ws{color:#7fb0ff}}';
@@ -10927,7 +10977,7 @@ const ASK_MINDY_HTML =
   + '<aside class="amk" id="amk" aria-hidden="true">'
   +   '<div class="amk-hd"><span class="mk"></span><div class="tt"><h3>Ask Mindy</h3><div class="amk-ctx" id="amkCtx"></div></div><button class="amk-x" id="amkX" aria-label="Close"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>'
   +   '<div class="amk-body" id="amkBody"></div>'
-  +   '<div class="amk-foot"><div class="amk-in"><textarea id="amkIn" rows="1" placeholder="Ask about this view&hellip;"></textarea>'
+  +   '<div class="amk-foot"><div class="amk-in"><textarea id="amkIn" rows="1" placeholder="Ask Mindy&hellip;"></textarea>'
   +     '<button class="amk-send" id="amkSend" aria-label="Send"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg></button></div></div>'
   + '</aside>';
 
@@ -10975,8 +11025,8 @@ const ASK_MINDY_JS = `<script>(function(){
   var foot=input&&input.parentNode&&input.parentNode.parentNode;
   var attEl=document.getElementById('amkAtt');
   if(!attEl&&foot&&input.parentNode){ attEl=document.createElement('div'); attEl.id='amkAtt'; foot.insertBefore(attEl,input.parentNode); }
-  var wsEl=document.getElementById('amkWs');
-  if(!wsEl&&foot){ wsEl=document.createElement('a'); wsEl.id='amkWs'; wsEl.className='amk-ws'; wsEl.href='/app?panel=chat'; wsEl.textContent='Open in full workspace \u2197'; foot.appendChild(wsEl); }
+  // Map Ask is the primary surface — no handoff link into the retiring /app chat panel.
+  // Reports open in the in-chat reading pane on this drawer.
   function syncAttached(){
     if(oppCtx) return;
     var s=window.__selectedOpp;
@@ -11034,16 +11084,6 @@ const ASK_MINDY_JS = `<script>(function(){
     }).catch(fail);
   }
   window.__onSelectedOpp=function(){ if(drawer.classList.contains('show')) syncAttached(); };
-  // Continue this conversation (and the attached notice) in the full Ask Mindy workspace. The panel reads
-  // mindy_chat_handoff once and does not auto-send. Inside the /app shell the frame hands this link to the
-  // parent window; standalone it navigates normally. Same-origin frames share sessionStorage.
-  if(wsEl) wsEl.addEventListener('click',function(){
-    try{ sessionStorage.setItem('mindy_chat_handoff',JSON.stringify({v:1,sessionId:oppCtx?'':(sessionId||''),
-      context:(attached&&!oppCtx)?{kind:'opportunity',notice_id:attached.id,title:attached.title,deadline:attached.deadline}:(oppCtx?{kind:'opportunity',notice_id:oppCtx.id,title:oppCtx.title,deadline:oppCtx.deadline}:null)})); }catch(e){}
-    // So the App workspace can offer "Back to Map" without dropping this conversation.
-    try{ sessionStorage.setItem('mindy_chat_from_map','1'); }catch(e){}
-    try{ if(window.__track) window.__track('tool_use','ask_mindy_open_workspace',{attached:!!(attached||oppCtx)}); }catch(e){}
-  });
   // CHARGE ONCE PER QUESTION: every card question gets a stable turn id. It is saved here as "pending" BEFORE
   // the request and cleared only when the answer has fully arrived, so a dropped connection, a refresh or a
   // reopen asks the server for THAT question again (same id): the server returns the saved answer for free
@@ -11088,16 +11128,20 @@ const ASK_MINDY_JS = `<script>(function(){
   function renderCtx(){ if(!ctxEl)return;
     var about=oppCtx||attached;
     if(about){ ctxEl.innerHTML='<span class="dim">About:</span> '+esc(about.title||'this opportunity')+(about.deadline?' <span class="dim">\\u00b7 due '+esc(String(about.deadline).slice(0,10))+'</span>':''); return; }
-    var c=viewCtx(); var parts=ctxParts(c);
-    ctxEl.innerHTML='<span class="dim">Context:</span> '+parts.map(esc).join(' \\u00b7 '); }
-  // Threaded to the chat so answers are about THIS view — a compact, factual preface (no invented numbers).
-  function ctxPreamble(){ var c=viewCtx(); var parts=ctxParts(c); if(!parts.length)return '';
-    return '[Current map view \\u2014 '+parts.join('; ')+'. '+ctxLocation(c)+' Answer for THIS view when the question is about "these"/"this"/"here": use this location, not the user\\'s saved profile locations, and do not choose a city the user did not name.]\\n\\n'; }
+    // Product decision 2026-11-19: Map and Ask Mindy are separate tools. Do not show map viewport
+    // geography as Ask "Context" — that made Mid-Atlantic pins bind company market research.
+    ctxEl.innerHTML=''; }
+  // Kept for tests / dead call sites that still name it. Always empty: Ask messages are the customer's
+  // words only (no map-view injection).
+  function ctxPreamble(){ return ''; }
   // NARROW-PANEL DISPLAY (2026-11-16 parity audit): the drawer is ~420px wide, so every request says so with
   // display:'narrow_panel'. The server adds the presentation rule (answer first, short sections) to the answer
   // prompt as a SYSTEM note (src/lib/chat/display-hint.ts). It is never part of the message, so it is never
   // stored as the customer's words or read as their intent (review F3).
-  function setOpen(o){ ov.classList.toggle('show',o); drawer.classList.toggle('show',o); drawer.setAttribute('aria-hidden',o?'false':'true'); if(o){ syncAttached(); if(!body.children.length){ if(oppCtx)greetCard(); else greet(); } setTimeout(function(){ input&&input.focus(); },220); } }
+  function setOpen(o){ ov.classList.toggle('show',o); drawer.classList.toggle('show',o); drawer.setAttribute('aria-hidden',o?'false':'true'); if(o){ syncAttached(); if(!body.children.length){ if(oppCtx)greetCard(); else greet(); } setTimeout(function(){ if(input&&!repIsOpen()) input.focus(); },220);
+    // Return later: the report left open comes back with the drawer (view mode only; card chat is about one notice).
+    if(oppCtx){ repHide(false); } else { var rs=repRead(); if(rs){ rep=Object.assign({},rep||{},rs); if(rs.open) repOpen(rs.id); } syncRepBtn(); } }
+    else { repHide(false); } }
   function greetCard(){
     var chips=[['What does it require?','Summarize what this solicitation requires: scope, deliverables, and key dates.'],
       ['Who held this before?','Who held this work before, and what did the prior contract cost?'],
@@ -11124,24 +11168,12 @@ const ASK_MINDY_JS = `<script>(function(){
     if(pendingTurn){ var pd=pendingTurn; ask(pd.q,{turnId:pd.turnId,replay:true}); }
   };
   function greet(){
-    var c=viewCtx();
-    // View-aware follow-up chips — data-core only, NO teaching. Adapt the wording to what\\u2019s in view.
-    var chips=[];
-    if(c.count>0){ chips.push(['Who buys the most here?','Which agencies buy the most in this view? Name them with their spend.']);
-      chips.push(['Who wins these?','Which firms win the most contracts in this view? List the top incumbents.']); }
-    else { chips.push(['Who buys 541512 work?','Which agencies buy the most NAICS 541512 (custom computer programming) work?']);
-      chips.push(['Find the incumbent','How do I find who currently holds a contract before it recompetes?']); }
-    chips.push(['Write a capability statement','What should my capability statement include for the agencies in this view?']);
-    var h='<div class="amk-empty"><b>Ask about what you\\u2019re looking at</b><div class="lead">Agencies, incumbents, set-asides, teaming \\u2014 answered from live federal data for this view.</div><div class="amk-chips">';
-    chips.forEach(function(ch){ h+='<button data-q="'+esc(ch[1])+'">'+esc(ch[0])+'</button>'; });
-    h+='</div></div>';
-    body.innerHTML=h;
-    Array.prototype.forEach.call(body.querySelectorAll('.amk-chips button'),function(b){ b.onclick=function(){ ask(b.getAttribute('data-q')); }; });
+    // Blank start (2026-11-20): no starter prompt ideas. The input is the product.
+    // Opportunity-card opens still use greetCard() (scoped shortcuts for that notice).
+    body.innerHTML='<div class="amk-empty" data-testid="amk-blank" aria-hidden="true"></div>';
   }
   // Public opener (does NOT auto-send). An explicit question (typed in the search bar, then "Ask") goes into the
-  // box as the customer's own words. The map's search term only becomes the HINT: it already reaches the answer
-  // through the view preamble, and putting it in the box made "click in and type" send the two glued together
-  // ("hvac servicesFind HVAC\\u2026", D7, Agent 4 live scorecard 2026-11-16). What is sent = what is in the box.
+  // box as the customer's own words. What is sent = what is in the box (map filters are not injected).
   // A later open without a seed clears the box only if it still holds the text the opener itself put there
   // (openerSeed); a draft the customer typed is kept.
   var openerSeed='';
@@ -11160,7 +11192,7 @@ const ASK_MINDY_JS = `<script>(function(){
   };
   var x=document.getElementById('amkX'); if(x)x.onclick=function(){ setOpen(false); };
   ov.onclick=function(){ setOpen(false); };
-  document.addEventListener('keydown',function(e){ if(e.key==='Escape'&&drawer.classList.contains('show'))setOpen(false); });
+  document.addEventListener('keydown',function(e){ if(e.key==='Escape'&&drawer.classList.contains('show')){ if(repIsOpen()){ repHide(true); return; } setOpen(false); } });
   // Auto-grow the textarea + Enter-to-send (Shift+Enter = newline).
   if(input){ input.addEventListener('input',function(){ input.style.height='auto'; input.style.height=Math.min(input.scrollHeight,120)+'px'; });
     input.addEventListener('keydown',function(e){ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); ask(input.value); } }); }
@@ -11176,7 +11208,7 @@ const ASK_MINDY_JS = `<script>(function(){
   function buildAttach(){
     var foot=drawer.querySelector('.amk-foot'); if(!foot)return;
     var row=document.createElement('div'); row.className='amk-attach'; row.setAttribute('data-testid','amk-attach');
-    row.innerHTML='<div class="amk-docs"></div><div class="amk-attach-bar"><input type="file" accept=".pdf,.docx,.txt,.xlsx,.xls,.csv" hidden><button type="button" class="amk-clip">Attach</button><span class="amk-priv">Saved privately to your Vault</span></div><div class="amk-attach-err" role="alert"></div>';
+    row.innerHTML='<div class="amk-docs"></div><div class="amk-attach-bar"><input type="file" accept=".pdf,.docx,.txt,.xlsx,.xls,.csv" hidden><button type="button" class="amk-clip">Attach</button><span class="amk-priv">Saved privately</span></div><div class="amk-attach-err" role="alert"></div>';
     foot.insertBefore(row, foot.firstChild);
     var fileIn=row.querySelector('input'), clip=row.querySelector('.amk-clip'), docsEl=row.querySelector('.amk-docs'), errEl=row.querySelector('.amk-attach-err');
     function uuid(){ try{ if(window.crypto&&crypto.randomUUID) return crypto.randomUUID(); }catch(e){} var h='0123456789abcdef',x=''; for(var i=0;i<32;i++){ x+=h.charAt(Math.floor(Math.random()*16)); } return x.slice(0,8)+'-'+x.slice(8,12)+'-4'+x.slice(13,16)+'-8'+x.slice(17,20)+'-'+x.slice(20,32); }
@@ -11208,6 +11240,187 @@ const ASK_MINDY_JS = `<script>(function(){
         .then(function(d){ if(d && d.uploads===true && !amkDocs) buildAttach(); },function(){});
     }catch(e){}
   }
+  // ── REPORT PANE. A document Mindy just saved (create_document) opens HERE, in the chat, as a readable page:
+  // no download needed. Reuses the Vault: GET /api/app/vault/documents/preview renders the stored DocModel with
+  // the same engine that made the PDF/Word, owner-scoped. Export (PDF/Word/Excel/CSV) is a menu in the open pane.
+  // A revision is a NEW Vault row (the old version stays); its deliverables
+  // event simply replaces what the pane shows. The open document (and the signed source ledger that lets the
+  // next "revise it" resolve it) is kept in localStorage per account + workspace, so it is still there tomorrow.
+  var REP_KEY='mindy_map_report', rep=null, repEls=null, repSeq=0, repBtn=null;
+  var FMT_LABEL={pdf:'PDF',docx:'Word',xlsx:'Excel',csv:'CSV'}, FMT_ORDER=['pdf','docx','xlsx','csv'];
+  var UUID_RX=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  function wsKey(){ try{ return localStorage.getItem('mindy_active_workspace')||''; }catch(e){ return ''; } }
+  function repRead(){ try{ var j=JSON.parse(localStorage.getItem(REP_KEY)||'null');
+    if(j&&typeof j==='object'&&j.email&&j.email===email()&&(j.ws||'')===wsKey()&&UUID_RX.test(String(j.id||''))) return j; }catch(e){} return null; }
+  function repWrite(){ try{ if(rep) localStorage.setItem(REP_KEY,JSON.stringify(rep)); else localStorage.removeItem(REP_KEY); }catch(e){} }
+  // One chip per format (highest version wins). Sibling preview queries + rewrite retries
+  // used to push five "PDF" buttons into the header and crush the title.
+  function cleanFiles(list){ var by={};
+    (Array.isArray(list)?list:[]).forEach(function(f){
+      if(!f||typeof f!=='object') return;
+      var id=String(f.document_id||''), fm=String(f.format||'').toLowerCase();
+      if(!UUID_RX.test(id)||!FMT_LABEL[fm]) return;
+      var ver=(typeof f.version==='number'?f.version:0);
+      var cur=by[fm];
+      if(!cur||ver>=cur.version) by[fm]={format:fm,document_id:id,file_name:String(f.file_name||'').slice(0,160),version:ver};
+    });
+    return FMT_ORDER.filter(function(fm){ return !!by[fm]; }).map(function(fm){ return by[fm]; }); }
+  function primaryId(files){ for(var i=0;i<files.length;i++){ if(files[i].format==='docx') return files[i].document_id; } return files.length?files[0].document_id:''; }
+  function authHdrs(){ return withWorkspace({'x-mi-auth-token':tok()||'','x-user-email':email()}); }
+  // Download one saved file: the existing Vault route mints a 60-second signed URL (attachment).
+  // Claude/ChatGPT pattern: formats live behind Export in the OPEN report pane — never on the chat card.
+  function repError(text){ var E=ensurePane(); E.err.textContent=text||''; E.err.hidden=!text; }
+  function exportFile(file,btn){
+    var label=btn.textContent; btn.disabled=true; btn.textContent='Preparing...'; repError('');
+    fetch('/api/app/vault/documents/download?email='+encodeURIComponent(email())+'&id='+encodeURIComponent(file.document_id),{headers:authHdrs()})
+      .then(function(r){ return r.ok?r.json():null; },function(){ return null; })
+      .then(function(d){ if(d&&d.url){ try{ if(window.__track) window.__track('tool_use','map_report_export',{format:file.format}); }catch(e){} location.href=d.url; } else { btn.textContent='Try again'; repError('The '+FMT_LABEL[file.format]+' file could not be prepared. Try again, or reopen the report from your Vault.'); } },function(){ btn.textContent='Try again'; repError('The file could not be prepared. Check your connection and try again.'); })
+      .then(function(){ btn.disabled=false; if(btn.textContent==='Preparing...') btn.textContent=label; });
+  }
+  // Packaged market report: a real PDF from /reports/<id>/pdf (same renderer as the hosted page). Fetched
+  // here, OUTSIDE the script-less preview frame, and saved as a file; a failure shows the server's message.
+  var REPORT_ID_RX=/^[A-Za-z0-9_-]{16,64}$/;
+  function downloadReportPdf(reportId,btn){
+    var label=btn.textContent; btn.disabled=true; btn.textContent='Preparing PDF...'; repError('');
+    var fail=function(msg){ btn.textContent='Try again'; repError(msg||'The PDF could not be created. Try again in a minute.'); };
+    fetch('/reports/'+encodeURIComponent(reportId)+'/pdf',{headers:{Accept:'application/pdf, application/json'}})
+      .then(function(r){
+        var ct=r.headers.get('content-type')||'';
+        if(r.ok&&ct.indexOf('application/pdf')===0){
+          var m=/filename="([^"]+)"/.exec(r.headers.get('content-disposition')||'');
+          return r.blob().then(function(b){
+            if(!b||!b.size){ fail(); return; }
+            var u=URL.createObjectURL(b), a=document.createElement('a'); a.href=u; a.download=(m&&m[1])||'market-report.pdf';
+            a.setAttribute('data-testid','amk-report-pdf-link'); document.body.appendChild(a); a.click();
+            setTimeout(function(){ URL.revokeObjectURL(u); if(a.parentNode) a.parentNode.removeChild(a); },1000);
+            btn.textContent=label;
+            try{ if(window.__track) window.__track('tool_use','map_report_export',{format:'pdf',source:'market_report'}); }catch(e){}
+          });
+        }
+        return r.json().then(function(j){ fail(j&&typeof j.message==='string'?j.message:''); },function(){ fail(); });
+      },function(){ fail('The PDF could not be downloaded. Check your connection and try again.'); })
+      .then(function(){ btn.disabled=false; if(btn.textContent==='Preparing PDF...') btn.textContent=label; });
+  }
+  // items: [{label, fmt, run(btn)}]
+  function exportMenu(items,host){
+    host.innerHTML=''; if(!items.length) return;
+    var wrap=document.createElement('div'); wrap.className='amk-exp-menu'; wrap.setAttribute('data-testid','amk-export-menu');
+    var toggle=document.createElement('button'); toggle.type='button'; toggle.className='amk-exp-toggle'; toggle.setAttribute('data-testid','amk-export-toggle'); toggle.setAttribute('aria-expanded','false'); toggle.textContent='Export';
+    var panel=document.createElement('div'); panel.className='amk-exp-panel'; panel.hidden=true; panel.setAttribute('role','menu');
+    items.forEach(function(it){
+      var b=document.createElement('button'); b.type='button'; b.setAttribute('data-fmt',it.fmt); b.setAttribute('role','menuitem'); b.textContent=it.label;
+      b.onclick=function(){ it.run(b); panel.hidden=true; toggle.setAttribute('aria-expanded','false'); };
+      panel.appendChild(b);
+    });
+    toggle.onclick=function(){ var open=panel.hidden; panel.hidden=!open; toggle.setAttribute('aria-expanded',open?'true':'false'); };
+    wrap.appendChild(toggle); wrap.appendChild(panel); host.appendChild(wrap);
+  }
+  function fileItems(files){ return files.map(function(f){ return {label:FMT_LABEL[f.format],fmt:f.format,run:function(b){ exportFile(f,b); }}; }); }
+  // Preview HTML goes into the script-less frame. Its own "Save as PDF" button (window.print) cannot run
+  // there, so it is hidden; Export in the pane header is the working path.
+  function repSetDoc(E,html){
+    var hide='<style>.pdfbtn{display:none!important}</style>';
+    E.f.srcdoc=/<[/]head>/i.test(html)?html.replace(/<[/]head>/i,hide+'</head>'):hide+html;
+    E.f.style.visibility='visible'; E.msg.style.display='none'; repError('');
+  }
+  function ensurePane(){
+    if(repEls) return repEls;
+    var el=document.createElement('aside'); el.className='amk-rep'; el.id='amkRep'; el.setAttribute('aria-hidden','true'); el.setAttribute('role','dialog'); el.setAttribute('aria-label','Report'); el.setAttribute('data-testid','amk-report-pane');
+    el.innerHTML='<div class="amk-rep-hd"><button type="button" class="amk-rep-back">Back to chat</button><div class="amk-rep-tt"><b class="amk-rep-t"></b><span class="amk-rep-v"></span></div><div class="amk-rep-exp"></div><button type="button" class="amk-rep-x" aria-label="Close report">&times;</button></div><p class="amk-rep-err" role="alert" data-testid="amk-report-error" hidden></p><div class="amk-rep-body"><iframe class="amk-rep-f" sandbox="" title="Report"></iframe><div class="amk-rep-msg"></div></div>';
+    document.body.appendChild(el);
+    repEls={el:el,t:el.querySelector('.amk-rep-t'),v:el.querySelector('.amk-rep-v'),exp:el.querySelector('.amk-rep-exp'),f:el.querySelector('.amk-rep-f'),msg:el.querySelector('.amk-rep-msg'),err:el.querySelector('.amk-rep-err')};
+    // Keyboard reading: once a report has loaded, focus moves into it so Space / Page Down / arrows scroll it
+    // (focus used to stay in the chat box, so the keys typed there and the report never moved).
+    repEls.f.addEventListener('load',function(){ if(repIsOpen()&&repEls.f.style.visibility==='visible'){ try{ repEls.f.focus(); }catch(e){} } });
+    el.querySelector('.amk-rep-x').onclick=function(){ repHide(true); };
+    el.querySelector('.amk-rep-back').onclick=function(){ repHide(true); };
+    return repEls;
+  }
+  function repIsOpen(){ return !!(repEls&&repEls.el.classList.contains('show')); }
+  function syncRepBtn(){
+    var hd=drawer.querySelector('.amk-hd'), xb=document.getElementById('amkX'); if(!hd) return;
+    if(rep&&!repIsOpen()&&!oppCtx){
+      if(!repBtn){ repBtn=document.createElement('button'); repBtn.type='button'; repBtn.className='amk-repbtn'; repBtn.setAttribute('data-testid','amk-report-btn'); repBtn.textContent='Report'; repBtn.title='Open your report'; repBtn.onclick=function(){ if(rep) repOpen(rep.id); }; }
+      if(!repBtn.parentNode) hd.insertBefore(repBtn,xb||null);
+    } else if(repBtn&&repBtn.parentNode){ repBtn.parentNode.removeChild(repBtn); }
+  }
+  // user=true: the reader closed it (remembered); false: the drawer closed or card mode took over (restored on reopen).
+  function repHide(user){ repSeq++; if(repEls){ repEls.el.classList.remove('show'); repEls.el.setAttribute('aria-hidden','true'); } if(user&&rep){ rep.open=false; repWrite(); } syncRepBtn(); }
+  function repMessage(text,retryId){
+    var E=ensurePane(); E.msg.innerHTML=''; E.msg.style.display='flex'; E.f.style.visibility='hidden';
+    var p=document.createElement('div'); p.textContent=text; E.msg.appendChild(p);
+    if(retryId){ var b=document.createElement('button'); b.type='button'; b.textContent='Try again'; b.onclick=function(){ repOpen(retryId); }; E.msg.appendChild(b); }
+  }
+  function repOpen(id){
+    var t=tok(), em=email(); if(!UUID_RX.test(String(id||''))||!t||!em) return;
+    var E=ensurePane(), seq=++repSeq;
+    E.el.classList.add('show'); E.el.setAttribute('aria-hidden','false');
+    if(rep){ rep.open=true; repWrite(); }
+    syncRepBtn(); repMessage('Loading your report...');
+    fetch('/api/app/vault/documents/preview?email='+encodeURIComponent(em)+'&id='+encodeURIComponent(id),{headers:authHdrs()})
+      .then(function(r){
+        if(r.status===404){ return {gone:true}; }
+        if(!r.ok) throw new Error('preview '+r.status);
+        return r.json();
+      })
+      .then(function(j){
+        if(seq!==repSeq) return; // a newer open (a revision) replaced this one
+        if(j&&j.gone){ if(rep&&rep.id===id){ rep=null; repWrite(); } repMessage('This report is no longer available. Ask Mindy to create it again.'); syncRepBtn(); return; }
+        if(!j||!j.success||typeof j.html!=='string') throw new Error('preview shape');
+        repSetDoc(E,j.html);
+        E.t.textContent=String(j.title||'Report'); E.v.textContent='Version '+(j.version||1)+' - saved in your Vault';
+        var files=cleanFiles(j.files); if(!files.length&&rep) files=cleanFiles(rep.files);
+        exportMenu(fileItems(files),E.exp);
+        rep=Object.assign({},rep||{},{email:em,ws:wsKey(),id:id,title:String(j.title||''),version:j.version||1,files:files,open:true}); repWrite();
+        try{ if(window.__track) window.__track('tool_use','map_report_open',{version:j.version||1}); }catch(e){}
+      })
+      .catch(function(){ if(seq===repSeq) repMessage('The report could not be loaded. Check your connection and try again.',id); });
+  }
+  // The reply that created or revised a document: a card under the answer + the pane opens on the new version.
+  function repOnDeliverables(list,aEl){
+    var files=cleanFiles(list); var id=primaryId(files); if(!id) return;
+    var prim=files.filter(function(f){ return f.document_id===id; })[0]||files[0];
+    var ver=0; files.forEach(function(f){ if(f.version>ver) ver=f.version; });
+    rep={email:email(),ws:wsKey(),id:id,title:'',version:ver||1,files:files,ledger:(rep&&rep.ledger)||null,open:true}; repWrite();
+    var w=document.createElement('div'); w.className='amk-repcard'; w.setAttribute('data-testid','amk-report-card');
+    w.innerHTML='<div class="amk-repcard-t"><b></b><span></span></div><button type="button" class="amk-repcard-open">Open report</button>';
+    w.querySelector('b').textContent=(prim.file_name||'Your report').replace(/[.](pdf|docx|xlsx|csv)$/i,'');
+    w.querySelector('span').textContent='Version '+(ver||1)+' - saved to your Vault';
+    w.querySelector('.amk-repcard-open').onclick=function(){ repOpen(id); };
+    aEl.appendChild(w); body.scrollTop=body.scrollHeight;
+    repOpen(id);
+  }
+  // Packaged generate_market_report deliverable (Mindy IP — same engine as MCP). Opens the Ask
+  // report pane from the inline HTML; optional hosted /reports/<id> link for sharing.
+  function repOnMarketReport(ev,aEl){
+    var html=typeof ev.html==='string'?ev.html:''; if(!html) return;
+    var title=String(ev.title||'Market report').slice(0,160);
+    var url=typeof ev.url==='string'?ev.url:'';
+    var E=ensurePane(), seq=++repSeq;
+    E.el.classList.add('show'); E.el.setAttribute('aria-hidden','false');
+    repSetDoc(E,html);
+    E.t.textContent=title; E.v.textContent=url?'Packaged market report \\u00b7 shareable':'Packaged market report';
+    var reportId=typeof ev.report_id==='string'&&REPORT_ID_RX.test(ev.report_id)?ev.report_id:'';
+    function mrExport(){
+      var E3=ensurePane();
+      // PDF only: the one format this report has a real export for. Without a saved copy there is nothing to render.
+      exportMenu(reportId?[{label:'Download PDF',fmt:'pdf',run:function(b){ downloadReportPdf(reportId,b); }}]:[],E3.exp);
+      if(!reportId){ var n=document.createElement('span'); n.className='amk-rep-note'; n.setAttribute('data-testid','amk-report-no-export'); n.textContent='This report was not saved, so it cannot be downloaded. Ask Mindy to create it again.'; E3.exp.appendChild(n); }
+      if(url){ var a=document.createElement('a'); a.href=url; a.target='_blank'; a.rel='noopener'; a.textContent='Open hosted link'; a.style.cssText='font:600 12px Inter,system-ui,sans-serif;color:#1d4ed8;margin-left:4px'; E3.exp.appendChild(a); }
+    }
+    mrExport();
+    syncRepBtn();
+    var w=document.createElement('div'); w.className='amk-repcard'; w.setAttribute('data-testid','amk-report-card');
+    w.innerHTML='<div class="amk-repcard-t"><b></b><span></span></div><button type="button" class="amk-repcard-open">Open report</button>';
+    w.querySelector('b').textContent=title;
+    w.querySelector('span').textContent='Packaged research \\u00b7 same engine as MCP';
+    w.querySelector('.amk-repcard-open').onclick=function(){
+      var E2=ensurePane(); E2.el.classList.add('show'); E2.el.setAttribute('aria-hidden','false');
+      if(seq===repSeq||E2.f.srcdoc){ repSetDoc(E2,html); E2.t.textContent=title; mrExport(); }
+    };
+    aEl.appendChild(w); body.scrollTop=body.scrollHeight;
+    try{ if(window.__track) window.__track('tool_use','map_market_report_open',{}); }catch(e){}
+  }
   function addMsg(role, text){ var d=document.createElement('div'); d.className='amk-msg '+(role==='user'?'u':'a'); d.innerHTML=(role==='user')?esc(text):('<div class="bub"></div>'); if(role!=='user'){ var bb=d.querySelector('.bub'); if(text) paint(bb,text); else bb.textContent=''; } body.appendChild(d); body.scrollTop=body.scrollHeight; return d; }
   function upsell(){ body.innerHTML='<div class="amk-up"><h4>\\ud83d\\udd12 Ask Mindy is a Pro feature</h4><p>Get grounded, real-data answers on set-asides, agencies, opportunities, teaming and proposals \\u2014 with sources.</p><a href="/market-intelligence">Upgrade to Pro</a></div>'; }
   // opts (card chat only): turnId = reuse this question's id (retry/reopen); replay = only fetch the saved answer.
@@ -11228,30 +11441,42 @@ const ASK_MINDY_JS = `<script>(function(){
     var aEl=addMsg('assistant',''); var bub=aEl.querySelector('.bub');
     bub.innerHTML='<span class="amk-typing"><i></i><i></i><i></i></span>';
     busy=true; if(send)send.disabled=true; clearFollowups();
-    var acc='', started=false, gotDone=false, gotError=false, ledger=null;
-    // Prepend the grounded view context to the MESSAGE (not shown to the user) so the answer
-    // is about "these"/"here" — the map\\u2019s real filters + count, never fabricated.
-    // Card chat sends NO view preamble: the server supplies the opportunity from its own record.
-    // An attached notice travels as context (below); the map-view preface stays in the message exactly as
-    // without one (server contract, Agent 1, 2026-11-16: the server reconciles the two).
+    // Stop (view mode): abort the stream, keep what already arrived. Card chat keeps its once-per-question retry flow.
+    var ctrl=(!oppCtx&&typeof AbortController==='function')?new AbortController():null, stopped=false, stopBtn=null;
+    if(ctrl){ stopBtn=document.createElement('button'); stopBtn.type='button'; stopBtn.className='amk-stop'; stopBtn.setAttribute('data-testid','amk-stop'); stopBtn.textContent='Stop';
+      stopBtn.onclick=function(){ stopped=true; try{ ctrl.abort(); }catch(e){} }; aEl.appendChild(stopBtn); }
+    function stoppedEnd(){
+      if(acc){ paint(bub,acc); history.push({role:'user',content:q}); history.push(ledger?{role:'assistant',content:acc,sources:ledger}:{role:'assistant',content:acc}); }
+      else bub.textContent='';
+      var sn=document.createElement('div'); sn.className='amk-credits'; sn.setAttribute('data-testid','amk-stopped'); sn.textContent=acc?'You stopped this answer, so it may be incomplete.':'You stopped this answer.'; aEl.appendChild(sn);
+      release(); body.scrollTop=body.scrollHeight;
+    }
+    var acc='', started=false, gotDone=false, gotError=false, ledger=null, turnDoc=false;
+    // Product decision 2026-11-19: Map and Ask Mindy are separate tools. Send the customer's words
+    // only — never inject map viewport filters/geography into Ask. Card chat still sends notice
+    // context (below); that is an opportunity record, not the map view.
     var attAtSend=oppCtx?null:attached;
-    var sendMsg=oppCtx?q:(ctxPreamble()+q);
+    var sendMsg=q;
+    // Back on the map after a reload with a report still open: the conversation memory is gone, but the signed
+    // source ledger saved with the report is what lets "revise it" resolve to THAT document. It rides along as
+    // the oldest assistant turn (the server verifies the signature and the owner; a forged one is ignored).
+    if(!oppCtx&&!history.length&&rep&&rep.ledger&&rep.email===em){ history.push({role:'assistant',content:'I saved your report'+(rep.title?' "'+rep.title+'"':'')+' to your Vault.',sources:rep.ledger}); }
     var payload={email:em,message:sendMsg,sessionId:sessionId||undefined,history:history.slice(-8),display:'narrow_panel'};
     if(attAtSend){ payload.context={kind:'opportunity',notice_id:attAtSend.id}; try{ if(window.__track) window.__track('tool_use','ask_mindy_with_notice',{}); }catch(e){} }
     if(oppCtx){ payload.context={kind:'opportunity',notice_id:oppCtx.id}; payload.turn_id=turnId; if(opts.replay)payload.replay_only=true;
       if(!opts.turnId){ try{ if(window.__track) window.__track('tool_use','card_chat_ask',{turn:Math.floor(history.length/2)+1}); }catch(e){} } }
     var cardAtSend=oppCtx;
-    function release(){ busy=false; if(send)send.disabled=false; }
+    function release(){ busy=false; if(send)send.disabled=false; if(stopBtn&&stopBtn.parentNode)stopBtn.parentNode.removeChild(stopBtn); stopBtn=null; }
     // Drop the question's two bubbles (it is about to be re-asked with the same turn id).
     function dropBubbles(){ var u=aEl.previousSibling; if(aEl.parentNode)aEl.parentNode.removeChild(aEl); if(u&&u.classList&&u.classList.contains('u')&&u.parentNode)u.parentNode.removeChild(u); }
     // The answer did not arrive: offer to get it. Same turn id, so an answer the server already finished
     // comes back free, and one it did not finish is answered (and charged) once.
     function offerRetry(msg){ bub.textContent=msg; var w=document.createElement('div'); w.className='amk-act'; var b=document.createElement('button'); b.textContent='Get the answer';
       b.onclick=function(){ if(busy||oppCtx!==cardAtSend)return; dropBubbles(); ask(q,{turnId:turnId}); }; w.appendChild(b); aEl.appendChild(w); }
-    fetch('/api/app/chat',{method:'POST',headers:withWorkspace({'Content-Type':'application/json','x-mi-auth-token':t,'x-user-email':em}),body:JSON.stringify(payload)})
+    fetch('/api/app/chat',{method:'POST',headers:withWorkspace({'Content-Type':'application/json','x-mi-auth-token':t,'x-user-email':em}),body:JSON.stringify(payload),signal:ctrl?ctrl.signal:undefined})
       .then(function(r){
-        if(r.status===403){ if(turnId){ pendingTurn=null; saveCard(); } upsell(); busy=false; if(send)send.disabled=false; return null; }
-        if(r.status===402){ if(turnId){ pendingTurn=null; saveCard(); } r.json().then(function(d){ creditsWall(bub,d||{}); },function(){ creditsWall(bub,{}); }); busy=false; if(send)send.disabled=false; return null; }
+        if(r.status===403){ if(turnId){ pendingTurn=null; saveCard(); } upsell(); release(); return null; }
+        if(r.status===402){ if(turnId){ pendingTurn=null; saveCard(); } r.json().then(function(d){ creditsWall(bub,d||{}); },function(){ creditsWall(bub,{}); }); release(); return null; }
         // Charge once per question: the same question is still being answered by another request (a second
         // tab, a double click, a retry during a slow answer). Wait, then fetch the saved answer (free).
         if(r.status===409&&turnId){ return r.json().catch(function(){ return {}; }).then(function(d){
@@ -11263,9 +11488,9 @@ const ASK_MINDY_JS = `<script>(function(){
         if(r.status===404&&turnId&&opts.replay){ return r.json().catch(function(){ return {}; }).then(function(d){
           if(d&&d.error==='turn_not_completed'){ offerRetry('This answer did not finish, so it was not charged.'); release(); return null; }
           bub.textContent='Mindy could not load this opportunity right now. Try reopening it.'; release(); return null; }); }
-        if(r.status===404&&oppCtx){ if(turnId){ pendingTurn=null; saveCard(); } bub.textContent='Mindy could not load this opportunity right now. Try reopening it.'; busy=false; if(send)send.disabled=false; return null; }
-        if(r.status===401){ bub.textContent='Please sign in again to ask Mindy.'; busy=false; if(send)send.disabled=false; return null; }
-        if(!r.ok||!r.body){ if(turnId){ offerRetry('Something went wrong before the answer arrived.'); release(); return null; } bub.textContent='Something went wrong. Try again.'; busy=false; if(send)send.disabled=false; return null; }
+        if(r.status===404&&oppCtx){ if(turnId){ pendingTurn=null; saveCard(); } bub.textContent='Mindy could not load this opportunity right now. Try reopening it.'; release(); return null; }
+        if(r.status===401){ bub.textContent='Please sign in again to ask Mindy.'; release(); return null; }
+        if(!r.ok||!r.body){ if(turnId){ offerRetry('Something went wrong before the answer arrived.'); release(); return null; } bub.textContent='Something went wrong. Try again.'; release(); return null; }
         var reader=r.body.getReader(), dec=new TextDecoder(), buf='';
         function pump(){ return reader.read().then(function(res){
           if(res.done){ finish(); return; }
@@ -11274,10 +11499,13 @@ const ASK_MINDY_JS = `<script>(function(){
           parts.forEach(function(p){ var line=p.split('\\n').filter(function(l){return l.indexOf('data:')===0;}).map(function(l){return l.slice(5).trim();}).join(''); if(!line)return;
             var ev; try{ ev=JSON.parse(line); }catch(e){ return; }
             if(ev.type==='session'){ sessionId=ev.sessionId||sessionId; }
-            else if(ev.type==='sources'){ ledger=(ev.ledger&&typeof ev.ledger==='object')?ev.ledger:null; }
+            else if(ev.type==='sources'){ ledger=(ev.ledger&&typeof ev.ledger==='object')?ev.ledger:null; if(turnDoc&&rep&&ledger){ rep.ledger=ledger; repWrite(); } }
+            // create_document saved a document: a card under the answer and the report opens in the pane (view mode only).
+            else if(ev.type==='deliverables'&&Array.isArray(ev.files)&&!oppCtx){ turnDoc=true; try{ repOnDeliverables(ev.files,aEl); }catch(e){} }
+            else if(ev.type==='market_report'&&ev.html&&!oppCtx){ turnDoc=true; try{ repOnMarketReport(ev,aEl); }catch(e){} }
             else if(ev.type==='token'){ if(!started){ bub.textContent=''; started=true; } acc+=(ev.content||''); paint(bub,acc); body.scrollTop=body.scrollHeight; }
             // citations event is now always empty (RAG corpus removed 2026-08-02) \\u2014 ignored.
-            else if(ev.type==='error'){ gotError=true; if(!started)bub.textContent=(ev.message||'Something went wrong.'); }
+            else if(ev.type==='error'){ gotError=true; if(!started)bub.textContent=safeErr(ev.message); }
             else if(ev.type==='done'){ gotDone=true; }
             else if(ev.type==='replayed'){ var rd=document.createElement('div'); rd.className='amk-credits'; rd.textContent='Saved answer \\u00b7 no extra credits'; aEl.appendChild(rd); }
             else if(ev.type==='citations'&&oppCtx&&Array.isArray(ev.sources)&&ev.sources.length){ var sd=document.createElement('div'); sd.className='amk-src'; var s0=ev.sources[0]; sd.innerHTML='Source: '+(s0.url?'<a href="'+esc(s0.url)+'" target="_blank" rel="noopener">'+esc(s0.title||'SAM.gov notice')+'</a>':esc(s0.title||'SAM.gov notice')); aEl.appendChild(sd); }
@@ -11293,11 +11521,18 @@ const ASK_MINDY_JS = `<script>(function(){
           if(turnId&&oppCtx===cardAtSend){ pendingTurn=null; }
           if(!started&&!acc&&!gotError)bub.textContent='Mindy had no answer for that \\u2014 try rephrasing.';
           if(!(turnId&&gotError&&!acc)){ history.push({role:'user',content:q}); history.push(ledger?{role:'assistant',content:acc,sources:ledger}:{role:'assistant',content:acc}); }
-          saveCard(); if(acc)paint(bub,acc); if(acc&&!oppCtx)followups(aEl,q,acc); busy=false; if(send)send.disabled=false; body.scrollTop=body.scrollHeight; }
-        return pump().catch(function(){ if(turnId){ if(oppCtx===cardAtSend)offerRetry('The connection dropped before the answer finished.'); release(); return; } bub.textContent='Connection failed. Check your network and try again.'; release(); });
+          saveCard(); if(acc)paint(bub,acc);
+          // Follow-ups only after a real outcome (report/files) or a finished Q&A answer — never mid-gather.
+          if(acc&&!oppCtx&&(turnDoc||String(acc).trim().length>=80))followups(aEl,q,acc);
+          release(); body.scrollTop=body.scrollHeight; }
+        return pump().catch(function(){ if(stopped){ stoppedEnd(); return; } if(turnId){ if(oppCtx===cardAtSend)offerRetry('The connection dropped before the answer finished.'); release(); return; } bub.textContent='Connection failed. Check your network and try again.'; release(); });
       })
-      .catch(function(){ if(turnId){ offerRetry('Connection failed before the answer arrived.'); release(); return; } bub.textContent='Connection failed. Check your network and try again.'; busy=false; if(send)send.disabled=false; });
+      .catch(function(){ if(stopped){ stoppedEnd(); return; } if(turnId){ offerRetry('Connection failed before the answer arrived.'); release(); return; } bub.textContent='Connection failed. Check your network and try again.'; release(); });
   }
+  // Customer-safe failure text (B2): only these exact strings are shown verbatim; anything else becomes the
+  // generic one. Kept identical to src/lib/chat/customer-errors.ts (ask-window-stop-errors.unit.test.ts).
+  var SAFE_ERR=["Mindy couldn't answer right now. Nothing was wrong with your question. Please try again in a moment.","Something went wrong while Mindy was answering, so this answer is incomplete. Please try again.","Couldn't reach Mindy. Check your connection and try again.","Mindy is temporarily unavailable. Please try again in a moment.","That question pulled in more data than Mindy can read at once. Try narrowing it, for example to one agency, state or contract type.","Mindy took too long to answer, so this answer is incomplete. Please try again, or narrow the question."];
+  function safeErr(m){ return (typeof m==='string'&&SAFE_ERR.indexOf(m)>=0)?m:SAFE_ERR[0]; }
   // Card chat out of credits: say what an answer costs and what they hold; Pro is the next step. No new grant.
   function creditsWall(bub,d){
     var per=(typeof d.credits_per_answer==='number')?d.credits_per_answer:null, bal=(typeof d.balance==='number')?d.balance:null;
@@ -11718,10 +11953,10 @@ export async function GET(request: NextRequest) {
     html = html.replace('__AGENCY_PRESETS__', () => JSON.stringify(AGENCY_PRESETS));
     html = html.replace('__FSC_PRESETS__', () => JSON.stringify(FSC_PRESETS));
   }
-  // Object-specific social metadata for a shared opportunity. Unknown/missing notice → the page stays
-  // exactly as before (generic title); the authenticated Maps experience is untouched either way.
+  // Object-specific social metadata for a shared opportunity. Unknown/missing notice → the default
+  // map head (title, description, canonical, og/twitter); the authenticated Maps experience is untouched.
   const shareHead = await shareHeadP;
-  if (shareHead) html = repl(html, '<title>Mindy Map</title>', shareHead);
+  html = applyMapHead(html, shareHead, reqUrl.origin);
   // ?shell=app — this map inside the signed-in app's shell (/app?panel=map). Hides ONLY .zhead/.zrail
   // and adds the parent bridge; data, boot and fetch behaviour are untouched (see app-shell.ts).
   // Never for ?embed= (a different, static mode with its own boot rules).

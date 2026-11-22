@@ -16,6 +16,7 @@
  * (spend desc) so we can ship a static page that hits edge cache.
  */
 import type { Metadata } from 'next';
+import { siteShareImages } from '@/lib/seo/share-image';
 import Link from 'next/link';
 import { NAICS_TOP_100 } from '@/data/naics-top100';
 
@@ -43,6 +44,7 @@ export const metadata: Metadata = {
       'The top 100 NAICS codes by federal spend. Find incumbents, top federal buyers, and set daily alerts for any code.',
     type: 'website',
     url: 'https://getmindy.ai/naics',
+    images: siteShareImages(),
   },
 };
 

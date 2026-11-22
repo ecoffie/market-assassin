@@ -104,6 +104,8 @@ describe('chat route wiring', () => {
   it('adds the rules layer only when the flag is on for the verified email', () => {
     expect(route).toMatch(/const rulesLayer = askMindyRulesEnabledFor\(auth\.email\);/);
     expect(route).toMatch(/const findContract = rulesLayer \? rulesLayerFindContract\(\) : CURRENT_FIND_CHAT_CONTRACT;/);
-    expect(route).toMatch(/\+ \(rulesLayer \? `\\n\\n\$\{askMindyRulesPromptBlock\(\)\}` : ''\)/);
+    // Merged with #2204: an FMP ask keeps its own contract and gets only the rules, never the answer format.
+    expect(route).toMatch(/const rulesBlock = !rulesLayer \? '' : federalMarketProfileAsk \? `\\n\\n\$\{ASK_MINDY_RULES_LAYER\}` : `\\n\\n\$\{askMindyRulesPromptBlock\(\)\}`;/);
+    expect(route).toMatch(/\+ hostContract\n\s+\+ rulesBlock;/);
   });
 });

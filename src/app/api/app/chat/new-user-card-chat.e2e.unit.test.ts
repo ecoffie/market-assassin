@@ -96,7 +96,7 @@ vi.mock('next/server', async (orig) => ({ ...(await orig<object>()), after: (fn:
 vi.mock('@/lib/mcp/credit-emails', () => ({ sendCreditWelcomeEmail: vi.fn(async () => {}) }));
 vi.mock('@/lib/api-auth', () => ({ verifyUserOwnsEmail: async (_r: unknown, email: string) => ({ authenticated: true, email }) }));
 vi.mock('@/lib/access/resolve-access', () => ({ hasProAccess: async () => false }));
-vi.mock('@/lib/proposal/loaders', () => ({ loadBidderProfile: async () => null, formatProfileForPrompt: () => '' }));
+vi.mock('@/lib/proposal/loaders', () => ({ loadBidderProfile: async () => null, loadBidderProfileResult: async () => ({ status: 'empty' as const, profile: {} }), formatProfileForPrompt: () => '' }));
 vi.mock('@/lib/llm/usage-cost', () => ({ isUserOverBudget: async () => false, recordLlmUsage: async () => {} }));
 vi.mock('@/lib/chat/provider-events', () => ({ recordProviderEvent: async () => {} }));
 vi.mock('@/lib/entitlements/shadow', () => ({ shadowEntitlement: () => {} }));

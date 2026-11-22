@@ -131,6 +131,7 @@ const TOOL_LABELS: Record<string, string> = {
   search_my_vault: 'Your Vault records',
   find_my_documents: 'Your saved documents (Vault)',
   create_document: 'Document Mindy saved to your Vault',
+  search_web: 'Open web (Serper)',
 };
 
 function toolLabel(tool: string): string {

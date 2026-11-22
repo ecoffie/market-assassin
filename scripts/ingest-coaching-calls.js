@@ -13,10 +13,10 @@
  *
  * SOURCES (already exported to disk by the MCP Drive step — see
  *   tasks/PLAN-rag-coaching-calls-ingest.md):
- *     tasks/cache/calls/<fileId>.txt        ← one Fireflies call per file
- *     tasks/cache/calls/<fileId>.json       ← OPTIONAL sidecar metadata
+ *     $MINDY_PRIVATE_DIR/cache/calls/<fileId>.txt        ← one Fireflies call per file
+ *     $MINDY_PRIVATE_DIR/cache/calls/<fileId>.json       ← OPTIONAL sidecar metadata
  *                                              { title, fileId, source, mimeType }
- *     tasks/cache/calls/assessment-doc.txt  ← the big concatenated doc
+ *     $MINDY_PRIVATE_DIR/cache/calls/assessment-doc.txt  ← the big concatenated doc
  *                                              (split here by "# Member" headers)
  *   We read pre-extracted .txt so this script needs NO Drive creds and NO
  *   mammoth/pdf-parse at ingest time. (The export step does extraction.)
@@ -46,11 +46,13 @@
  *     --endpoint=https://getmindy.ai   (default)
  *     --limit=5                        (first N files)
  *     --only=sales|coaching            (ingest just one type)
- *     --cache=tasks/cache/calls        (override source dir)
+ *     --cache=$MINDY_PRIVATE_DIR/cache/calls        (override source dir)
  *     --include-internal               (override the internal-ops skip)
  */
 
 const fs = require('fs');
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { privatePath } = require('./lib/private-path');
 const path = require('path');
 const crypto = require('crypto');
 
@@ -65,7 +67,8 @@ const getArg = (name, dflt) => {
 const ENDPOINT = (getArg('endpoint', 'https://getmindy.ai')).replace(/\/$/, '');
 const LIMIT = Number(getArg('limit', Infinity));
 const ONLY = getArg('only', null); // 'sales' | 'coaching' | null
-const CACHE_DIR = path.resolve(getArg('cache', path.join(__dirname, '..', 'tasks', 'cache', 'calls')));
+// Default source: the private transcript cache ($MINDY_PRIVATE_DIR/cache/calls), never the repository.
+const CACHE_DIR = path.resolve(getArg('cache', '') || privatePath('cache', 'calls'));
 const PASSWORD = process.env.ADMIN_PASSWORD;
 
 const sha256 = (buf) => crypto.createHash('sha256').update(buf).digest('hex');

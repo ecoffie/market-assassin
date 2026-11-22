@@ -26,6 +26,7 @@
  *    future and the reader deserves to know where it came from and how old it is.
  */
 import type { Metadata } from 'next';
+import { siteShareImages } from '@/lib/seo/share-image';
 import Link from 'next/link';
 import { getForecastSummary, agencySlug } from '@/lib/seo/forecasts-summary';
 import { getRecentForecastLinks } from '@/lib/seo/forecast-pages';
@@ -67,7 +68,7 @@ export async function generateMetadata(): Promise<Metadata> {
     alternates: { canonical: `${SITE_URL}/forecasts` },
     // No noindex for an unavailable summary: the page body throws a 5xx instead (2026-11-12).
     // A temporary state must never tell Google the page went away.
-    openGraph: { title, description, type: 'website', url: `${SITE_URL}/forecasts` },
+    openGraph: { title, description, type: 'website', url: `${SITE_URL}/forecasts`, images: siteShareImages() },
   };
 }
 

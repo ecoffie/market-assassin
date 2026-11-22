@@ -22,6 +22,7 @@ import { readNoticeEvent } from '@/lib/events/event-currency';
 import { loadActiveCandidates, loadFamilyPool, loadListedRows, loadNoticesById, type ListedEventRow } from '@/lib/events/event-currency-live';
 import { buildCandidateSet, familiesToLoad, planEvents, planRetirements, pruneMode } from '@/lib/events/extract-run';
 import { reportCronOutcome } from '@/lib/cron-self-report';
+import { hasValidCronSecret } from '@/lib/cron/cron-request-auth';
 
 export const maxDuration = 300;
 
@@ -77,7 +78,7 @@ export async function GET(request: NextRequest) {
   const dryRun = searchParams.get('dry_run') === 'true';
 
   const isAuthorized =
-    password === ADMIN_PASSWORD || cronSecret === process.env.CRON_SECRET;
+    password === ADMIN_PASSWORD || hasValidCronSecret(request);
 
   if (!isAuthorized) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
