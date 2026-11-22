@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import PublicShell from '@/components/public-site/PublicShell';
 
 export const metadata: Metadata = {
+  alternates: { canonical: '/december-spend' },
   title: 'December Spend Forecast | Mindy',
   description: 'Year-end government spending predictions with hot agencies and categories.',
 };
