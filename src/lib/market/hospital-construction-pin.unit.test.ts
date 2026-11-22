@@ -5,9 +5,14 @@ import { buildMarketFilter } from './keyword-coverage';
 describe('hospital construction term of art', () => {
   it('pins hospital construction/renovation phrasings', () => {
     for (const k of ['hospital construction renovation', 'VA hospital construction', 'renovation of medical center', 'VAMC renovation', 'clinic build-out']) {
-      expect(termOfArtPscCodes(k)).toEqual(['Y1DA', 'Z1DA', 'Z2DA']);
+      expect(termOfArtPscCodes(k)).toEqual(['Y1DA', 'Z2DA', 'Y1DZ']); // construction + repair/alteration, no maintenance
       expect(termOfArtNaicsCodes(k)).toEqual(['236220']);
     }
+  });
+  it('maintenance is pinned only when the ask names it (Z1DA is recurring maintenance)', () => {
+    expect(termOfArtPscCodes('hospital maintenance services')).toEqual(['Z1DA']);
+    expect(termOfArtPscCodes('VA hospital construction, renovation and maintenance')).toEqual(['Y1DA', 'Z2DA', 'Y1DZ', 'Z1DA']);
+    expect(termOfArtPscCodes('hospital renovation')).not.toContain('Z1DA');
   });
   it('never pins non-construction hospital work', () => {
     for (const k of ['hospital staffing', 'medical center IT support', 'clinic janitorial services', 'construction management software']) {
@@ -15,8 +20,8 @@ describe('hospital construction term of art', () => {
     }
   });
   it('a pinned coverage ranks sections by PSC only — the literal phrase is not ANDed back in', () => {
-    const f = buildMarketFilter({ coverage: { keyword: 'hospital construction renovation', pinnedPscCodes: ['Y1DA', 'Z1DA', 'Z2DA'] } as never })!;
-    expect(f.psc_codes).toEqual(['Y1DA', 'Z1DA', 'Z2DA']);
+    const f = buildMarketFilter({ coverage: { keyword: 'hospital construction renovation', pinnedPscCodes: ['Y1DA', 'Z2DA', 'Y1DZ'] } as never })!;
+    expect(f.psc_codes).toEqual(['Y1DA', 'Z2DA', 'Y1DZ']);
     expect(f.keywords).toBeUndefined();
   });
 });

@@ -20,20 +20,20 @@ vi.mock('@/lib/market/keyword-coverage', () => ({
     topPsc: { code: 'Y1NZ', name: 'CONSTRUCTION OF OTHER UTILITIES' }, topPscList: [],
     windowLabel: 'FY2026 (1 complete fiscal year · description match)',
     identityResolvedVia: ['electrical contractor', 'roofing'],
-    pinnedPscCodes: ['Y1DA', 'Z1DA', 'Z2DA'],
+    pinnedPscCodes: ['Y1DA', 'Z2DA', 'Y1DZ'],
   })),
   codeMarketSize: vi.fn(async (o: unknown) => {
     calls.codeMarketSize.push(o);
     return { totalMarket: 812_000_000, topPsc: { code: 'Y1DA', name: 'CONSTRUCTION OF HOSPITALS AND INFIRMARIES' }, basis: 'psc',
-      windowKind: 'latest_complete_fy_live_api', windowLabel: 'FY2026 (1 complete fiscal year · all awards coded PSC Y1DA/Z1DA/Z2DA · Department of Veterans Affairs only)',
+      windowKind: 'latest_complete_fy_live_api', windowLabel: 'FY2026 (1 complete fiscal year · all awards coded PSC Y1DA/Z2DA/Y1DZ · Department of Veterans Affairs only)',
       questionKind: 'code_pinned_fy_category_total', fiscalYear: 2026 };
   }),
   marketKeywords: vi.fn((k: string) => [k]),
 }));
 vi.mock('@/lib/market/undercount-signal', () => ({ detectUndercount: vi.fn(async () => null) }));
 vi.mock('@/lib/market/spend-query', () => ({
-  resolveMarketScope: vi.fn(async () => ({ basis: 'keyword', marketFilter: { psc_codes: ['Y1DA', 'Z1DA', 'Z2DA'], mode: 'keyword_psc', rankingLabel: '' }, naicsCodes: [], coverage: null, rankedByDominantNaics: false, label: 'pinned' })),
-  filtersForScope: vi.fn(() => ({ psc_codes: ['Y1DA', 'Z1DA', 'Z2DA'] })),
+  resolveMarketScope: vi.fn(async () => ({ basis: 'keyword', marketFilter: { psc_codes: ['Y1DA', 'Z2DA', 'Y1DZ'], mode: 'keyword_psc', rankingLabel: '' }, naicsCodes: [], coverage: null, rankedByDominantNaics: false, label: 'pinned' })),
+  filtersForScope: vi.fn(() => ({ psc_codes: ['Y1DA', 'Z2DA', 'Y1DZ'] })),
   buildSpendingFilters: vi.fn(() => ({})),
   fetchSpendingCategory: vi.fn(async () => []),
 }));
@@ -55,7 +55,7 @@ beforeEach(() => { calls.codeMarketSize.length = 0; calls.expiring.length = 0; c
 describe('a pinned term of art defines the market (VA hospital construction)', () => {
   it('headline = pinned PSCs measured for the named agency, not the national trade description match', async () => {
     const r = await generateMarketReport({ keyword: 'hospital construction renovation', agency: 'Department of Veterans Affairs', state: 'FL' });
-    expect(calls.codeMarketSize[0]).toMatchObject({ pscCodes: ['Y1DA', 'Z1DA', 'Z2DA'], agency: 'Department of Veterans Affairs', strict: true });
+    expect(calls.codeMarketSize[0]).toMatchObject({ pscCodes: ['Y1DA', 'Z2DA', 'Y1DZ'], agency: 'Department of Veterans Affairs', strict: true });
     expect(r.summary.total_market).toBe(812_000_000);
     expect(r.summary.top_psc).toEqual({ code: 'Y1DA', name: 'CONSTRUCTION OF HOSPITALS AND INFIRMARIES' });
     expect(r.summary.naics_count).toBeNull(); // the 163 description-match NAICS are not this market
