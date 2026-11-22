@@ -80,11 +80,21 @@ export function mapsRecompetePolicy(get: Get): SurfacePolicy {
   return { ...MAPS_POLICY, recompete: { windowMonths } };
 }
 
+/**
+ * Maps set-aside checkbox keys added 2026-11-22 → the stored `set_aside_type` value. TRANSLATION ONLY:
+ * every other value (legacy 'SDVOSB' included) passes through exactly as before.
+ */
+const RECOMPETE_SET_ASIDE_ALIAS: Record<string, string> = { SDVOSB_ONLY: 'SDVOSB', VOSB: 'VOSB' };
+export function recompeteSetAsideValue(raw: string): string {
+  if (!raw.includes(',')) return RECOMPETE_SET_ASIDE_ALIAS[raw] ?? raw;
+  return raw.split(',').map((t) => RECOMPETE_SET_ASIDE_ALIAS[t] ?? t).join(',');
+}
+
 export function mapsRecompeteRequest(get: Get, opts?: { ctx?: PlanContext }): MapsRecompeteRequest {
   const t = (k: string) => String(get(k) ?? '').trim();
   const sap = t('sap').toLowerCase();
   const surface: MapsRecompeteSurface = {
-    setAside: t('setAside'),
+    setAside: recompeteSetAsideValue(t('setAside')),
     subAgency: t('subAgency'),
     minValue: num(get('minValue')),
     maxValue: num(get('maxValue')),

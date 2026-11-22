@@ -575,12 +575,13 @@ const AGENCY={VA:"Veterans Affairs",DoD:"Dept of Defense",GSA:"General Services 
  USAGM:"US Agency for Global Media","DoD/Army":"Dept of Defense — Army",SSA:"Social Security Admin",
  "DHS/USCG":"Homeland Security — Coast Guard","USDA/FS":"Agriculture — Forest Service",
  DoDEA:"DoD Education Activity","DOI/NPS":"Interior — National Park Service"};
-const SETFULL={SDVOSB:"Service-Disabled Veteran-Owned",SB:"Small Business",
+const SETFULL={SDVOSB:"Service-Disabled Veteran-Owned",VOSB:"Veteran-Owned",SB:"Small Business",
  "8(a)":"8(a) Competed",EDWOSB:"Economically Disadv. WOSB",WOSB:"Women-Owned Small Business",
  "Veteran SA":"Veteran-Owned",ISBEE:"Indian Small Business",
  "Buy Indian":"Buy Indian Set-Aside",None:"Not stated","":"—"};
 const SETGROUPS=[
- {key:"SDVOSB",label:"SDVOSB",col:"--grnd",match:s=>s==="SDVOSB"||s==="Veteran SA"},
+ {key:"SDVOSB",label:"SDVOSB",col:"--grnd",match:s=>s==="SDVOSB"},
+ {key:"VOSB",label:"VOSB (veteran-owned)",col:"--it",match:s=>s==="VOSB"||s==="Veteran SA"},
  {key:"SB",label:"Small Business",col:"--jan",match:s=>s==="SB"},
  {key:"8(a)",label:"8(a)",col:"--fac",match:s=>s==="8(a)"},
  {key:"EDWOSB",label:"WOSB / EDWOSB",col:"--con",match:s=>s==="EDWOSB"||s==="WOSB"},

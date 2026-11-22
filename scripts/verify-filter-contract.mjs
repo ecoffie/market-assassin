@@ -94,7 +94,36 @@ const CASES = [
     extractCodes: (text) => [...text.matchAll(/NAICS\s*\n?\s*(\d{4,6})/g)].map((m) => m[1]),
     expectPrefix: '33361',
   },
+  // Set-aside split (2026-11-22). ⚠️ Added without a live run. Legacy `?setAside=SDVOSB` must keep
+  // its FROZEN code list (VSA/VSB included — saved searches store the bare key); SDVOSB_ONLY and
+  // VOSB are the new checkboxes. Truth = open SAM by set_aside_code + mappable recompete by the
+  // set_aside_type value the recompete adapter translates the key to.
+  ...[
+    { key: 'SDVOSB', codes: ['SDVOSBC', 'SDVOSBS', 'VSA', 'VSB', 'SDVOSB'], rc: 'SDVOSB', labels: ['SDVOSB', 'VOSB'] },
+    { key: 'SDVOSB_ONLY', codes: ['SDVOSBC', 'SDVOSBS', 'SDVOSB'], rc: 'SDVOSB', labels: ['SDVOSB'] },
+    { key: 'VOSB', codes: ['VSA', 'VSS', 'VSB'], rc: 'VOSB', labels: ['VOSB'] },
+  ].map((x) => ({
+    name: `setaside-${x.key.toLowerCase()}`,
+    facet: 'Set-aside',
+    url: `/opportunity-map?setAside=${x.key}`,
+    truth: async () => sumSetAside(x.codes, x.rc),
+    cardMatches: (text) => x.labels.includes(text.replace(/^NAICS\n/, '').trim()),
+    extractCodes: (text) => [...text.matchAll(/Set-aside\s*\n?\s*(SDVOSB|VOSB)\b/g)].map((m) => m[1]),
+  })),
 ];
+
+/** Set-aside truth: open SAM rows in the code list + mappable recompete rows with that set_aside_type. */
+async function sumSetAside(codes, rcValue) {
+  const parts = {};
+  let total = 0;
+  const sam = await db.from('sam_opportunities').select('*', { count: 'exact', head: true })
+    .in('set_aside_code', codes).gte('response_deadline', new Date().toISOString());
+  if (sam.error) parts.sam_opportunities = `ERR ${sam.error.message}`; else { parts.sam_opportunities = sam.count ?? 0; total += sam.count ?? 0; }
+  const rc = await db.from('recompete_opportunities').select('*', { count: 'exact', head: true })
+    .eq('set_aside_type', rcValue).is('quality_flag', null).not('map_lat', 'is', null);
+  if (rc.error) parts.recompete_opportunities = `ERR ${rc.error.message}`; else { parts.recompete_opportunities = rc.count ?? 0; total += rc.count ?? 0; }
+  return { total, parts };
+}
 
 /**
  * Count a facet across every source the map unions, not just one table.

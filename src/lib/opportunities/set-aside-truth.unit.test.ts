@@ -47,7 +47,7 @@ describe('mapSetAside — missing data can never become Open', () => {
     ['SBA', 'SB'], ['SDVOSBC', 'SDVOSB'], ['8AN', '8A'], ['HZC', 'HZ'], ['WOSB', 'WOSB'],
     // recompete vocabulary — these all used to fall to NONE and render "Open / unrestricted"
     ['SB-Total', 'SB'], ['SB-Partial', 'SB'], ['8(a)', '8A'], ['SDVOSB', 'SDVOSB'], ['HUBZone', 'HZ'],
-    ['EDWOSB', 'WOSB'], ['VOSB', 'SDVOSB'], ['Indian-SB', 'OTHER'],
+    ['EDWOSB', 'WOSB'], ['VOSB', 'VOSB'], ['VSA', 'VOSB'], ['VSS', 'VOSB'], ['Indian-SB', 'OTHER'],
     // forecast vocabulary
     ['Small Business', 'SB'], ['Small Business Set Aside - Total', 'SB'],
     // an unrecognized restriction is OTHER, never NONE

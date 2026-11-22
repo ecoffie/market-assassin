@@ -154,7 +154,7 @@ async function loadProfile(email: string): Promise<{ naics: string[]; states: st
 
 export async function GET(request: NextRequest) {
   const p = new URL(request.url).searchParams;
-  const setGroups = SET_GROUPS.map((g) => ({ key: g.key, label: g.label, color: g.color }));
+  const setGroups = SET_GROUPS.map((g) => ({ key: g.pin ?? g.key, label: g.label, color: g.color })); // pin display buckets (pin.set)
 
   // LEGACY list mode — no bbox (existing callers / simple pin dumps).
   const bbox = p.get('bbox');

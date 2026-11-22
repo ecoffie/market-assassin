@@ -288,7 +288,7 @@ function detectSetAsideFromText(text: string): { setAsideFromText: string | null
 // "Service-Disabled Veteran-Owned..." (text) are recognized as the SAME family, not a false
 // mismatch, and any future change to the grouping only has one place to update.
 const TEXT_LABEL_TO_GROUP: Record<string, string> = {
-  SDVOSB: 'SDVOSB', VOSB: 'SDVOSB',
+  SDVOSB: 'SDVOSB', VOSB: 'VOSB',
   WOSB: 'WOSB', EDWOSB: 'WOSB',
   HUBZone: 'HZ', '8(a)': '8A',
   'Small Business': 'SB', '100% Small Business': 'SB',
