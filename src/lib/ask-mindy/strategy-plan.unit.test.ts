@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import {
-  askMindyStrategyPlanEnabledFor, isStrategyPlanRequest, STRATEGY_PLAN_CHAT_CONTRACT, strategyPlanCheck, strategyProfileNote, strategyCompanyContext,
+  askMindyStrategyPlanEnabledFor, isStrategyPlanRequest, STRATEGY_PLAN_CHAT_CONTRACT, strategyPlanCheck, strategyProfileNote, strategyCompanyContext, strategyFitNote,
   STRATEGY_PLAN_ENV, STRATEGY_PLAN_ALLOWLIST_ENV,
 } from './strategy-plan';
 import { GENERIC_MARKET_REPORT, LIST_AND_GENERIC_PLAN, STRONG_PLAN } from './__fixtures__/strategy-plan/docs';
@@ -191,5 +191,46 @@ describe('the synthetic Ridgeline plan (built through the workflow, 2026-11-22) 
     expect(text).toContain('Why these and not others');
     expect(text).toContain('DSBS');
     expect(text).not.toMatch(/\$\d+\s*\/\s*mo|subscription|upgrade|Mindy Pro/i);
+  });
+});
+
+describe('PR 2: "where to focus" is ranked by the shared fit scorer', () => {
+  const NOW = Date.parse('2026-11-22T12:00:00Z');
+  const profile = {
+    companyName: 'Ridgeline Test Facilities LLC', naicsCodes: ['561720'], states: ['SC', 'GA'], certifications: [],
+    keywords: ['janitorial'], unknown: [],
+  };
+  const FIND = {
+    horizons: {
+      open_now: { status: 'grounded', matched_count: 2, items: [
+        { horizon: 'open_now', title: 'Francis Marion Ranger District Office Janitorial Services', buyer: 'AGRICULTURE, DEPARTMENT OF', naics_code: '561720', place_of_performance_state: 'SC', set_aside_description: 'Small Business Set Aside - Total', response_deadline: '2026-12-17T22:00:00+00:00', relevant_date: '2026-12-17', relevant_date_label: 'response_deadline' },
+        { horizon: 'open_now', title: 'Tractor Purchase', buyer: 'DEPT OF DEFENSE', naics_code: '336120', place_of_performance_state: 'GA', set_aside_description: 'No Set aside used', response_deadline: '2026-11-23T21:00:00+00:00' },
+      ] },
+      coming_back: { status: 'grounded', matched_count: 0, items: [] },
+      coming_soon: { status: 'unavailable', items: [] },
+    },
+  };
+  const r = (tool: string, value: unknown, status = 'success') => ({ record: { tool, status }, content: JSON.stringify(value) });
+
+  it('ranks the FIND result for this company: the matching janitorial notice, not the tractor', () => {
+    const fit = strategyFitNote([r('find_opportunities', FIND)], { status: 'ok', profile }, NOW);
+    expect(fit.reason).toBe('ok');
+    expect(fit.note).toMatch(/^FIT RANKING/);
+    expect(fit.note).toContain('Francis Marion Ranger District Office Janitorial Services');
+    expect(fit.note).not.toContain('Tractor Purchase');
+    expect(fit.note).toMatch(/Never print a score/);
+  });
+
+  it('no note without a profile, without a successful FIND, or with an unreadable result', () => {
+    expect(strategyFitNote([r('find_opportunities', FIND)], { status: 'unavailable' }, NOW)).toEqual({ note: null, reason: 'no_profile' });
+    expect(strategyFitNote([r('find_opportunities', FIND)], null, NOW).reason).toBe('no_profile');
+    expect(strategyFitNote([r('get_contractor_award_history', {})], { status: 'ok', profile }, NOW)).toEqual({ note: null, reason: 'no_find' });
+    expect(strategyFitNote([r('find_opportunities', FIND, 'failed')], { status: 'ok', profile }, NOW).reason).toBe('no_find');
+    expect(strategyFitNote([{ record: { tool: 'find_opportunities', status: 'success' }, content: 'not json' }], { status: 'ok', profile }, NOW)).toEqual({ note: null, reason: 'unreadable' });
+  });
+
+  it('the contract tells the write-up to follow the fit order and never print a score', () => {
+    expect(STRATEGY_PLAN_CHAT_CONTRACT).toContain('when a FIT RANKING note is present');
+    expect(STRATEGY_PLAN_CHAT_CONTRACT).toContain('Never print a fit score');
   });
 });
