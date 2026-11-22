@@ -892,8 +892,9 @@ server.registerTool(
       'ONE-SHOT full market report. Give a keyword (best), NAICS, or agency and get the entire market in one call: ' +
       'total market $ + all buying NAICS + top PSC, top buying agencies, competitive landscape, recompetes, forecasts, ' +
       'and (with an agency) an agency deep-dive + set-aside gap. Returns structured sections PLUS a client-ready ' +
-      'Mindy-branded deliverable: deliverable.url (hosted, shareable — send it to a client) + deliverable.html ' +
-      '(inline). Prefer a keyword over one NAICS. grounded=false only when nothing is found.',
+      'Mindy-branded deliverable: deliverable.url (hosted, shareable — send it to a client; expires after 90 days, ' +
+      'see deliverable.expires_at; the owner can extend or revoke it in Mindy) + deliverable.html (inline). Prefer a ' +
+      'keyword over one NAICS. grounded=false only when nothing is found.',
     inputSchema: {
       keyword: z.string().optional().describe('What the market is about (e.g. "drones"). Best axis — captures the whole market.'),
       naics: z.string().optional().describe('NAICS code, for a code-anchored report instead of a keyword.'),

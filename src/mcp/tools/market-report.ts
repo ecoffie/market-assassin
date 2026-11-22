@@ -19,14 +19,16 @@
  * `deliverable.url` (/reports/<id>) — the link Sue actually sends a client. Saving is
  * best-effort: if storage is down the caller still gets the full JSON + inline HTML,
  * just without a link (they paid credits for this call — never lose the result).
- * PDF = the hosted page's Save-as-PDF (server-side HTML→PDF would need Chromium in
- * the lambda; puppeteer is a devDependency). See tasks/one-shot-tools-plan.md.
+ * PDF = /reports/<id>/pdf (the hosted page's renderer + the shared Chromium path). New links expire
+ * after 90 days (deliverable.expires_at); the owner can extend or revoke them in Mindy.
+ * See tasks/one-shot-tools-plan.md.
  */
 import { keywordCoverage, codeMarketSize, marketKeywords, type KeywordCoverage } from '@/lib/market/keyword-coverage';
 import { detectUndercount } from '@/lib/market/undercount-signal';
 import { resolveMarketScope, filtersForScope, fetchSpendingCategory, buildSpendingFilters } from '@/lib/market/spend-query';
 import { expiringContracts } from '@/mcp/tools/expiring-contracts';
 import { queryFederalContacts } from '@/lib/gov-contacts/contact-roster';
+import { isValidOfficeCode } from '@/lib/gov-contacts/dodaac-prefix';
 import { displayContactName } from '@/lib/gov-contacts/contact-quality';
 import { agencyForecasts } from '@/mcp/tools/forecasts';
 import { getAgencySpendingDetailTool } from '@/mcp/tools/agency-spending-detail';
@@ -230,6 +232,13 @@ export interface MarketReportContacts {
   people: Array<{ name: string; role: string; email: string; office: string | null }>;
   /** Total matched (before the display cap) so truncation is explicit. */
   total: number;
+  /**
+   * WHY these people. 'market_awarding_offices' = staff who post solicitations for the contracting
+   * offices that awarded this market's in-scope expiring contracts (office_codes = PIID prefixes).
+   * 'department_roster' = the agency's general roster — NOT specific to this market or state.
+   */
+  basis?: 'market_awarding_offices' | 'department_roster';
+  office_codes?: string[];
 }
 
 /**
@@ -299,7 +308,9 @@ export interface MarketReportResult {
    * client. `url` is null when the report could not be saved (storage unavailable or
    * no verified caller); the html is still valid.
    */
-  deliverable: { html: string; url: string | null; report_id: string | null };
+  /** expires_at: when the hosted link stops working (ISO). Null = no expiry, or no link at all. The owner can
+   *  extend or revoke it in Mindy. */
+  deliverable: { html: string; url: string | null; report_id: string | null; expires_at: string | null };
   _meta: {
     grounded: boolean;
     degraded: boolean;
@@ -401,6 +412,22 @@ async function unionSpendingCategory(
   return [...merged.values()]
     .sort((a, b) => b.amount - a.amount)
     .slice(0, limit);
+}
+
+
+/**
+ * The contracting offices behind a market: the 6-char office prefix of each in-scope contract's PIID
+ * (DoD DoDAAC or civilian code, e.g. 36C248), most frequent first, at most 3. Orders contribute their
+ * own PIID prefix (the ordering office). Codes that are not office-shaped are skipped.
+ */
+export function marketOfficeCodes(contracts: Array<Record<string, unknown>>, max = 3): string[] {
+  const counts = new Map<string, number>();
+  for (const c of contracts) {
+    const code = String(c.piid ?? '').toUpperCase().trim().slice(0, 6);
+    if (!isValidOfficeCode(code)) continue;
+    counts.set(code, (counts.get(code) ?? 0) + 1);
+  }
+  return [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, max).map(([c]) => c);
 }
 
 export async function generateMarketReport(input: MarketReportInput): Promise<MarketReportResult> {
@@ -631,28 +658,47 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
   const contactAgency = agency || topAgencies[0]?.name || '';
   const CONTACTS_CAP = 6;
   let contactsSection: MarketReportContacts | null = null;
-  if (contactAgency) {
+  const toPeople = (rows: Awaited<ReturnType<typeof queryFederalContacts>>['contacts']) => rows
+    .filter((c) => (c.contact_email || '').includes('@'))
+    .map((c) => ({
+      // The roster appends phone/DSN junk to the name on 12.8% of rows ("Stephen
+      // Weaver6142923131", "Natalya RadykDSN312-850-4033"). This cleaner used to live ONLY
+      // here, so the report showed clean names while every other surface showed the raw
+      // pollution. It is now the shared contract.
+      name: displayContactName(c.contact_fullname) || '',
+      role: c.role_category_label || c.contact_title || c.role || '',
+      email: c.contact_email || '',
+      office: c.derived_office || c.sub_agency || null,
+    }))
+    .filter((p) => p.name && p.email)
+    .slice(0, CONTACTS_CAP);
+  // 1) The offices that actually award THIS market: the contracting-office prefix of the in-scope
+  //    expiring contracts' PIIDs (already scoped by NAICS/keyword, agency and state). The department
+  //    roster ranked by recency returned Army Corps staff in Mobile/Pittsburgh for a GA janitorial
+  //    report and generic VA staff for a VA construction report (2026-11-22).
+  const officeCodes = marketOfficeCodes((recompetesR.value?.contracts ?? []) as Array<Record<string, unknown>>);
+  if (officeCodes.length) {
+    const roster = (await guard(queryFederalContacts({ officeCodes, limit: CONTACTS_CAP * 3 }))).value;
+    const people = toPeople(roster?.contacts ?? []);
+    if (people.length) {
+      contactsSection = {
+        agency: contactAgency || String((recompetesR.value?.contracts?.[0] as { awarding_agency?: string } | undefined)?.awarding_agency || ''),
+        office: people[0].office, people, total: roster?.total ?? people.length,
+        basis: 'market_awarding_offices', office_codes: officeCodes,
+      };
+    }
+  }
+  // 2) Fallback: the agency's general roster, labelled as such (not market- or state-specific).
+  if (!contactsSection && contactAgency) {
     const roster = (await guard(queryFederalContacts({ agency: contactAgency, limit: CONTACTS_CAP * 3 }))).value;
-    const people = (roster?.contacts ?? [])
-      .filter((c) => (c.contact_email || '').includes('@'))
-      .map((c) => ({
-        // The roster appends phone/DSN junk to the name on 12.8% of rows ("Stephen
-        // Weaver6142923131", "Natalya RadykDSN312-850-4033"). This cleaner used to live ONLY
-        // here, so the report showed clean names while every other surface showed the raw
-        // pollution. It is now the shared contract.
-        name: displayContactName(c.contact_fullname) || '',
-        role: c.role_category_label || c.contact_title || c.role || '',
-        email: c.contact_email || '',
-        office: c.derived_office || c.sub_agency || null,
-      }))
-      .filter((p) => p.name && p.email)
-      .slice(0, CONTACTS_CAP);
+    const people = toPeople(roster?.contacts ?? []);
     if (people.length) {
       contactsSection = {
         agency: contactAgency,
         office: people[0].office,
         people,
         total: roster?.total ?? people.length,
+        basis: 'department_roster',
       };
     }
   }
@@ -943,7 +989,7 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
     basis,
     reconciliation,
     sections,
-    deliverable: { html: '', url: null, report_id: null },
+    deliverable: { html: '', url: null, report_id: null, expires_at: null },
     _meta: {
       grounded: sectionsGrounded > 0,
       degraded,
@@ -1000,16 +1046,18 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
   // Best-effort: a storage failure must not lose the report the caller paid for.
   if (input.userEmail && deliverableWorthy) {
     const { deliverable: _omit, ...payload } = result; // store the payload; HTML re-renders on view
-    const id = await saveMarketReport({
+    const saved = await saveMarketReport({
       ownerEmail: input.userEmail,
       subject,
       clientName: input.client_name?.trim() || null,
       params: { keyword, naics: naicsIn, agency, state, set_aside: setAside, client_name: input.client_name || null },
       payload: payload as unknown as Record<string, unknown>,
     });
+    const id = saved?.id ?? null;
     if (id) {
       result.deliverable.report_id = id;
       result.deliverable.url = `${SITE_URL.replace(/\/$/, '')}/reports/${id}`;
+      result.deliverable.expires_at = saved?.expires_at ?? null;
       result._meta.saved = true;
     }
   }
@@ -1021,7 +1069,16 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
   return result;
 }
 
-function buildHint(r: MarketReportResult): NonNullable<MarketReportResult['_ai_hint']> {
+/** " The link expires on <date>; the owner can extend or revoke it in Mindy." ('' when there is no expiry). */
+export function linkExpiryNote(expiresAt: string | null | undefined): string {
+  if (!expiresAt) return '';
+  const d = new Date(expiresAt);
+  if (Number.isNaN(d.getTime())) return '';
+  const day = d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
+  return ` The link expires on ${day}; the owner can extend or revoke it in Mindy.`;
+}
+
+export function buildHint(r: MarketReportResult): NonNullable<MarketReportResult['_ai_hint']> {
   if (r._meta.degraded && r._meta.sections_grounded === 0) {
     return {
       summary: `A market report for "${r.subject}" could not be assembled — upstream sources errored.`,
@@ -1039,10 +1096,10 @@ function buildHint(r: MarketReportResult): NonNullable<MarketReportResult['_ai_h
   const dollars = r.summary.total_market ? `$${Math.round(r.summary.total_market).toLocaleString()}` : 'an unstated total';
   return {
     summary: `Market report for "${r.subject}": ${dollars} across ${r.summary.naics_count ?? 'several'} NAICS, ${r.summary.buying_agencies} top buying agencies, ${r.summary.top_contractors} leading contractors, ${r.summary.recompetes} recompetes, ${r.summary.forecasts} forecasts.${
-      r.deliverable.url ? ` Shareable report: ${r.deliverable.url}` : ''
+      r.deliverable.url ? ` Shareable report: ${r.deliverable.url}${linkExpiryNote(r.deliverable.expires_at)}` : ''
     }`,
     how_to_use: r.deliverable.url
-      ? `Use the structured sections for facts. Give the user deliverable.url (${r.deliverable.url}) — a hosted, client-ready page they can send straight to a client, with a Save-as-PDF button. deliverable.html is the same report inline. Every figure traces to a returned section.`
+      ? `Use the structured sections for facts. Give the user deliverable.url (${r.deliverable.url}) — a hosted, client-ready page they can send straight to a client, with a Download PDF link.${linkExpiryNote(r.deliverable.expires_at)} Say when the link expires if you share it. deliverable.html is the same report inline. Every figure traces to a returned section.`
       : 'Use the structured sections for facts; hand deliverable.html to the client as the report. No hosted link was created for this run — do NOT invent a report URL. Every figure traces to a returned section.',
     key_caveats: 'Only cite sections that returned rows. NAICS totals are contract obligations (FY window), not budget authority. Place-of-performance/agency filters are as labeled.',
   };
