@@ -275,11 +275,14 @@ describe('production authority', () => {
   it('accepts the cron DISPATCHER bearer — without it a scheduled fire 401s', () => {
     // The dispatcher sends `authorization: Bearer $CRON_SECRET` and never `x-vercel-cron`.
     // The first real scheduled fire returned 401 because this branch did not exist.
-    expect(ROUTE).toMatch(/auth === `Bearer \$\{process\.env\.CRON_SECRET\}`/);
+    // Checked through the shared constant-time helper (src/lib/cron/cron-request-auth.ts).
+    expect(ROUTE).toMatch(/isDispatcher = Boolean\(process\.env\.CRON_SECRET\) && hasValidCronSecret\(request\)/);
     expect(ROUTE).toMatch(/!isVercelCron && !isDispatcher && password !== ADMIN_PASSWORD/);
   });
 
   it('an unset CRON_SECRET cannot authenticate an empty bearer', () => {
-    expect(ROUTE).toMatch(/Boolean\(process\.env\.CRON_SECRET\) && auth ===/);
+    // hasValidCronSecret() returns false whenever CRON_SECRET is unset (cron-request-auth.unit.test.ts).
+    expect(ROUTE).toMatch(/Boolean\(process\.env\.CRON_SECRET\) && hasValidCronSecret\(request\)/);
+    expect(ROUTE).not.toMatch(/`Bearer \$\{process\.env\.CRON_SECRET\}`/);
   });
 });
