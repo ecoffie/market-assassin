@@ -322,3 +322,53 @@ describe('Map report pane: the preview can be scrolled', () => {
     expect(MAP).toContain('setTimeout(function(){ if(input&&!repIsOpen()) input.focus(); },220);');
   });
 });
+
+describe('Map report pane: the same-origin preview frame is locked down (Agent 4 review, 2026-11-22)', () => {
+  const frame = (doc: Document) => doc.querySelector('.amk-rep-f') as HTMLIFrameElement;
+
+  it('the sandbox is exactly allow-same-origin: never scripts, forms, popups, modals or top navigation', async () => {
+    const t = boot({ chat: reportTurn() });
+    await t.ask('market report');
+    const sb = frame(t.doc).getAttribute('sandbox');
+    expect(sb).toBe('allow-same-origin');
+    for (const token of ['allow-scripts', 'allow-forms', 'allow-popups', 'allow-modals', 'allow-top-navigation', 'allow-downloads']) expect(sb).not.toContain(token);
+    expect(MAP.match(/sandbox="[^"]*"/g)?.filter((m) => m.includes('allow-')) ?? []).toEqual(['sandbox="allow-same-origin"']); // the only token anywhere in the Map page
+  });
+
+  it('a Content-Security-Policy that blocks every request is the first thing in the frame, and refresh / base tags are removed', async () => {
+    const hostile = '<!doctype html><html><head><meta http-equiv="refresh" content="0;url=/api/app/chat-sessions?email=x"><META HTTP-EQUIV=Refresh CONTENT="1; URL=/api/x"><base href="https://evil.example/"><title>R</title></head><body><p>REPORT BODY</p></body></html>';
+    const t = boot({ chat: reportTurn({ html: hostile }) });
+    await t.ask('market report');
+    const srcdoc = frame(t.doc).srcdoc;
+    const head = srcdoc.slice(srcdoc.indexOf('<head>') + '<head>'.length);
+    expect(head.startsWith('<meta http-equiv="Content-Security-Policy" content="default-src \'none\'; style-src \'unsafe-inline\'; img-src data:; font-src data:; base-uri \'none\'; form-action \'none\'">')).toBe(true);
+    expect(srcdoc).not.toMatch(/http-equiv="?refresh/i);
+    expect(srcdoc).not.toMatch(/<base\b/i);
+    expect(srcdoc).toContain('REPORT BODY');
+  });
+
+  it('HTML without a head still gets the policy first', async () => {
+    const t = boot({ chat: reportTurn({ html: '<p>BARE</p>' }) });
+    await t.ask('market report');
+    expect(frame(t.doc).srcdoc.startsWith('<meta http-equiv="Content-Security-Policy"')).toBe(true);
+  });
+
+  it('links never navigate the frame: http(s) opens a new tab with noopener, mailto goes to the mail app, anything else does nothing', async () => {
+    const t = boot({ chat: reportTurn() });
+    await t.ask('market report');
+    const f = frame(t.doc);
+    const d = f.contentDocument!;
+    d.open(); d.write('<!doctype html><html><head></head><body><a id="ext" href="https://www.sam.gov/opp/1">SAM</a><a id="api" href="/api/app/vault/documents/download?id=1">x</a><a id="js" href="javascript:alert(1)">y</a><span id="txt">plain</span></body></html>'); d.close();
+    const open = vi.fn();
+    (t.w as unknown as { open: typeof open }).open = open;
+    f.dispatchEvent(new t.w.Event('load'));
+    const click = (id: string) => { const ev = new d.defaultView!.MouseEvent('click', { bubbles: true, cancelable: true }); d.getElementById(id)!.dispatchEvent(ev); return ev.defaultPrevented; };
+    expect(click('ext')).toBe(true);
+    expect(open).toHaveBeenCalledWith('https://www.sam.gov/opp/1', '_blank', 'noopener');
+    expect(click('api')).toBe(true); // prevented, and nothing opened
+    expect(click('js')).toBe(true);
+    expect(open).toHaveBeenCalledTimes(1);
+    expect(click('txt')).toBe(false); // ordinary clicks are untouched
+  });
+});
+

@@ -35,7 +35,10 @@ if (PDF.subarray(0, 5).toString('latin1') !== '%PDF-') { console.error('--pdf is
 
 const REPORT_ID = 'AbCdEfGhIjKlMnOpQrStUv';
 const sections = Array.from({ length: 30 }, (_, i) => `<div class="sec"><h2>Section ${i + 1}</h2><p>Line of report text.</p></div>`).join('');
-const HTML = `<!doctype html><html><head><meta charset="utf-8"><style>.sec{padding:20px;border:1px solid #ddd;margin:12px}</style></head><body><header class="rp" style="position:relative"><h1>Facilities maintenance</h1><button class="pdfbtn" onclick="window.print()">Save as PDF</button></header>${sections}</body></html>`;
+// Stand-in for a renderer bug: raw markup that would act with our cookies in a same-origin frame. The
+// frame's CSP must block the request, the refresh must be gone, and the frame must not navigate.
+const HOSTILE = '<img id="probe-img" src="/api/should-never-load.png"><meta http-equiv="refresh" content="0;url=/api/should-never-navigate"><base href="https://evil.example/">';
+const HTML = `<!doctype html><html><head><meta charset="utf-8"><style>.sec{padding:20px;border:1px solid #ddd;margin:12px}</style></head><body><header class="rp" style="position:relative"><h1>Facilities maintenance</h1><button class="pdfbtn" onclick="window.print()">Save as PDF</button></header>${sections}${HOSTILE}</body></html>`;
 // Same shape as fail() in src/app/reports/[id]/pdf/route.ts for a non-JSON request (a navigation).
 const ERROR_PAGE = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>PDF not available</title></head><body><div class="c"><h1>PDF not available</h1><p>We couldn't create the PDF just now. Try again in a minute. The report itself is unchanged.</p><p style="margin-top:16px"><a href="/reports/${REPORT_ID}">Back to the report</a></p></div></body></html>`;
 const tokPayload = Buffer.from(JSON.stringify({ email: 'fixture@example.com', exp: 9999999999 })).toString('base64url');
@@ -68,6 +71,12 @@ for (const [label, opts] of [['desktop 1440x900', { viewport: { width: 1440, hei
     await ctx.addInitScript((t) => { try { localStorage.setItem('mi_beta_auth_token', t); } catch {} }, `${tokPayload}.sig`);
     const page = await ctx.newPage();
     const pageErrors = [];
+    const forbidden = [];
+    // A request the CSP blocks is still REPORTED by the browser, then fails as blocked; only one that got a
+    // response (or failed any other way) means something left the frame.
+    const blocked = [];
+    page.on('requestfailed', (r) => { if (/should-never|evil\.example/.test(r.url())) { const why = (r.failure() && r.failure().errorText) || ''; (/csp|blocked/i.test(why) ? blocked : forbidden).push(`${r.url()} (${why})`); } });
+    page.on('response', (r) => { if (/should-never|evil\.example/.test(r.url())) forbidden.push(`${r.url()} (got ${r.status()})`); });
     page.on('pageerror', (e) => pageErrors.push(e.message));
     await page.route('**/api/app/chat', (r) => r.fulfill({ status: 200, headers: { 'content-type': 'text/event-stream' }, body: sse([
       { type: 'session', sessionId: '11111111-1111-4111-8111-111111111111' },
@@ -133,6 +142,17 @@ for (const [label, opts] of [['desktop 1440x900', { viewport: { width: 1440, hei
     check(`${tag} one PDF request`, pdfRequests === 1, String(pdfRequests));
     check(`${tag} the PDF is requested by navigation, not fetch`, pdfKinds[0] === 'document:nav', pdfKinds.join(','));
     check(`${tag} no page errors`, pageErrors.length === 0, pageErrors.slice(0, 2).join(' | '));
+    if (mode === 'ok') {
+      const lock = await page.evaluate(() => {
+        const f = document.querySelector('.amk-rep-f'); const d = f.contentDocument;
+        return { sandbox: f.getAttribute('sandbox'), firstInHead: d.head.firstElementChild && d.head.firstElementChild.getAttribute('http-equiv'), url: d.location.href, img: d.getElementById('probe-img') ? d.getElementById('probe-img').naturalWidth : -1, refresh: !!d.querySelector('meta[http-equiv=refresh i]'), base: !!d.querySelector('base') };
+      });
+      check(`${tag} frame sandbox is allow-same-origin only`, lock.sandbox === 'allow-same-origin', lock.sandbox);
+      check(`${tag} a request-blocking CSP is the first element of the frame head`, lock.firstInHead === 'Content-Security-Policy', String(lock.firstInHead));
+      check(`${tag} no refresh or base tag reached the frame`, !lock.refresh && !lock.base, JSON.stringify(lock));
+      check(`${tag} the frame never navigated`, lock.url === 'about:srcdoc', lock.url);
+      check(`${tag} nothing left the frame: the probe image was blocked by the CSP`, forbidden.length === 0 && blocked.length === 1 && lock.img === 0, `blocked=${blocked.join(',')} forbidden=${forbidden.join(',')}`);
+    }
     await ctx.close();
   }
 }

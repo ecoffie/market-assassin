@@ -11440,11 +11440,37 @@ const ASK_MINDY_JS = `<script>(function(){
   // production browser (2026-11-22). Measuring needs allow-same-origin; the frame still has NO scripts,
   // forms, popups or top navigation. If the document cannot be read, the frame keeps the old full-pane
   // layout and its own document scrolls (html is forced scrollable below).
+  // Same-origin frame, so it is locked down further (Agent 4 review of this change):
+  // - a Content-Security-Policy meta is the FIRST thing in its head: no request of any kind leaves the
+  //   frame (default-src 'none'; only inline styles and data: images/fonts), so nothing in it can reach
+  //   an /api route or any URL with our cookies; no <base>, no form submission;
+  // - <meta http-equiv="refresh"> and <base> are removed before the HTML goes in;
+  // - link clicks never navigate the frame: http(s) links open a new tab, mailto opens the mail app,
+  //   anything else does nothing (repLinks).
+  // The HTML itself is only our renderers' output (market report, Vault preview), with every user and
+  // model string escaped.
+  var REP_FRAME_CSP='<meta http-equiv="Content-Security-Policy" content="default-src \\'none\\'; style-src \\'unsafe-inline\\'; img-src data:; font-src data:; base-uri \\'none\\'; form-action \\'none\\'">';
   var REP_FRAME_CSS='<style>.pdfbtn{display:none!important}html{height:auto!important;overflow:auto!important}body{height:auto!important;min-height:0!important;overflow:visible!important}</style>';
+  function repFrameHtml(html){
+    var h=String(html||'').replace(/<meta[^>]*http-equiv\\s*=\\s*["']?refresh[^>]*>/gi,'').replace(/<base\\b[^>]*>/gi,'');
+    h=/<[/]head>/i.test(h)?h.replace(/<[/]head>/i,REP_FRAME_CSS+'</head>'):REP_FRAME_CSS+h;
+    return /<head\\b[^>]*>/i.test(h)?h.replace(/<head\\b[^>]*>/i,function(m){ return m+REP_FRAME_CSP; }):REP_FRAME_CSP+h;
+  }
   function repSetDoc(E,html){
     E.f.classList.remove('fit'); E.f.style.height='';
-    E.f.srcdoc=/<[/]head>/i.test(html)?html.replace(/<[/]head>/i,REP_FRAME_CSS+'</head>'):REP_FRAME_CSS+html;
+    E.f.srcdoc=repFrameHtml(html);
     E.f.style.visibility='visible'; E.msg.style.display='none'; repError('');
+  }
+  function repLinks(E){
+    var d=null; try{ d=E.f.contentDocument; }catch(e){ d=null; }
+    if(!d||d.__amkLinks) return; d.__amkLinks=1;
+    d.addEventListener('click',function(ev){
+      var t=ev.target, a=t&&t.closest?t.closest('a[href]'):null; if(!a) return;
+      ev.preventDefault();
+      var href=String(a.getAttribute('href')||'');
+      if(/^https?:/i.test(href)){ try{ window.open(href,'_blank','noopener'); }catch(e){} }
+      else if(/^mailto:/i.test(href)){ try{ window.location.href=href; }catch(e){} }
+    },true);
   }
   function repFit(E){
     var d=null; try{ d=E.f.contentDocument; }catch(e){ d=null; }
@@ -11471,7 +11497,7 @@ const ASK_MINDY_JS = `<script>(function(){
     var body=el.querySelector('.amk-rep-body'); repEls.body=body;
     repEls.f.addEventListener('load',function(){
       if(repEls.f.style.visibility!=='visible') return;
-      var fitted=repFit(repEls); body.scrollTop=0;
+      var fitted=repFit(repEls); repLinks(repEls); body.scrollTop=0;
       if(repIsOpen()){ try{ (fitted?body:repEls.f).focus(); }catch(e){} }
     });
     // A width change reflows the report, so its height is measured again.
