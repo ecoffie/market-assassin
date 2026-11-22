@@ -118,10 +118,15 @@ async function sumSetAside(codes, rcValue) {
   let total = 0;
   const sam = await db.from('sam_opportunities').select('*', { count: 'exact', head: true })
     .in('set_aside_code', codes).gte('response_deadline', new Date().toISOString());
-  if (sam.error) parts.sam_opportunities = `ERR ${sam.error.message}`; else { parts.sam_opportunities = sam.count ?? 0; total += sam.count ?? 0; }
+  // A null count with no error is UNKNOWN (e.g. a missing relation), never 0 — the truth is then unusable.
+  if (sam.error) parts.sam_opportunities = `ERR ${sam.error.message}`;
+  else if (sam.count === null) { parts.sam_opportunities = 'UNKNOWN (null count)'; total = NaN; }
+  else { parts.sam_opportunities = sam.count; total += sam.count; }
   const rc = await db.from('recompete_opportunities').select('*', { count: 'exact', head: true })
     .eq('set_aside_type', rcValue).is('quality_flag', null).not('map_lat', 'is', null);
-  if (rc.error) parts.recompete_opportunities = `ERR ${rc.error.message}`; else { parts.recompete_opportunities = rc.count ?? 0; total += rc.count ?? 0; }
+  if (rc.error) parts.recompete_opportunities = `ERR ${rc.error.message}`;
+  else if (rc.count === null) { parts.recompete_opportunities = 'UNKNOWN (null count)'; total = NaN; }
+  else { parts.recompete_opportunities = rc.count; total += rc.count; }
   return { total, parts };
 }
 
