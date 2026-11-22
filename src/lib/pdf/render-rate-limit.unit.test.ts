@@ -59,4 +59,20 @@ describe('checkBrowserRateLimits', () => {
     expect(r.source).toBe('fallback');
     expect(r.results.every((x) => x.source === 'fallback')).toBe(true);
   });
+
+  it('KV hanging: times out and uses the fallback instead of waiting (no request held to maxDuration)', async () => {
+    const kv = fakeKv();
+    kv.incr = vi.fn(() => new Promise<number>(() => {})); // never settles
+    const t0 = Date.now();
+    const r = await checkBrowserRateLimits([spec], global, { kv, now: () => 1_000_000_000, timeoutMs: 50 });
+    expect(Date.now() - t0).toBeLessThan(1000);
+    expect(r).toMatchObject({ allowed: true, source: 'fallback' });
+    const r2 = await checkBrowserRateLimits([spec], global, { kv, now: () => 1_000_000_000, timeoutMs: 50 });
+    expect(r2.allowed).toBe(false); // fallback cap (1) still enforced
+  });
+
+  it('the default timeout is short', async () => {
+    const { KV_TIMEOUT_MS } = await import('./render-rate-limit');
+    expect(KV_TIMEOUT_MS).toBeLessThanOrEqual(2000);
+  });
 });
