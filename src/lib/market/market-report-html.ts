@@ -178,11 +178,41 @@ function kpi(status: string | undefined, n: unknown): string {
   return num(n);
 }
 
-function table(headers: string[], rows: string[][], whenEmpty?: string): string {
+const FOOTER_HTML = 'Powered by <b>Mindy</b> · getmindy.ai — federal contracting intelligence.<br>\n  '
+  + 'Figures are federal contract obligations over the reporting window (USASpending/SAM), not budget authority.';
+
+/**
+ * In the PDF the page footer is printed INSIDE the last section, so it travels with that section's final
+ * rows; as a separate block after the section it could land alone on an extra page (Claude Local,
+ * 2026-11-22: page 9 held only the footer). The screen keeps the page-level footer.
+ */
+function withPrintFooter(body: string): string {
+  const at = body.lastIndexOf('</section>');
+  if (at < 0) return body;
+  return `${body.slice(0, at)}<div class="rp rp-print">${FOOTER_HTML}</div>${body.slice(at)}`;
+}
+
+/**
+ * Wraps code-like tokens in already-escaped text (letters/digits joined by hyphens with at least one digit,
+ * such as a project number "561A4-26-510") so the PDF never splits them at a hyphen. Ordinary hyphenated
+ * words ("Service-Disabled") are left to wrap like prose.
+ */
+function keepCodesWhole(escaped: string): string {
+  return escaped.replace(/(^|[\s(])((?=[A-Za-z0-9-]*\d)[A-Za-z0-9]+(?:-[A-Za-z0-9]+)+)(?=$|[\s),.;:])/g, '$1<span class="code">$2</span>');
+}
+
+/**
+ * `textCols`: columns (besides the first, which is always the lead) that hold long prose, such as an agency name
+ * or a set-aside. In the PDF only those and the lead wrap, and only between words; every other cell (money,
+ * codes, dates, short labels) and every header stays whole (Claude Local, 2026-11-22: "$1.6B" printed as
+ * "$1." / "6B" and "AMOUNT" as AM/OU/NT).
+ */
+function table(headers: string[], rows: string[][], whenEmpty?: string, textCols: number[] = []): string {
   if (!rows.length) return `<p class="empty">${esc(whenEmpty || emptyText(undefined))}</p>`;
   const head = headers.map((h) => `<th>${esc(h)}</th>`).join('');
+  const cls = (i: number) => (i === 0 ? ' class="lead"' : textCols.includes(i) ? ' class="txt"' : '');
   const body = rows
-    .map((r) => `<tr>${r.map((c, i) => `<td${i === 0 ? ' class="lead"' : ''}>${c}</td>`).join('')}</tr>`)
+    .map((r) => `<tr>${r.map((c, i) => `<td${cls(i)}>${c}</td>`).join('')}</tr>`)
     .join('');
   return `<div class="tw"><table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div>`;
 }
@@ -267,8 +297,8 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
   // same incumbent apart (Heritage-M2C1 holds FA500425F0093 AND FA500425F0094 — two
   // contracts, not one row printed twice).
   const recompeteRows = (sections.recompetes.contracts as Row[]).map((c) => [
-    `${esc(c.incumbent_name || '—')}<div class="rowsub">${esc(c.piid || '')}${
-      c.description ? ` · ${esc(s(c.description).slice(0, 90))}${s(c.description).length > 90 ? '…' : ''}` : ''
+    `${esc(c.incumbent_name || '—')}<div class="rowsub">${c.piid ? `<span class="code">${esc(c.piid)}</span>` : ''}${
+      c.description ? ` · ${keepCodesWhole(esc(s(c.description).slice(0, 90)))}${s(c.description).length > 90 ? '…' : ''}` : ''
     }</div>`,
     esc(c.awarding_sub_agency || c.awarding_agency || '—'),
     esc(c.naics_code || '—'),
@@ -398,6 +428,8 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
                 + (t.inputs.length > 1 ? `<div class="tier-terms">Terms: ${esc(t.inputs.join(', '))}</div>` : ''),
             ]),
           ],
+          undefined,
+          [2],
         ),
       )
     : '';
@@ -473,7 +505,7 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
           ? ` Showing ${num(recompeteRows.length)} of ${num(summary.recompetes_total)} found.`
           : ''
       }`,
-      table(['Incumbent / contract', 'Agency', 'NAICS', 'Value', 'Ends', 'Likelihood'], recompeteRows, emptyText(st('recompetes')))),
+      table(['Incumbent / contract', 'Agency', 'NAICS', 'Value', 'Ends', 'Likelihood'], recompeteRows, emptyText(st('recompetes')), [1, 5])),
     section('Upcoming forecasts',
       `Planned procurements agencies have published.${
         summary.forecasts_total != null && summary.forecasts_total > forecastRows.length
@@ -484,7 +516,7 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
           ? ` ${num(summary.forecasts_duplicates_removed)} duplicate listing${summary.forecasts_duplicates_removed === 1 ? '' : 's'} (the same listing received from two sources) removed.`
           : ''
       }`,
-      table(['Title', 'Agency', 'NAICS', 'Value', 'FY', 'Set-aside'], forecastRows, emptyText(st('forecasts')))),
+      table(['Title', 'Agency', 'NAICS', 'Value', 'FY', 'Set-aside'], forecastRows, emptyText(st('forecasts')), [1, 5])),
     agencyDetailHtml,
   ].join('\n');
 
@@ -536,6 +568,7 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
   .rec h2 { color:var(--purple); }
   footer.rp { margin-top:28px; text-align:center; color:var(--muted); font-size:12px; }
   footer.rp b { color:var(--purple); }
+  .rp-print { display:none; }
   .pdfbtn { position:absolute; top:22px; right:22px; background:rgba(255,255,255,.16); color:#fff; border:1px solid rgba(255,255,255,.5);
             border-radius:8px; padding:7px 13px; font:600 12.5px/1 inherit; cursor:pointer; text-decoration:none; }
   .pdfbtn:hover { background:rgba(255,255,255,.28); }
@@ -544,9 +577,17 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
   @media print {
     .tw { overflow: visible; }
     table { width: 100%; table-layout: auto; }
-    th, td, td:not(.lead) { white-space: normal; overflow-wrap: anywhere; }
+    th, td:not(.lead):not(.txt) { white-space: nowrap; }
+    td.lead, td.txt { white-space: normal; overflow-wrap: break-word; word-break: normal; }
+    .code { white-space: nowrap; }
     thead { display: table-header-group; }
     tr { break-inside: avoid; }
+    .sec { break-inside: auto; }
+    .sec h2, .sec h3, .sec .sub { break-after: avoid; }
+    .stat, .two > div { break-inside: avoid; }
+    footer.rp { display: none; }
+    .rp-print { display: block; margin-top: 14px; text-align: center; color: var(--muted); font-size: 12px; break-before: avoid; break-inside: avoid; }
+    .rp-print b { color: var(--purple); }
     .stat-v { white-space: normal; overflow: visible; text-overflow: clip; }
     .stat-sub { display: block; -webkit-line-clamp: unset; overflow: visible; }
   }
@@ -561,8 +602,7 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
       : '<button class="pdfbtn" onclick="window.print()">Save as PDF</button>'}
   </header>
   ${degradedNote}
-  ${body}
-  <footer class="rp">Powered by <b>Mindy</b> · getmindy.ai — federal contracting intelligence.<br>
-  Figures are federal contract obligations over the reporting window (USASpending/SAM), not budget authority.</footer>
+  ${withPrintFooter(body)}
+  <footer class="rp">${FOOTER_HTML}</footer>
 </div></body></html>`;
 }
