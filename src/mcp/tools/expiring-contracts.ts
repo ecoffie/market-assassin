@@ -262,7 +262,7 @@ export async function expiringContracts(
       key_caveats: [
         'vehicles[] groups orders by the parent IDV recorded on each order. Holders of a multiple-award vehicle each hold their own IDV number, so sibling IDVs from one solicitation appear as separate vehicles; holders_in_result lists only holders seen in these rows.',
         'place_of_performance_state is the place of performance as reported by USASpending, shown as reported; null means USASpending reported none.',
-        'recompete_likelihood is an inference; some contracts get extended or not recompeted.',
+        'recompete_likelihood is an inference; some contracts get extended or not recompeted. not_recurring = a one-time construction/alteration project (definitive contract, construction PSC/NAICS; see recompete_likelihood_basis): present it as a finished project, not a recompete target.',
         // set_aside_type is NULL on ~65% of rows (only PIIDs matched in the BQ awards
         // backfill carry it). NULL means UNKNOWN, never "Full & Open" — do not tell a
         // user a contract is open to them because the field is empty.

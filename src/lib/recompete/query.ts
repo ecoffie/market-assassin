@@ -12,6 +12,7 @@ import { createClient } from '@supabase/supabase-js';
 import { getNaics } from '@/lib/codes/lookup';
 import { annotateRecompeteRow, type RecompeteRowAnnotations } from '@/lib/recompete/annotate';
 import { dedupeRecompeteRows } from '@/lib/recompete/dedupe-orders';
+import { NOT_ONE_TIME_CONSTRUCTION_OR } from '@/lib/recompete/one-time-project';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -274,6 +275,9 @@ export async function queryExpiringContracts(input: ExpiringContractsInput): Pro
     if (Number.isFinite(input.maxValue)) q = q.lte('total_obligation', Number(input.maxValue));
     if (input.likelihood && ['high', 'medium', 'low'].includes(input.likelihood)) {
       q = q.eq('recompete_likelihood', input.likelihood);
+      // The stored likelihood ignores contract type; one-time construction displays as not_recurring
+      // (annotate.ts), so it must not be paged in under a likelihood filter either.
+      q = q.or(NOT_ONE_TIME_CONSTRUCTION_OR);
     }
     // Eligibility narrowing. Matches on set_aside_enriched (the column the
     // backfill actually populated — set_aside_type is a coalesced VIEW of it in

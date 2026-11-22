@@ -10,6 +10,8 @@
  *              (The DB trigger column is overridden here, at read time.)
  *   lineage  — an order under a vehicle is labelled as one (`award_kind`, parent vehicle) and
  *              carries no standalone recompete date.
+ *   likelihood — a one-time construction project (definitive contract, construction PSC/NAICS) is
+ *              'not_recurring', not the DB trigger's 'high' (one-time-project.ts).
  *   location — `place_of_performance_state` is USASpending's reported place of performance,
  *              exposed AS REPORTED (Eric, 2026-09-22: no free-text override, no alternate PoP
  *              authority). The source note says exactly that.
@@ -23,6 +25,7 @@
  */
 import { overlayRecompeteTiming, CAPTURE_START_BASIS } from './timing';
 import { parseAwardLineage, type AwardKind } from './award-lineage';
+import { isOneTimeConstruction, NOT_RECURRING, ONE_TIME_BASIS } from './one-time-project';
 import { contractCeiling, type CeilingBasis } from './contract-value';
 
 export const POP_SOURCE_NOTE = 'Place of performance as reported by USASpending.' as const;
@@ -74,6 +77,7 @@ export function recompeteRowAnnotations(row: AnnotatableRow, now: Date = new Dat
     place_of_performance_source_note: POP_SOURCE_NOTE,
     potential_total_value: ceiling.ceiling,
     ceiling_basis: ceiling.basis,
+    ...(isOneTimeConstruction(row) ? { recompete_likelihood: NOT_RECURRING, recompete_likelihood_basis: ONE_TIME_BASIS } : {}),
   };
 }
 

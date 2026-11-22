@@ -268,7 +268,7 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
     esc(c.naics_code || '—'),
     money(c.potential_total_value ?? c.total_obligation),
     esc(s(c.period_of_performance_current_end).slice(0, 10) || '—'),
-    esc(c.recompete_likelihood || '—'),
+    esc(c.recompete_likelihood === 'not_recurring' ? 'One-time project' : (c.recompete_likelihood || '—')),
   ]);
 
   // ---- Forecasts ----
