@@ -162,7 +162,12 @@ function section(title: string, sub: string, inner: string): string {
   return `<section class="sec"><h2>${esc(title)}</h2>${sub ? `<p class="sub">${esc(sub)}</p>` : ''}${inner}</section>`;
 }
 
-export function renderMarketReportHtml(report: ReportLike, opts: { date?: string } = {}): string {
+/**
+ * opts.pdfUrl: where a real PDF of THIS report can be downloaded (the hosted /reports/<id> page passes
+ * /reports/<id>/pdf). With it the header button is a download link; without it (MCP's inline HTML, which
+ * has no stored copy to render) it stays the browser's print dialog.
+ */
+export function renderMarketReportHtml(report: ReportLike, opts: { date?: string; pdfUrl?: string } = {}): string {
   const { subject, summary, sections, generated_for } = report;
   const date = opts.date || new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 
@@ -479,9 +484,9 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
   footer.rp { margin-top:28px; text-align:center; color:var(--muted); font-size:12px; }
   footer.rp b { color:var(--purple); }
   .pdfbtn { position:absolute; top:22px; right:22px; background:rgba(255,255,255,.16); color:#fff; border:1px solid rgba(255,255,255,.5);
-            border-radius:8px; padding:7px 13px; font:600 12.5px/1 inherit; cursor:pointer; }
+            border-radius:8px; padding:7px 13px; font:600 12.5px/1 inherit; cursor:pointer; text-decoration:none; }
   .pdfbtn:hover { background:rgba(255,255,255,.28); }
-  @media (max-width:560px){ .pdfbtn { display:none; } }
+  @media (max-width:560px){ button.pdfbtn { display:none; } a.pdfbtn { position:static; display:inline-block; margin-top:12px; } }
   @media print { body { background:#fff; } .sec,.stat { break-inside:avoid; } .pdfbtn { display:none; } }
 </style></head>
 <body><div class="wrap">
@@ -489,7 +494,9 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
     <div class="kick">Federal Market Report</div>
     <h1>${esc(subject)}</h1>
     <div class="meta">${generated_for ? `Prepared for ${esc(generated_for)} · ` : ''}${esc(date)}</div>
-    <button class="pdfbtn" onclick="window.print()">Save as PDF</button>
+    ${opts.pdfUrl
+      ? `<a class="pdfbtn" href="${esc(opts.pdfUrl)}" download>Download PDF</a>`
+      : '<button class="pdfbtn" onclick="window.print()">Save as PDF</button>'}
   </header>
   ${degradedNote}
   ${body}
