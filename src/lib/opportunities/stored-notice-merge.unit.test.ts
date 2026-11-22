@@ -35,3 +35,29 @@ describe('withMergedNoticeType', () => {
     expect(get('naics')).toBe('236220');
   });
 });
+
+describe('semantics match the live map exactly (Claude Local review of #2339)', () => {
+  function full() {
+    const calls: Array<[string, unknown[]]> = [];
+    const q: Record<string, unknown> = {};
+    for (const m of ['eq', 'neq', 'gte', 'lte', 'gt', 'lt', 'is', 'not', 'ilike', 'like', 'contains', 'overlaps', 'filter', 'order', 'limit', 'range', 'select', 'textSearch', 'match', 'or', 'in']) {
+      q[m] = (...args: unknown[]) => { calls.push([m, args]); return q; };
+    }
+    return { q, calls };
+  }
+  // The map's own merge (opportunity-map/route.ts _merge): [noticeType, noticeMulti].filter(Boolean).join(',')
+  const mapMerge = (a?: string, b?: string) => [a, b].filter(Boolean).join(',');
+
+  it('OR within notice types (one .in), AND with every other filter (separate chained predicates), identical to the map', () => {
+    const stored = { noticeType: 'Presolicitation', noticeMulti: 'Solicitation,Sources Sought', naics: '236220', state: 'FL' } as Record<string, string>;
+    const saved = full();
+    applyMapFilters(saved.q, parseMapFilters(withMergedNoticeType(withMergedSetAside((k) => stored[k] ?? null))));
+    const live = full();
+    const url = { noticeType: mapMerge(stored.noticeType, stored.noticeMulti), naics: stored.naics, state: stored.state } as Record<string, string>;
+    applyMapFilters(live.q, parseMapFilters((k) => url[k] ?? null));
+    expect(saved.calls).toEqual(live.calls);
+    const notice = saved.calls.filter(([m, a]) => m === 'in' && a[0] === 'notice_type');
+    expect(notice).toEqual([['in', ['notice_type', ['Presolicitation', 'Solicitation', 'Sources Sought']]]]);
+    expect(saved.calls.some(([m, a]) => m === 'or' && String(a[0]).includes('naics_code'))).toBe(true);
+  });
+});

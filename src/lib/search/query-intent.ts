@@ -136,13 +136,13 @@ export function keywordOrExpr(keyword: string, cols: string[]): string {
 //
 // SAM: has BOTH a short set_aside_code (8A/8AN/…) and a long set_aside_description → match either.
 // Recompete/Forecast: only a free-text set_aside_type → ILIKE the canonical spellings.
-const SET_ASIDE_CODES: Record<SetAsideKey, string[]> = {
+export const SET_ASIDE_CODES: Record<SetAsideKey, string[]> = {
   '8a': ['8A', '8AN'],
   wosb: ['WOSB', 'WOSBSS'],
   edwosb: ['EDWOSB', 'EDWOSBSS'],
   hubzone: ['HZC', 'HZS'],
   sdvosb: ['SDVOSBC', 'SDVOSBS'],
-  vosb: ['VSA', 'VSB'],
+  vosb: ['VSA', 'VSS'], // VA-only Veteran-Owned set-aside / sole source. VSB is Very Small Business, NOT veteran.
   sdb: ['SDB'],
   sb: ['SBA', 'SBP'],
   isbee: ['ISBEE'],

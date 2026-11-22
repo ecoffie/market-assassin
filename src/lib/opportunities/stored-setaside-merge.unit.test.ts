@@ -45,3 +45,20 @@ describe('a saved search with a Filters-panel set-aside is filtered like the map
     expect(evaluate({ setAside: 'SB' })).toMatch(/set_aside_code\.in\.\(SBA,SBP,SB\)/);
   });
 });
+
+describe('stored LOWERCASE tokens (plain-English search appends them) — Claude Local review of #2338', () => {
+  it("a stored lowercase 'sdvosb' maps exactly like 'SDVOSB'", () => {
+    expect(evaluate({ setAsideMulti: 'sdvosb' })).toBe(evaluate({ setAsideMulti: 'SDVOSB' }));
+    expect(evaluate({ setAsideMulti: 'sdvosb' })).toMatch(/set_aside_code\.in\.\(SDVOSBC,SDVOSBS/);
+  });
+  it('lowercase intent keys with no group key use their official codes, never a literal that matches nothing', () => {
+    const e = evaluate({ setAsideMulti: 'hubzone,vosb' });
+    expect(e).toMatch(/HZC/);
+    expect(e).toMatch(/VSA/);
+    expect(e).not.toMatch(/\bhubzone\b|\bvosb\b/);
+  });
+  it('an uppercase group key and unknown tokens pass through unchanged', () => {
+    const get = withMergedSetAside((k) => ({ setAside: 'SB', setAsideMulti: 'XYZ' } as Record<string, unknown>)[k]);
+    expect(get('setAside')).toBe('SB,XYZ');
+  });
+});
