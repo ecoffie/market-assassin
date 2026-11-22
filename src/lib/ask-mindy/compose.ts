@@ -205,3 +205,110 @@ export function composeProfileSetup(run: RecipeRun): ReadinessItem[] {
   items.push({ item: 'website', status: 'unknown', detail: 'No tool returns the company website yet; add it on the profile page.' });
   return items;
 }
+
+// ---------------------------------------------------------------------------------------------------------------
+// Opportunity deep dive (spec section 5, recipe 3): the facts a pursue/pass read is written from.
+
+export interface DeepDiveContext {
+  notice: {
+    state: 'found' | 'not_found' | 'ambiguous' | 'unavailable';
+    title?: string | null;
+    identifiers?: string[];
+    status?: string;
+    not_biddable?: boolean;
+    response_deadline?: string | null;
+    /** Whole days from now to the response deadline (negative = passed). Absent when the deadline is unknown. */
+    days_to_deadline?: number;
+    latest_amendment?: string | null;
+    deadline_conflict?: boolean;
+    buyer?: string | null;
+    naics?: string | null;
+    psc?: string | null;
+    contact?: { name: string | null; email: string | null; phone: string | null } | null;
+  };
+  incumbent: {
+    /** Only 'identified' may be named as the incumbent. */
+    finding: 'identified' | 'candidate_not_confirmed' | 'not_found' | 'search_failed' | 'notice_not_found' | 'unavailable';
+    name?: string;
+    award_id?: string;
+    obligated?: number;
+    ceiling?: number;
+    /** The tool's own sentence for every non-identified finding; the answer must not contradict it. */
+    absence_note?: string;
+    prior_award_count?: number;
+  };
+  /** Present when understand_customer returned; its content is passed to the answer as-is, not summarized here. */
+  customer_brief_available: boolean;
+  not_checked: Array<{ step: string; state: string; reason: string }>;
+}
+
+type LookupLike = { items?: Array<Record<string, unknown>> };
+type IncumbentLike = {
+  incumbent?: { recipientName?: string; awardId?: string; obligated?: number; ceiling?: number } | null;
+  prior_awards?: unknown[];
+  _meta?: { incumbent_finding?: DeepDiveContext['incumbent']['finding']; absence_note?: string };
+};
+
+const DAY_MS = 86_400_000;
+
+/** Opportunity deep dive: notice facts, the incumbent finding exactly as the tool states it, and what was not checked. */
+export function composeDeepDive(run: RecipeRun, nowMs: number = Date.now()): DeepDiveContext {
+  const notice = stepOf(run, 'notice');
+  const items = notice?.state === 'ok' ? ((notice.value as LookupLike)?.items ?? []) : null;
+  let n: DeepDiveContext['notice'];
+  if (items === null) n = { state: 'unavailable' };
+  else if (items.length === 0) n = { state: 'not_found' };
+  else if (items.length > 1) n = { state: 'ambiguous', identifiers: items.flatMap((i) => (Array.isArray(i.identifiers) ? (i.identifiers as string[]) : [])) };
+  else {
+    const i = items[0];
+    const deadline = typeof i.response_deadline === 'string' ? i.response_deadline : null;
+    const t = deadline ? Date.parse(deadline) : NaN;
+    n = {
+      state: 'found',
+      title: (i.title as string | null) ?? null,
+      identifiers: Array.isArray(i.identifiers) ? (i.identifiers as string[]) : [],
+      status: typeof i.status === 'string' ? i.status : undefined,
+      not_biddable: i.not_biddable === true,
+      response_deadline: deadline,
+      ...(Number.isFinite(t) ? { days_to_deadline: Math.floor((t - nowMs) / DAY_MS) } : {}),
+      latest_amendment: (i.latest_amendment as string | null) ?? null,
+      deadline_conflict: i.deadline_conflict === true,
+      buyer: (i.buyer as string | null) ?? null,
+      naics: (i.naics as string | null) ?? null,
+      psc: (i.psc as string | null) ?? null,
+      contact: (i.contact as DeepDiveContext['notice']['contact']) ?? null,
+    };
+  }
+
+  const inc = stepOf(run, 'incumbent');
+  let incumbent: DeepDiveContext['incumbent'];
+  if (!inc || inc.state !== 'ok') incumbent = { finding: inc?.state === 'skipped' ? 'notice_not_found' : 'unavailable', absence_note: 'The incumbent lookup did not run, so whether there is an incumbent is unknown. Never say there is no incumbent.' };
+  else {
+    const v = inc.value as IncumbentLike;
+    const finding = v?._meta?.incumbent_finding ?? 'search_failed';
+    const prior = Array.isArray(v?.prior_awards) ? v.prior_awards.length : undefined;
+    incumbent = finding === 'identified' && v.incumbent
+      ? {
+        finding,
+        ...(v.incumbent.recipientName ? { name: v.incumbent.recipientName } : {}),
+        ...(v.incumbent.awardId ? { award_id: v.incumbent.awardId } : {}),
+        ...(typeof v.incumbent.obligated === 'number' && v.incumbent.obligated > 0 ? { obligated: v.incumbent.obligated } : {}),
+        ...(typeof v.incumbent.ceiling === 'number' && v.incumbent.ceiling > 0 ? { ceiling: v.incumbent.ceiling } : {}),
+        ...(prior !== undefined ? { prior_award_count: prior } : {}),
+      }
+      : {
+        finding: finding === 'identified' ? 'search_failed' : finding,
+        ...(v?._meta?.absence_note ? { absence_note: v._meta.absence_note } : { absence_note: 'Mindy could not identify an incumbent. Never say there is no incumbent.' }),
+        ...(prior !== undefined ? { prior_award_count: prior } : {}),
+      };
+  }
+
+  return {
+    notice: n,
+    incumbent,
+    customer_brief_available: stepOf(run, 'customer')?.state === 'ok',
+    not_checked: run.status === 'ran'
+      ? run.steps.filter((s) => s.outcome.state !== 'ok').map((s) => ({ step: s.id, state: s.outcome.state, reason: (s.outcome as { reason: string }).reason }))
+      : [{ step: 'recipe', state: 'not_implemented', reason: 'recipe not built' }],
+  };
+}
