@@ -29,6 +29,8 @@ function money(v: unknown): string {
  * has no meaningful share of awards).
  */
 function percentShare(pct: unknown, amount: unknown): string {
+  // A FAILED lookup carries null (agency-spending-detail): unknown, never "net de-obligation" (Number(null) = 0).
+  if (amount === null || amount === undefined || pct === null || pct === undefined || pct === '') return 'unavailable';
   const a = typeof amount === 'number' ? amount : Number(amount);
   if (Number.isFinite(a) && a <= 0) return 'n/a (net de-obligation)';
   if (pct === null || pct === undefined || pct === '') return 'unavailable';
@@ -293,7 +295,7 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
   if (ad && ad.total_obligated) {
     const share = (r: Row) => percentShare(r.pct_of_total, r.amount);
     const subRows = (ad.sub_agencies || []).slice(0, 8).map((r) => [esc(r.name), money(r.amount), share(r)]);
-    const saRows = (ad.set_aside_breakdown || []).slice(0, 8).map((r) => [esc(r.label), money(r.amount), share(r)]);
+    const saRows = (ad.set_aside_breakdown || []).slice(0, 8).map((r) => [esc(r.label), r.amount === null ? 'unavailable' : money(r.amount), share(r)]);
     const fy = Number.isFinite(Number(ad.fiscal_year)) && ad.fiscal_year ? `FY${ad.fiscal_year}` : 'one fiscal year';
     const sb = percentShare(ad.small_business_share, 1);
     agencyDetailHtml = section(
