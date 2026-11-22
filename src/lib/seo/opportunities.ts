@@ -144,6 +144,11 @@ export async function getOpportunityBySlug(slug: string): Promise<SeoOpportunity
 /** LIKE pattern matching strings of at least `n` characters (PostgREST: `*` is `%`). */
 const atLeast = (n: number) => `${'_'.repeat(n)}*`;
 
+/** Related links only consider notices posted within this many days (bounds the scan). */
+export const RELATED_WINDOW_DAYS = 365;
+/** Rows read per scope = limit × this, so the in-JS thin/open checks still fill the list. */
+const RELATED_OVERFETCH = 4;
+
 export interface RelatedOpenOpportunities {
   /** Which scope produced the list: same NAICS first, then the same department. */
   scope: 'naics' | 'agency';
@@ -154,12 +159,19 @@ export interface RelatedOpenOpportunities {
  * Related OPEN opportunities — the internal-link web, and the next step a visitor on a CLOSED
  * notice actually wants. `active` does not mean open (see opportunityStatus), so the old
  * "Similar Active Opportunities" block could link a past-deadline notice under an "active"
- * heading. Every scope — NAICS/department, open-ness, the thin gate — is applied IN THE QUERY,
- * before the limit, so a big NAICS full of closed notices cannot starve the list (filter, then
- * rank). The JS pass only re-checks open-ness to the second (the query is day-grained).
+ * heading. Scope (NAICS/department), open-ness and a recent posted_date window are applied IN
+ * THE QUERY, before the limit, so a big NAICS full of closed notices cannot starve the list
+ * (filter, then rank). The JS pass re-checks open-ness to the second (the query is day-grained)
+ * and applies the description-length part of the thin gate.
  *
- * Returns null when nothing could be read or nothing qualifies — the page then renders no block.
- * A read error is logged, never presented as "no related opportunities".
+ * Cost (2026-11-21): the description-length gate used to run in SQL as a 200-wildcard LIKE,
+ * which de-TOASTs the large description of every candidate row; on big NAICS codes that hit
+ * the statement timeout (1,725 events / 24h). It now runs here on an over-fetched, bounded
+ * batch of RELATED_WINDOW_DAYS.
+ *
+ * A read error on one scope is logged and the next scope (department) is still tried. Returns
+ * null when nothing could be read or nothing qualifies — the page then renders no block. A read
+ * error is never presented as "no related opportunities".
  */
 export async function getRelatedOpenOpportunities(
   opp: Pick<SeoOpportunity, 'noticeId' | 'naicsCode' | 'department'>,
@@ -169,6 +181,7 @@ export async function getRelatedOpenOpportunities(
   const client = sb();
   if (!client) return null;
   const today = now.toISOString().slice(0, 10);
+  const postedFloor = new Date(now.getTime() - RELATED_WINDOW_DAYS * 86_400_000).toISOString().slice(0, 10);
 
   const scopes: Array<{ scope: 'naics' | 'agency'; column: string; value: string | null }> = [
     { scope: 'naics', column: 'naics_code', value: opp.naicsCode },
@@ -178,23 +191,26 @@ export async function getRelatedOpenOpportunities(
     if (!sc.value) continue;
     const { data, error } = await client
       .from('sam_opportunities')
-      .select('notice_id, title, department, notice_type, response_deadline, naics_code')
+      .select('notice_id, title, description, department, notice_type, response_deadline, naics_code')
       .eq('active', true)
       .eq(sc.column, sc.value)
       .neq('notice_id', opp.noticeId)
+      .gte('posted_date', postedFloor)
       .or(`response_deadline.gte.${today},response_deadline.is.null`)
       .or('notice_type.is.null,notice_type.not.ilike.*award*')
       .like('title', atLeast(8))
-      .like('description', atLeast(MIN_BODY)) // a subset of isIndexableOpp: never links a 404
       .order('posted_date', { ascending: false })
-      .limit(limit * 2);
+      .limit(limit * RELATED_OVERFETCH);
     if (error) {
-      // A related-links block must not take the page down; log it so a broken column is visible.
+      // A related-links block must not take the page down; log it so a broken column is visible,
+      // then try the next (department) scope rather than dropping the whole block.
       console.error(`[seo/opportunities] related-open (${sc.scope}) read failed:`, error.message);
-      return null;
+      continue;
     }
     const items = (data ?? [])
       .filter((r) => r.title && r.title.trim().length >= 8)
+      // Description alone reaching MIN_BODY is a subset of isIndexableOpp: never links a 404.
+      .filter((r) => (r.description || '').trim().length >= MIN_BODY)
       .filter((r) => opportunityStatus(r, now) === 'open')
       .slice(0, limit)
       .map((r) => ({

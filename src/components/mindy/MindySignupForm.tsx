@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { signInWithGoogle, signInWithMicrosoft } from '@/lib/supabase/auth';
 import { trackLeadConversion } from '@/lib/google-ads';
 import { trackSignUp } from '@/lib/ga4';
+import { TRIAL_CTA_LABEL } from '@/lib/public-site/trial-cta';
 
 export function MindySignupForm() {
   const [email, setEmail] = useState('');
@@ -140,7 +141,7 @@ export function MindySignupForm() {
           href="/pricing"
           className="flex-1 py-2 rounded-md text-sm font-semibold text-center transition-colors text-slate-300 hover:text-white"
         >
-          Start for free
+          {TRIAL_CTA_LABEL}
         </a>
       </div>
       <div className="space-y-3">

@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import type { Metadata } from 'next';
+import { siteShareImages } from '@/lib/seo/share-image';
 import { BLOG_POSTS_SORTED } from '@/data/blog-posts';
 
 /**
@@ -22,6 +23,7 @@ export const metadata: Metadata = {
       'Tactics, frameworks, and plain-English explainers for small businesses pursuing federal contracts.',
     type: 'website',
     url: 'https://getmindy.ai/blog',
+    images: siteShareImages(),
   },
 };
 
@@ -168,7 +170,7 @@ export default function BlogIndexPage() {
             href="/pricing"
             className="inline-block px-8 py-3 bg-white hover:bg-(--mp-wash) text-(--mp-navy) font-bold rounded-lg transition-colors"
           >
-            Start for free
+            Start 14-day free trial
           </Link>
         </div>
       </section>

@@ -97,7 +97,7 @@ async function main() {
 <p>Nothing new matched your filters today. Coming Back below is work returning to market later — not an open solicitation.</p>`;
 
     const comingHtml = renderComingBackSection(comingBack, {
-      panelUrl: 'https://getmindy.ai/app?panel=recompetes',
+      panelUrl: 'https://getmindy.ai/opportunity-map?horizon=recompete',
     });
 
     if (!openHtml.includes(OPEN_NOW_HEADING)) fail(`${email}: Open Now heading missing`);

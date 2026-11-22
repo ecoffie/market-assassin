@@ -13,9 +13,14 @@
  */
 import { kv } from '@vercel/kv';
 import { sendEmail } from '@/lib/send-email';
+import { appendEmailUtm } from '@/lib/engagement';
 
 const LOGO_URL = 'https://getmindy.ai/brand/mindy-logo-3d.png';
-const APP = 'https://getmindy.ai/app';
+// Map-era destinations only: /app is a legacy surface (src/lib/email/legacy-destination-guard.ts).
+const SITE = 'https://getmindy.ai';
+const ALERT_SETTINGS = `${SITE}/alerts/preferences`;          // keywords + NAICS for daily alerts
+const RECOMPETES = `${SITE}/opportunity-map?horizon=recompete`;
+const PURSUITS = `${SITE}/opportunity-map/pursuits`;           // the user's pipeline (user_pipeline)
 const SUPPORT_EMAIL = 'admin@getmindy.ai';
 
 export type TrialStep = 'day0' | 'day1' | 'day3' | 'day7';
@@ -63,7 +68,7 @@ function content(step: TrialStep, c: TrialContext): Body {
           { title: 'Connect Mindy to your AI', text: 'Use Mindy inside Claude or ChatGPT at getmindy.ai/mcp.' },
         ],
         note: `After the trial: ${price}. Cancel anytime in Settings.`,
-        cta: { label: 'Set up my profile', url: `${APP}?panel=settings` },
+        cta: { label: 'Set up my profile', url: ALERT_SETTINGS },
       };
     case 'day1':
       return {
@@ -76,7 +81,7 @@ function content(step: TrialStep, c: TrialContext): Body {
           { title: 'Your questions, answered', text: 'Ask anything about Mindy or winning federal work.' },
         ],
         note: 'Free during your trial. Pick any time that works for you.',
-        cta: { label: 'Book my call', url: process.env.MINDY_SETUP_CALL_URL || `${APP}?panel=settings` },
+        cta: { label: 'Book my call', url: process.env.MINDY_SETUP_CALL_URL || ALERT_SETTINGS },
       };
     case 'day3':
       return {
@@ -87,7 +92,7 @@ function content(step: TrialStep, c: TrialContext): Body {
           { title: 'Open Recompetes', text: 'Filter to your NAICS codes.' },
           { title: 'Pick one to track', text: 'You get months of warning before the bid posts.' },
         ],
-        cta: { label: 'Open Recompetes', url: `${APP}?panel=recompetes` },
+        cta: { label: 'Open Recompetes', url: RECOMPETES },
       };
     case 'day7':
       return {
@@ -99,13 +104,18 @@ function content(step: TrialStep, c: TrialContext): Body {
           { title: 'Research a buyer', text: 'Run a market report to see who buys what you sell.' },
           { title: 'Stuck on anything?', text: 'Just reply to this email. A real person reads it.' },
         ],
-        cta: { label: 'Open my pipeline', url: `${APP}?panel=pipeline` },
+        cta: { label: 'Open my pipeline', url: PURSUITS },
       };
   }
 }
 
 export function renderTrialStep(step: TrialStep, c: TrialContext): { subject: string; html: string; text: string } {
   const b = content(step, c);
+  // Tag our own links so the sequence's effect on activation is measurable; a third-party
+  // booking link (day 1) is left exactly as configured.
+  if (b.cta.url.startsWith(`${SITE}/`)) {
+    b.cta = { ...b.cta, url: appendEmailUtm(b.cta.url, { campaign: 'trial_onboarding', content: step }) };
+  }
   const stepsHtml = (b.steps || []).map((s, i) => `
           <tr><td style="padding:0 0 14px;vertical-align:top;width:34px;">
             <div style="width:26px;height:26px;border-radius:13px;background:#efe9fd;color:#7c3aed;font-size:13px;font-weight:700;text-align:center;line-height:26px;">${i + 1}</div>

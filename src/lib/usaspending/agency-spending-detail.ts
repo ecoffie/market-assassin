@@ -34,11 +34,15 @@ import {
 const USASPENDING = 'https://api.usaspending.gov/api/v2';
 const CONTRACT_AWARD_TYPES = ['A', 'B', 'C', 'D'];
 
-const SET_ASIDE_BUCKETS: Array<{ label: string; codes: string[] }> = [
+// WOSB/EDWOSB include their SOLE-SOURCE codes (WOSBSS, EDWOSBSS), as admin set-aside-stats and the map
+// already do — the bucket used to count only the competed codes, understating WOSB (VA report 2026-11-22).
+// VA's veteran codes (VSA "Veteran Set Aside" / veteran sole source) are deliberately NOT in SDVOSB: they
+// are Veteran-Owned (VOSB), a wider group, and counting them would overstate SDVOSB against its 3% goal.
+export const SET_ASIDE_BUCKETS: Array<{ label: string; codes: string[] }> = [
   { label: 'Small Business (total set-aside)', codes: ['SBA', 'SBP'] },
   { label: '8(a)', codes: ['8A', '8AN'] },
   { label: 'SDVOSB', codes: ['SDVOSBC', 'SDVOSBS'] },
-  { label: 'WOSB / EDWOSB', codes: ['WOSB', 'EDWOSB'] },
+  { label: 'WOSB / EDWOSB', codes: ['WOSB', 'WOSBSS', 'EDWOSB', 'EDWOSBSS'] },
   { label: 'HUBZone', codes: ['HZC', 'HZS'] },
 ];
 
@@ -47,7 +51,8 @@ export interface AgencySpendingDetailInput {
   fiscalYear?: number;
 }
 
-export interface SetAsideSlice { label: string; codes: string[]; amount: number; pct_of_total: number }
+/** amount / pct_of_total are null when that bucket's lookup FAILED (unknown, never $0). */
+export interface SetAsideSlice { label: string; codes: string[]; amount: number | null; pct_of_total: number | null }
 export interface SubAgencySlice { name: string; amount: number; pct_of_total: number }
 
 export interface NestedSpending {
@@ -300,12 +305,16 @@ export async function getAgencySpendingDetail(input: AgencySpendingDetailInput):
 
   const set_aside_breakdown: SetAsideSlice[] = SET_ASIDE_BUCKETS.map((b, i) => {
       const rows = bucketRows[i];
-      const amount = (rows || []).reduce((s, r) => s + (r.amount || 0), 0);
+      // A failed bucket lookup is UNKNOWN — summing `null` rows to 0 printed "$0 / 0%" for a lookup that never answered.
+      if (rows === null) return { label: b.label, codes: b.codes, amount: null, pct_of_total: null };
+      const amount = rows.reduce((s, r) => s + (r.amount || 0), 0);
       return { label: b.label, codes: b.codes, amount, pct_of_total: pct(amount) };
     });
 
-  const sbTotal = set_aside_breakdown.reduce((s, b) => s + b.amount, 0);
-  const set_aside_share = total <= 0 ? null : Math.round((sbTotal / total) * 1000) / 10;
+  // The combined set-aside share is only known when every bucket answered.
+  const anyBucketFailed = set_aside_breakdown.some((b) => b.amount === null);
+  const sbTotal = set_aside_breakdown.reduce((s, b) => s + (b.amount ?? 0), 0);
+  const set_aside_share = total <= 0 || anyBucketFailed ? null : Math.round((sbTotal / total) * 1000) / 10;
   const recipientAmount = recipientSbRows === null
     ? null
     : (recipientSbRows || []).reduce((s, r) => s + (r.amount || 0), 0);

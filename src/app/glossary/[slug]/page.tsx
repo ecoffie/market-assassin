@@ -232,7 +232,7 @@ export default async function GlossaryTermPage({
                 href="/pricing"
                 className="inline-block px-6 py-3 bg-(--mp-navy) hover:bg-(--mp-navy-hover) text-white rounded-lg font-semibold transition"
               >
-                Start for free
+                Start 14-day free trial
               </Link>
             </div>
           </article>
@@ -292,7 +292,7 @@ export default async function GlossaryTermPage({
             href="/pricing"
             className="inline-block px-8 py-4 bg-(--mp-navy) hover:bg-(--mp-navy-hover) text-white rounded-lg font-bold text-lg transition-colors"
           >
-            Meet Mindy — Start for free
+            Meet Mindy — Start 14-day free trial
           </Link>
           <p className="text-(--mp-muted) text-sm mt-4">
             14-day free trial. Cancel anytime. First briefing lands tomorrow morning.
