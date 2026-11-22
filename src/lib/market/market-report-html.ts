@@ -492,6 +492,10 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
     ? `<p class="note">Some sections could not be loaded at generation time and may be incomplete.</p>`
     : '';
 
+  // The second @media print block is PDF-only: a page is a fixed width, so nothing may rely on horizontal
+  // scrolling or truncation (screen layout unchanged). Before it, the recompetes / forecasts tables were
+  // ~1,150-1,290px wide in a 626px column and the PDF cut their right side off (Claude Local, 2026-11-22).
+  // No comments inside the emitted HTML/CSS: client HTML carries no engineering notes (tested).
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Market Report — ${esc(subject)}</title>
 <style>
@@ -537,6 +541,15 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
   .pdfbtn:hover { background:rgba(255,255,255,.28); }
   @media (max-width:560px){ button.pdfbtn { display:none; } a.pdfbtn { position:static; display:inline-block; margin-top:12px; } }
   @media print { body { background:#fff; } .sec,.stat { break-inside:avoid; } .pdfbtn { display:none; } }
+  @media print {
+    .tw { overflow: visible; }
+    table { width: 100%; table-layout: auto; }
+    th, td, td:not(.lead) { white-space: normal; overflow-wrap: anywhere; }
+    thead { display: table-header-group; }
+    tr { break-inside: avoid; }
+    .stat-v { white-space: normal; overflow: visible; text-overflow: clip; }
+    .stat-sub { display: block; -webkit-line-clamp: unset; overflow: visible; }
+  }
 </style></head>
 <body><div class="wrap">
   <header class="rp" style="position:relative">
