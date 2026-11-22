@@ -24,13 +24,20 @@ export interface SbaGoalingInput {
   fiscal_year?: number;
 }
 
-/** Government-wide statutory goals, keyed to the set-aside buckets the spending lib reports. */
-const STATUTORY_GOALS: Array<{ category: string; goal_pct: number; matches: RegExp }> = [
-  { category: 'Small Business (prime)', goal_pct: 23, matches: /small business/i },
-  { category: '8(a) / SDB', goal_pct: 5, matches: /8\(a\)/i },
-  { category: 'SDVOSB', goal_pct: 3, matches: /sdvosb/i },
-  { category: 'WOSB / EDWOSB', goal_pct: 5, matches: /wosb/i },
-  { category: 'HUBZone', goal_pct: 3, matches: /hubzone/i },
+/**
+ * Government-wide statutory goals and the actual each is scored on. Matching is by explicit source, never by
+ * bucket label:
+ *   - 'combined': the 23% small-business row is scored on set_aside_share, the sum of EVERY set-aside-code
+ *     bucket (SBA/SBP + 8(a) + SDVOSB + WOSB + HUBZone + VA's VOSB). It used to match /small business/i
+ *     against the SBA/SBP bucket alone (VA FY2026: 0.6% while set_aside_share was 9.4%).
+ *   - { code }: a program row is the bucket that carries that set-aside code.
+ */
+const STATUTORY_GOALS: Array<{ category: string; goal_pct: number; source: 'combined' | { code: string } }> = [
+  { category: 'Small Business (prime)', goal_pct: 23, source: 'combined' },
+  { category: '8(a) / SDB', goal_pct: 5, source: { code: '8A' } },
+  { category: 'SDVOSB', goal_pct: 3, source: { code: 'SDVOSBC' } },
+  { category: 'WOSB / EDWOSB', goal_pct: 5, source: { code: 'WOSB' } },
+  { category: 'HUBZone', goal_pct: 3, source: { code: 'HZC' } },
 ];
 
 export interface GoalingRow {
@@ -61,7 +68,7 @@ export interface SbaGoalingResult {
   };
 }
 
-const BASIS = 'set-aside-CODE obligations (USASpending) vs. statutory government-wide goals — a FLOOR on true small-business achievement, NOT the official SBA Scorecard (small firms also win full-and-open dollars this does not count). recipient_small_business_share is a third metric (who won). Neither share is the 23% goaling figure (different eligible-dollar base). toptier_code 097 on a Navy row is the DoD parent, not a claim the dollars are all of DoD.';
+const BASIS = 'set-aside-CODE obligations (USASpending) vs. statutory government-wide goals — a FLOOR on true small-business achievement, NOT the official SBA Scorecard (small firms also win full-and-open dollars this does not count). The Small Business (prime) row is the COMBINED set-aside-code share (every set-aside program summed); it is not SBA Scorecard achievement — recipient_small_business_share is the broader read of who won. recipient_small_business_share is a third metric (who won). Neither share is the 23% goaling figure (different eligible-dollar base). toptier_code 097 on a Navy row is the DoD parent, not a claim the dollars are all of DoD.';
 
 export async function getSbaGoalingShare(input: SbaGoalingInput): Promise<SbaGoalingResult> {
   const detail = await getAgencySpendingDetail({ agency: input.agency, fiscalYear: input.fiscal_year });
@@ -78,8 +85,11 @@ export async function getSbaGoalingShare(input: SbaGoalingInput): Promise<SbaGoa
   const goals: GoalingRow[] | null = !grounded
     ? null
     : STATUTORY_GOALS.map((g) => {
-        const slice = detail.set_aside_breakdown.find((s) => g.matches.test(s.label));
-        const actual = slice ? slice.pct_of_total : null;
+        // set_aside_share is already null when any bucket lookup failed: unknown, never 0.
+        const code = g.source === 'combined' ? null : g.source.code;
+        const actual = code === null
+          ? detail.set_aside_share
+          : detail.set_aside_breakdown.find((s) => s.codes.includes(code))?.pct_of_total ?? null;
         if (actual === null) return { category: g.category, goal_pct: g.goal_pct, actual_setaside_pct: null, gap_pct: null, meets_goal: null };
         const gap = Math.round((actual - g.goal_pct) * 10) / 10;
         return { category: g.category, goal_pct: g.goal_pct, actual_setaside_pct: actual, gap_pct: gap, meets_goal: actual >= g.goal_pct };
@@ -87,7 +97,8 @@ export async function getSbaGoalingShare(input: SbaGoalingInput): Promise<SbaGoa
 
   const sbRow = goals?.find((g) => /prime/i.test(g.category));
   // meets_goal is null (unknown) when there's no scorecard — NOT false (which reads as "failed").
-  const meetsSb = grounded ? (sbRow?.meets_goal ?? false) : null;
+  // A failed bucket makes the combined share unknown, so meets is unknown too (null), not false.
+  const meetsSb = grounded ? (sbRow?.meets_goal ?? null) : null;
 
   const result: SbaGoalingResult = {
     agency: detail.agency,

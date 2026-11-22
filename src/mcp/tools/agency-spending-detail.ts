@@ -140,7 +140,8 @@ export async function getAgencySpendingDetailTool(input: AgencySpendingDetailToo
 
   if (mcpFlags.aiHint) {
     const topSub = res.sub_agencies?.[0];
-    const topSetAside = [...res.set_aside_breakdown].filter((b) => b.label !== 'Small Business (total set-aside)').sort((a, b) => (b.amount ?? -Infinity) - (a.amount ?? -Infinity))[0];
+    // Every bucket is a disjoint set of codes (none is a rollup), so all compete for "biggest lane".
+    const topSetAside = [...res.set_aside_breakdown].sort((a, b) => (b.amount ?? -Infinity) - (a.amount ?? -Infinity))[0];
     result._ai_hint = {
       summary: res.degraded
         ? 'USASpending errored on the total — treat as temporarily unavailable, not $0.'
