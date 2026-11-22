@@ -59,6 +59,7 @@ vi.mock('@/lib/seo/forecast-pages', async (orig) => ({
 
 vi.mock('@/lib/bigquery/naics', () => ({
   getNaicsProfile: vi.fn(async () => null),
+  lookupNaicsProfile: vi.fn(async () => ({ kind: 'absent' })),
   getTopRecipientsForNaics: vi.fn(async () => []),
   getTopAgenciesForNaics: vi.fn(async () => []),
   getNaicsSetAsideAndPsc: vi.fn(async () => null),

@@ -4,7 +4,8 @@
  * The shared limiter (src/lib/rate-limit.ts checkRateLimit) FAILS OPEN: when Vercel KV errors it allows
  * every request. That is a reasonable trade for a cheap route, but not for one where every request starts
  * Chromium. Here a KV failure falls back to an in-process, per-instance fixed window with conservative caps,
- * plus one per-instance cap across all keys while degraded. So an outage can never mean "no effective limit"
+ * plus one per-instance cap across all keys while degraded. A KV call that HANGS longer than KV_TIMEOUT_MS
+ * is treated the same as one that throws. So an outage can never mean "no effective limit"
  * (owner decision on ecoffie/market-assassin#2307, 2026-11-22).
  *
  * The in-process window is per serverless instance, so it is approximate. That's acceptable for a fallback:
@@ -36,6 +37,15 @@ export interface LimitSpec {
   /** Conservative limit for the in-process fallback (per instance). */
   fallbackLimit: number;
   windowSeconds: number;
+}
+
+/** A KV call slower than this counts as unavailable, so a hanging KV falls back instead of waiting to maxDuration. */
+export const KV_TIMEOUT_MS = 1500;
+
+function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error(`KV timeout after ${ms}ms`)), ms); });
+  return Promise.race([p, timeout]).finally(() => clearTimeout(timer));
 }
 
 type Window = { count: number; resetAtMs: number };
@@ -89,13 +99,13 @@ async function hitKv(kv: KvLike, spec: LimitSpec, nowMs: number): Promise<Browse
 export async function checkBrowserRateLimits(
   specs: LimitSpec[],
   degradedGlobal: { key: string; limit: number; windowSeconds: number },
-  deps: { kv?: KvLike; now?: () => number } = {},
+  deps: { kv?: KvLike; now?: () => number; timeoutMs?: number } = {},
 ): Promise<{ allowed: boolean; retryAfter: number; source: 'kv' | 'fallback'; results: BrowserRateLimitResult[] }> {
   const kv = deps.kv ?? (vercelKv as unknown as KvLike);
   const nowMs = (deps.now ?? Date.now)();
   let results: BrowserRateLimitResult[];
   try {
-    results = await Promise.all(specs.map((s) => hitKv(kv, s, nowMs)));
+    results = await withTimeout(Promise.all(specs.map((s) => hitKv(kv, s, nowMs))), deps.timeoutMs ?? KV_TIMEOUT_MS);
   } catch (err) {
     console.warn('[browser-rate-limit] KV unavailable; using the in-process fallback limits', (err as Error)?.message);
     results = specs.map((s) => hitFallback(s.key, s.fallbackLimit, s.windowSeconds, nowMs));

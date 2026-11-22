@@ -50,8 +50,8 @@ describe('Coming Back to Market — omit vs show', () => {
       naicsCodes: ['561720'],
     });
     expect(out).toEqual({ kind: 'omit', reason: 'query_failed' });
-    expect(renderComingBackSection(out, { panelUrl: 'https://getmindy.ai/app?panel=recompetes' })).toBe('');
-    expect(renderComingBackSection(out, { panelUrl: 'https://getmindy.ai/app?panel=recompetes' })).not.toMatch(/0 recompete/i);
+    expect(renderComingBackSection(out, { panelUrl: `https://getmindy.ai${COMING_BACK_PANEL_PATH}` })).toBe('');
+    expect(renderComingBackSection(out, { panelUrl: `https://getmindy.ai${COMING_BACK_PANEL_PATH}` })).not.toMatch(/0 recompete/i);
   });
 
   it('omits when count is unknown rather than treating it as 0', () => {
@@ -61,7 +61,7 @@ describe('Coming Back to Market — omit vs show', () => {
       naicsCodes: ['561720'],
     });
     expect(out).toEqual({ kind: 'omit', reason: 'unknown_count' });
-    expect(renderComingBackSection(out, { panelUrl: 'https://getmindy.ai/app?panel=recompetes' })).toBe('');
+    expect(renderComingBackSection(out, { panelUrl: `https://getmindy.ai${COMING_BACK_PANEL_PATH}` })).toBe('');
   });
 
   it('omits contracts with under 3 months remaining even when they are the largest', () => {
@@ -71,7 +71,7 @@ describe('Coming Back to Market — omit vs show', () => {
       naicsCodes: ['561720'],
     });
     expect(out).toEqual({ kind: 'omit', reason: 'none_qualify' });
-    expect(renderComingBackSection(out, { panelUrl: 'https://getmindy.ai/app?panel=recompetes' })).toBe('');
+    expect(renderComingBackSection(out, { panelUrl: `https://getmindy.ai${COMING_BACK_PANEL_PATH}` })).toBe('');
   });
 
   it('omits when the profile has no NAICS market', () => {
@@ -227,7 +227,7 @@ describe('Coming Back to Market — email copy', () => {
     expect(html).toContain('Central Plains Janitorial');
     expect(html).toContain('NAICS 561720');
     expect(html).toContain('Expires Mar 15, 2027');
-    expect(html).toContain('/app?panel=recompetes');
+    expect(html).toContain('/opportunity-map?horizon=recompete');
     expect(html).toContain('View the full market');
     expect(html).not.toContain('5876');
     expect(html).not.toMatch(/5,876/);

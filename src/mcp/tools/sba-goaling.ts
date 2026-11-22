@@ -36,9 +36,10 @@ const STATUTORY_GOALS: Array<{ category: string; goal_pct: number; matches: RegE
 export interface GoalingRow {
   category: string;
   goal_pct: number;
-  actual_setaside_pct: number;
-  gap_pct: number; // actual − goal (negative = below the statutory goal)
-  meets_goal: boolean;
+  /** null when that category's USASpending lookup failed — unknown, never 0 / "below goal". */
+  actual_setaside_pct: number | null;
+  gap_pct: number | null; // actual − goal (negative = below the statutory goal)
+  meets_goal: boolean | null;
 }
 
 export interface SbaGoalingResult {
@@ -78,7 +79,8 @@ export async function getSbaGoalingShare(input: SbaGoalingInput): Promise<SbaGoa
     ? null
     : STATUTORY_GOALS.map((g) => {
         const slice = detail.set_aside_breakdown.find((s) => g.matches.test(s.label));
-        const actual = slice ? slice.pct_of_total : 0;
+        const actual = slice ? slice.pct_of_total : null;
+        if (actual === null) return { category: g.category, goal_pct: g.goal_pct, actual_setaside_pct: null, gap_pct: null, meets_goal: null };
         const gap = Math.round((actual - g.goal_pct) * 10) / 10;
         return { category: g.category, goal_pct: g.goal_pct, actual_setaside_pct: actual, gap_pct: gap, meets_goal: actual >= g.goal_pct };
       });
