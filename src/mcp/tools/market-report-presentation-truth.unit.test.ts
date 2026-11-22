@@ -224,3 +224,20 @@ describe('PRESENT — forecast set-aside is a category or "Not stated"', () => {
     expect(r.deliverable.html).toContain('Not stated');
   });
 });
+
+describe('forecasts are scoped to the measured market and the agency (reported: VA construction report had no forecasts)', () => {
+  it('a literal phrase that measured nothing is not used as a forecast title filter; the subject NAICS and agency are', async () => {
+    const { agencyForecasts } = await import('@/mcp/tools/forecasts');
+    const mock = agencyForecasts as unknown as ReturnType<typeof vi.fn>;
+    mock.mockClear();
+    const { getAgencySpendingDetailTool } = await import('@/mcp/tools/agency-spending-detail');
+    const { getSbaGoalingShare } = await import('@/mcp/tools/sba-goaling');
+    (getAgencySpendingDetailTool as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({ _meta: { grounded: false } });
+    (getSbaGoalingShare as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({ _meta: { grounded: false } });
+    await generateMarketReport({ keyword: 'building construction and renovation', agency: 'Department of Veterans Affairs' });
+    const args = mock.mock.calls[0][0] as Record<string, unknown>;
+    expect(args.keyword).toBeUndefined();
+    expect(args.naics).toBe('236220,237310');
+    expect(args.agency).toBe('Department of Veterans Affairs');
+  });
+});
