@@ -1,0 +1,27 @@
+# Kill switch for the nightly agent team's auto-merge (CLAUDE.md rule 1,
+# "Nightly team auto-merge"). Cancels auto-merge on a team PR when the repo
+# variable AGENT_AUTO_MERGE is not "on" or the PR has the no-auto-merge label.
+name: agent-automerge-guard
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, labeled, ready_for_review, auto_merge_enabled]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  guard:
+    if: startsWith(github.head_ref, 'claude/team-')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Cancel auto-merge when the switch is off or the PR opted out
+        if: vars.AGENT_AUTO_MERGE != 'on' || contains(github.event.pull_request.labels.*.name, 'no-auto-merge')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          gh pr merge "$PR" --repo "$REPO" --disable-auto || echo "auto-merge was not enabled"
+          echo "Auto-merge blocked: AGENT_AUTO_MERGE='${{ vars.AGENT_AUTO_MERGE }}' or label no-auto-merge present."

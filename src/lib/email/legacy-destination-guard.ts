@@ -27,8 +27,14 @@ const LEGACY_PATHS = /^\/(app|briefings)(\/|\?|#|$)/;
  * Documented compatibility exceptions. Each carries a REASON — an undocumented exception
  * list is just a quiet way to reintroduce the bug.
  */
-const ALLOWED: Array<{ match: RegExp; reason: string }> = [
+const ALLOWED: Array<{ match: RegExp; query?: (q: URLSearchParams) => boolean; reason: string }> = [
   { match: /^\/app\/(reset-password|set-password|verify|signup|sign-in)\b/, reason: 'credential flow — no Map-native equivalent yet' },
+  {
+    // Exactly /app?panel=settings&section=billing — not /app, not other panels or Settings tabs.
+    match: /^\/app$/,
+    query: (q) => q.get('panel') === 'settings' && q.get('section') === 'billing',
+    reason: 'billing / cancel subscription — the Subscriptions card (Manage / cancel) lives only in Settings → Billing & credits; no Map-native equivalent yet',
+  },
 ];
 
 export interface LegacyLinkFinding {
@@ -68,13 +74,17 @@ export function findLegacyDestinations(html?: string, text?: string): LegacyLink
   for (const raw of candidates) {
     const { url, viaTracking } = unwrap(raw);
     let path: string;
+    let query: URLSearchParams;
     try {
-      path = new URL(url, 'https://getmindy.ai').pathname;
+      // An href in HTML carries `&amp;` between params; decode it so the query reads true.
+      const parsed = new URL(url.replace(/&amp;/g, '&'), 'https://getmindy.ai');
+      path = parsed.pathname;
+      query = parsed.searchParams;
     } catch {
       continue;   // mailto:, {{merge_tag}} — not a navigation target
     }
     if (!LEGACY_PATHS.test(path)) continue;
-    if (ALLOWED.some((a) => a.match.test(path))) continue;
+    if (ALLOWED.some((a) => a.match.test(path) && (!a.query || a.query(query)))) continue;
     const key = `${path}|${viaTracking}`;
     if (seen.has(key)) continue;
     seen.add(key);

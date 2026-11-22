@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import MeetMindyStrip from '@/components/MeetMindyStrip';
+import { TRIAL_CTA_LABEL } from '@/lib/public-site/trial-cta';
 
 interface OpportunityData {
   id: string;
@@ -151,7 +152,7 @@ export default function SharedOpportunityClient() {
             href={`https://getmindy.ai/pricing?ref=${shareId}`}
             className="text-sm px-4 py-2 bg-(--mp-navy) hover:bg-(--mp-navy-hover) text-white rounded-none transition-colors"
           >
-            Start for free
+            {TRIAL_CTA_LABEL}
           </Link>
         </div>
       </header>
@@ -303,7 +304,7 @@ export default function SharedOpportunityClient() {
             href={`https://getmindy.ai/pricing?ref=${shareId}`}
             className="inline-flex items-center gap-2 px-8 py-4 bg-(--mp-navy) hover:bg-(--mp-navy-hover) text-white font-semibold rounded-none transition-colors text-lg"
           >
-            Start for free
+            {TRIAL_CTA_LABEL}
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
             </svg>

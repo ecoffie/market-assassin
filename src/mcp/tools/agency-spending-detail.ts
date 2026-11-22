@@ -81,7 +81,7 @@ export async function getAgencySpendingDetailTool(input: AgencySpendingDetailToo
 
   if (mcpFlags.aiHint) {
     const topSub = res.sub_agencies[0];
-    const topSetAside = [...res.set_aside_breakdown].filter((b) => b.label !== 'Small Business (total set-aside)').sort((a, b) => b.amount - a.amount)[0];
+    const topSetAside = [...res.set_aside_breakdown].filter((b) => b.label !== 'Small Business (total set-aside)').sort((a, b) => (b.amount ?? -Infinity) - (a.amount ?? -Infinity))[0];
     result._ai_hint = {
       summary: res.degraded
         ? 'USASpending errored on the total — treat as temporarily unavailable, not $0.'
@@ -89,7 +89,7 @@ export async function getAgencySpendingDetailTool(input: AgencySpendingDetailToo
         ? `${res.agency} identity is established. Command-level spending is NOT_ESTABLISHED. Parent-service (${res.spending.scope_name}) obligated ${typeof res.spending.total === 'number' ? usd(res.spending.total) : 'an unmeasured total'} — do not attribute that to ${res.agency}.`
         : !requestedDollars
         ? `No toptier agency matched "${input.agency}" (or spend is not established). Do NOT invent figures.`
-        : `${res.agency} FY${res.fiscal_year}: ${usd(res.total_obligated!)} in contract obligations (toptier_code ${res.toptier_code} is the USASpending parent). Set-aside share ${res.set_aside_share}% · small-business recipients ${res.recipient_small_business_share}%. Neither is the SBA 23% goaling figure.${topSub ? ` Top component: ${topSub.name} (${topSub.pct_of_total}%).` : ''}${topSetAside && topSetAside.amount > 0 ? ` Biggest set-aside lane: ${topSetAside.label} (${usd(topSetAside.amount)}).` : ''}`,
+        : `${res.agency} FY${res.fiscal_year}: ${usd(res.total_obligated!)} in contract obligations (toptier_code ${res.toptier_code} is the USASpending parent). Set-aside share ${res.set_aside_share}% · small-business recipients ${res.recipient_small_business_share}%. Neither is the SBA 23% goaling figure.${topSub ? ` Top component: ${topSub.name} (${topSub.pct_of_total}%).` : ''}${topSetAside && (topSetAside.amount ?? 0) > 0 ? ` Biggest set-aside lane: ${topSetAside.label} (${usd(topSetAside.amount as number)}).` : ''}`,
       how_to_use:
         'Use spending.scope. REQUESTED dollars are this entity. PARENT_SERVICE dollars are the military department, not the SYSCOM. Set-aside share ≠ recipient small-business share ≠ 23% statutory goal.',
       key_caveats: [
