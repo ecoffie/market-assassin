@@ -16,6 +16,7 @@
  * Data discipline (rule #1): every field from sam_opportunities. No fabrication.
  */
 import type { Metadata } from 'next';
+import { opportunityShareImages } from '@/lib/seo/share-image';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import MemberAwareCta from '@/components/MemberAwareCta';
@@ -93,7 +94,7 @@ export async function generateMetadata({
     title,
     description: desc,
     alternates: { canonical: url },
-    openGraph: { title: ogTitle, description: desc, type: 'article', url },
+    openGraph: { title: ogTitle, description: desc, type: 'article', url, images: opportunityShareImages(opp.noticeId, opp.title) },
     keywords: [
       `${opp.title.toLowerCase()} government contract`,
       opp.solicitationNumber ? `${opp.solicitationNumber} solicitation` : 'federal solicitation',

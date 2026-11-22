@@ -13,6 +13,7 @@
  *    the database answered "no such row".
  */
 import type { Metadata } from 'next';
+import { siteShareImages } from '@/lib/seo/share-image';
 import Link from 'next/link';
 import { notFound, permanentRedirect } from 'next/navigation';
 import MemberAwareCta from '@/components/MemberAwareCta';
@@ -89,7 +90,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     title: titleStr,
     description,
     alternates: { canonical: url },
-    openGraph: { title: titleStr, description, type: 'article', url, siteName: 'Mindy' },
+    openGraph: { title: titleStr, description, type: 'article', url, siteName: 'Mindy', images: siteShareImages() },
     ...(indexability.indexable ? {} : { robots: { index: false, follow: true } }),
   };
 }
