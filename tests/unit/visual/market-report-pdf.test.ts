@@ -86,10 +86,11 @@ describe.runIf(!!CHROME)('market report PDF — full report', () => {
       const all = squash(execFileSync(PDFTOTEXT, ['-enc', 'UTF-8', '-', '-'], { input: pdf, encoding: 'utf8' }));
       expect(lines.filter((l) => !all.includes(squash(l)))).toEqual(KNOWN_PRINT_DEFECTS.missingLines);
     } else {
-      // pdf.js drops tabular digits: compare letters only.
+      // pdf.js drops tabular digits: compare letters only. A short line ("high") is found inside other words by a
+      // letters-only search, so it proves nothing either way; only lines of 8+ letters are compared here.
       const all = lettersOnly(pages.join(''));
-      const known = KNOWN_PRINT_DEFECTS.missingLines.filter((l) => lettersOnly(l).length >= 3);
-      expect(lines.filter((l) => lettersOnly(l).length >= 3 && !all.includes(lettersOnly(l)))).toEqual(known);
+      const comparable = (l: string) => lettersOnly(l).length >= 8;
+      expect(lines.filter((l) => comparable(l) && !all.includes(lettersOnly(l)))).toEqual(KNOWN_PRINT_DEFECTS.missingLines.filter(comparable));
     }
   });
 
