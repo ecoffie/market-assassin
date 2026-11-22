@@ -74,6 +74,7 @@
     "migrate:baseline": "npx tsx scripts/migrate.ts baseline",
     "check:zero-alerts": "node scripts/check-zero-alert-drop.mjs",
     "ledger:audit": "node scripts/audit-repair-ledger.mjs",
+    "ledger:render": "node scripts/render-repair-ledger.mjs",
     "tidy:branches": "node scripts/tidy-branches.mjs",
     "test:chain": "vitest run src/mcp/decision-chain --exclude \"**/*.live.test.ts\"",
     "test:chain:live": "vitest run src/mcp/decision-chain/*.live.test.ts",

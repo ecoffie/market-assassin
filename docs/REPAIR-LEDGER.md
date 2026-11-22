@@ -1,5 +1,8 @@
 # Repair Ledger — the running tally of fixes (audit against reverts)
 
+> **Frozen archive (2026-11-22).** New entries go in [`docs/repair-ledger/`](repair-ledger/README.md),
+> one file per PR, so ledger rows never conflict. Rows here stay audited; never rewrite or delete them.
+
 **Why this exists (Eric, 2026-07-27):** "Earlier I saw Draw was fixed, now it's messed up
 again. What would help is a ledger of repairs — a running tally we can audit to make sure
 nothing reverted." Concurrent Claude sessions share one checkout and switch branches under
@@ -8,7 +11,7 @@ the code is actually fine. This ledger is the source of truth for "is fix X stil
 
 ## How to use it
 
-- **Every non-trivial fix/feature gets ONE row here, in the same commit as the fix.** No row =
+- **Every non-trivial fix/feature gets ONE entry file in `docs/repair-ledger/`, in the same commit as the fix.** No entry =
   not shipped, same rule as slash commands in CLAUDE.md.
 - Each row carries a **PROOF anchor**: an exact string that must be present (`grep`-able) in a
   named file. That's what makes the ledger *auditable* rather than a memory.
