@@ -6,7 +6,8 @@
  * "<office> contracting officer".
  *
  * What is public vs gated (owner decision): counts and role mix are public; contact names, emails
- * and phones, office alerts and full history sit behind a FREE Mindy account.
+ * and phones, office alerts and full history are in Mindy (Pro/Team, 14-day free trial; there is
+ * no free plan for new users since 2026-11-12 — src/lib/seo/record-trial-cta.ts).
  *
  * Data: src/lib/seo/offices.ts — Supabase + KV only, never BigQuery on a crawl. A read failure
  * throws SeoTemporarilyUnavailableError (5xx, not cached) rather than rendering a zero.
@@ -16,6 +17,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound, permanentRedirect } from 'next/navigation';
 import MemberAwareCta from '@/components/MemberAwareCta';
+import { recordTrialHref, TRIAL_CTA_LABEL } from '@/lib/seo/record-trial-cta';
 import { getOfficePageData, type OfficePageData } from '@/lib/seo/offices';
 import { formatCompanyName } from '@/lib/format-name';
 import { formatMoneyCompact } from '@/lib/format-money';
@@ -40,12 +42,6 @@ function fmtDate(iso: string | null): string | null {
 
 const n = (x: number) => x.toLocaleString('en-US');
 
-/** The free-signup link. The landing page and referrer are already captured by the root
- *  AttributionTracker (gca_attr first/last touch); src/office tag the last touch with the office. */
-function signupHref(dodaac: string): string {
-  return `/app/signup?src=seo_office&office=${encodeURIComponent(dodaac)}`;
-}
-
 function parentLabel(o: OfficePageData): string {
   return o.subAgency && o.subAgency !== o.agency ? `${o.subAgency} · ${o.agency ?? 'Department of Defense'}` : (o.agency ?? 'Department of Defense');
 }
@@ -63,7 +59,7 @@ export async function generateMetadata({ params }: { params: Promise<{ dodaac: s
     `${n(o.openCount)} open ${o.openCount === 1 ? 'bid' : 'bids'} now`,
     `${n(o.activeNotices)} active SAM.gov ${o.activeNotices === 1 ? 'notice' : 'notices'}`,
     `${n(o.contacts.count)}${o.contacts.capped ? '+' : ''} named buying ${o.contacts.count === 1 ? 'contact' : 'contacts'}.`,
-    'Get free alerts for this office.',
+    'Get alerts for this office with a 14-day free trial.',
   ];
   const description = `${parts[0]} ${parts[1]}, ${parts[2]}, ${parts[3]} ${parts[4]}`;
   return {
@@ -184,7 +180,7 @@ export default async function OfficePage({ params }: { params: Promise<{ dodaac:
           {o.openCount > o.openNotices.length && (
             <p className="text-xs text-(--mp-muted) mt-2">
               Showing the {o.openNotices.length} most recently posted of {n(o.openCount)} open bids. See all
-              of them, with alerts, in a free Mindy account.
+              of them, with alerts, in Mindy.
             </p>
           )}
         </section>
@@ -221,7 +217,7 @@ export default async function OfficePage({ params }: { params: Promise<{ dodaac:
           </section>
         )}
 
-        {/* Contacts: count + roles public; people gated behind a free account */}
+        {/* Contacts: count + roles public; people gated behind a Mindy account */}
         <section className="mt-8">
           <h2 className="text-lg font-semibold text-(--mp-ink) mb-2">Who buys at this office</h2>
           {o.contacts.count === 0 ? (
@@ -243,26 +239,27 @@ export default async function OfficePage({ params }: { params: Promise<{ dodaac:
                 ))}
               </ul>
               <p className="text-xs text-(--mp-muted) mt-2">
-                Names, emails and phone numbers are in your free Mindy account.
+                Names, emails and phone numbers are in Mindy.
               </p>
             </>
           )}
         </section>
 
-        {/* CTA — free signup */}
+        {/* CTA — 14-day trial */}
         <div className="mt-8 border border-(--mp-line) rounded-lg p-6 bg-(--mp-wash)">
           <h2 className="text-lg font-bold text-(--mp-ink)">Get alerts for {o.name}</h2>
           <p className="text-sm text-(--mp-muted) mt-1">
             Mindy emails you the morning {o.dodaac} posts a new solicitation, and unlocks this office&rsquo;s
-            full contact roster and notice history. Free.
+            full contact roster and notice history. Start with a 14-day free trial.
           </p>
           <div className="mt-4">
             <MemberAwareCta appearance="public" memberHref="/app" memberLabel="Open in Mindy →">
               <Link
-                href={signupHref(o.dodaac)}
+                /* src/office tag the AttributionTracker last touch with this office */
+                href={recordTrialHref('seo_office', { office: o.dodaac })}
                 className="inline-block bg-(--mp-navy) hover:bg-(--mp-navy-hover) text-white font-semibold rounded-lg px-5 py-2.5 text-sm"
               >
-                Get free alerts for this office →
+                {TRIAL_CTA_LABEL}
               </Link>
             </MemberAwareCta>
           </div>
