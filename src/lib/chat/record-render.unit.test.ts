@@ -47,6 +47,22 @@ describe('every record, once, in order', () => {
   });
 });
 
+describe('capped retrieval: the agency breakdown is scoped to what was retrieved (Data Core review)', () => {
+  const agencies = ['Department of Veterans Affairs', 'Department of Veterans Affairs', 'Department of Justice'];
+  const three = agencies.map((a, i) => rec(`C${i + 1}`, `2027-0${i + 1}-01`, { awarding_agency: a }));
+  it('retrieved < total: "retrieved N of TOTAL" sits by the total and the breakdown says it is among the retrieved', () => {
+    const r = renderExpiringRecords({ contracts: three, _meta: meta({ total: 850 }) })!;
+    expect(r.text).toMatch(/^850 expiring records match \([^)]*\); Mindy retrieved 3 of the 850\. Source:/);
+    expect(r.text).toContain('Among the 3 retrieved (of 850), by awarding agency: Department Of Veterans Affairs 2; Department Of Justice 1.'.replace(/Department Of/g, 'Department of'));
+    expect(r.text).not.toMatch(/\nBy awarding agency:/);
+  });
+  it('a complete retrieval keeps the plain breakdown', () => {
+    const r = renderExpiringRecords({ contracts: three, _meta: meta({ total: 3 }) })!;
+    expect(r.text).toMatch(/\nBy awarding agency: Department of Veterans Affairs 2; Department of Justice 1\./);
+    expect(r.text).not.toMatch(/retrieved 3 of/);
+  });
+});
+
 describe('counts, pages and continuation', () => {
   const many = Array.from({ length: 26 }, (_, i) => rec(`P${String(i + 1).padStart(2, '0')}`, `2027-01-${String((i % 28) + 1).padStart(2, '0')}`));
   it('distinguishes the full count from the displayed range and gives an explicit continuation', () => {

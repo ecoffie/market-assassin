@@ -93,10 +93,10 @@ describe('investigateOpportunity: the four recommendations', () => {
     expect(r.reasons.map((x) => x.text).join(' ')).toMatch(/not a close match/);
   });
 
-  it('PASS: unrelated work, even when timing and a small-business set-aside lift it into the related band', () => {
+  it('PASS: unrelated work stays hidden, even when timing and a small-business set-aside would lift its score', () => {
     const r = run(dd({ notice: { naics: '236220', title: 'Building construction' } }), { ...COMPANY, pastPerformance: undefined });
     expect(r.fit?.factors.find((f) => f.id === 'capability')?.points).toBe(0);
-    expect(r.fit?.band).toBe('related'); // the scorer alone would offer it as "show more"
+    expect(r.fit?.band).toBe('hidden'); // a known zero work match is hidden, never 'related' (#2298)
     expect(r.verdict).toBe('PASS');
     expect(r.reasons[0].text).toBe('The work does not match what you do.');
   });

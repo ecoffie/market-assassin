@@ -89,7 +89,6 @@ export function investigateOpportunity(input: {
 }): Investigation {
   const { deepDive, profile } = input;
   const n = deepDive.notice;
-  const reasons: Sourced[] = [];
   const risks: Sourced[] = [];
   const missing: string[] = [];
 
@@ -157,7 +156,7 @@ export function investigateOpportunity(input: {
   const coLine = contact ? `the contracting contact${contact.name ? ` ${contact.name}` : ''}${contact.email ? ` (${contact.email})` : ''}` : 'the contracting office';
   const amendment = n.latest_amendment ? ` Read ${n.latest_amendment} first.` : '';
   const done = (verdict: Verdict, why: Sourced[], next: string): Investigation => ({
-    verdict, confidence, reasons: [...why, ...reasons], risks, missing_evidence: missing, next_action: next, fit,
+    verdict, confidence, reasons: why, risks, missing_evidence: missing, next_action: next, fit,
   });
 
   if (closed) {

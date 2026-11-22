@@ -16,10 +16,26 @@ function esc(v: unknown): string {
 function money(v: unknown): string {
   const n = typeof v === 'number' ? v : Number(v);
   if (!Number.isFinite(n) || n === 0) return '—';
+  // Transaction obligations are NET of de-obligations, so a bucket can be negative. Say so; never "$-1,188,272".
+  if (n < 0) return `−${money(-n)} net`;
   if (n >= 1e9) return `$${(n / 1e9).toFixed(1)}B`;
   if (n >= 1e6) return `$${(n / 1e6).toFixed(1)}M`;
   if (n >= 1e3) return `$${Math.round(n / 1e3)}K`;
   return `$${Math.round(n).toLocaleString()}`;
+}
+/**
+ * A share that is ALREADY in percent units (agency-spending-detail pct()). Never ×100, never clamped.
+ * Unavailable when the value is missing, or when the bucket's net amount is ≤ 0 (a net de-obligation
+ * has no meaningful share of awards).
+ */
+function percentShare(pct: unknown, amount: unknown): string {
+  const a = typeof amount === 'number' ? amount : Number(amount);
+  if (Number.isFinite(a) && a <= 0) return 'n/a (net de-obligation)';
+  if (pct === null || pct === undefined || pct === '') return 'unavailable';
+  const p = typeof pct === 'number' ? pct : Number(pct);
+  if (!Number.isFinite(p)) return 'unavailable';
+  if (p > 0 && p < 0.1) return '<0.1%';
+  return `${p.toFixed(1)}%`;
 }
 function num(v: unknown): string {
   const n = typeof v === 'number' ? v : Number(v);
@@ -244,16 +260,24 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
   ]);
 
   // ---- Agency deep-dive (optional) ----
-  const ad = sections.agency_detail as { total_obligated?: number; small_business_share?: number; sub_agencies?: Row[]; set_aside_breakdown?: Row[] } | null;
+  // agency_detail comes from getAgencySpendingDetail (USASpending spending_by_category): the WHOLE agency,
+  // all NAICS, one fiscal year, contract obligations net of de-obligations. Its pct_of_total and
+  // small_business_share are already PERCENT units (9.4 = 9.4%) — multiplying by 100 printed 940%.
+  const ad = sections.agency_detail as { total_obligated?: number; small_business_share?: number | null; fiscal_year?: number; agency?: string; sub_agencies?: Row[]; set_aside_breakdown?: Row[] } | null;
   let agencyDetailHtml = '';
   if (ad && ad.total_obligated) {
-    const subRows = (ad.sub_agencies || []).slice(0, 8).map((r) => [esc(r.name), money(r.amount), `${Math.round(Number(r.pct_of_total || 0) * 100)}%`]);
-    const saRows = (ad.set_aside_breakdown || []).slice(0, 8).map((r) => [esc(r.label), money(r.amount), `${Math.round(Number(r.pct_of_total || 0) * 100)}%`]);
+    const share = (r: Row) => percentShare(r.pct_of_total, r.amount);
+    const subRows = (ad.sub_agencies || []).slice(0, 8).map((r) => [esc(r.name), money(r.amount), share(r)]);
+    const saRows = (ad.set_aside_breakdown || []).slice(0, 8).map((r) => [esc(r.label), money(r.amount), share(r)]);
+    const fy = Number.isFinite(Number(ad.fiscal_year)) && ad.fiscal_year ? `FY${ad.fiscal_year}` : 'one fiscal year';
+    const sb = percentShare(ad.small_business_share, 1);
     agencyDetailHtml = section(
       'Agency deep-dive',
-      `Total obligated ${money(ad.total_obligated)} · small-business share ${Math.round(Number(ad.small_business_share || 0) * 100)}%`,
-      `<div class="two"><div><h3>Top sub-agencies</h3>${table(['Sub-agency', 'Obligated', 'Share'], subRows)}</div>` +
-        `<div><h3>Set-aside breakdown</h3>${table(['Set-aside', 'Obligated', 'Share'], saRows)}</div></div>`
+      `${esc(ad.agency || 'Agency')}-wide, all NAICS, ${fy} — not limited to this market. `
+        + `Total contract obligations ${money(ad.total_obligated)} (net of de-obligations) · set-aside-code share ${sb} `
+        + `(dollars awarded under small-business set-aside codes; not the SBA goaling figure — small firms also win full-and-open work)`,
+      `<div class="two"><div><h3>Top sub-agencies</h3>${table(['Sub-agency', 'Obligated', 'Share of agency total'], subRows)}</div>` +
+        `<div><h3>Set-aside breakdown</h3>${table(['Set-aside', 'Obligated (net)', 'Share of agency total'], saRows)}</div></div>`
     );
   }
 
