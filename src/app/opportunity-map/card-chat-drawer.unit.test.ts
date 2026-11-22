@@ -278,10 +278,10 @@ describe('charge once per question: the browser reuses a question\'s turn id', (
   });
 
   it('an answer that failed on the server is not kept as pending (asking again is a new, free-until-answered question)', async () => {
-    const t = boot({ replies: [{ events: [{ type: 'session', sessionId: S }, { type: 'error', message: 'Mindy could not answer right now.' }, { type: 'done' }] }] });
+    const t = boot({ replies: [{ events: [{ type: 'session', sessionId: S }, { type: 'error', message: "Mindy couldn't answer right now. Nothing was wrong with your question. Please try again in a moment." }, { type: 'done' }] }] });
     (t.w.__askAboutOpp as (o: unknown) => void)(OPP);
     await askCard(t, 'When is it due?');
-    expect(t.body().textContent).toContain('Mindy could not answer right now.');
+    expect(t.body().textContent).toContain("Mindy couldn't answer right now. Nothing was wrong with your question. Please try again in a moment."); // a customer-safe message (customer-errors.ts) is shown as is
     expect(pending(t)).toBeNull();
   });
 });

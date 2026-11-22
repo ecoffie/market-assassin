@@ -2,6 +2,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { NextConfig } from "next";
 import { agencySlugRedirects } from "./src/lib/seo/agency-slug-redirects";
+import { authAliasRedirects } from "./src/lib/seo/auth-alias-redirects";
 
 /**
  * Git worktrees live at `.claude/worktrees/<slug>` inside the parent checkout.
@@ -106,6 +107,9 @@ const nextConfig: NextConfig = {
     // Third browser route: the document engine renders DocModel -> PDF (src/lib/documents/render-pdf.ts).
     '/api/app/documents/render': ['./node_modules/@sparticuz/chromium/bin/**/*'],
     '/api/app/documents/render/**/*': ['./node_modules/@sparticuz/chromium/bin/**/*'],
+    // Fourth: the hosted market report's PDF download (src/app/reports/[id]/pdf/route.ts). '*' stands in for
+    // the [id] segment (Next matches these keys with picomatch, where brackets are a character class).
+    '/reports/*/pdf': ['./node_modules/@sparticuz/chromium/bin/**/*'],
     // Ralph Phase 1 MRR assembler reads a vendored .docx by absolute cwd path.
     // Nothing `require()`s the binary, so NFT never sees it → ENOENT on Vercel
     // at assembling_documents (job.error: open '.../mrr-rfo-may-2026-prototype.docx').
@@ -429,6 +433,8 @@ const nextConfig: NextConfig = {
     return [
       // Abbreviation URLs customers type. The canonical pages already exist.
       ...agencySlugRedirects(),
+      // /login, /sign-in -> /signin and /register -> /pricing (they used to 404).
+      ...authAliasRedirects(),
       // ── RETIRED LEGACY STOREFRONT (Eric, 2026-07-28) ────────────────────────────────
       // These 7 routes are pure SALES pages for products we no longer sell. Their Stripe
       // payment links were deactivated the same day (10 links: GovCon Starter Bundle $697,
