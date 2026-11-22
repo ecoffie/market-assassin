@@ -41,7 +41,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { applyMapFilters, multiVal, parseMapFilters, withMergedSetAside } from '@/lib/opportunities/map-filters';
+import { applyMapFilters, multiVal, parseMapFilters, withMergedSetAside, withMergedNoticeType } from '@/lib/opportunities/map-filters';
 import { sendEmail } from '@/lib/send-email';
 import { savedSearchWantsOpen } from '@/lib/saved-searches/alert-scope';
 import type { SavedSearchMode } from '@/lib/saved-searches/constants';
@@ -328,7 +328,7 @@ async function evaluateSavedSearch(
     // the search's missed interval is preserved for an explicit recovery instead of silently baselined.
     let f: ReturnType<typeof parseMapFilters>;
     try {
-      f = parseMapFilters(withMergedSetAside((k) => savedFilters[k] ?? null), profileOpts);
+      f = parseMapFilters(withMergedNoticeType(withMergedSetAside((k) => savedFilters[k] ?? null)), profileOpts);
     } catch (e) {
       console.error(`[saved-search-alerts] ${s.id}: stored filters cannot be evaluated:`, (e as Error)?.message);
       return { failureClass: 'invalid_saved_filters' };

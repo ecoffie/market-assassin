@@ -22,7 +22,7 @@
  *   - Unreadable evidence is `unknown`, never "fine" and never "failed".
  */
 import { getAppSupabase } from '@/lib/app/workspace';
-import { applyMapFilters, parseMapFilters, withMergedSetAside } from '@/lib/opportunities/map-filters';
+import { applyMapFilters, parseMapFilters, withMergedSetAside, withMergedNoticeType } from '@/lib/opportunities/map-filters';
 import { hierarchyFilterLimitations, type FilterLimitation, type MapHorizon } from '@/lib/opportunities/hierarchy-sub-agency';
 import { isSavedSearchDueAt } from './cadence';
 import type { SavedSearchDeliveryReadiness } from './delivery-readiness';
@@ -281,10 +281,10 @@ export async function probeFilterReach(filters: Record<string, unknown>): Promis
   if (valueShapeError(filters)) return { reach: 'unknown', detail: 'stored filters cannot be evaluated' };
   const supabase = getAppSupabase();
   try {
-    const open = await anyRow(supabase, parseMapFilters(withMergedSetAside(filterGetter(filters))));
+    const open = await anyRow(supabase, parseMapFilters(withMergedNoticeType(withMergedSetAside(filterGetter(filters)))));
     if (open === null) return { reach: 'unknown', detail: null };
     if (open) return { reach: 'matches_open_now', detail: null };
-    const all = parseMapFilters(withMergedSetAside(filterGetter(filters)));
+    const all = parseMapFilters(withMergedNoticeType(withMergedSetAside(filterGetter(filters))));
     all.status = 'all';
     const ever = await anyRow(supabase, all);
     if (ever === null) return { reach: 'unknown', detail: null };
