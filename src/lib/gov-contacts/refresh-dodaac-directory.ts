@@ -43,6 +43,8 @@ function cleanName(code: string, raw: string): string {
 export function buildDirectoryRecords(
   rows: Array<{ dodaac: string; office_name: string | null; agency: string | null; sub_agency: string | null; award_count: number | string; total_obligated: number | string | null }>,
   updatedAt: string,
+  /** Filled with the codes whose rows conflict (no agency pair >= OFFICE_IDENTITY_MIN_SHARE). */
+  conflictingOut?: Set<string>,
 ) {
   const ids = voteOfficeIdentity(rows.map((r) => ({ code: r.dodaac, name: r.office_name, agency: r.agency, sub_agency: r.sub_agency, n: r.award_count })));
   const totals = new Map<string, { count: number; obligated: number; anyName: string | null }>();
@@ -55,6 +57,7 @@ export function buildDirectoryRecords(
   }
   return [...ids.values()].map((id) => {
     const t = totals.get(id.code)!;
+    if (id.identity_basis === 'conflicting') conflictingOut?.add(id.code);
     return {
       dodaac: id.code,
       office_name: cleanName(id.code, id.name ?? t.anyName ?? id.code),
@@ -68,7 +71,31 @@ export function buildDirectoryRecords(
   });
 }
 
-export async function refreshDodaacDirectory(): Promise<{ offices: number; written: number }> {
+export type DirectoryRecord = ReturnType<typeof buildDirectoryRecords>[number];
+export interface ExistingDirectoryRow { dodaac: string; source: string | null; agency: string | null; sub_agency: string | null }
+
+/**
+ * A conflicting vote must not erase attribution from a MORE authoritative source. Pass 1 upserts
+ * dodaac, office_name, agency, sub_agency, award_count, total_obligated, source, updated_at; it never
+ * writes sam_office_name or any other column. For a code whose award rows conflict, an existing row
+ * whose source is NOT fpds_awards (the SAM hierarchy fill, or anything curated) keeps its agency,
+ * sub_agency and source; only the counts are refreshed. An existing fpds_awards agency was an
+ * ANY_VALUE pick — not evidence — and becomes unknown (Eric, 2026-11-22: option A).
+ */
+export function preserveAuthoritativeAgency(
+  records: DirectoryRecord[],
+  conflicting: Set<string>,
+  existing: Map<string, ExistingDirectoryRow>,
+): DirectoryRecord[] {
+  return records.map((r) => {
+    if (!conflicting.has(r.dodaac)) return r;
+    const prev = existing.get(r.dodaac);
+    if (!prev || !prev.source || prev.source === 'fpds_awards' || !prev.agency) return r;
+    return { ...r, agency: prev.agency, sub_agency: prev.sub_agency, source: prev.source };
+  });
+}
+
+export async function refreshDodaacDirectory(): Promise<{ offices: number; written: number; conflicting: number }> {
   // One row per (code, name, agency, sub_agency): the office's agency is decided by majority vote
   // (office-identity.ts), never ANY_VALUE — that let one miskeyed transaction label CBP's 70B01C the FTC.
   const rows = await bqQuery<{
@@ -92,9 +119,22 @@ export async function refreshDodaacDirectory(): Promise<{ offices: number; writt
     maximumBytesBilled: String(20 * 1024 * 1024 * 1024),
   });
 
-  const records = buildDirectoryRecords(rows, new Date().toISOString());
+  const conflicting = new Set<string>();
+  const voted = buildDirectoryRecords(rows, new Date().toISOString(), conflicting);
 
   const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+  // Read the existing rows of conflicting codes only, so a more authoritative agency survives.
+  const existing = new Map<string, ExistingDirectoryRow>();
+  const conflictCodes = [...conflicting];
+  for (let i = 0; i < conflictCodes.length; i += 500) {
+    const { data, error } = await sb.from('dodaac_directory')
+      .select('dodaac, source, agency, sub_agency')
+      .in('dodaac', conflictCodes.slice(i, i + 500));
+    // Unreadable → refuse to write rather than risk nulling an authoritative agency.
+    if (error) throw new Error(`dodaac existing read: ${error.message}`);
+    for (const row of (data ?? []) as ExistingDirectoryRow[]) existing.set(row.dodaac, row);
+  }
+  const records = preserveAuthoritativeAgency(voted, conflicting, existing);
   let written = 0;
   for (let i = 0; i < records.length; i += 500) {
     const batch = records.slice(i, i + 500);
@@ -102,7 +142,7 @@ export async function refreshDodaacDirectory(): Promise<{ offices: number; writt
     if (error) throw new Error(`dodaac upsert: ${error.message}`);
     written += batch.length;
   }
-  return { offices: records.length, written };
+  return { offices: records.length, written, conflicting: conflicting.size };
 }
 
 /**

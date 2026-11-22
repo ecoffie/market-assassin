@@ -62,3 +62,36 @@ describe('every surface uses the vote', () => {
     expect(recs[0].office_name).toBeTruthy();
   });
 });
+
+describe('a conflicting vote never erases more authoritative attribution', () => {
+  const rows = [
+    { dodaac: '70B01C', office_name: CBP.name, agency: CBP.agency, sub_agency: CBP.sub_agency, award_count: 5, total_obligated: 1 },
+    { dodaac: '70B01C', office_name: FTC.name, agency: FTC.agency, sub_agency: FTC.sub_agency, award_count: 5, total_obligated: 1 },
+    { dodaac: 'N00189', office_name: 'NAVSUP', agency: 'Department of Defense', sub_agency: 'Department of the Navy', award_count: 9, total_obligated: 9 },
+  ];
+  it('marks only the genuinely ambiguous codes as conflicting', () => {
+    const conflicting = new Set<string>();
+    buildDirectoryRecords(rows, 't', conflicting);
+    expect([...conflicting]).toEqual(['70B01C']);
+  });
+  it('a SAM (or any non-FPDS) agency on a conflicting code survives; counts refresh', async () => {
+    const { preserveAuthoritativeAgency } = await import('./refresh-dodaac-directory');
+    const conflicting = new Set<string>();
+    const recs = buildDirectoryRecords(rows, 't', conflicting);
+    const out = preserveAuthoritativeAgency(recs, conflicting, new Map([
+      ['70B01C', { dodaac: '70B01C', source: 'sam_hierarchy', agency: 'HOMELAND SECURITY, DEPARTMENT OF', sub_agency: 'U.S. CUSTOMS AND BORDER PROTECTION' }],
+    ]));
+    expect(out.find((r) => r.dodaac === '70B01C')).toMatchObject({ agency: 'HOMELAND SECURITY, DEPARTMENT OF', source: 'sam_hierarchy', award_count: 10 });
+  });
+  it('an existing FPDS agency (an ANY_VALUE pick) on a conflicting code becomes unknown; majority codes are untouched', async () => {
+    const { preserveAuthoritativeAgency } = await import('./refresh-dodaac-directory');
+    const conflicting = new Set<string>();
+    const recs = buildDirectoryRecords(rows, 't', conflicting);
+    const out = preserveAuthoritativeAgency(recs, conflicting, new Map([
+      ['70B01C', { dodaac: '70B01C', source: 'fpds_awards', agency: 'Federal Trade Commission', sub_agency: 'Federal Trade Commission' }],
+      ['N00189', { dodaac: 'N00189', source: 'sam_hierarchy', agency: 'X', sub_agency: 'Y' }],
+    ]));
+    expect(out.find((r) => r.dodaac === '70B01C')!.agency).toBeNull();
+    expect(out.find((r) => r.dodaac === 'N00189')!.agency).toBe('Department of Defense');
+  });
+});
