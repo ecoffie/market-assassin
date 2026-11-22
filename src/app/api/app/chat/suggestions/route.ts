@@ -76,7 +76,7 @@ export async function GET(request: NextRequest) {
  * critical path. Fails soft to [] — never blocks the chat.
  */
 export async function POST(request: NextRequest) {
-  let body: { email?: string; message?: string; answer?: string };
+  let body: { email?: string; message?: string; answer?: string; earlier?: unknown };
   try {
     body = await request.json();
   } catch {
@@ -94,6 +94,10 @@ export async function POST(request: NextRequest) {
   const answer = (body.answer || '').trim();
   if (!message || !answer) return NextResponse.json({ suggestions: [] });
 
-  const suggestions = await generateFollowups(message, answer, { userEmail: auth.email, rulesLayer: askMindyRulesEnabledFor(auth.email) });
+  // The customer's earlier messages (bounded): a next step must not ask for what they already said.
+  const earlier = Array.isArray(body.earlier)
+    ? body.earlier.filter((x): x is string => typeof x === 'string' && x.trim().length > 0).slice(-6).map((x) => x.trim().slice(0, 500))
+    : [];
+  const suggestions = await generateFollowups(message, answer, { userEmail: auth.email, rulesLayer: askMindyRulesEnabledFor(auth.email), earlier });
   return NextResponse.json({ suggestions });
 }

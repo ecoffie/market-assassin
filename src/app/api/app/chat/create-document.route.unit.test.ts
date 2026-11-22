@@ -27,7 +27,7 @@ vi.mock('@supabase/supabase-js', () => {
 vi.mock('@/lib/api-auth', () => ({ verifyUserOwnsEmail: vi.fn(async (_r: unknown, email: string) => ({ authenticated: true, email })) }));
 vi.mock('@/lib/access/resolve-access', () => ({ hasProAccess: vi.fn(async () => true) }));
 vi.mock('@/lib/entitlements/shadow', () => ({ shadowEntitlement: vi.fn() }));
-vi.mock('@/lib/proposal/loaders', () => ({ loadBidderProfile: vi.fn(async () => ({})), formatProfileForPrompt: () => '' }));
+vi.mock('@/lib/proposal/loaders', () => ({ loadBidderProfile: vi.fn(async () => ({})), loadBidderProfileResult: async () => ({ status: 'empty' as const, profile: {} }), formatProfileForPrompt: () => '' }));
 vi.mock('@/lib/llm/usage-cost', () => ({ isUserOverBudget: vi.fn(async () => false), recordLlmUsage: vi.fn(async () => {}) }));
 vi.mock('@/lib/chat/provider-events', () => ({ recordProviderEvent: vi.fn(async () => {}) }));
 vi.mock('@/lib/chat/mentioned-notice', () => ({ resolveMentionedNotice: vi.fn(async () => ({ status: 'none' })), answerUsesNotice: () => false }));
