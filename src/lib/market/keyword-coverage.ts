@@ -216,6 +216,24 @@ export function buildMarketFilter(opts: {
     // user's market. Do not collapse to leadCodePct / topPscPct (HVAC≠236220,
     // drones≠336411, patrol≠shipbuilding). Senses v2 owns interpretation.
     const kw = coverage.keyword;
+    // RC-1 continuity: when the literal phrase measured NOTHING and the market was measured through curated
+    // alternates (identityResolvedVia), the agency/contractor sections must search those SAME terms. Searching
+    // the literal again returned $0 — the VA construction report showed a $1.6B market with no buyers and no
+    // competitors (2026-11-22). USASpending ORs a keywords array, so this is the headline's own measurement set.
+    if (coverage.identityResolvedVia?.length) {
+      const seen = new Set<string>();
+      const terms = [kw, ...coverage.identityResolvedVia].filter((t) => {
+        const k = t.toLowerCase();
+        if (seen.has(k)) return false;
+        seen.add(k);
+        return true;
+      });
+      return {
+        keywords: terms,
+        mode: 'keyword',
+        rankingLabel: `keyword "${kw}" measured via ${terms.length - 1} curated trade term${terms.length - 1 === 1 ? '' : 's'} (${coverage.identityResolvedVia.join(', ')})`,
+      };
+    }
     const expanded = marketKeywords(kw);
     return {
       keywords: expanded,

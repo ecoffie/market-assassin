@@ -1,6 +1,7 @@
 /**
  * /recompetes/[slug] — one public, indexable record page per expiring federal contract
- * (2026-11-17). GovTribe-style record page that ends in a free sign-up.
+ * (2026-11-17). GovTribe-style record page that ends in the 14-day trial (no free plan since
+ * 2026-11-12 — src/lib/seo/record-trial-cta.ts).
  *
  * Path: /recompetes/<incumbent-agency>--<contract_id>. NOT /expiring-contracts — that path
  * 308s to `/` (retired product, next.config.ts).
@@ -24,6 +25,7 @@ import Link from 'next/link';
 import { cache } from 'react';
 import { notFound, permanentRedirect } from 'next/navigation';
 import MemberAwareCta from '@/components/MemberAwareCta';
+import { recordTrialHref, TRIAL_CTA_LABEL } from '@/lib/seo/record-trial-cta';
 import { AGENCIES_SEO } from '@/data/agencies-seo';
 import { getNaicsTopEntry } from '@/data/naics-top100';
 import { recipientSlug } from '@/lib/bigquery/recipients';
@@ -109,7 +111,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       (value != null ? `, worth ${formatMoneyCompact(value)}` : '') +
       (end ? `, ends ${fmtDate(end)}` : '') +
       (r.naics_code ? `. NAICS ${r.naics_code}${r.naics_description ? ` ${r.naics_description}` : ''}` : '') +
-      '. See the estimated rebid window and track the recompete free with Mindy.',
+      '. See the estimated rebid window and track the recompete with Mindy.',
   );
   const indexable = recompeteIndexVerdict(r).indexable;
   return {
@@ -274,7 +276,7 @@ export default async function RecompetePage({ params }: PageProps) {
 
         {/* Gated: alerts, change history detail, contacts. */}
         <section className="mt-8 border border-(--mp-line) rounded-lg p-6 bg-(--mp-wash)">
-          <h2 className="text-lg font-bold text-(--mp-ink)">Track this recompete free</h2>
+          <h2 className="text-lg font-bold text-(--mp-ink)">Track this recompete</h2>
           <ul className="text-sm text-(--mp-body) mt-3 space-y-2">
             <li>
               <span className="font-semibold">Change history:</span>{' '}
@@ -282,7 +284,7 @@ export default async function RecompetePage({ params }: PageProps) {
                 ? 'unavailable right now.'
                 : changeCount === 0
                   ? 'no changes recorded since Mindy began tracking this contract.'
-                  : `${changeCount.toLocaleString('en-US')} recorded change${changeCount === 1 ? '' : 's'} to the end date, value or incumbent. Sign up to see each one.`}
+                  : `${changeCount.toLocaleString('en-US')} recorded change${changeCount === 1 ? '' : 's'} to the end date, value or incumbent. Start a trial to see each one.`}
             </li>
             <li><span className="font-semibold">Alerts:</span> get an email when the end date moves or the follow-on is posted.</li>
             <li><span className="font-semibold">Contacts:</span> the buying office and small-business contacts for this agency.</li>
@@ -290,10 +292,10 @@ export default async function RecompetePage({ params }: PageProps) {
           <div className="mt-4">
             <MemberAwareCta appearance="public" memberHref={memberHref} memberLabel="Open in Mindy →">
               <Link
-                href="/app/signup"
+                href={recordTrialHref('seo_recompete')}
                 className="inline-block bg-(--mp-navy) hover:bg-(--mp-navy-hover) text-white font-semibold rounded-lg px-5 py-2.5 text-sm"
               >
-                Sign up free to track it →
+                {TRIAL_CTA_LABEL}
               </Link>
             </MemberAwareCta>
           </div>
