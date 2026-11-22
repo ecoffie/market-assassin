@@ -15,6 +15,7 @@
  * "0 offices" (Bug Prevention Rule #11: unknown is not zero).
  */
 import type { Metadata } from 'next';
+import { siteShareImages } from '@/lib/seo/share-image';
 import Link from 'next/link';
 import { cache } from 'react';
 import { getOfficeHubEntries, groupOfficesForHub, type OfficeHubEntry } from '@/lib/seo/offices';
@@ -50,7 +51,7 @@ export async function generateMetadata(): Promise<Metadata> {
     description,
     alternates: { canonical: url },
     robots: hub.ok && hub.offices.length > 0 ? { index: true, follow: true } : { index: false, follow: true },
-    openGraph: { title, description, type: 'website', url },
+    openGraph: { title, description, type: 'website', url, images: siteShareImages() },
   };
 }
 

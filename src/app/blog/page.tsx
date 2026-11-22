@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import type { Metadata } from 'next';
+import { siteShareImages } from '@/lib/seo/share-image';
 import { BLOG_POSTS_SORTED } from '@/data/blog-posts';
 
 /**
@@ -22,6 +23,7 @@ export const metadata: Metadata = {
       'Tactics, frameworks, and plain-English explainers for small businesses pursuing federal contracts.',
     type: 'website',
     url: 'https://getmindy.ai/blog',
+    images: siteShareImages(),
   },
 };
 
