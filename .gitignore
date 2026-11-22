@@ -101,3 +101,6 @@ tasks/cache/
 *unmatched*.json
 scripts/rollback_*.sql
 /"email"
+
+# scripts/agent-release.mts: throwaway merge worktrees for the merged-tree type check
+.agent-release/

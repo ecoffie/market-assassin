@@ -1,11 +1,14 @@
 #!/usr/bin/env -S npx tsx
 /**
  * PR handoff summary for the reviewer / release queue.
- *   npx tsx scripts/pr-handoff.mts <pr-number> [--repo owner/name] [--no-overlap]
+ *   npx tsx scripts/pr-handoff.mts <pr-number> [--repo owner/name] [--no-overlap] [--no-label]
  *
  * Prints: head SHA, CI `verify` state, changed files, other OPEN PRs touching the same files, and a
  * release-risk hint (payments/Stripe, auth, migrations, customer data → RED; env/flags, cron,
- * release tooling → YELLOW). Read-only: uses `gh api` (REST) and changes nothing.
+ * release tooling → YELLOW).
+ *
+ * Its one write: it adds the `agent4:ready` label (docs/agents/agent4-release-protocol.md), a hint that
+ * the PR is handed off. Labels never authorize a release. Pass --no-label to keep it read-only.
  */
 import { execFileSync } from 'node:child_process';
 import { riskHint, overlappingPrs } from './lib/pr-risk.mjs';
@@ -15,8 +18,9 @@ const num = Number(args.find((a) => /^\d+$/.test(a)));
 const repoIdx = args.indexOf('--repo');
 const REPO = repoIdx >= 0 ? args[repoIdx + 1] : 'ecoffie/market-assassin';
 const OVERLAP = !args.includes('--no-overlap');
+const LABEL = !args.includes('--no-label');
 if (!num) {
-  console.error('usage: npx tsx scripts/pr-handoff.mts <pr-number> [--repo owner/name] [--no-overlap]');
+  console.error('usage: npx tsx scripts/pr-handoff.mts <pr-number> [--repo owner/name] [--no-overlap] [--no-label]');
   process.exit(2);
 }
 
@@ -64,5 +68,13 @@ if (OVERLAP) {
   const overlap = overlappingPrs(num, files, others);
   console.log(`overlapping open PRs (${overlap.length} of ${open.length} open)`);
   for (const o of overlap) console.log(`  #${o.number} ${o.title}\n      ${o.files.join(', ')}`);
+}
+if (LABEL) {
+  try {
+    execFileSync('gh', ['api', '-X', 'POST', `repos/${REPO}/issues/${num}/labels`, '--input', '-'], { input: JSON.stringify({ labels: ['agent4:ready'] }), encoding: 'utf8' });
+    console.log('label       agent4:ready added (a hint only; it never authorizes a release)');
+  } catch (e) {
+    console.log(`label       could not add agent4:ready (${String((e as Error).message).split('\n')[0].slice(0, 120)})`);
+  }
 }
 console.log('\nA risk hint is not an approval. RED/YELLOW need independent review + Eric approval (CLAUDE.md rule 15).');
