@@ -241,3 +241,23 @@ describe('forecasts are scoped to the measured market and the agency (reported: 
     expect(args.agency).toBe('Department of Veterans Affairs');
   });
 });
+
+describe('Who to call is anchored on the offices that award this market (VA / GA reports 2026-11-22)', () => {
+  it('the contacts query uses the in-scope contracts\' office prefixes, most frequent first, and labels the basis', async () => {
+    const { queryFederalContacts } = await import('@/lib/gov-contacts/contact-roster');
+    const mock = queryFederalContacts as unknown as ReturnType<typeof vi.fn>;
+    mock.mockClear();
+    mock.mockResolvedValueOnce({ contacts: [{ contact_fullname: 'Pat Example', contact_email: 'pat@example.gov', role_category_label: 'Contracting Officer', derived_office: 'Office FA5004' }], total: 1 });
+    const r = await generateMarketReport({ keyword: 'building construction and renovation' });
+    expect(mock.mock.calls[0][0]).toMatchObject({ officeCodes: ['FA5004'] });
+    expect(r.sections.contacts).toMatchObject({ basis: 'market_awarding_offices', office_codes: ['FA5004'] });
+  });
+});
+
+describe('marketOfficeCodes', () => {
+  it('takes the 6-char PIID prefix (civilian or DoD), skips non-office shapes, ranks by frequency', async () => {
+    const { marketOfficeCodes } = await import('./market-report');
+    expect(marketOfficeCodes([{ piid: '36C24825C0020' }, { piid: '36C24826C0003' }, { piid: 'W912EQ25C0001' }, { piid: 'ABCDEF' }, { piid: '123456' }, { piid: null }]))
+      .toEqual(['36C248', 'W912EQ']);
+  });
+});
