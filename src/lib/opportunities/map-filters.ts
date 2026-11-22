@@ -204,6 +204,18 @@ export function stateOrExpr(codes: string[]): string | null {
  * got UNFILTERED alerts (2026-11-22). Wrap a stored-filter getter with this so `setAside` is the same
  * merge the map applies. Values may be strings (comma lists) or arrays; the result is a deduped comma list.
  */
+function mergeStoredPair(get: (k: string) => unknown, key: string, multiKey: string): (k: string) => string | null {
+  const parts = (v: unknown): string[] =>
+    v === null || v === undefined ? [] : (Array.isArray(v) ? v : [v]).flatMap((x) => (typeof x === 'string' || typeof x === 'number' ? String(x).split(',') : [])).map((x) => x.trim()).filter(Boolean);
+  return (k: string) => {
+    if (k === key) {
+      const merged = [...new Set([...parts(get(key)), ...parts(get(multiKey))])];
+      return merged.length ? merged.join(',') : null;
+    }
+    return get(k) as string | null;
+  };
+}
+
 /**
  * A stored set-aside token → what the map means by it. The map's plain-English search appends LOWERCASE
  * intent keys ('sdvosb', 'vosb', 'hubzone', '8a', …) to setAsideMulti, and SET_GROUPS keys are uppercase,
@@ -229,6 +241,15 @@ export function withMergedSetAside(get: (k: string) => unknown): (k: string) => 
     const out = [...new Set([...parts(get('setAside')), ...parts(get('setAsideMulti'))].flatMap(canonicalSetAsideTokens))];
     return out.length ? out.join(',') : null;
   };
+}
+
+/**
+ * Same defect, notice type: the Filters panel writes `noticeMulti` (the top-bar notice select was removed
+ * 2026-07-27), the map merges `noticeType` + `noticeMulti` into `noticeType=` (route.ts:2788), and saved-search
+ * evaluation read only `noticeType` — so a notice-type filter chosen in the panel never reached alerts.
+ */
+export function withMergedNoticeType(get: (k: string) => unknown): (k: string) => string | null {
+  return mergeStoredPair(get, 'noticeType', 'noticeMulti');
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

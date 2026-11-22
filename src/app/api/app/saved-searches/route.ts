@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { getAppSupabase, normalizeEmail } from '@/lib/app/workspace';
-import { parseMapFilters, applyMapFilters, withMergedSetAside } from '@/lib/opportunities/map-filters';
+import { parseMapFilters, applyMapFilters, withMergedSetAside, withMergedNoticeType } from '@/lib/opportunities/map-filters';
 import {
   createSavedSearch,
   deleteSavedSearch,
@@ -54,7 +54,7 @@ export async function GET(request: NextRequest) {
       // sapBuyer:true row). Report THAT search as unknown — never 0, which would claim "nothing new".
       let f: ReturnType<typeof parseMapFilters>;
       try {
-        f = parseMapFilters(withMergedSetAside((k) => (sf.filters as Record<string, string>)?.[k] ?? null));
+        f = parseMapFilters(withMergedNoticeType(withMergedSetAside((k) => (sf.filters as Record<string, string>)?.[k] ?? null)));
       } catch {
         perSearch.push({ id: sf.id, count: null, invalidFilters: true });
         continue;
@@ -137,7 +137,7 @@ export async function POST(request: NextRequest) {
       // interval it never delivered (2026-10-01 sapBuyer:true row). Skip it and report it.
       let f: ReturnType<typeof parseMapFilters>;
       try {
-        f = parseMapFilters(withMergedSetAside((k) => (sf.filters as Record<string, string>)?.[k] ?? null));
+        f = parseMapFilters(withMergedNoticeType(withMergedSetAside((k) => (sf.filters as Record<string, string>)?.[k] ?? null)));
       } catch {
         skipped.push(String(sf.id));
         continue;
