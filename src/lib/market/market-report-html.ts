@@ -421,6 +421,10 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
 
   /** An empty ranked table explains itself when the phrase it ranked on measured $0. */
   const sectionsBasisTier = tiers.find((t) => t.role === 'sections_basis');
+  // The agency and contractor tables are ranked on a different reading (and window) than the headline. With
+  // several readings "How this market was measured" explains it; with ONE that table is not rendered, and the
+  // reader saw $1.6B for the Army under a $426.3M headline with nothing saying why. Show the tier's own note.
+  const sectionsBasisNote = !measurementHtml && sectionsBasisTier?.note ? `<p class="note">${esc(sectionsBasisTier.note)}</p>` : '';
   const phraseEmptyNote = sectionsBasisTier && sectionsBasisTier.amount === 0
     ? `<p class="note">No contract award text contains the exact phrase this table is ranked on, so it is empty for that phrase. That is not a statement that no one buys this work — the market total above was measured ${
         tb?.identity_resolved_via?.length ? `through: ${esc(tb.identity_resolved_via.join(', '))}` : 'differently (see How this market was measured)'
@@ -452,6 +456,7 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
       ${summary.contacts ? statCard('Contacts to call', num(summary.contacts)) : ''}
     </section>`,
     scopeNote,
+    sectionsBasisNote,
     // THE BRIDGE — how the headline was derived, shown so a client can audit it.
     // A single unlabeled number is what made a $46.3B hypersonics headline
     // indefensible: nobody could see which awards it was built from.
