@@ -26,7 +26,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { getReadClient, getWriteClient } from '@/lib/supabase/server-clients';
-import { parseMapFilters, applyMapFilters } from '@/lib/opportunities/map-filters';
+import { parseMapFilters, applyMapFilters, withMergedSetAside } from '@/lib/opportunities/map-filters';
 import { normalizeStateCode } from '@/lib/utils/us-states';
 import { authorizeCronRequest } from '@/lib/cron/cron-request-auth';
 
@@ -85,7 +85,7 @@ export async function GET(request: NextRequest) {
       sf.filters && typeof sf.filters === 'object' && !Array.isArray(sf.filters) ? sf.filters : {};
     const seen = new Set<string>(Array.isArray(sf.last_seen_notice_ids) ? sf.last_seen_notice_ids : []);
 
-    const f = parseMapFilters((k) => (rawFilters as Record<string, string>)?.[k] ?? null);
+    const f = parseMapFilters(withMergedSetAside((k) => (rawFilters as Record<string, string>)?.[k] ?? null));
     f.postedDays = f.postedDays || 30;
 
     let q = read

@@ -31,7 +31,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { getAppSupabase, normalizeEmail } from '@/lib/app/workspace';
-import { parseMapFilters, applyMapFilters } from '@/lib/opportunities/map-filters';
+import { parseMapFilters, applyMapFilters, withMergedSetAside } from '@/lib/opportunities/map-filters';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -117,7 +117,7 @@ export async function GET(request: NextRequest) {
       sf.filters && typeof sf.filters === 'object' && !Array.isArray(sf.filters) ? sf.filters : {};
     const seen = new Set<string>(Array.isArray(sf.last_seen_notice_ids) ? sf.last_seen_notice_ids : []);
 
-    const f = parseMapFilters((k) => (rawFilters as Record<string, string>)?.[k] ?? null);
+    const f = parseMapFilters(withMergedSetAside((k) => (rawFilters as Record<string, string>)?.[k] ?? null));
     f.postedDays = f.postedDays || 30;
 
     let q = supabase
