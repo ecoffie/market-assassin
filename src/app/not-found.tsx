@@ -1,5 +1,12 @@
 export const dynamic = 'force-dynamic';
 
+const secondaryLink = {
+  color: '#2563eb',
+  padding: '12px 16px',
+  textDecoration: 'none',
+  fontSize: '16px',
+} as const;
+
 export default function NotFound() {
   return (
     <div style={{
@@ -26,6 +33,12 @@ export default function NotFound() {
         }}
       >
         Go Home
+      </a>
+      <a href="/signin" style={secondaryLink}>
+        Sign in
+      </a>
+      <a href="/pricing" style={secondaryLink}>
+        Pricing
       </a>
     </div>
   );
