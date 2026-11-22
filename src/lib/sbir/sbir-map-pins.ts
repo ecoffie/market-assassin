@@ -84,3 +84,12 @@ export async function getSbirMapPins(limit = 400): Promise<SbirMapPin[]> {
     return [];
   }
 }
+
+/**
+ * SBIR/STTR topics carry no set-aside (set 'None'), so they must not appear as matches for a set-aside
+ * (or Full & Open) filter — the map used to append them regardless (25 SBIR pins under the veteran filters,
+ * Claude Local 2026-11-22). True = leave SBIR pins out for this request.
+ */
+export function sbirExcludedForSetAside(setAside: string | null, fullOpen: string | null): boolean {
+  return Boolean((setAside || '').trim() || (fullOpen || '').trim());
+}

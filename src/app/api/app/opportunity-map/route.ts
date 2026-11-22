@@ -18,7 +18,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { DIBBS_MAP_ENABLED } from '@/lib/dibbs/availability';
 import { getMapOpportunities, getDibbsMapPins, getDibbsViewportPins, SET_GROUPS, mapSetAside, SET_LABEL, naicsCategory } from '@/lib/opportunities/map-data';
-import { getSbirMapPins } from '@/lib/sbir/sbir-map-pins';
+import { getSbirMapPins, sbirExcludedForSetAside } from '@/lib/sbir/sbir-map-pins';
 import { sapBuyerTier } from '@/lib/opportunities/sap-friendly-agencies';
 import { computeGenome } from '@/lib/opportunities/genome';
 import { multiVal } from '@/lib/opportunities/map-filters';
@@ -411,7 +411,12 @@ export async function GET(request: NextRequest) {
     // sponsoring branch HQ (APPROXIMATE — no place of performance), same fail-soft contract as DIBBS: a
     // SBIR read must never take down the SAM pins. bbox-filtered in JS (topics are a small set).
     let sbirPins: ReturnType<typeof toPin>[] = [];
-    if (wantSbirSources(p.get('sources'))) {
+    // SBIR/STTR topics carry NO set-aside (set 'None'). They were appended regardless of the set-aside
+    // filter, so any set-aside selection (e.g. VOSB/SDVOSB) showed SBIR pins as if they matched it
+    // (Claude Local, 2026-11-22: 25 SBIR pins under the veteran filters). With a set-aside filter active
+    // they are left out — and the response says so — instead of being presented as matches.
+    const sbirExcludedBySetAside = sbirExcludedForSetAside(p.get('setAside'), p.get('fullOpen'));
+    if (wantSbirSources(p.get('sources')) && !sbirExcludedBySetAside) {
       try {
         const all = await getSbirMapPins(400);
         sbirPins = all
@@ -468,6 +473,7 @@ export async function GET(request: NextRequest) {
       : { SAM: pins.length, DLA: dlaPins.length, SBIR: sbirPins.length };
     return NextResponse.json({
       success: true, mode: 'viewport', setGroups,
+      ...(sbirExcludedBySetAside && wantSbirSources(p.get('sources')) ? { sbirNote: 'SBIR/STTR topics carry no set-aside, so they are not shown while a set-aside filter is active.' } : {}),
       // Canonical discovery status for the Open query. needs_positive_scope / needs_refinement mean
       // "not a searchable market yet" — the SAM counts are then 0 by construction, not market truth.
       discovery: mapsOpenDiscoveryMeta(openReq.plan),

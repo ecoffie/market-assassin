@@ -61,3 +61,14 @@ describe('eligibility pools (behaviour)', () => {
     expect(sdvosb).not.toContain('VSB');
   });
 });
+
+describe('SBIR pins never appear as set-aside matches (Claude Local: 25 SBIR pins under veteran filters)', () => {
+  it('a set-aside or Full & Open filter excludes SBIR topics; no filter keeps them', async () => {
+    const { sbirExcludedForSetAside } = await import('@/lib/sbir/sbir-map-pins');
+    expect(sbirExcludedForSetAside('VOSB', null)).toBe(true);
+    expect(sbirExcludedForSetAside('SDVOSB_ONLY,VOSB', null)).toBe(true);
+    expect(sbirExcludedForSetAside(null, '1')).toBe(true);
+    expect(sbirExcludedForSetAside(null, null)).toBe(false);
+    expect(sbirExcludedForSetAside('', '')).toBe(false);
+  });
+});
