@@ -60,9 +60,11 @@ const failures = [];
 const check = (name, ok, detail = '') => { console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? '  ' + detail : ''}`); if (!ok) failures.push(name); };
 
 const browser = await chromium.launch();
-for (const [label, opts] of [['desktop 1440x900', { viewport: { width: 1440, height: 900 } }], ['iPhone 13', devices['iPhone 13']]]) {
+for (const [label, opts] of [['desktop 1440x900', { viewport: { width: 1440, height: 900 } }], ['small window 757x485', { viewport: { width: 757, height: 485 } }], ['iPhone 13', devices['iPhone 13']]]) {
   for (const mode of ['ok', 'error']) {
     const ctx = await browser.newContext({ ...opts, acceptDownloads: true });
+    // The site's timed event popup (src/lib/events/event-popup.ts) is unrelated to this pane; mark it seen.
+    await ctx.addCookies([{ name: 'mindy_lcb_popup_s', value: '1', url: base }]);
     await ctx.addInitScript((t) => { try { localStorage.setItem('mi_beta_auth_token', t); } catch {} }, `${tokPayload}.sig`);
     const page = await ctx.newPage();
     const pageErrors = [];
@@ -86,16 +88,25 @@ for (const [label, opts] of [['desktop 1440x900', { viewport: { width: 1440, hei
     const tag = `${label} [${mode}]`;
     if (mode === 'ok') {
       // 1. keyboard right after opening, then wheel
+      // The PANE BODY scrolls: the frame is sized to its report, so a plain element of the page moves.
+      const pos = () => page.$eval('.amk-rep-body', (e) => ({ top: e.scrollTop, max: e.scrollHeight - e.clientHeight }));
+      const fit = await page.$eval('.amk-rep-f', (f) => ({ fit: f.classList.contains('fit'), h: f.getBoundingClientRect().height, docH: f.contentDocument ? f.contentDocument.documentElement.scrollHeight : -1, innerY: getComputedStyle(f.contentDocument.documentElement).overflowY }));
+      check(`${tag} frame is sized to the whole report`, fit.fit && fit.h >= fit.docH && fit.docH > 2000, JSON.stringify(fit));
+      check(`${tag} the report itself is not a second vertical scroller`, fit.innerY === 'hidden', fit.innerY);
       await page.keyboard.press('PageDown'); await page.keyboard.press('PageDown'); await page.waitForTimeout(500);
-      const yKey = await frame.evaluate(() => scrollY);
-      check(`${tag} keyboard scrolls the preview`, yKey > 0, `scrollY=${yKey}`);
-      const box = await page.locator('.amk-rep-f').boundingBox();
+      const yKey = (await pos()).top;
+      check(`${tag} keyboard scrolls the preview`, yKey > 0, `scrollTop=${yKey}`);
+      const box = await page.locator('.amk-rep-body').boundingBox();
       await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
       await page.mouse.wheel(0, 900); await page.waitForTimeout(500);
-      const yWheel = await frame.evaluate(() => scrollY);
-      check(`${tag} wheel scrolls the preview`, yWheel > yKey, `scrollY=${yWheel}`);
-      const bodyOverflow = await page.$eval('.amk-rep-body', (e) => getComputedStyle(e).overflowY);
-      check(`${tag} preview container is a scroll container (WebKit sizes iframes to content)`, bodyOverflow === 'auto', bodyOverflow);
+      const yWheel = (await pos()).top;
+      check(`${tag} wheel over the report scrolls the preview`, yWheel > yKey, `scrollTop=${yWheel}`);
+      await page.keyboard.press('End'); await page.waitForTimeout(500);
+      const end = await pos();
+      check(`${tag} the last section is reachable`, end.max > 0 && end.top >= end.max - 1, JSON.stringify(end));
+      const lastVisible = await page.evaluate(() => { const b = document.querySelector('.amk-rep-body').getBoundingClientRect(); const f = document.querySelector('.amk-rep-f'); const last = [...f.contentDocument.querySelectorAll('.sec')].pop(); const r = last.getBoundingClientRect(); const fr = f.getBoundingClientRect(); return fr.top + r.bottom <= b.bottom + 1 && fr.top + r.bottom > b.top; });
+      check(`${tag} the last section is on screen at the end`, lastVisible);
+      await page.keyboard.press('Home'); await page.waitForTimeout(300);
       // 2. dead in-frame button hidden
       const inFrameBtn = await frame.evaluate(() => { const b = document.querySelector('.pdfbtn'); return b ? getComputedStyle(b).display : 'absent'; });
       check(`${tag} in-frame print button hidden`, inFrameBtn === 'none' || inFrameBtn === 'absent', inFrameBtn);

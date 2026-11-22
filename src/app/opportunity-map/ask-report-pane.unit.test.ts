@@ -92,7 +92,7 @@ describe('Map Ask Mindy report pane', () => {
     expect(prev.url).toContain(`id=${DOCX}`); // the Word row is the primary id
     expect(prev.headers['x-mi-auth-token']).toBeTruthy();
     const frame = pane.querySelector('iframe')!;
-    expect(frame.getAttribute('sandbox')).toBe(''); // no scripts, no same-origin
+    expect(frame.getAttribute('sandbox')).toBe('allow-same-origin'); // no scripts, forms, popups or navigation; same-origin only so the pane can size it
     expect(frame.getAttribute('srcdoc')).toContain('REPORT BODY');
     expect(pane.querySelector('.amk-rep-t')!.textContent).toBe('Koamana Build report');
     expect(pane.querySelector('.amk-rep-v')!.textContent).toContain('Version 1');

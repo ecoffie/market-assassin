@@ -14,7 +14,10 @@
  *   production that saved nothing, while the route itself returned a valid PDF (2026-11-22);
  * - a failure loads the route's HTML error page in that frame, and its message is shown in the pane;
  * - the in-frame button is hidden;
- * - the preview can be scrolled with the keyboard as soon as it opens.
+ * - the preview can be scrolled with the keyboard as soon as it opens;
+ * - the PANE BODY scrolls: the frame is sized to its report, because a container-sized frame left scrolling
+ *   to the inner document, which did not move in a production browser (757x485 and the /app iframe,
+ *   2026-11-22).
  *
  * Browser proof: scripts/acceptance/map-report-pane.mjs.
  */
@@ -108,9 +111,10 @@ describe('Map report pane: a packaged market report exports a real PDF', () => {
     await t.ask('market report for facilities maintenance');
     expect(pane(t.doc).classList.contains('show')).toBe(true);
     const srcdoc = (t.doc.querySelector('.amk-rep-f') as HTMLIFrameElement).srcdoc;
-    expect(srcdoc).toContain('<style>.pdfbtn{display:none!important}</style></head>');
+    expect(srcdoc).toMatch(/<style>\.pdfbtn\{display:none!important\}html\{height:auto!important;overflow:auto!important\}body\{[^}]*\}<\/style><\/head>/);
     expect(srcdoc).toContain('REPORT BODY');
-    expect((t.doc.querySelector('.amk-rep-f') as HTMLIFrameElement).getAttribute('sandbox')).toBe(''); // still script-less
+    // Still script-less: same-origin ONLY, so the pane can measure the report (no scripts/forms/popups/navigation).
+    expect((t.doc.querySelector('.amk-rep-f') as HTMLIFrameElement).getAttribute('sandbox')).toBe('allow-same-origin');
     expect(pdfItem(t.doc)?.textContent).toBe('Download PDF');
     expect(t.doc.querySelectorAll('.amk-exp-panel button').length).toBe(1); // PDF only: the one real export
     expect([...t.doc.querySelectorAll('.amk-rep-exp a')].map((a) => a.textContent)).toEqual(['Open hosted link']);
@@ -247,6 +251,65 @@ describe('Map report pane: Vault document export errors are visible', () => {
 describe('Map report pane: the preview can be scrolled', () => {
   it('the preview container scrolls (WebKit/iOS size iframes to their content)', () => {
     expect(MAP).toMatch(/\.amk-rep-body\{[^}]*overflow:auto;-webkit-overflow-scrolling:touch/);
+  });
+
+  const fakeHeight = (f: HTMLIFrameElement, h: number) => {
+    const de = f.contentDocument!.documentElement;
+    Object.defineProperty(de, 'scrollHeight', { configurable: true, get: () => h });
+    Object.defineProperty(de, 'clientHeight', { configurable: true, get: () => parseInt(f.style.height, 10) || 0 });
+  };
+
+  it('a loaded report is sized to its full height, the pane body takes focus, and the report is not a second scroller', async () => {
+    const t = boot({ chat: reportTurn() });
+    await t.ask('market report');
+    const f = t.doc.querySelector('.amk-rep-f') as HTMLIFrameElement;
+    const body = t.doc.querySelector('.amk-rep-body') as HTMLElement;
+    const d = f.contentDocument!; d.open(); d.write(HTML); d.close();
+    fakeHeight(f, 5953);
+    body.scrollTop = 200;
+    f.dispatchEvent(new t.w.Event('load'));
+    expect(f.classList.contains('fit')).toBe(true);
+    expect(f.style.height).toBe('5953px');
+    expect(d.documentElement.style.getPropertyValue('overflow-y')).toBe('hidden');
+    // Must be !important to beat the injected html{overflow:auto!important} (jsdom drops the priority, so the
+    // source is asserted; the browser acceptance asserts the computed value).
+    expect(MAP).toContain("de.style.setProperty('overflow-y','hidden','important')");
+    expect(body.getAttribute('tabindex')).toBe('-1');
+    expect(t.doc.activeElement).toBe(body); // keyboard scrolls the pane
+    expect(body.scrollTop).toBe(0); // a new report starts at the top
+    expect(MAP).toContain('.amk-rep-f.fit{position:static;display:block;inset:auto}');
+  });
+
+  it('a horizontal scrollbar inside the report is added to the height, so the last line is not hidden', async () => {
+    const t = boot({ chat: reportTurn() });
+    await t.ask('market report');
+    const f = t.doc.querySelector('.amk-rep-f') as HTMLIFrameElement;
+    const d = f.contentDocument!; d.open(); d.write(HTML); d.close();
+    const de = d.documentElement;
+    Object.defineProperty(de, 'scrollHeight', { configurable: true, get: () => 3000 });
+    Object.defineProperty(de, 'clientHeight', { configurable: true, get: () => (parseInt(f.style.height, 10) || 0) - 14 });
+    f.dispatchEvent(new t.w.Event('load'));
+    expect(f.style.height).toBe('3014px');
+  });
+
+  it('a new report resets the fit, and a report whose document cannot be read keeps the full-pane frame', async () => {
+    const t = boot({ chat: reportTurn() });
+    await t.ask('market report');
+    const f = t.doc.querySelector('.amk-rep-f') as HTMLIFrameElement;
+    const d = f.contentDocument!; d.open(); d.write(HTML); d.close();
+    fakeHeight(f, 4000);
+    f.dispatchEvent(new t.w.Event('load'));
+    expect(f.classList.contains('fit')).toBe(true);
+    // A revision / another report: the frame goes back to full-pane until it is measured again.
+    (t.doc.querySelector('.amk-rep-x') as HTMLButtonElement).click();
+    (t.doc.querySelector('.amk-repcard-open') as HTMLButtonElement).click();
+    expect(f.classList.contains('fit')).toBe(false);
+    expect(f.style.height).toBe('');
+    Object.defineProperty(f, 'contentDocument', { configurable: true, get: () => null });
+    const focus = vi.spyOn(f, 'focus');
+    f.dispatchEvent(new t.w.Event('load'));
+    expect(f.classList.contains('fit')).toBe(false);
+    expect(focus).toHaveBeenCalledTimes(1); // fallback: the frame's own document scrolls
   });
 
   it('focus moves into the loaded report so the keyboard scrolls it, and opening the drawer does not take it back', async () => {
