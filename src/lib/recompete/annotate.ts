@@ -13,6 +13,9 @@
  *   location — `place_of_performance_state` is USASpending's reported place of performance,
  *              exposed AS REPORTED (Eric, 2026-09-22: no free-text override, no alternate PoP
  *              authority). The source note says exactly that.
+ *   value    — `potential_total_value` is the award CEILING only when a source reported one; the
+ *              USASpending sync stores the obligated amount in that column, so an equal value is not
+ *              a ceiling and is exposed as null with `ceiling_basis: 'not_established'`.
  *
  * Consumers: queryExpiringContracts (MCP get_expiring_contracts, briefings, market report,
  * capability match, recompete map), coming-back-to-market alerts, /api/recompete (panel), and
@@ -20,6 +23,7 @@
  */
 import { overlayRecompeteTiming, CAPTURE_START_BASIS } from './timing';
 import { parseAwardLineage, type AwardKind } from './award-lineage';
+import { contractCeiling, type CeilingBasis } from './contract-value';
 
 export const POP_SOURCE_NOTE = 'Place of performance as reported by USASpending.' as const;
 
@@ -35,6 +39,12 @@ export interface RecompeteRowAnnotations {
   parent_vehicle_id: string | null;
   /** The provenance of place_of_performance_state (the value itself is untouched). */
   place_of_performance_source_note: typeof POP_SOURCE_NOTE;
+  /**
+   * The award ceiling (base + all options) ONLY when a source reported one distinct from the obligated
+   * amount; otherwise null. Never the obligated amount relabelled — see contract-value.ts.
+   */
+  potential_total_value: number | null;
+  ceiling_basis: CeilingBasis;
 }
 
 type AnnotatableRow = {
@@ -44,11 +54,14 @@ type AnnotatableRow = {
   period_of_performance_current_end?: string | null;
   estimated_recompete_date?: string | null;
   lead_time_months?: number | null;
+  potential_total_value?: number | string | null;
+  total_obligation?: number | string | null;
 };
 
 export function recompeteRowAnnotations(row: AnnotatableRow, now: Date = new Date()): RecompeteRowAnnotations {
   const timing = overlayRecompeteTiming(row.period_of_performance_current_end, now);
   const lineage = parseAwardLineage(row);
+  const ceiling = contractCeiling(row);
   return {
     estimated_recompete_date: null,
     capture_start_date: timing?.capture_start_date ?? null,
@@ -59,6 +72,8 @@ export function recompeteRowAnnotations(row: AnnotatableRow, now: Date = new Dat
     parent_vehicle_piid: lineage.parent_vehicle_piid,
     parent_vehicle_id: lineage.parent_vehicle_id,
     place_of_performance_source_note: POP_SOURCE_NOTE,
+    potential_total_value: ceiling.ceiling,
+    ceiling_basis: ceiling.basis,
   };
 }
 
