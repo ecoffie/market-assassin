@@ -4,7 +4,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import {
-  decide, apply, validateReview, isBuilderBranch, releaseRecordBody, LABELS, LOCK_TTL_MS, MAX_ATTEMPTS,
+  decide, apply, validateReview, isAllowed, stampMatches, releaseRecordBody, LABELS, LOCK_TTL_MS, MAX_ATTEMPTS,
   type Port, type Pr, type Comment, type LockPayload, type ReviewRecord, type ReleaseRecord, type Compare,
 } from '../../scripts/lib/agent-release-core.mjs';
 
@@ -29,6 +29,8 @@ type World = {
   compare: (base: string, head: string) => Compare;
   typecheck: (pr: number) => { ok: boolean; detail: string };
   prodChecksOk: boolean;
+  allow: { prs: number[]; branches: string[] };
+  prodCheckCalls: string[];
   lock: LockPayload | null;
   merges: Array<{ pr: number; sha: string }>;
   mergeResult: (pr: number) => { merged: boolean; merge_commit?: string; message?: string };
@@ -48,6 +50,8 @@ function world(over: Partial<World> = {}): World {
     compare: () => 'ahead',
     typecheck: () => ({ ok: true, detail: '' }),
     prodChecksOk: true,
+    allow: { prs: [101, 102, 103], branches: [] },
+    prodCheckCalls: [],
     lock: null,
     merges: [],
     mergeResult: () => ({ merged: true, merge_commit: SHA('c') }),
@@ -77,7 +81,8 @@ function port(w: World): Port {
     productionSha: async () => w.prod,
     compare: async (b, h) => w.compare(b, h),
     typecheckMerged: async (n) => w.typecheck(n),
-    prodChecks: async () => ({ ok: w.prodChecksOk, results: [{ name: 'GET /', ok: w.prodChecksOk, detail: w.prodChecksOk ? '' : '500' }] }),
+    allowlist: async () => w.allow,
+    prodChecks: async (sha) => { w.prodCheckCalls.push(sha); return { ok: w.prodChecksOk, results: [{ name: 'GET /', ok: w.prodChecksOk, detail: w.prodChecksOk ? '' : '500' }] }; },
     merge: async (n, sha) => {
       const r = w.mergeResult(n);
       if (r.merged) { w.merges.push({ pr: n, sha }); const p = w.prs.get(n)!; p.state = 'closed'; p.merged = true; p.merge_commit_sha = r.merge_commit ?? null; }
@@ -126,9 +131,10 @@ describe('happy path', () => {
   });
 
   it('a failed production check is recorded as verify_failed and blocked, never "released"', async () => {
-    const w = world({ prodChecksOk: false }); addPr(w, 101, {}, [{ body: review() }]);
+    const w = world(); addPr(w, 101, {}, [{ body: review() }]);
     const p = port(w);
     await apply(p, await decide(p));
+    w.prodChecksOk = false;
     w.prod = SHA('c');
     await apply(p, await decide(p));
     expect(records(w, 101).at(-1)).toMatchObject({ status: 'verify_failed' });
@@ -210,10 +216,21 @@ describe('the required refusals', () => {
 });
 
 describe('eligibility', () => {
+  it('only allowlisted PRs or branches; claude/team-* is excluded even when listed', () => {
+    const allow = { prs: [7], branches: ['fix/thing', 'claude/team-x'] };
+    expect(isAllowed({ number: 7, head: { sha: HEAD, ref: 'feat/a' } }, allow)).toBe(true);
+    expect(isAllowed({ number: 8, head: { sha: HEAD, ref: 'fix/thing' } }, allow)).toBe(true);
+    expect(isAllowed({ number: 9, head: { sha: HEAD, ref: 'claude/other' } }, allow)).toBe(false);
+    expect(isAllowed({ number: 7, head: { sha: HEAD, ref: 'claude/team-nightly' } }, allow)).toBe(false);
+    expect(isAllowed({ number: 10, head: { sha: HEAD, ref: 'claude/team-x' } }, allow)).toBe(false);
+  });
+
+  it('a reviewed PR that is not on the allowlist is never merged', async () => {
+    const w = world({ allow: { prs: [], branches: [] } }); addPr(w, 101, {}, [{ body: review() }]);
+    expect((await decide(port(w))).kind).toBe('idle');
+  });
+
   it("Branden's team branches (claude/team-*) are excluded; drafts and non-main bases too", async () => {
-    expect(isBuilderBranch('claude/team-fix')).toBe(false);
-    expect(isBuilderBranch('claude/ask-window-history')).toBe(true);
-    expect(isBuilderBranch('feature/x')).toBe(false);
     const w = world();
     addPr(w, 101, { head: { sha: HEAD, ref: 'claude/team-nightly-1' } }, [{ body: review() }]);
     addPr(w, 102, { draft: true }, [{ body: review() }]);
@@ -310,6 +327,36 @@ describe('serialization and restart safety', () => {
     expect(r.stopped).toContain('merge refused');
     expect(records(w, 101).at(-1)).toMatchObject({ status: 'attempt_failed' });
     expect(w.lock).toBeNull();
+  });
+});
+
+describe('production gates', () => {
+  it('production checks run against the live deploy BEFORE merging; a failure waits (not an attempt) and merges nothing', async () => {
+    const w = world({ prodChecksOk: false }); addPr(w, 101, {}, [{ body: review() }]);
+    const d = await decide(port(w));
+    expect(d.kind).toBe('wait');
+    expect(d.reasons[0]).toContain('production checks fail before merging');
+    expect(d.actions).toEqual([]);
+    expect(w.prodCheckCalls).toEqual([MAIN]);
+  });
+
+  it('the build stamp matches by prefix; empty means unknown, never a match', () => {
+    expect(stampMatches(SHA('c'), SHA('c').slice(0, 12))).toBe(true);
+    expect(stampMatches(SHA('c'), SHA('d'))).toBe(false);
+    expect(stampMatches('', SHA('c'))).toBe(false);
+    expect(stampMatches(null, SHA('c'))).toBe(false);
+  });
+
+  it('success means production CONTAINS the merge (main moved on), not production == merge', async () => {
+    const w = world(); addPr(w, 101, {}, [{ body: review() }]);
+    const p = port(w);
+    await apply(p, await decide(p));
+    w.prod = SHA('e'); w.main = SHA('e'); // later commits on top of our merge
+    w.compare = (base, head) => (base === SHA('c') && head === SHA('e') ? 'ahead' : 'diverged');
+    const v = await decide(p);
+    expect(v.kind).toBe('verify');
+    await apply(p, v);
+    expect(records(w, 101).at(-1)).toMatchObject({ status: 'released' });
   });
 });
 

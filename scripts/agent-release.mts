@@ -11,17 +11,21 @@
  * Decision logic, trust rules and the lock live in scripts/lib/agent-release-core.mts (tested in
  * tests/unit/agent-release.test.ts). This file only wires that logic to:
  *   - GitHub, through `gh api` (REST);
- *   - production, through fetch. The build stamp is the maps-account-build comment on /opportunity-map;
+ *   - production, through fetch: the build stamp is the first maps-account-build:<sha> on /opportunity-map?cb=…,
+ *     and PROD_CHECKS is Agent 4's verify-prod set;
  *   - local git, to type-check the merged tree in a throwaway worktree under .agent-release/.
  *
- * Never runs vercel. Unattended (scheduled) use stays OFF until Eric decides. This script schedules nothing.
+ * Never runs vercel. Eric's decisions (2026-11-22): dry-run is the default, --execute is for ATTENDED runs
+ * from Agent 4's session only, and unattended merges stay disabled until a separate reviewer identity and
+ * branch protection exist. This script schedules nothing. Eligibility = scripts/agent-release.allow.json AND
+ * a valid review record; claude/team-* is always excluded.
  * Reviews are tamper-evident, not tamper-proof: every agent shares one GitHub identity.
  */
 import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, rmSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
-  decide, apply, LOCK_REF, type Port, type Pr, type Comment, type LockPayload, type Compare,
+  decide, apply, stampMatches, LOCK_REF, type Port, type Pr, type Comment, type LockPayload, type Compare, type Allowlist,
 } from './lib/agent-release-core.mjs';
 
 const args = process.argv.slice(2);
@@ -37,29 +41,36 @@ const SITE = 'https://getmindy.ai';
 const MCP = 'https://mcp.getmindy.ai';
 const ROOT = process.cwd();
 
-// ── production checks (the verify-prod set) ──────────────────────────────────────────────────────
-type Check = { name: string; url: string; method?: 'GET' | 'POST'; expect: number | number[]; body?: string; contains?: string; location?: RegExp; headers?: Record<string, string> };
+// ── production checks (Agent 4's verify-prod set, verbatim) ─────────────────────────────────────
+// All read-only; redirects are never followed; any failure = FAIL. Never calls /api/cron/*.
+type Check = { name: string; url: string; method?: 'GET' | 'POST'; expect: number[]; body?: string; headers?: Record<string, string>; locationIncludes?: string };
 export const PROD_CHECKS: Check[] = [
-  { name: 'home', url: `${SITE}/`, expect: 200 },
-  { name: 'opportunity map', url: `${SITE}/opportunity-map`, expect: 200, contains: 'maps-account-build:' },
-  { name: 'pricing', url: `${SITE}/pricing`, expect: 200 },
-  { name: 'MCP setup', url: `${SITE}/mcp/setup`, expect: 200 },
-  { name: 'agencies', url: `${SITE}/agencies`, expect: 200 },
-  { name: 'MCP OAuth metadata', url: `${MCP}/.well-known/oauth-authorization-server`, expect: 200, contains: '"authorization_endpoint"' },
-  { name: 'MCP unauthenticated → 401', url: `${MCP}/mcp`, method: 'POST', expect: 401, body: '{"jsonrpc":"2.0","id":1,"method":"tools/list"}', headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream' } },
+  { name: 'VA redirect', url: `${SITE}/agencies/va`, expect: [301, 307, 308], locationIncludes: 'department-of-veterans-affairs' },
+  ...['/', '/opportunity-map', '/pricing', '/mcp/setup', '/agencies/department-of-veterans-affairs'].map((path) => ({ name: `GET ${path}`, url: `${SITE}${path}`, expect: [200] })),
+  { name: 'MCP OAuth metadata', url: `${MCP}/.well-known/oauth-authorization-server`, expect: [200] },
+  // Auth required: 401, or 400/406 from transports that reject an empty unauthenticated body. Never 200 or 5xx.
+  { name: 'MCP requires auth', url: `${MCP}/mcp`, method: 'POST', expect: [401, 400, 406], body: '{}', headers: { 'content-type': 'application/json' } },
 ];
+const TIMEOUT_MS = 45_000;
 
 async function runCheck(c: Check): Promise<{ name: string; ok: boolean; detail: string }> {
   try {
-    const r = await fetch(c.url, { method: c.method ?? 'GET', body: c.body, headers: c.headers, redirect: c.location ? 'manual' : 'follow', signal: AbortSignal.timeout(30_000) });
-    const want = Array.isArray(c.expect) ? c.expect : [c.expect];
-    if (!want.includes(r.status)) return { name: c.name, ok: false, detail: `status ${r.status}, expected ${want.join('/')}` };
-    if (c.location && !c.location.test(r.headers.get('location') || '')) return { name: c.name, ok: false, detail: `redirect to ${r.headers.get('location')}` };
-    if (c.contains) { const t = await r.text(); if (!t.includes(c.contains)) return { name: c.name, ok: false, detail: `body lacks ${c.contains}` }; }
+    const r = await fetch(c.url, { method: c.method ?? 'GET', body: c.body, headers: c.headers, redirect: 'manual', signal: AbortSignal.timeout(TIMEOUT_MS) });
+    if (!c.expect.includes(r.status)) return { name: c.name, ok: false, detail: `status ${r.status}, expected ${c.expect.join('/')}` };
+    if (c.locationIncludes && !(r.headers.get('location') || '').includes(c.locationIncludes)) return { name: c.name, ok: false, detail: `redirects to ${r.headers.get('location') || '(none)'}` };
     return { name: c.name, ok: true, detail: `${r.status}` };
   } catch (e) {
     return { name: c.name, ok: false, detail: (e as Error).message.slice(0, 120) };
   }
+}
+
+/** The SHA production serves: first maps-account-build stamp on /opportunity-map (cache-busted). Empty = unknown. */
+async function liveStamp(): Promise<string | null> {
+  try {
+    const html = await (await fetch(`${SITE}/opportunity-map?cb=${Math.random().toString(36).slice(2)}`, { signal: AbortSignal.timeout(TIMEOUT_MS) })).text();
+    const m = html.match(/maps-account-build:([a-fA-F0-9]+)/);
+    return m && m[1] ? m[1].toLowerCase() : null;
+  } catch { return null; }
 }
 
 // ── GitHub ───────────────────────────────────────────────────────────────────────────────────────
@@ -129,17 +140,16 @@ const port: Port = {
     return runs.every((r) => r.conclusion === 'skipped') ? 'missing' : 'failure';
   },
   mainSha: async () => gh<{ object: { sha: string } }>(`repos/${REPO}/git/ref/heads/main`).object.sha,
-  productionSha: async () => {
-    try {
-      const html = await (await fetch(`${SITE}/opportunity-map`, { signal: AbortSignal.timeout(30_000) })).text();
-      const m = html.match(/maps-account-build:([0-9a-f]{40})/);
-      return m ? m[1] : null;
-    } catch { return null; }
+  productionSha: liveStamp,
+  allowlist: async () => {
+    const j = JSON.parse(readFileSync(join(ROOT, 'scripts', 'agent-release.allow.json'), 'utf8')) as Partial<Allowlist>;
+    return { prs: (j.prs ?? []).filter((n) => Number.isInteger(n)), branches: (j.branches ?? []).filter((b) => typeof b === 'string') };
   },
   compare: async (base, head) => gh<{ status: Compare }>(`repos/${REPO}/compare/${base}...${head}`).status,
   typecheckMerged: async (pr, sha) => typecheckMerged(pr, sha),
-  prodChecks: async () => {
-    const results = [];
+  prodChecks: async (expectedSha) => {
+    const stamp = await liveStamp();
+    const results = [{ name: 'build stamp', ok: stampMatches(stamp, expectedSha), detail: `live ${stamp ? stamp.slice(0, 12) : 'unknown'}, expected ${expectedSha.slice(0, 12)}` }];
     for (const c of PROD_CHECKS) results.push(await runCheck(c));
     return { ok: results.every((r) => r.ok), results };
   },
@@ -168,9 +178,18 @@ const port: Port = {
   deleteLock: async () => { ghTry(`repos/${REPO}/git/${LOCK_REF}`, 'DELETE'); },
 };
 
-// Mergeability is only computed on the single-PR endpoint: refresh it for the candidates decide() reads.
+// Mergeability is only computed on the single-PR endpoint (and lazily): refresh allowlisted candidates,
+// polling up to ~60 s while GitHub computes it. Everything else stays as listed.
 const baseOpen = port.openPrs;
-port.openPrs = async () => Promise.all((await baseOpen()).map(async (p) => (p.draft ? p : await port.pr(p.number))));
+port.openPrs = async () => {
+  const allow = await port.allowlist();
+  return Promise.all((await baseOpen()).map(async (p) => {
+    if (p.draft || !(allow.prs.includes(p.number) || allow.branches.includes(p.head.ref))) return p;
+    let fresh = await port.pr(p.number);
+    for (let i = 0; i < 12 && fresh.mergeable === null; i++) { await new Promise((r) => setTimeout(r, 5_000)); fresh = await port.pr(p.number); }
+    return fresh;
+  }));
+};
 
 const decision = await decide(port);
 const result = EXECUTE ? await apply(port, decision) : null;

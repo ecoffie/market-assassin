@@ -9,9 +9,11 @@
  *      covers a crash between merge and record). If production's build stamp contains that merge, run the
  *      production checks, record the result and label the PR agent4:released. If not, wait. A restart in
  *      this state RESUMES verification and NEVER merges again.
- *  (b) Otherwise pick the oldest eligible PR and gate it: valid review record for the exact head, CI
- *      `verify` green on that head, mergeable, production == main, the merged tree type-checks. Then take
- *      the ATOMIC lock and merge pinned to the reviewed SHA, record it, and exit.
+ *  (b) Otherwise pick the oldest eligible PR: on the checked-in allowlist (scripts/agent-release.allow.json)
+ *      AND with a valid review record for the exact head. Then gate it: CI `verify` green on that head,
+ *      mergeable, production == main, the merged tree type-checks, and the production checks pass on the
+ *      live deploy BEFORE merging. Then take the ATOMIC lock and merge pinned to the reviewed SHA, record
+ *      it, and exit. Success after a merge = production serves a commit that CONTAINS the merge.
  *
  * Trust: labels are hints and never authorize. Authorization is the latest review-record comment (a
  * fenced ```agent4-review JSON block). It must be posted after the head commit's timestamp, never edited
@@ -29,9 +31,13 @@ export const LABELS = {
   released: 'agent4:released', blocked: 'agent4:blocked',
 } as const;
 
-/** Builders whose PRs this driver may release. Branden's team (claude/team-*) is never eligible. */
-export const BUILDER_BRANCH_PREFIXES = ['claude/'] as const;
+/**
+ * Eligibility is an explicit allowlist (scripts/agent-release.allow.json, maintained by Agent 4) of PR numbers
+ * and/or exact branch names, AND a valid review record. Branch prefixes alone are not safe: builders use
+ * feat/, fix/, docs/, chore/ and claude/. Branden's team (claude/team-*) is excluded even if listed.
+ */
 export const EXCLUDED_BRANCH_PREFIXES = ['claude/team-'] as const;
+export interface Allowlist { prs: number[]; branches: string[] }
 
 export type ReviewClass = 'GREEN' | 'YELLOW' | 'RED';
 
@@ -70,6 +76,7 @@ export type Compare = 'identical' | 'ahead' | 'behind' | 'diverged';
 export interface Port {
   now(): number;
   openPrs(): Promise<Pr[]>;
+  allowlist(): Promise<Allowlist>;
   /** Recently merged PRs into main (newest first, bounded). */
   recentlyMergedPrs(): Promise<Pr[]>;
   pr(n: number): Promise<Pr>;
@@ -82,7 +89,8 @@ export interface Port {
   /** How `head` relates to `base` in commit history. */
   compare(base: string, head: string): Promise<Compare>;
   typecheckMerged(pr: number, sha: string): Promise<{ ok: boolean; detail: string }>;
-  prodChecks(): Promise<{ ok: boolean; results: Array<{ name: string; ok: boolean; detail: string }> }>;
+  /** The production checks against the live deploy; `expectedSha` must prefix the live build stamp. */
+  prodChecks(expectedSha: string): Promise<{ ok: boolean; results: Array<{ name: string; ok: boolean; detail: string }> }>;
   // writes (the CLI calls these only with --execute)
   merge(n: number, sha: string): Promise<{ merged: boolean; merge_commit?: string; message?: string }>;
   comment(n: number, body: string): Promise<void>;
@@ -140,9 +148,14 @@ export function validateReview(comments: Comment[], headSha: string, headCommitD
   return { ok: true, record };
 }
 
-export function isBuilderBranch(ref: string): boolean {
-  if (EXCLUDED_BRANCH_PREFIXES.some((p) => ref.startsWith(p))) return false;
-  return BUILDER_BRANCH_PREFIXES.some((p) => ref.startsWith(p));
+export function isAllowed(pr: Pick<Pr, 'number' | 'head'>, allow: Allowlist): boolean {
+  if (EXCLUDED_BRANCH_PREFIXES.some((p) => pr.head.ref.startsWith(p))) return false;
+  return allow.prs.includes(pr.number) || allow.branches.includes(pr.head.ref);
+}
+
+/** The production build stamp "contains" an expected SHA when that SHA is a prefix of it (empty = unknown). */
+export function stampMatches(stamp: string | null, expected: string): boolean {
+  return !!stamp && !!expected && stamp.toLowerCase().startsWith(expected.toLowerCase());
 }
 
 /** Failed attempts for THIS head commit: a fixed and re-reviewed head starts again from zero. */
@@ -197,11 +210,12 @@ async function verifyStep(port: Port, pend: Pending): Promise<Decision> {
   const prod = await port.productionSha();
   if (!prod) return { kind: 'wait', pr: pend.pr, reasons: ['production build stamp unreadable'], actions: [] };
   if (!pend.merge_commit) return { kind: 'wait', pr: pend.pr, reasons: ['merge commit not known yet'], actions: [] };
-  const rel = prod === pend.merge_commit ? 'identical' : await port.compare(pend.merge_commit, prod);
+  // Success = production serves a commit that CONTAINS the merge (main keeps moving; live rarely == merge).
+  const rel = stampMatches(prod, pend.merge_commit) ? 'identical' : await port.compare(pend.merge_commit, prod);
   if (rel !== 'identical' && rel !== 'ahead') {
     return { kind: 'wait', pr: pend.pr, reasons: [`#${pend.pr} merged but not live yet (production ${prod.slice(0, 8)})`], actions: [] };
   }
-  const checks = await port.prodChecks();
+  const checks = await port.prodChecks(prod);
   const summary = checks.results.map((r) => `${r.ok ? 'PASS' : 'FAIL'} ${r.name}${r.ok ? '' : ` — ${r.detail}`}`).join('\n');
   const record: ReleaseRecord = { type: 'release', pr: pend.pr, status: checks.ok ? 'released' : 'verify_failed', sha: pend.sha, merge_commit: pend.merge_commit, at: nowIso };
   return {
@@ -230,10 +244,11 @@ export async function decide(port: Port): Promise<Decision> {
   }
 
   const [main, prod] = await Promise.all([port.mainSha(), port.productionSha()]);
-  if (!prod || prod !== main) return { kind: 'wait', reasons: [`production (${prod ? prod.slice(0, 8) : 'unreadable'}) is not main (${main.slice(0, 8)})`], actions: [] };
+  if (!stampMatches(prod, main)) return { kind: 'wait', reasons: [`production (${prod ? prod.slice(0, 8) : 'unreadable'}) is not main (${main.slice(0, 8)})`], actions: [] };
 
+  const allow = await port.allowlist();
   const candidates = (await port.openPrs())
-    .filter((p) => p.state === 'open' && !p.draft && p.base.ref === 'main' && isBuilderBranch(p.head.ref) && !p.labels.includes(LABELS.blocked))
+    .filter((p) => p.state === 'open' && !p.draft && p.base.ref === 'main' && isAllowed(p, allow) && !p.labels.includes(LABELS.blocked))
     .sort((a, b) => Date.parse(a.created_at) - Date.parse(b.created_at) || a.number - b.number);
 
   const skipped: string[] = [];
@@ -259,6 +274,9 @@ export async function decide(port: Port): Promise<Decision> {
     if (c.mergeable === false) return refuse('not mergeable with main (conflict)');
     const tc = await port.typecheckMerged(c.number, c.head.sha);
     if (!tc.ok) return refuse(`merged tree does not type-check: ${tc.detail}`);
+    // Production must be healthy BEFORE we add to it; a failure here is not this PR's fault, so wait.
+    const pre = await port.prodChecks(main);
+    if (!pre.ok) return { kind: 'wait', pr: c.number, reasons: [`production checks fail before merging: ${pre.results.filter((r) => !r.ok).map((r) => r.name).join(', ')}`], actions: [] };
 
     const payload: LockPayload = { owner: 'agent4-release', pr: c.number, sha: c.head.sha, expires_at: new Date(now + LOCK_TTL_MS).toISOString() };
     return {

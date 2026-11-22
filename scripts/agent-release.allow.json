@@ -1,0 +1,5 @@
+{
+  "_comment": "Maintained by Agent 4. PRs (numbers) and/or exact head branches the release driver may consider. A valid Agent 4 review record is ALSO required. claude/team-* is always excluded. See docs/agents/agent4-release-protocol.md.",
+  "prs": [],
+  "branches": []
+}
