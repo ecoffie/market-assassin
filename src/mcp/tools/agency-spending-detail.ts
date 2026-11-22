@@ -9,7 +9,7 @@
  * small_business_share is SET-ASIDE-CODE share. recipient_small_business_share is
  * who won. Neither is the SBA 23% goaling figure.
  */
-import { getAgencySpendingDetail, VA_VOSB_BUCKET, type SubAgencySlice, type SetAsideSlice, type SubAgencyStructure } from '@/lib/usaspending/agency-spending-detail';
+import { getAgencySpendingDetail, setAsideIncompleteReason, VA_VOSB_BUCKET, type SubAgencySlice, type SetAsideSlice, type SubAgencyStructure } from '@/lib/usaspending/agency-spending-detail';
 import { mcpFlags } from '@/lib/mcp/flags';
 import type { CommandSpendingStatus, RequestedIdentity, SpendingScope } from '@/lib/gov-contacts/agency-identity';
 
@@ -49,6 +49,8 @@ export interface AgencySpendingDetailToolResult {
     sub_agency_count: number | null;
     small_business_share: number | null;
     spending_scope: SpendingScope;
+    /** Set when a set-aside bucket lookup failed: result_state becomes 'partial' (the rest is real data). */
+    incomplete_reason?: string;
   };
 }
 
@@ -135,6 +137,7 @@ export async function getAgencySpendingDetailTool(input: AgencySpendingDetailToo
       sub_agency_count: res.sub_agencies ? res.sub_agencies.length : null,
       small_business_share: res.small_business_share,
       spending_scope: res.spending.scope,
+      ...(setAsideIncompleteReason(res.set_aside_breakdown) ? { incomplete_reason: setAsideIncompleteReason(res.set_aside_breakdown)! } : {}),
     },
   };
 

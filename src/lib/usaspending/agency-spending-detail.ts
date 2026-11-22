@@ -21,6 +21,7 @@
  * All figures are live USASpending contract obligations for the fiscal year.
  */
 import { fetchAllUSASpendingAgencies } from '@/lib/utils/agency-list-builder';
+import { logToolError, ToolNames, ErrorTypes } from '@/lib/tool-errors';
 import { fiscalYearTimePeriod, latestCompleteFiscalYear } from '@/lib/utils/fiscal-year';
 import { DOD_SUBTIER_ALIASES } from '@/lib/usaspending/awarding-agency-filter';
 import {
@@ -179,15 +180,58 @@ async function spendingByCategory(
   };
   if (setAsideCodes && setAsideCodes.length) filters.set_aside_type_codes = setAsideCodes;
   if (recipientTypeNames && recipientTypeNames.length) filters.recipient_type_names = recipientTypeNames;
-  const res = await fetch(`${USASPENDING}/search/spending_by_category/${category}/`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ filters, category, limit: category === 'awarding_subagency' ? 50 : 5, page: 1 }),
-    signal: AbortSignal.timeout(20000),
-  });
-  if (!res.ok) throw new Error(`spending_by_category/${category} → ${res.status}`);
-  const j = (await res.json()) as { results?: CategoryRow[] };
-  return j.results || [];
+  const body = JSON.stringify({ filters, category, limit: category === 'awarding_subagency' ? 50 : 5, page: 1 });
+
+  // ONE bounded retry, inside the same 20 s budget the single call always had. Only a transient failure is
+  // retried (network error, 5xx, 429); a 4xx is a bad request and a timeout has already spent the budget.
+  const deadline = Date.now() + CATEGORY_BUDGET_MS;
+  for (let attempt = 1; ; attempt++) {
+    try {
+      const res = await fetch(`${USASPENDING}/search/spending_by_category/${category}/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body,
+        signal: AbortSignal.timeout(Math.max(1, deadline - Date.now())),
+      });
+      if (!res.ok) throw new UsaspendingHttpError(res.status, `spending_by_category/${category} → ${res.status}`);
+      const j = (await res.json()) as { results?: CategoryRow[] };
+      return j.results || [];
+    } catch (e) {
+      const backoff = RETRY_BASE_MS + Math.floor(Math.random() * RETRY_JITTER_MS);
+      const budgetLeft = deadline - Date.now() - backoff;
+      if (attempt >= 2 || !isRetryableUsaspendingError(e) || budgetLeft < RETRY_MIN_BUDGET_MS) throw e;
+      await new Promise((r) => setTimeout(r, backoff));
+    }
+  }
+}
+
+const CATEGORY_BUDGET_MS = 20_000;
+const RETRY_BASE_MS = 150;
+const RETRY_JITTER_MS = 250;
+/** A retry is only worth sending with at least this much of the budget left. */
+const RETRY_MIN_BUDGET_MS = 2_000;
+
+export class UsaspendingHttpError extends Error {
+  constructor(readonly status: number, message: string) { super(message); this.name = 'UsaspendingHttpError'; }
+}
+
+/** Network error, 5xx or 429. Never a 4xx, never a timeout/abort (the budget is already spent). */
+export function isRetryableUsaspendingError(e: unknown): boolean {
+  if (e instanceof UsaspendingHttpError) return e.status === 429 || e.status >= 500;
+  const name = (e as { name?: string } | null)?.name;
+  if (name === 'TimeoutError' || name === 'AbortError') return false;
+  return e instanceof TypeError; // undici: "fetch failed" (DNS, reset, refused)
+}
+
+/**
+ * Why a set-aside answer is incomplete, or null when every bucket answered. Set as `_meta.incomplete_reason`
+ * by get_agency_spending_detail and get_sba_goaling_share, which makes result_state 'partial'
+ * (result-contract.ts) while grounded/degraded stay truthful: the total and the other buckets are real.
+ */
+export function setAsideIncompleteReason(breakdown: SetAsideSlice[]): string | null {
+  const failed = breakdown.filter((b) => b.amount === null).map((b) => b.label);
+  if (!failed.length) return null;
+  return `Set-aside bucket${failed.length > 1 ? 's' : ''} ${failed.join(', ')} unavailable from USASpending; the combined set-aside share is unknown (not zero).`;
 }
 
 function emptyResult(
@@ -313,6 +357,7 @@ export async function getAgencySpendingDetail(input: AgencySpendingDetailInput):
 
   const parentService = grain.spendingScope === 'PARENT_SERVICE';
   const buckets = setAsideBucketsFor(resolved.toptierCode, sub);
+  const bucketFailures: Array<{ label: string; codes: string[]; message: string }> = [];
 
   const [totalRows, subRows, recipientSbRows, ...bucketRows] = await Promise.all([
     spendingByCategory('awarding_agency', resolved.name, window, undefined, sub).catch((e) => { trace.push(`total: ${e.message}`); return null; }),
@@ -321,9 +366,24 @@ export async function getAgencySpendingDetail(input: AgencySpendingDetailInput):
       : spendingByCategory('awarding_subagency', resolved.name, window, undefined, sub).catch((e) => { trace.push(`subagency: ${e.message}`); return null; }),
     spendingByCategory('awarding_agency', resolved.name, window, undefined, sub, ['small_business']).catch((e) => { trace.push(`recipient_sb: ${e.message}`); return null; }),
     ...buckets.map((b) =>
-      spendingByCategory('awarding_agency', resolved!.name, window, b.codes, sub).catch((e) => { trace.push(`${b.label}: ${e.message}`); return null; }),
+      spendingByCategory('awarding_agency', resolved!.name, window, b.codes, sub).catch((e) => {
+        trace.push(`${b.label}: ${e.message}`);
+        bucketFailures.push({ label: b.label, codes: b.codes, message: String(e?.message ?? e) });
+        return null;
+      }),
     ),
   ]);
+
+  // Persist bucket failures (after the retry) so the real failure rate is measurable; the trace is in-memory only.
+  if (bucketFailures.length) {
+    await logToolError({
+      tool: ToolNames.AGENCY_SPENDING_DETAIL,
+      errorType: ErrorTypes.API_ERROR,
+      errorMessage: `USASpending set-aside bucket lookup failed after retry: ${bucketFailures.map((f) => `${f.label} (${f.message})`).join('; ')}`,
+      requestPath: 'usaspending/search/spending_by_category/awarding_agency',
+      requestParams: { agency: resolved.name, sub_agency: sub ?? null, fiscal_year: fy, failed_buckets: bucketFailures.map((f) => f.codes.join('/')), bucket_count: buckets.length },
+    }).catch(() => null);
+  }
 
   const identityFields = grain.established
     ? {
