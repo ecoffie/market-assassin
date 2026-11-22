@@ -1021,10 +1021,11 @@ export async function POST(request: NextRequest) {
         let turnMarketReport: { report_id: string | null; url: string | null; title: string; html: string } | null = null;
         // Hoisted out of the tool try so the answer call can rewrite invent-links + re-push the note.
         const fmpToolContents: Array<{ tool: string; content: string }> = [];
-        // Strategy plan (#2320): the "where to focus" ranking comes from the shared fit scorer, not the model. The first
-        // successful find_opportunities in the research rounds adds a FIT RANKING note (compose.ts, the same note as
-        // #2285's chat ranking) built from THIS company's saved profile, so the write-up ranks and explains pathways by
-        // fit. Once per turn; no profile (refused/unavailable) means no note, never a guessed ranking.
+        // Strategy plan (#2320): opportunity fit comes from the shared fit scorer, not the model. The first successful
+        // find_opportunities in the research rounds adds a FIT SIGNAL note (compose.ts strategy_input mode: the same
+        // picks and reasons as #2285's chat ranking) built from THIS company's saved profile. It is one input: the
+        // write-up weighs it with award history, vehicles, competition, buyers and timing, and must say why whenever its
+        // order departs from the fit order. Once per turn; no profile (refused/unavailable) means no note, never a guess.
         let strategyFitNotePushed = false;
         const pushStrategyFitNote = (results: ReadonlyArray<{ record: { tool: string; status: string }; content: string }>) => {
           if (!strategyPlanAsk || strategyFitNotePushed) return;

@@ -3,6 +3,7 @@ import {
   askMindyStrategyPlanEnabledFor, isStrategyPlanRequest, STRATEGY_PLAN_CHAT_CONTRACT, strategyPlanCheck, strategyProfileNote, strategyCompanyContext, strategyFitNote,
   STRATEGY_PLAN_ENV, STRATEGY_PLAN_ALLOWLIST_ENV,
 } from './strategy-plan';
+import { fitRankingNote, rankFindResult } from './compose';
 import { GENERIC_MARKET_REPORT, LIST_AND_GENERIC_PLAN, STRONG_PLAN } from './__fixtures__/strategy-plan/docs';
 import { buildFmpNextMarketReportArgs, buildFmpPathwayFindArgs, filterToolsForTurn } from '@/lib/chat/tool-selection';
 import { initialFmpPhaseState } from '@/lib/chat/fmp-phase-machine';
@@ -215,10 +216,34 @@ describe('PR 2: "where to focus" is ranked by the shared fit scorer', () => {
   it('ranks the FIND result for this company: the matching janitorial notice, not the tractor', () => {
     const fit = strategyFitNote([r('find_opportunities', FIND)], { status: 'ok', profile }, NOW);
     expect(fit.reason).toBe('ok');
-    expect(fit.note).toMatch(/^FIT RANKING/);
+    expect(fit.note).toMatch(/^FIT SIGNAL/);
     expect(fit.note).toContain('Francis Marion Ranger District Office Janitorial Services');
     expect(fit.note).not.toContain('Tractor Purchase');
-    expect(fit.note).toMatch(/Never print a score/);
+    expect(fit.note).toMatch(/Never print or cite a score/);
+  });
+
+  it('the strategy note is one input to prioritization, never the final order (no "do not re-rank", no "in this order")', () => {
+    const note = strategyFitNote([r('find_opportunities', FIND)], { status: 'ok', profile }, NOW).note!;
+    expect(note).toContain('one input to prioritization, not the final order');
+    expect(note).not.toMatch(/do not re-rank/i);
+    expect(note).not.toMatch(/in this order/i);
+    expect(note).not.toMatch(/TOP PICKS/);
+    // same picks and fit reasons as the answer-mode note: one scorer, not a second scoring system
+    const answer = fitRankingNote(rankFindResult(FIND as Parameters<typeof rankFindResult>[0], profile, { nowMs: NOW }))!;
+    const picks = (s: string) => s.split('\n').filter((l) => /^\d+\. /.test(l));
+    expect(picks(note)).toEqual(picks(answer));
+    expect(picks(note).length).toBeGreaterThan(0);
+  });
+
+  it('default (answer) mode is byte-identical to the live #2285 note', () => {
+    const ctx = rankFindResult(FIND as Parameters<typeof rankFindResult>[0], profile, { nowMs: NOW });
+    const live = fitRankingNote(ctx)!;
+    expect(fitRankingNote(ctx, {})).toBe(live);
+    expect(fitRankingNote(ctx, { mode: 'answer' })).toBe(live);
+    const lines = live.split('\n');
+    expect(lines[0]).toBe("FIT RANKING (computed for this company by Mindy's shared fit scorer from the find_opportunities result above; use it, do not re-rank):");
+    expect(lines[1]).toBe('TOP PICKS, best first. Present these as the top picks in this order, each with its "why" in plain words. Never print a score.');
+    expect(lines.slice(2)).toEqual(fitRankingNote(ctx, { mode: 'strategy_input' })!.split('\n').slice(2));
   });
 
   it('no note without a profile, without a successful FIND, or with an unreadable result', () => {
@@ -229,8 +254,19 @@ describe('PR 2: "where to focus" is ranked by the shared fit scorer', () => {
     expect(strategyFitNote([{ record: { tool: 'find_opportunities', status: 'success' }, content: 'not json' }], { status: 'ok', profile }, NOW)).toEqual({ note: null, reason: 'unreadable' });
   });
 
-  it('the contract tells the write-up to follow the fit order and never print a score', () => {
-    expect(STRATEGY_PLAN_CHAT_CONTRACT).toContain('when a FIT RANKING note is present');
-    expect(STRATEGY_PLAN_CHAT_CONTRACT).toContain('Never print a fit score');
+  it('the contract treats fit as one input and REQUIRES an evidence-named why whenever the order departs from it', () => {
+    const line = STRATEGY_PLAN_CHAT_CONTRACT.split('\n').find((l) => l.startsWith('- Prioritization:'))!;
+    expect(line).toContain('when a FIT SIGNAL note is present');
+    expect(line).toContain('one input to prioritization, not the final order');
+    // the evidence it must weigh alongside fit
+    for (const w of ['award history', 'vehicles held', 'competitive position', 'incumbents', 'buyer relationships', 'timing', 'objective', 'trade-offs']) expect(line).toContain(w);
+    // a departure is not merely permitted: the explanation is required
+    expect(line).toContain('Every pathway states why it is recommended');
+    expect(line).toMatch(/When your order differs from the FIT SIGNAL order, that pathway's why MUST name the evidence that moved it/);
+    expect(line).toContain('never depart from the fit order without saying why');
+    expect(line).toContain('Never print or cite a fit score');
+    // the old "follow its order" instruction is gone
+    expect(line).not.toMatch(/follows its order/);
+    expect(STRATEGY_PLAN_CHAT_CONTRACT).not.toContain('do not re-rank');
   });
 });
