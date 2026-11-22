@@ -338,7 +338,7 @@ export default async function ContractorPage({ params }: PageProps) {
         </p>
 
         {/* Identity stats */}
-        <div className="mt-8 grid gap-4 md:grid-cols-4">
+        <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-4">
           <Stat label="Total Obligated" value={fmtMoney(recipient.total_obligated)} highlight />
           <Stat label="Award Records" value={Number(recipient.award_count || 0).toLocaleString()} />
           <Stat label="Agencies Served" value={Number(recipient.distinct_agency_count || 0).toString()} />
@@ -391,7 +391,7 @@ export default async function ContractorPage({ params }: PageProps) {
       {/* Company Profile */}
       <section className="mx-auto max-w-6xl px-6 pb-10">
         <h2 className="text-2xl font-bold mb-4 font-(family-name:--mp-font-serif)">Company Profile</h2>
-        <div className="rounded-lg border border-(--mp-line) bg-(--mp-surface) p-6 grid gap-4 md:grid-cols-2">
+        <div className="rounded-lg border border-(--mp-line) bg-(--mp-surface) p-6 grid grid-cols-1 gap-4 md:grid-cols-2">
           <Field label="Parent UEI (Unique Entity Identifier)" value={rollupUei} mono />
           {recipient.cage_code && <Field label="CAGE Code" value={recipient.cage_code} mono />}
           {recipient.child_count > 1 && (
@@ -441,7 +441,7 @@ export default async function ContractorPage({ params }: PageProps) {
       </section>
 
       {/* Top Agencies + Top NAICS */}
-      <section className="mx-auto max-w-6xl px-6 pb-10 grid gap-6 md:grid-cols-2">
+      <section className="mx-auto max-w-6xl px-6 pb-10 grid grid-cols-1 gap-6 md:grid-cols-2">
         <div className="rounded-lg border border-(--mp-line) bg-(--mp-surface) p-6">
           <h2 className="text-xl font-bold mb-4 font-(family-name:--mp-font-serif)">Top Federal Agencies</h2>
           {topAgencies.length === 0 ? (
@@ -609,7 +609,7 @@ export default async function ContractorPage({ params }: PageProps) {
             USAspending sub-award reporting (FY2016-FY2026).
           </p>
           <div className="rounded-lg border border-(--mp-line) bg-(--mp-surface) p-6">
-            <div className="grid gap-4 md:grid-cols-3 mb-6">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3 mb-6">
               <Stat label="Total Paid to Subs" value={fmtMoney(subPaidOutSummary.total_amount)} highlight />
               <Stat label="Sub Awards" value={subPaidOutSummary.count.toLocaleString()} />
               <Stat label="Distinct Subawardees" value={subPaidOutSummary.partner_count.toLocaleString()} />
@@ -646,7 +646,7 @@ export default async function ContractorPage({ params }: PageProps) {
             sub-award reporting (FY2016-FY2026).
           </p>
           <div className="rounded-lg border border-(--mp-line) bg-(--mp-surface) p-6">
-            <div className="grid gap-4 md:grid-cols-3 mb-6">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3 mb-6">
               <Stat label="Total Received" value={fmtMoney(subReceivedSummary.total_amount)} highlight />
               <Stat label="Sub Awards" value={subReceivedSummary.count.toLocaleString()} />
               <Stat label="Distinct Primes" value={subReceivedSummary.partner_count.toLocaleString()} />
@@ -681,7 +681,7 @@ export default async function ContractorPage({ params }: PageProps) {
           <p className="text-sm text-(--mp-muted) mb-4">
             Other companies active in NAICS {topNaicsCode} — {topNaics[0]?.naics_description}.
           </p>
-          <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-4">
             {related.map((r) => (
               <Link
                 key={r.recipient_uei}

@@ -23,15 +23,17 @@ function loadEnv(filename) {
 loadEnv('.env.local');
 loadEnv('.env.codex-production');
 
-const EMAILS = [
-  'fernando.mercado@venerandavalor.com',
-  'kenworthbudd@yahoo.com',
-  'sylvester.anderson@andslylegacy.com',
-  'powerwealthprofits@protonmail.com',
-  'hello@eganrose.com',
-  'sylwiak@hjgovcontractingcorp.com',
-  'kydun00@yahoo.com',
-];
+// The accounts to verify are a private input: one email per line in
+// $MINDY_PRIVATE_DIR/ultimate-access-emails.txt (never committed). Refuses without it.
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { privatePath } = require('./lib/private-path');
+const EMAILS = (() => {
+  const file = privatePath('ultimate-access-emails.txt');
+  if (!fs.existsSync(file)) { console.error('Refusing to run: missing private input ultimate-access-emails.txt in MINDY_PRIVATE_DIR.'); process.exit(1); }
+  const list = fs.readFileSync(file, 'utf8').split(/\r?\n/).map((e) => e.trim().toLowerCase()).filter((e) => e.includes('@'));
+  if (!list.length) { console.error('Refusing to run: ultimate-access-emails.txt is empty.'); process.exit(1); }
+  return list;
+})();
 
 function normalizeEmail(email) {
   return String(email || '').toLowerCase().trim();

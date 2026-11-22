@@ -218,7 +218,12 @@ export async function fetchUSAJobs(
     const data = (await res.json()) as {
       SearchResult?: { SearchResultItems?: USAJobsItem[]; UserArea?: { NumberOfPages?: string } };
     };
-    const items = data.SearchResult?.SearchResultItems || [];
+    // A 200 without a SearchResultItems ARRAY proves nothing: an empty search returns `[]`. Treat a missing
+    // or malformed list as a failed read, so it surfaces as unavailable and never as a confirmed 0.
+    if (!Array.isArray(data?.SearchResult?.SearchResultItems)) {
+      throw new Error('USAJobs returned no SearchResult.SearchResultItems array (unproven, not an empty result)');
+    }
+    const items = data.SearchResult!.SearchResultItems!;
     for (const it of items) {
       const row = mapUSAJob(it, query);
       if (row) out.push(row);

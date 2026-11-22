@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { backupVaultFiles } from '@/lib/vault/vault-file-backup';
+import { hasValidCronSecret } from '@/lib/cron/cron-request-auth';
 
 /**
  * Daily vault-file backup cron. Copies new/changed customer files from
@@ -27,8 +28,8 @@ const CRON_SECRET = process.env.CRON_SECRET;
 function isAuthed(request: NextRequest): boolean {
   const pw = request.nextUrl.searchParams.get('password');
   const bearer = request.headers.get('authorization')?.replace('Bearer ', '');
-  const isVercelCron = request.headers.get('x-vercel-cron') === '1';
-  const isDispatch = request.headers.get('x-cron-dispatch') === '1';
+  const isVercelCron = hasValidCronSecret(request);
+  const isDispatch = hasValidCronSecret(request);
   return (
     (!!ADMIN_PASSWORD && pw === ADMIN_PASSWORD) ||
     (!!CRON_SECRET && bearer === CRON_SECRET) ||

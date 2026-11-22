@@ -33,6 +33,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getAttachmentDrainKeys, getRotatedSAMKey } from '@/lib/sam/utils';
 import { fetchNoticeResources } from '@/lib/sam/fetch-notice-resources';
+import { hasValidCronSecret } from '@/lib/cron/cron-request-auth';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -59,7 +60,7 @@ function authorized(request: NextRequest): boolean {
     const auth = request.headers.get('authorization') || '';
     if (auth === `Bearer ${cronSecret}`) return true;
   }
-  if (request.headers.get('x-vercel-cron')) return true;
+  if (hasValidCronSecret(request)) return true;
   const password = new URL(request.url).searchParams.get('password');
   return password === process.env.ADMIN_PASSWORD;
 }

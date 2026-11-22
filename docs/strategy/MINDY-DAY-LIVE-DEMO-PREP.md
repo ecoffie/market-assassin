@@ -70,16 +70,16 @@ Run `--verify-only` the morning of to confirm matches are still live (opps expir
 
 | Rank | Account | Space | Verdict | Headline match(es) |
 |---|---|---|---|---|
-| 🥇 | `brian.polser@dobermanemg.com` | Emergency mgmt consulting/training | 🟢 **7 strong** | Ground Ambulance @ Ft. Polk · Forensic Behavioral Science (State) |
+| 🥇 | `[email removed]` | Emergency mgmt consulting/training | 🟢 **7 strong** | Ground Ambulance @ Ft. Polk · Forensic Behavioral Science (State) |
 | 🥈 | `demo@govcongiants.com` | Federal IT / program mgmt | 🟢 **5 strong** | IT Managed Service Provider · Enterprise Financial Services |
-| 🥉 | `obi@attendantsinc.com` | Construction & facilities (HUBZone) | 🟢 **6 strong** | Fire-panel replacements · Automatic-doors maintenance |
-| 4 | `andrellanos@hotmail.com` | Environmental/scientific (USVI) | 🟢 **5 strong** | Munitions clearance · Marsh creation · Eelgrass survey |
-| 5 | `tavin@alfordcontracting.com` | Energy/construction (8(a)+WOSB) | 🟢 **4 strong** | Army microgrid · Airfield lighting vault |
-| — | `candice@capglobalworks.com` | Multimedia production | 🟡 1 strong | Chaplain Corps Multimedia |
-| — | `miazhudson@gmail.com` | Admin/mgmt consulting | 🟡 1 strong | Freshworks licenses |
+| 🥉 | `[email removed]` | Construction & facilities (HUBZone) | 🟢 **6 strong** | Fire-panel replacements · Automatic-doors maintenance |
+| 4 | `[email removed]` | Environmental/scientific (USVI) | 🟢 **5 strong** | Munitions clearance · Marsh creation · Eelgrass survey |
+| 5 | `[email removed]` | Energy/construction (8(a)+WOSB) | 🟢 **4 strong** | Army microgrid · Airfield lighting vault |
+| — | `[email removed]` | Multimedia production | 🟡 1 strong | Chaplain Corps Multimedia |
+| — | `[email removed]` | Admin/mgmt consulting | 🟡 1 strong | Freshworks licenses |
 | ⛔ | `eric@govcongiants.com` | Strategic planning (generic) | 🟡 **0 matches** | — (too generic; do NOT use) |
 
-**Recommended PRIMARY: `brian.polser@dobermanemg.com`** — most compelling story. Its
+**Recommended PRIMARY: `[email removed]`** — most compelling story. Its
 matches (Ground Ambulance, Forensic Behavioral Science) are exactly the "your NAICS search
 would NEVER have shown these" moment — vivid proof of the 💡 hidden-match value.
 ⚠️ It's a real customer account — **get Brian's OK** before featuring his company on stage.
@@ -89,7 +89,7 @@ would NEVER have shown these" moment — vivid proof of the 💡 hidden-match va
 as primary instead if you'd rather not put a customer on stage.
 
 **Notes / do-not-use:**
-- `obi@attendantsinc.com` is GREEN but its #1 result was a noisy "IT Managed Service
+- `[email removed]` is GREEN but its #1 result was a noisy "IT Managed Service
   Provider" (it's a construction firm) — fine as a backup, skip for the headline demo.
 - `eric@govcongiants.com` → 0 matches (generic "strategic planning" profile). This is the
   engine being HONEST (it won't invent matches), not a bug — but don't demo it.
@@ -100,7 +100,7 @@ as primary instead if you'd rather not put a customer on stage.
 
 - [ ] **Confirm the demo company:** get Brian's OK to feature `dobermanemg.com`, OR fall
       back to `demo@govcongiants.com` (internal — no permission needed).
-- [ ] **Night before:** run `demo-prep.ts brian.polser@dobermanemg.com` and
+- [ ] **Night before:** run `demo-prep.ts [email removed]` and
       `demo-prep.ts demo@govcongiants.com` → confirm both 🟢 GREEN.
 - [ ] **Screen-record** the GREEN run (Vimeo) as the fallback if the live API stumbles.
 - [ ] **Morning of:** `--verify-only` both accounts (opps may have expired overnight).

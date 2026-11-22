@@ -3,6 +3,7 @@
  * Phase 2 SEO. Geo+category long-tail (the Yelp pattern). ISR.
  */
 import type { Metadata } from 'next';
+import { siteShareImages } from '@/lib/seo/share-image';
 import { notFound } from 'next/navigation';
 import FacetPage from '@/components/seo/FacetPage';
 import { getNaicsStateOpps, US_STATES } from '@/lib/seo/facets';
@@ -23,7 +24,7 @@ export async function generateMetadata({ params }: { params: Promise<{ code: str
   return {
     title, description,
     alternates: { canonical: url },
-    openGraph: { title, description, type: 'website', url },
+    openGraph: { title, description, type: 'website', url, images: siteShareImages() },
     keywords: [
       `naics ${code} ${st.toLowerCase()}`,
       `federal contracts ${st.toLowerCase()} naics ${code}`,

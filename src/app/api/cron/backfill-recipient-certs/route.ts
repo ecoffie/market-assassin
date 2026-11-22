@@ -13,15 +13,16 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { certBackfillQueue, drainCertBackfill } from '@/lib/sam/recipient-certs';
+import { hasValidCronSecret } from '@/lib/cron/cron-request-auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
 
 export async function GET(request: NextRequest) {
-  const isVercelCron = request.headers.get('x-vercel-cron') === '1';
+  const isVercelCron = hasValidCronSecret(request);
   const authHeader = request.headers.get('authorization');
-  const hasSecret = Boolean(process.env.CRON_SECRET) && authHeader === `Bearer ${process.env.CRON_SECRET}`;
+  const hasSecret = Boolean(process.env.CRON_SECRET) && hasValidCronSecret(request);
   // Also allow the admin password (so Eric can trigger it by hand on prod).
   const pw = new URL(request.url).searchParams.get('password');
   const hasPw = Boolean(process.env.ADMIN_PASSWORD) && pw === process.env.ADMIN_PASSWORD;

@@ -15,8 +15,8 @@ This outreach should focus on people who have already demonstrated commitment by
 Use these as current inputs:
 
 - `ANNELLE-SIKANDER-QUALIFIED-CUSTOMER-OUTREACH.csv` - current 60-person outreach tracker in workspace root.
-- `scripts/paid_customers_unified_2026-04-28.csv` - paid customer purchase history export.
-- `scripts/briefings_activation_segments_2026-04-30.csv` - briefing account/profile/setup signals.
+- `$MINDY_PRIVATE_DIR/paid_customers_unified_2026-04-28.csv` (private; not in the repository) - paid customer purchase history export.
+- `$MINDY_PRIVATE_DIR/briefings_activation_segments_2026-04-30.csv` (private; not in the repository) - briefing account/profile/setup signals.
 - `ERIC-10-10-FOREVER-LIST.md` - proof customer and 10-10 candidate context.
 
 ## Scoring Model
@@ -52,26 +52,26 @@ These are the top contacts to prioritize first because they have the freshest bu
 
 | Rank | Email | Segment | Score | Why Qualified | Recommended Ask |
 | --- | --- | --- | ---: | --- | --- |
-| 1 | trungh@lifestylesolarinc.com | White Glove / Highest Value | 90 | White-glove/high-ticket buyer, highest premium signal | Premium customer validation call |
-| 2 | tavin@alfordcontracting.com | 10-10 Proof / AI Tools Buyer | 85 | Named proof customer plus recent execution-stack purchase | MI setup + proof customer call |
-| 3 | james.banks@coreglobalconsultants.com | Recent Ultimate Buyer | 80 | Recent $1,497 Ultimate purchase | Onboarding + MI value call |
-| 4 | office@getmore.llc | Recent Ultimate Buyer | 80 | Recent $1,497 Ultimate purchase | Onboarding + MI value call |
-| 5 | shelley@integratedfire.org | MI Annual Buyer | 80 | Direct MI annual buyer, fresh intent | MI-specific setup/value call |
-| 6 | sylwiak@hjgovcontractingcorp.com | Ultimate / Active Profile Buyer | 80 | High-value buyer, briefings enabled, alerts enabled, profile configured | MI/profile feedback call |
-| 7 | rhendricks@horrangi.com | High Value / Active Profile Buyer | 75 | High-value buyer with briefings, alerts, and NAICS profile | MI/profile feedback call |
-| 8 | kenworthbudd@yahoo.com | High Value / Briefings Buyer | 70 | High-value buyer with briefings and alerts enabled | MI-specific feedback call |
-| 9 | miazhud1111@gmail.com | Repeat Buyer | 70 | Recent Ultimate plus Opportunity Hunter purchases | Repeat-buyer onboarding call |
-| 10 | peter@valorgovcon.com | Recent High-Value Buyer | 70 | Recent $997 product purchase | Customer validation call |
-| 11 | eduardo@trunorthgovx.com | AI Tools + CRM Buyer | 65 | Recent execution-stack buyer | Deal Flow / CRM validation call |
-| 12 | daphne@yellowbirdtech.com | AI Tools + CRM Buyer | 65 | Execution-stack buyer | Deal Flow / CRM validation call |
-| 13 | hello@eganrose.com | Pro Member / High Lifetime Buyer | 65 | Current subscriber plus high historical value | Pro/FHC retention call |
-| 14 | james.bdavis@outlook.com | FHC / Tool Buyer | 65 | High lifetime value and current subscription behavior | FHC/tool validation call |
-| 15 | coaching@familylifeenhancement.com | Recent Tool Buyer | 60 | Recent contractor database purchase | Tool-to-MI validation call |
-| 16 | jhennings@footprintsfloors.com | MI Buyer | 60 | Direct MI buyer | MI setup call |
-| 17 | altonseth@gmail.com | Alert Buyer | 55 | Direct Alert Pro buyer | Alert-to-MI validation call |
-| 18 | qbcleaningllc@gmail.com | AI Tools Buyer | 55 | Recent AI tools buyer | Product consolidation call |
-| 19 | mdula@cordgroupinc.com | Pro Member Buyer | 55 | Recent Pro buyer | Pro retention call |
-| 20 | yvette@sharpernewaxe.com | 10-10 Bench / Ultimate Buyer | 55 | Named bench customer and previous Ultimate buyer | Customer-first validation call |
+| 1 | [email removed] | White Glove / Highest Value | 90 | White-glove/high-ticket buyer, highest premium signal | Premium customer validation call |
+| 2 | [email removed] | 10-10 Proof / AI Tools Buyer | 85 | Named proof customer plus recent execution-stack purchase | MI setup + proof customer call |
+| 3 | [email removed] | Recent Ultimate Buyer | 80 | Recent $1,497 Ultimate purchase | Onboarding + MI value call |
+| 4 | [email removed] | Recent Ultimate Buyer | 80 | Recent $1,497 Ultimate purchase | Onboarding + MI value call |
+| 5 | [email removed] | MI Annual Buyer | 80 | Direct MI annual buyer, fresh intent | MI-specific setup/value call |
+| 6 | [email removed] | Ultimate / Active Profile Buyer | 80 | High-value buyer, briefings enabled, alerts enabled, profile configured | MI/profile feedback call |
+| 7 | [email removed] | High Value / Active Profile Buyer | 75 | High-value buyer with briefings, alerts, and NAICS profile | MI/profile feedback call |
+| 8 | [email removed] | High Value / Briefings Buyer | 70 | High-value buyer with briefings and alerts enabled | MI-specific feedback call |
+| 9 | [email removed] | Repeat Buyer | 70 | Recent Ultimate plus Opportunity Hunter purchases | Repeat-buyer onboarding call |
+| 10 | [email removed] | Recent High-Value Buyer | 70 | Recent $997 product purchase | Customer validation call |
+| 11 | [email removed] | AI Tools + CRM Buyer | 65 | Recent execution-stack buyer | Deal Flow / CRM validation call |
+| 12 | [email removed] | AI Tools + CRM Buyer | 65 | Execution-stack buyer | Deal Flow / CRM validation call |
+| 13 | [email removed] | Pro Member / High Lifetime Buyer | 65 | Current subscriber plus high historical value | Pro/FHC retention call |
+| 14 | [email removed] | FHC / Tool Buyer | 65 | High lifetime value and current subscription behavior | FHC/tool validation call |
+| 15 | [email removed] | Recent Tool Buyer | 60 | Recent contractor database purchase | Tool-to-MI validation call |
+| 16 | [email removed] | MI Buyer | 60 | Direct MI buyer | MI setup call |
+| 17 | [email removed] | Alert Buyer | 55 | Direct Alert Pro buyer | Alert-to-MI validation call |
+| 18 | [email removed] | AI Tools Buyer | 55 | Recent AI tools buyer | Product consolidation call |
+| 19 | [email removed] | Pro Member Buyer | 55 | Recent Pro buyer | Pro retention call |
+| 20 | [email removed] | 10-10 Bench / Ultimate Buyer | 55 | Named bench customer and previous Ultimate buyer | Customer-first validation call |
 
 ## Outreach Lanes
 

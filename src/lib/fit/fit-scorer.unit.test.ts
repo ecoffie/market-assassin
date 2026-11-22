@@ -96,6 +96,28 @@ describe('scoreFit', () => {
   });
 });
 
+describe('a known zero work match is hidden, never "related" (Agent 4 / Ask Mindy builder, 2026-11-22)', () => {
+  it('0 capability + open deadline + small business set-aside (22 of 55 known) is hidden, with the reason', () => {
+    const f = scoreFit(open({ title: 'Grounds Maintenance', naics: '561730', psc: undefined, value: undefined, state: undefined, buyerAgency: undefined }), { ...STAFFING, pastPerformance: undefined }, NOW);
+    expect(f.factors.find((x) => x.id === 'capability')?.points).toBe(0);
+    expect(f.known_weight).toBe(55);
+    expect(f.score).toBeGreaterThanOrEqual(RELATED_AT); // would have been 'related' on points alone
+    expect(f.band).toBe('hidden');
+    expect(f.hiddenBecause).toMatch(/no work match/);
+  });
+
+  it('unknown capability is not a zero: it is not hidden for that reason', () => {
+    const f = scoreFit(open({ naics: undefined, psc: undefined, title: '' }), { ...STAFFING, queryConcepts: [] }, NOW);
+    if (f.factors.find((x) => x.id === 'capability')?.points === null) {
+      expect(f.hiddenBecause ?? '').not.toMatch(/no work match/);
+    }
+  });
+
+  it('a real work match is unaffected', () => {
+    expect(scoreFit(open(), STAFFING, NOW).band).toBe('show');
+  });
+});
+
 describe('unknown is never guessed', () => {
   it('unknown factors are left out and the score scales over what is known; known_weight says how much', () => {
     const f = scoreFit(open({ value: undefined, state: undefined }), { naicsCodes: ['561320'] }, NOW);
