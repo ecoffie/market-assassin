@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import type { BlogPostMeta } from '@/data/blog-posts';
+import { TRIAL_CTA_LABEL } from '@/lib/public-site/trial-cta';
 
 /**
  * Shared chrome for every blog post.
@@ -103,8 +104,8 @@ export function BlogPostLayout({
       </article>
 
       {/* Final CTA card — same offer on every post. Goal: convert the
-          reader who finished the article. "Start for free"
-          is the wording the homepage uses, so we stay consistent. */}
+          reader who finished the article. The label is the homepage's
+          trial wording (TRIAL_CTA_LABEL): /pricing has no free plan. */}
       <section className="max-w-3xl mx-auto px-4 pb-16">
         <div className="rounded-lg border border-(--mp-line) p-8 md:p-10 text-center bg-(--mp-wash)">
           <h2 className="text-2xl md:text-3xl font-bold text-(--mp-ink) mb-3 font-(family-name:--mp-font-serif)">
@@ -118,7 +119,7 @@ export function BlogPostLayout({
             href="/pricing"
             className="inline-block px-8 py-3 bg-white hover:bg-(--mp-wash) text-(--mp-navy) font-bold rounded-lg transition-colors"
           >
-            Start for free
+            {TRIAL_CTA_LABEL}
           </Link>
           <p className="text-xs text-(--mp-muted) mt-4">
             Pro ($149/mo) or Team. No charge for 14 days. Cancel anytime.
