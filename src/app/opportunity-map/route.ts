@@ -11382,29 +11382,40 @@ const ASK_MINDY_JS = `<script>(function(){
       .then(function(d){ if(d&&d.url){ try{ if(window.__track) window.__track('tool_use','map_report_export',{format:file.format}); }catch(e){} location.href=d.url; } else { btn.textContent='Try again'; repError('The '+FMT_LABEL[file.format]+' file could not be prepared. Try again, or reopen the report from your Vault.'); } },function(){ btn.textContent='Try again'; repError('The file could not be prepared. Check your connection and try again.'); })
       .then(function(){ btn.disabled=false; if(btn.textContent==='Preparing...') btn.textContent=label; });
   }
-  // Packaged market report: a real PDF from /reports/<id>/pdf (same renderer as the hosted page). Fetched
-  // here, OUTSIDE the script-less preview frame, and saved as a file; a failure shows the server's message.
+  // Packaged market report: a real PDF from /reports/<id>/pdf (same renderer as the hosted page). The browser
+  // downloads it by NAVIGATING a hidden frame to that URL (the response is Content-Disposition: attachment),
+  // never through a blob: a blob plus a synthetic link click after a long wait was blocked in production and
+  // saved nothing. A failure answers with the route's own HTML error page, which DOES load in the frame, so
+  // its message is read back and shown in the pane.
   var REPORT_ID_RX=/^[A-Za-z0-9_-]{16,64}$/;
+  var PDF_SETTLE_MS=10000, PDF_FRAME_TTL_MS=120000, pdfFrame=null;
   function downloadReportPdf(reportId,btn){
-    var label=btn.textContent; btn.disabled=true; btn.textContent='Preparing PDF...'; repError('');
-    var fail=function(msg){ btn.textContent='Try again'; repError(msg||'The PDF could not be created. Try again in a minute.'); };
-    fetch('/reports/'+encodeURIComponent(reportId)+'/pdf',{headers:{Accept:'application/pdf, application/json'}})
-      .then(function(r){
-        var ct=r.headers.get('content-type')||'';
-        if(r.ok&&ct.indexOf('application/pdf')===0){
-          var m=/filename="([^"]+)"/.exec(r.headers.get('content-disposition')||'');
-          return r.blob().then(function(b){
-            if(!b||!b.size){ fail(); return; }
-            var u=URL.createObjectURL(b), a=document.createElement('a'); a.href=u; a.download=(m&&m[1])||'market-report.pdf';
-            a.setAttribute('data-testid','amk-report-pdf-link'); document.body.appendChild(a); a.click();
-            setTimeout(function(){ URL.revokeObjectURL(u); if(a.parentNode) a.parentNode.removeChild(a); },1000);
-            btn.textContent=label;
-            try{ if(window.__track) window.__track('tool_use','map_report_export',{format:'pdf',source:'market_report'}); }catch(e){}
-          });
-        }
-        return r.json().then(function(j){ fail(j&&typeof j.message==='string'?j.message:''); },function(){ fail(); });
-      },function(){ fail('The PDF could not be downloaded. Check your connection and try again.'); })
-      .then(function(){ btn.disabled=false; if(btn.textContent==='Preparing PDF...') btn.textContent=label; });
+    var label='Download PDF'; btn.disabled=true; btn.textContent='Preparing PDF...'; repError('');
+    // The button settles after PDF_SETTLE_MS (no event tells us a download began); an error page that
+    // arrives later still shows, so a slow failure is never silent.
+    var errored=false;
+    var settle=function(){ if(errored||pdfFrame!==f) return; btn.disabled=false; btn.textContent=label; };
+    var failWith=function(msg){
+      if(errored||pdfFrame!==f) return; errored=true; btn.disabled=false; btn.textContent='Try again';
+      repError(msg||'The PDF could not be created. Try again in a minute.');
+    };
+    if(pdfFrame&&pdfFrame.parentNode) pdfFrame.parentNode.removeChild(pdfFrame);
+    var f=document.createElement('iframe'); pdfFrame=f;
+    f.setAttribute('data-testid','amk-report-pdf-frame'); f.setAttribute('aria-hidden','true'); f.setAttribute('tabindex','-1'); f.title='PDF download';
+    f.style.cssText='position:absolute;width:0;height:0;border:0;visibility:hidden;left:-9999px;top:0';
+    f.addEventListener('load',function(){
+      var d=null; try{ d=f.contentDocument; }catch(e){ d=null; }
+      if(!d){ failWith(''); return; }
+      var body=d.body?(d.body.textContent||'').replace(/\\s+/g,' ').trim():'';
+      if(d.title!=='PDF not available'&&!body) return;
+      var p=d.querySelector('.c p'); var msg=p?(p.textContent||'').trim():'';
+      failWith(msg);
+    });
+    document.body.appendChild(f);
+    f.src='/reports/'+encodeURIComponent(reportId)+'/pdf';
+    try{ if(window.__track) window.__track('tool_use','map_report_export',{format:'pdf',source:'market_report'}); }catch(e){}
+    setTimeout(settle,PDF_SETTLE_MS);
+    setTimeout(function(){ if(f.parentNode) f.parentNode.removeChild(f); if(pdfFrame===f) pdfFrame=null; },PDF_FRAME_TTL_MS);
   }
   // items: [{label, fmt, run(btn)}]
   function exportMenu(items,host){
