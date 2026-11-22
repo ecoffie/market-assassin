@@ -9,7 +9,7 @@
  *                fullAndOpen only when the published text literally says there is no set-aside;
  *                response_deadline (dateKind response_deadline); no value on SAM notices
  *   coming_back  set_aside_type (null = unknown); incumbentSoleSource8a when it literally says 8(a) sole source;
- *                potential_total_value ?? total_obligation; current_end (dateKind current_end);
+ *                total_obligation ?? potential_total_value (obligated vs obligated; #2300); current_end (dateKind current_end);
  *                awarding_sub_agency → buyerOffice; vehicle unknown (orders are excluded upstream)
  *   coming_soon  estimated_value_min / estimated_value_max → value range; contracting_office → buyerOffice;
  *                set_aside_type (null = unknown); anticipated_award_date (dateKind anticipated_award)
@@ -60,7 +60,9 @@ function mapRow(row: Row): FitResult | null {
     }
     case 'coming_back': {
       const published = str(row.set_aside_type);
-      const value = num(row.potential_total_value) ?? num(row.total_obligation);
+      // Obligated first: the size factor compares against the company's largest past award, an obligated amount.
+      // potential_total_value is a ceiling (or null) since Data Core #2300; it is the fallback only.
+      const value = num(row.total_obligation) ?? num(row.potential_total_value);
       return {
         kind: 'coming_back', ...common, ...setAsideFields(published),
         ...(published && SOLE_SOURCE_8A.test(published) ? { incumbentSoleSource8a: true } : {}),
