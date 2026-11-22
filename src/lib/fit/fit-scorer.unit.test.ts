@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { RELATED_AT, SHOW_AT, SHOW_MIN_KNOWN_WEIGHT, WEIGHTS, eligibilityGate, reasonSentence, requiredCertification, scoreFit, type FitProfile, type FitResult } from './fit-scorer';
+import { RELATED_AT, SHOW_AT, SHOW_MIN_KNOWN_WEIGHT, WEIGHTS, eligibilityGate, resultValue, scoreWindow, reasonSentence, requiredCertification, scoreFit, type FitProfile, type FitResult } from './fit-scorer';
 
 const NOW = Date.parse('2026-11-21T12:00:00Z');
 const days = (n: number) => new Date(NOW + n * 86_400_000).toISOString();
@@ -70,7 +70,7 @@ describe('scoreFit', () => {
     const p = { ...STAFFING, certifications: ['HUBZone'] };
     expect(scoreFit(open({ setAside: 'HUBZone Set-Aside' }), p, NOW).factors[3].points).toBe(10);
     expect(scoreFit(open({ setAside: 'Total Small Business' }), p, NOW).factors[3].points).toBe(7);
-    expect(scoreFit(open({ setAside: '' }), p, NOW).factors[3].points).toBe(4);
+    expect(scoreFit(open({ setAside: undefined, fullAndOpen: true }), p, NOW).factors[3].points).toBe(4);
     expect(scoreFit(open({ kind: 'coming_back', setAside: '', incumbentSoleSource8a: true, date: days(300) }), p, NOW).factors[3].points).toBe(2);
   });
 
@@ -93,6 +93,28 @@ describe('scoreFit', () => {
     expect(scoreFit(open({ vehicle: { name: 'OASIS+', openToNewBidders: true } }), p, NOW).factors[6].points).toBe(6);
     expect(scoreFit(open({ vehicle: { name: 'SEWP V', openToNewBidders: false } }), p, NOW).factors[6].points).toBe(2);
     expect(scoreFit(open({ vehicle: null }), p, NOW).factors[6].points).toBeNull();
+  });
+});
+
+describe('a known zero work match is hidden, never "related" (Agent 4 / Ask Mindy builder, 2026-11-22)', () => {
+  it('0 capability + open deadline + small business set-aside (22 of 55 known) is hidden, with the reason', () => {
+    const f = scoreFit(open({ title: 'Grounds Maintenance', naics: '561730', psc: undefined, value: undefined, state: undefined, buyerAgency: undefined }), { ...STAFFING, pastPerformance: undefined }, NOW);
+    expect(f.factors.find((x) => x.id === 'capability')?.points).toBe(0);
+    expect(f.known_weight).toBe(55);
+    expect(f.score).toBeGreaterThanOrEqual(RELATED_AT); // would have been 'related' on points alone
+    expect(f.band).toBe('hidden');
+    expect(f.hiddenBecause).toMatch(/no work match/);
+  });
+
+  it('unknown capability is not a zero: it is not hidden for that reason', () => {
+    const f = scoreFit(open({ naics: undefined, psc: undefined, title: '' }), { ...STAFFING, queryConcepts: [] }, NOW);
+    if (f.factors.find((x) => x.id === 'capability')?.points === null) {
+      expect(f.hiddenBecause ?? '').not.toMatch(/no work match/);
+    }
+  });
+
+  it('a real work match is unaffected', () => {
+    expect(scoreFit(open(), STAFFING, NOW).band).toBe('show');
   });
 });
 
@@ -201,5 +223,58 @@ describe('subcontract route never reads as prime-eligible (Eric, 2026-11-21)', (
     const f = scoreFit({ kind: 'open', setAside: 'HUBZone' }, { certifications: [] }, NOW);
     expect(f).toMatchObject({ route: 'subcontract', known_weight: 10, score: 0, band: 'hidden' });
     expect(f.reasons).toEqual(['subcontract route: set aside for HUBZone, which you do not hold']);
+  });
+});
+
+describe('Data Core contract (2026-11-21)', () => {
+  it('a blank or missing set-aside is unknown; full and open only when the source says so', () => {
+    for (const setAside of [undefined, null, '', '   ']) {
+      expect(scoreFit(open({ setAside }), STAFFING, NOW).factors[3].points).toBeNull();
+    }
+    expect(scoreFit(open({ setAside: undefined, fullAndOpen: true }), STAFFING, NOW).factors[3].points).toBe(4);
+    // A published set-aside still wins over the flag.
+    expect(scoreFit(open({ setAside: 'Total Small Business', fullAndOpen: true }), STAFFING, NOW).factors[3].points).toBe(7);
+  });
+
+  it('a value range scores at its midpoint; a one-sided range at its known bound; nonsense is unknown', () => {
+    expect(resultValue({ min: 1_000_000, max: 3_000_000 })).toBe(2_000_000);
+    expect(resultValue({ max: 5_000_000 })).toBe(5_000_000);
+    expect(resultValue({ min: 0, max: -1 })).toBeUndefined();
+    expect(resultValue({})).toBeUndefined();
+    expect(scoreFit(open({ kind: 'forecast', value: { min: 1_000_000, max: 2_000_000 } }), STAFFING, NOW).factors[4].points).toBe(10);
+    expect(scoreFit(open({ value: {} }), STAFFING, NOW).factors[4].points).toBeNull();
+  });
+
+  it('dateKind: the matching kind scores; a contradicting kind makes the date unknown, never reinterpreted', () => {
+    expect(scoreFit(open({ dateKind: 'response_deadline', date: days(30) }), STAFFING, NOW).factors[2].points).toBe(15);
+    expect(scoreFit(open({ kind: 'coming_back', dateKind: 'current_end', date: days(300) }), STAFFING, NOW).factors[2].points).toBe(12);
+    expect(scoreFit(open({ dateKind: 'current_end', date: days(30) }), STAFFING, NOW).factors[2].points).toBeNull();
+    expect(scoreFit(open({ dateKind: 'current_end', date: days(-5) }), STAFFING, NOW).band).not.toBe('hidden');
+  });
+
+  it('scoreWindow ranks the whole fetched window before paging and reports window vs matched', () => {
+    const rows = [
+      { id: 'construction', r: open({ title: 'Roof Repair', naics: '238160', setAside: undefined, fullAndOpen: true, state: 'WA', buyerAgency: 'Department of the Interior' }) },
+      { id: 'staffing', r: open() },
+      { id: 'nothing', r: { kind: 'open' as const } },
+    ];
+    const w = scoreWindow(rows, (x) => x.r, STAFFING, { matchedCount: 6_864, nowMs: NOW });
+    expect(w.ranked.map((x) => x.item.id)).toEqual(['staffing', 'construction', 'nothing']);
+    expect(w).toMatchObject({ window_size: 3, matched_count: 6_864 });
+    expect(w.coverage_note).toMatch(/top 3 fetched of 6864 matching; this is the best of what was scored, not of the whole market/);
+  });
+
+  it('scoreWindow sorts unscored (null) results after every scored one, including a real 0', () => {
+    // Empty profile: a bare row is unscored; a row with a passed-in set-aside and deadline scores.
+    const w = scoreWindow([{ kind: 'open' as const }, open({ setAside: 'SDVOSB', date: days(-3) }), open()], (r) => r, {}, { nowMs: NOW });
+    expect(w.ranked.map((x) => x.fit.score === null)).toEqual([false, false, true]);
+  });
+
+  it('scoreWindow leaves matched_count absent when unknown, and adds no note when the window covers it', () => {
+    const w1 = scoreWindow([open()], (r) => r, STAFFING, { nowMs: NOW });
+    expect(w1).not.toHaveProperty('matched_count');
+    expect(w1).not.toHaveProperty('coverage_note');
+    const w2 = scoreWindow([open()], (r) => r, STAFFING, { matchedCount: 1, nowMs: NOW });
+    expect(w2).not.toHaveProperty('coverage_note');
   });
 });

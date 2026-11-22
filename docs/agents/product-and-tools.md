@@ -684,11 +684,11 @@ Grant advocate: `npx tsx scripts/grant-mindy-pro-once.ts email@example.com --adv
 
 | Email | Purpose |
 |-------|---------|
-| `aj@cypherintel.com` | Testimonial |
-| `pa.joof@pjaygroup.com` | Testimonial |
-| `dare2dreaminc615@gmail.com` | Testimonial |
-| `olga@olaexecutiveconsulting.com` | Testimonial |
-| `tavinalford@gmail.com` | Testimonial |
+| `[email removed]` | Testimonial |
+| `[email removed]` | Testimonial |
+| `[email removed]` | Testimonial |
+| `[email removed]` | Testimonial |
+| `[email removed]` | Testimonial |
 
 ### Advocate Accounts (Exclude from Campaigns)
 
@@ -696,18 +696,18 @@ Complimentary Pro for creators / power users with their own audience (Launch Str
 
 | Email | Name |
 |-------|------|
-| `westover105@gmail.com` | Sue Kranes |
-| `olga@olaexecutiveconsulting.com` | Olga Alcaraz |
-| `louis.reed@reedasolutions.com` | Louis Reed |
-| `jaisonsolutions@gmail.com` | Tabitha Ruffin |
-| `aj@cypherintel.com` | Andre Jerry |
+| `[email removed]` | Sue Kranes |
+| `[email removed]` | Olga Alcaraz |
+| `[email removed]` | Louis Reed |
+| `[email removed]` | Tabitha Ruffin |
+| `[email removed]` | Andre Jerry |
 
 ⚠️ **Register the account the advocate WORKS FROM, not their app signup.** Tabitha connects as
-`jaisonsolutions@gmail.com`; her `tfeast15@gmail.com` signup holds the auth account and is NOT
+`[email removed]`; her `[email removed]` signup holds the auth account and is NOT
 where she works. Credits granted to the signup address sat unspent while the demo account ran
 dry. Comp access and campaign exclusion only matter where the person actually is.
 
-**John Simmons (`johnpalmer101@gmail.com`) is NOT an advocate** — a customer. AJ moved to
+**John Simmons (`[email removed]`) is NOT an advocate** — a customer. AJ moved to
 comp/testimonial 2026-07-19 and **back to advocate 2026-08-28**; he stays in
 `campaign-exclusions.ts` too, which is additive (that list suppresses campaigns, this one
 grants comp Pro).

@@ -22,6 +22,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { resolveEventOffice } from '@/lib/gov-contacts/event-office';
+import { hasValidCronSecret } from '@/lib/cron/cron-request-auth';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 const BATCH_SIZE = Number(process.env.EVENT_OFFICE_BACKFILL_BATCH) || 300;
@@ -40,7 +41,7 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const password = searchParams.get('password');
   const cronSecret = request.headers.get('authorization')?.replace('Bearer ', '');
-  if (password !== ADMIN_PASSWORD && cronSecret !== process.env.CRON_SECRET) {
+  if (password !== ADMIN_PASSWORD && !hasValidCronSecret(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

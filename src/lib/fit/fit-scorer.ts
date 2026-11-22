@@ -39,13 +39,21 @@ export interface FitResult {
   description?: string;
   naics?: string;
   psc?: string;
-  /** Set-aside as published, e.g. "Total Small Business", "8(a)", "SDVOSB", "HUBZone", "WOSB". Empty = full and open. Undefined = unknown. */
+  /**
+   * Set-aside as published, e.g. "Total Small Business", "8(a)", "SDVOSB", "HUBZone", "WOSB". Undefined, null or
+   * blank = UNKNOWN (a missing set-aside is never read as full and open; Data Core contract, 2026-11-21).
+   */
   setAside?: string | null;
+  /** Only when the source affirmatively says the work is full and open (no set-aside). */
+  fullAndOpen?: true;
   /** The current award was an 8(a) sole source (coming-back rows). */
   incumbentSoleSource8a?: boolean;
-  value?: number;
-  /** Open: response deadline. Coming back: current end date. Forecast: expected solicitation date. ISO. */
+  /** A dollar value, or a range (forecasts publish ranges). Absent = unknown. */
+  value?: number | { min?: number; max?: number };
+  /** Open: response deadline. Coming back: current end date. Forecast: expected award date. ISO. */
   date?: string;
+  /** Which date `date` is. When it contradicts `kind` the date is treated as unknown, never reinterpreted. */
+  dateKind?: 'response_deadline' | 'current_end' | 'anticipated_award';
   state?: string;
   /** Work is nationwide or remote. */
   nationwide?: boolean;
@@ -171,9 +179,15 @@ function pastPerformance(r: FitResult, p: FitProfile): FactorScore {
   return { id, points: 0 };
 }
 
+const DATE_KIND_FOR: Readonly<Record<ResultKind, NonNullable<FitResult['dateKind']>>> = {
+  open: 'response_deadline', coming_back: 'current_end', forecast: 'anticipated_award',
+};
+
 function timing(r: FitResult, now: number): FactorScore & { expired?: boolean } {
   const id = 'timing';
   if (r.kind === 'forecast') return { id, points: 8, reason: 'is on the agency forecast, so you can position early' };
+  // A date of the wrong kind (e.g. an award end date on an open notice) is unknown, not reinterpreted.
+  if (r.dateKind && r.dateKind !== DATE_KIND_FOR[r.kind]) return { id, points: null };
   const t = r.date ? Date.parse(r.date) : NaN;
   if (!Number.isFinite(t)) return { id, points: null };
   if (r.kind === 'open') {
@@ -188,18 +202,30 @@ function timing(r: FitResult, now: number): FactorScore & { expired?: boolean } 
 function competition(r: FitResult, p: FitProfile): FactorScore {
   const id = 'competition';
   if (r.incumbentSoleSource8a) return { id, points: 2, reason: undefined };
-  if (r.setAside === undefined) return { id, points: null };
-  const need = requiredCertification(r.setAside || '');
+  const published = (r.setAside ?? '').trim();
+  if (!published) return r.fullAndOpen ? { id, points: 4 } : { id, points: null };
+  const need = requiredCertification(published);
   if (need === null) return { id, points: 4 };
   if (need === 'small') return { id, points: 7, reason: 'is set aside for small business' };
   if (p.certifications === undefined) return { id, points: null };
   return has(p.certifications, need) ? { id, points: 10, reason: `is set aside for ${need}, which you hold` } : { id, points: 0 };
 }
 
+/** One number for a value or a range: a range scores at its midpoint; a one-sided range at its known bound. */
+export function resultValue(v: FitResult['value']): number | undefined {
+  if (typeof v === 'number') return Number.isFinite(v) && v > 0 ? v : undefined;
+  if (!v) return undefined;
+  const lo = typeof v.min === 'number' && v.min > 0 ? v.min : undefined;
+  const hi = typeof v.max === 'number' && v.max > 0 ? v.max : undefined;
+  if (lo !== undefined && hi !== undefined) return (lo + hi) / 2;
+  return lo ?? hi;
+}
+
 function size(r: FitResult, p: FitProfile): FactorScore {
   const id = 'size';
-  if (!r.value || !p.largestPastAward || r.value <= 0 || p.largestPastAward <= 0) return { id, points: null };
-  const ratio = r.value / p.largestPastAward;
+  const value = resultValue(r.value);
+  if (!value || !p.largestPastAward || value <= 0 || p.largestPastAward <= 0) return { id, points: null };
+  const ratio = value / p.largestPastAward;
   if (ratio >= 0.5 && ratio <= 3) return { id, points: 10, reason: 'is a size you have handled before' };
   if (ratio < 0.5 || ratio <= 10) return { id, points: 5 };
   return { id, points: 2 };
@@ -260,7 +286,13 @@ export function scoreFit(r: FitResult, p: FitProfile, nowMs: number = Date.now()
 
   let band: FitScore['band'] = t.expired ? 'hidden' : score >= SHOW_AT ? 'show' : score >= RELATED_AT ? 'related' : 'hidden';
   let evidenceNote: string | undefined;
-  const capabilityKnown = factors.find((f) => f.id === 'capability')?.points !== null;
+  const capabilityPoints = factors.find((f) => f.id === 'capability')?.points ?? null;
+  const capabilityKnown = capabilityPoints !== null;
+  // A KNOWN zero work match is not a fit, whatever timing or a set-aside add up to. Without this, 0 capability
+  // + an open deadline (15) + a small business set-aside (7) = 22 of 55 known points = 40 → 'related', so
+  // "show more" lists offered work the company does not do. Unknown capability is untouched (it is not a zero).
+  const noWorkMatch = capabilityKnown && capabilityPoints === 0;
+  if (noWorkMatch) band = 'hidden';
   if (band === 'show' && (!capabilityKnown || knownWeight < SHOW_MIN_KNOWN_WEIGHT)) {
     band = 'related';
     evidenceNote = `limited evidence: only ${listWords(known.map((f) => FACTOR_WORDS[f.id]))} could be checked`;
@@ -268,7 +300,7 @@ export function scoreFit(r: FitResult, p: FitProfile, nowMs: number = Date.now()
   return {
     score, band, route, reasons, known_weight: knownWeight, factors,
     ...(gate ? { gate } : {}),
-    ...(t.expired ? { hiddenBecause: 'response deadline has passed' } : {}),
+    ...(t.expired ? { hiddenBecause: 'response deadline has passed' } : noWorkMatch ? { hiddenBecause: 'no work match: the title, codes and description do not match what the company does' } : {}),
     ...(evidenceNote ? { evidenceNote } : {}),
   };
 }
@@ -279,4 +311,38 @@ export function reasonSentence(fit: FitScore): string {
   const [a, b] = fit.reasons;
   const s = b ? `${a} and ${b}` : a;
   return `${s.charAt(0).toUpperCase()}${s.slice(1)}.`;
+}
+
+export interface ScoredWindow<T> {
+  /** Every candidate in the fetched window, scored and sorted best first (unscored last). */
+  ranked: Array<{ item: T; fit: FitScore }>;
+  /** How many candidates were scored (the fetched window). */
+  window_size: number;
+  /** How many matched in the source, when known. Absent = unknown, never assumed equal to the window. */
+  matched_count?: number;
+  /** Set when the window is smaller than what matched: the ranking is "top of what was scored", not of the market. */
+  coverage_note?: string;
+}
+
+/**
+ * Rank-then-page (Data Core contract, 2026-11-21): score the FULL fetched window before any page cut, sort by
+ * score, and report window_size vs matched_count. Callers page `ranked`; they add no second relevance filter.
+ */
+export function scoreWindow<T>(
+  items: readonly T[],
+  toResult: (item: T) => FitResult,
+  profile: FitProfile,
+  opts: { matchedCount?: number; nowMs?: number } = {},
+): ScoredWindow<T> {
+  const now = opts.nowMs ?? Date.now();
+  const ranked = items.map((item) => ({ item, fit: scoreFit(toResult(item), profile, now) }))
+    .sort((a, b) => (b.fit.score ?? -1) - (a.fit.score ?? -1));
+  const out: ScoredWindow<T> = { ranked, window_size: items.length };
+  if (typeof opts.matchedCount === 'number' && Number.isFinite(opts.matchedCount)) {
+    out.matched_count = opts.matchedCount;
+    if (opts.matchedCount > items.length) {
+      out.coverage_note = `ranked the top ${items.length} fetched of ${opts.matchedCount} matching; this is the best of what was scored, not of the whole market`;
+    }
+  }
+  return out;
 }

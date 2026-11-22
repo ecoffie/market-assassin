@@ -20,6 +20,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { isValidDodaac } from '@/lib/gov-contacts/agency-key';
+import { hasValidCronSecret } from '@/lib/cron/cron-request-auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -36,7 +37,7 @@ function authed(request: NextRequest): boolean {
   const pw = request.nextUrl.searchParams.get('password');
   // Vercel cron hits this via the dispatcher with a CRON_SECRET bearer.
   const bearer = request.headers.get('authorization')?.replace('Bearer ', '');
-  const isCron = request.headers.get('x-cron-dispatch') === '1'
+  const isCron = hasValidCronSecret(request)
     || (!!process.env.CRON_SECRET && bearer === process.env.CRON_SECRET);
   return (!!pw && pw === process.env.ADMIN_PASSWORD) || isCron;
 }
@@ -136,7 +137,7 @@ async function run(execute: boolean) {
 export async function GET(request: NextRequest) {
   if (!authed(request)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   // Cron fires GET → execute so counts stay fresh without a separate POST.
-  const isCron = request.headers.get('x-cron-dispatch') === '1';
+  const isCron = hasValidCronSecret(request);
   const execute = isCron || request.nextUrl.searchParams.get('mode') === 'execute';
   return NextResponse.json(await run(execute));
 }

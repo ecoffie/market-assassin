@@ -14,6 +14,8 @@ Mindy (`market-assassin`): the Next.js app behind **getmindy.ai** and **mcp.getm
 
    `npm run deploy` is `vercel --prod` (a direct production upload of your local tree). It falls under this rule.
 
+   **Nightly team auto-merge (Eric, approved 2026-11-21).** A draft PR opened by the nightly agent team (`docs/agents/nightly-team.md`) MAY be merged by GitHub auto-merge without Eric's per-PR approval when ALL of these hold: the bug was reproduced; a new test fails on `main` and passes with the fix; the independent Verifier returned `pass` with no check skipped; CI `verify` is green on the latest commit; the symptom is re-tested on the preview build; the diff is ≤ 300 lines and ≤ 10 files; the PR has no conflicts and no `no-auto-merge` label; and the repo variable `AGENT_AUTO_MERGE` is not `off`. At most 3 such merges per night, 15 minutes apart. Two reverts in 7 days set `AGENT_AUTO_MERGE` to `off`. Agents still NEVER run `vercel --prod`, `promote`, `rollback` or `redeploy`, never run `npm run migrate -- --go`, and never change production env vars or flags.
+
 2. **Production migrations** only as `npm run migrate -- --go --only <file>`, never bare `--go` (it would apply unrelated pending files). Migrations are idempotent (`IF EXISTS` / `IF NOT EXISTS`, data-preserving step first). Verify against the live DB afterwards; a runner "ok" is not proof.
 3. **Worktrees:** one per task.
    - Link env with `npm run env:link-worktree -- <worktree>`, never a hand-typed `ln -sfn` (it has destroyed the main `.env.local` twice).

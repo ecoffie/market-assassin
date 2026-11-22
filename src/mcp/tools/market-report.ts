@@ -27,6 +27,7 @@ import { detectUndercount } from '@/lib/market/undercount-signal';
 import { resolveMarketScope, filtersForScope, fetchSpendingCategory, buildSpendingFilters } from '@/lib/market/spend-query';
 import { expiringContracts } from '@/mcp/tools/expiring-contracts';
 import { queryFederalContacts } from '@/lib/gov-contacts/contact-roster';
+import { isValidOfficeCode } from '@/lib/gov-contacts/dodaac-prefix';
 import { displayContactName } from '@/lib/gov-contacts/contact-quality';
 import { agencyForecasts } from '@/mcp/tools/forecasts';
 import { getAgencySpendingDetailTool } from '@/mcp/tools/agency-spending-detail';
@@ -184,6 +185,9 @@ export interface MarketReportSummary {
     window: string | null;
     state_scoped: boolean;
     requested_state: string | null;
+    /** The headline is never agency-scoped: false + requested_agency discloses that it covers ALL buyers. */
+    agency_scoped: boolean;
+    requested_agency: string | null;
     /** Measurement terms that recovered the market — evidence, not a rename. */
     identity_resolved_via: string[] | null;
   } | null;
@@ -227,6 +231,13 @@ export interface MarketReportContacts {
   people: Array<{ name: string; role: string; email: string; office: string | null }>;
   /** Total matched (before the display cap) so truncation is explicit. */
   total: number;
+  /**
+   * WHY these people. 'market_awarding_offices' = staff who post solicitations for the contracting
+   * offices that awarded this market's in-scope expiring contracts (office_codes = PIID prefixes).
+   * 'department_roster' = the agency's general roster — NOT specific to this market or state.
+   */
+  basis?: 'market_awarding_offices' | 'department_roster';
+  office_codes?: string[];
 }
 
 /**
@@ -400,6 +411,22 @@ async function unionSpendingCategory(
     .slice(0, limit);
 }
 
+
+/**
+ * The contracting offices behind a market: the 6-char office prefix of each in-scope contract's PIID
+ * (DoD DoDAAC or civilian code, e.g. 36C248), most frequent first, at most 3. Orders contribute their
+ * own PIID prefix (the ordering office). Codes that are not office-shaped are skipped.
+ */
+export function marketOfficeCodes(contracts: Array<Record<string, unknown>>, max = 3): string[] {
+  const counts = new Map<string, number>();
+  for (const c of contracts) {
+    const code = String(c.piid ?? '').toUpperCase().trim().slice(0, 6);
+    if (!isValidOfficeCode(code)) continue;
+    counts.set(code, (counts.get(code) ?? 0) + 1);
+  }
+  return [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, max).map(([c]) => c);
+}
+
 export async function generateMarketReport(input: MarketReportInput): Promise<MarketReportResult> {
   const keyword = (input.keyword || '').trim();
   const naicsIn = (input.naics || '').trim();
@@ -487,6 +514,22 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
   // USASpending source). This is what makes the report a faithful readout of the search.
   const scopedFilters = scope ? filtersForScope(scope, state, scopeExtra) : null;
 
+  // The keyword axis's subject boundary (see the recompetes section below): the ~90% coverage set.
+  const subjectNaicsSet: string[] = naicsCodes.length
+        ? naicsCodes
+        // Use the ~90% COVERAGE SET, not the full measured tail. The tail of a
+        // multi-trade family carries long-tail noise — a construction family
+        // measures 187 NAICS, of which 314910 textiles (0.004%) and 339112/339113
+        // surgical (0.002%/0.007%) are rounding error. Filtering recompetes on
+        // the whole tail put those back on the page, which is exactly the
+        // off-subject defect the P0 lock exists to prevent. coverageCodes is the
+        // smallest set covering ~90% of the measured market — 14 clean
+        // construction codes here — so it is the defensible subject boundary.
+        : (coverage?.coverageCodes?.length
+            ? coverage.coverageCodes
+            : (coverage?.allNaics ?? []).map((n) => n.code)
+          ).filter(Boolean);
+
   // UNION filter sets for a market that is "A OR B" (Cybersecurity = NAICS 518210 hosting
   // OR PSC DJ01/DJ10 security). USASpending ANDs its filters, so this can't be one query —
   // the agencies/contractors sections run each set + merge (unionSpendingCategory). When
@@ -534,20 +577,7 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
     // banner reports). When neither axis yields one, we return NO recompetes
     // rather than unrelated ones.
     (() => {
-      const subjectNaics = naicsCodes.length
-        ? naicsCodes
-        // Use the ~90% COVERAGE SET, not the full measured tail. The tail of a
-        // multi-trade family carries long-tail noise — a construction family
-        // measures 187 NAICS, of which 314910 textiles (0.004%) and 339112/339113
-        // surgical (0.002%/0.007%) are rounding error. Filtering recompetes on
-        // the whole tail put those back on the page, which is exactly the
-        // off-subject defect the P0 lock exists to prevent. coverageCodes is the
-        // smallest set covering ~90% of the measured market — 14 clean
-        // construction codes here — so it is the defensible subject boundary.
-        : (coverage?.coverageCodes?.length
-            ? coverage.coverageCodes
-            : (coverage?.allNaics ?? []).map((n) => n.code)
-          ).filter(Boolean);
+      const subjectNaics = subjectNaicsSet;
       if (!subjectNaics.length && !primaryNaics) {
         // No defensible subject filter exists → withhold the section.
         return Promise.resolve({
@@ -566,13 +596,25 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
       }), (v) => (v.contracts?.length ?? 0) > 0);
     })(),
     // Forecasts honor the FULL NAICS UNION (queryForecasts splits a comma list), NOT one code —
-    // a DOD-IT search of 4 codes was reading only the first (541511) and missing 541519's 2,668
-    // rows. And NO toptier agency filter: agency_forecasts.source_agency is stored as SHORT CODES
-    // (NAVY / USACE / DOD / GSA…), so passing the toptier name "Department of Defense" matched
-    // NOTHING and zeroed the section (Eric 2026-08-02: "the market report shows no forecast?").
-    // NAICS scope is the right market for forecasts; the saved-search agency was a $-section
-    // narrowing the forecast table can't honor by name anyway.
-    guard(agencyForecasts({ keyword: keyword || undefined, naics: naicsCodes.length ? naicsCodes.join(',') : primaryNaics, state, set_aside: setAside, limit: 15 }), (v) => (v.forecasts?.length ?? 0) > 0),
+    // a DOD-IT search of 4 codes was reading only the first (541511) and missing 541519's 2,668 rows.
+    // AGENCY: passed again — agencyForecasts now resolves names through agency-identity.ts (VA →
+    // source_agency 'VA', "Department of Defense" → its components), which is what the old toptier
+    // name could not match (Eric 2026-08-02). KEYWORD: when the literal phrase measured NOTHING and the
+    // market was identified through curated alternates (identityResolvedVia — e.g. "hospital construction
+    // renovation"), the literal is not a usable title filter (it matched 0 forecasts while VA publishes
+    // construction forecasts); the measured subject NAICS set scopes it instead, as for recompetes.
+    (() => {
+      const literalMeasuredNothing = Boolean(coverage?.identityResolvedVia?.length);
+      const forecastNaics = naicsCodes.length
+        ? naicsCodes.join(',')
+        : (literalMeasuredNothing && subjectNaicsSet.length ? subjectNaicsSet.join(',') : primaryNaics);
+      return guard(agencyForecasts({
+        keyword: keyword && !literalMeasuredNothing ? keyword : undefined,
+        naics: forecastNaics,
+        agency: agency || undefined,
+        state, set_aside: setAside, limit: 15,
+      }), (v) => (v.forecasts?.length ?? 0) > 0);
+    })(),
     agency ? guard(getAgencySpendingDetailTool({ agency }), (v) => v._meta?.grounded === true) : Promise.resolve({ value: null, degraded: false, status: 'empty' as SectionStatus, outcome: { status: 'empty' as SectionStatus, value: null } }),
     agency ? guard(getSbaGoalingShare({ agency }), (v) => v._meta?.grounded === true) : Promise.resolve({ value: null, degraded: false, status: 'empty' as SectionStatus, outcome: { status: 'empty' as SectionStatus, value: null } }),
   ]);
@@ -613,28 +655,52 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
   const contactAgency = agency || topAgencies[0]?.name || '';
   const CONTACTS_CAP = 6;
   let contactsSection: MarketReportContacts | null = null;
-  if (contactAgency) {
+  const toPeople = (rows: Awaited<ReturnType<typeof queryFederalContacts>>['contacts']) => rows
+    .filter((c) => (c.contact_email || '').includes('@'))
+    .map((c) => ({
+      // The roster appends phone/DSN junk to the name on 12.8% of rows ("Stephen
+      // Weaver6142923131", "Natalya RadykDSN312-850-4033"). This cleaner used to live ONLY
+      // here, so the report showed clean names while every other surface showed the raw
+      // pollution. It is now the shared contract.
+      name: displayContactName(c.contact_fullname) || '',
+      role: c.role_category_label || c.contact_title || c.role || '',
+      email: c.contact_email || '',
+      // Name the contracting office AND its code ("NETWORK CONTRACT OFFICE 8 (36C248)") so a reader knows which
+      // buying office this person posts for (Claude Local, 2026-11-22). Code only when the roster derived one.
+      office: c.office_code
+        ? `${c.derived_office || 'Contracting office'} (${c.office_code})`
+        : (c.derived_office || c.sub_agency || null),
+      office_code: c.office_code ?? null,
+    }))
+    .filter((p) => p.name && p.email)
+    .slice(0, CONTACTS_CAP);
+  // 1) The offices that actually award THIS market: the contracting-office prefix of the in-scope
+  //    expiring contracts' PIIDs (already scoped by NAICS/keyword, agency and state). The department
+  //    roster ranked by recency returned Army Corps staff in Mobile/Pittsburgh for a GA janitorial
+  //    report and generic VA staff for a VA construction report (2026-11-22).
+  const officeCodes = marketOfficeCodes((recompetesR.value?.contracts ?? []) as Array<Record<string, unknown>>);
+  if (officeCodes.length) {
+    const roster = (await guard(queryFederalContacts({ officeCodes, limit: CONTACTS_CAP * 3 }))).value;
+    const people = toPeople(roster?.contacts ?? []);
+    if (people.length) {
+      contactsSection = {
+        agency: contactAgency || String((recompetesR.value?.contracts?.[0] as { awarding_agency?: string } | undefined)?.awarding_agency || ''),
+        office: people[0].office, people, total: roster?.total ?? people.length,
+        basis: 'market_awarding_offices', office_codes: officeCodes,
+      };
+    }
+  }
+  // 2) Fallback: the agency's general roster, labelled as such (not market- or state-specific).
+  if (!contactsSection && contactAgency) {
     const roster = (await guard(queryFederalContacts({ agency: contactAgency, limit: CONTACTS_CAP * 3 }))).value;
-    const people = (roster?.contacts ?? [])
-      .filter((c) => (c.contact_email || '').includes('@'))
-      .map((c) => ({
-        // The roster appends phone/DSN junk to the name on 12.8% of rows ("Stephen
-        // Weaver6142923131", "Natalya RadykDSN312-850-4033"). This cleaner used to live ONLY
-        // here, so the report showed clean names while every other surface showed the raw
-        // pollution. It is now the shared contract.
-        name: displayContactName(c.contact_fullname) || '',
-        role: c.role_category_label || c.contact_title || c.role || '',
-        email: c.contact_email || '',
-        office: c.derived_office || c.sub_agency || null,
-      }))
-      .filter((p) => p.name && p.email)
-      .slice(0, CONTACTS_CAP);
+    const people = toPeople(roster?.contacts ?? []);
     if (people.length) {
       contactsSection = {
         agency: contactAgency,
         office: people[0].office,
         people,
         total: roster?.total ?? people.length,
+        basis: 'department_roster',
       };
     }
   }
@@ -764,6 +830,9 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
        */
       state_scoped: false,
       requested_state: state ?? null,
+      // Nor is it agency-scoped: keywordCoverage / codeMarketSize ignore the agency (VA report 2026-11-22).
+      agency_scoped: false,
+      requested_agency: agency || null,
       /** What resolved identity when the literal phrase measured nothing (RC-1). */
       identity_resolved_via: coverage?.identityResolvedVia ?? null,
     };

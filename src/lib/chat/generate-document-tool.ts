@@ -21,7 +21,7 @@
  * Offered only when VAULT_GENERATED_FILES is on for the verified caller ('true' or 'allowlist').
  */
 import { DOC_SCHEMA, labeledUnits, type DocModel } from '@/lib/documents/model';
-import { validateDocModel, demoteUncitedFacts, hardenedAssumptions, repeatedSentences, fixtureMarkers, neverAnAssumption, citedObservationAsAssumption, BLOCK_TYPE_VALUES, CLAIM_VALUES, SOURCE_KIND_VALUES } from '@/lib/documents/validate';
+import { validateDocModel, demoteUncitedFacts, repairDocModelStructure, hardenedAssumptions, repeatedSentences, fixtureMarkers, neverAnAssumption, citedObservationAsAssumption, BLOCK_TYPE_VALUES, CLAIM_VALUES, SOURCE_KIND_VALUES } from '@/lib/documents/validate';
 import { renderDocument } from '@/lib/documents';
 import { modelHasTables } from '@/lib/documents/render-spreadsheet';
 import { saveGeneratedDocument, type GeneratedDb, type GeneratedFormat } from '@/lib/vault/generated';
@@ -29,6 +29,7 @@ import type { VaultStorage, VaultUploadInput } from '@/lib/vault/upload';
 import { detectProhibitedMarkings, markingRefusalMessage } from '@/lib/vault/marking-detect';
 import { vaultEmailFor, WORKSPACE_UNCONFIRMED_NOTE, type ChatActingScope } from './chat-acting-scope';
 import { vaultDocEnabledFor } from '@/lib/vault/flags';
+import { validateFmpWriteup, type FmpWriteupContext } from './fmp-writeup-validate';
 
 export const CREATE_DOCUMENT = 'create_document';
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -102,7 +103,7 @@ export const CREATE_DOCUMENT_TOOL_DEF = {
   function: {
     name: CREATE_DOCUMENT,
     description:
-      "Create a document file — a client-ready PDF and an editable Word file (and Excel/CSV when the model has tables or the user asks for a spreadsheet) — and save it privately to the user's Vault. CALL THIS whenever the user asks to create, make, write up, export, download or save a document, report, PDF, Word file, Excel, spreadsheet, CSV, capability statement, brief or deliverable. Build it from the content already prepared in this conversation — INCLUDING the user's uploaded company material (capabilities, approach, company facts) and any rewrite you just gave them — not only the market research; do not run new searches first unless the user asks for new research. The user's own description of their company from their upload is a 'fact' that cites the upload: declare a source { kind: 'upload', recordId: <the upload's document_id>, label: <file name> } and cite it; never label it an assumption and never leave it out. Certifications, contract awards, past performance and eligibility may appear ONLY when the uploaded text states them, as facts citing the upload — never invented and never as assumptions. Label every block (an uncited fact is saved labeled \"Unverified — no source\"). Every declared source should be cited by at least one block. Write for a busy small-business owner who is not an AI expert: short sentences, plain English, no jargon without a one-line gloss in parentheses, concrete next steps. CHOOSING LENGTH: (1) If the user asks for a short strategy / capture / pursuit brief, use EXACTLY these body headings in order — 'About the company', 'Where demand is', 'How you fit', 'Next 30 days' — plus an optional role-'about' section 'How to read this'; keep each section to at most 3 short paragraphs or 1 table + 3 bullets. (2) If the user asks for a market research report, comprehensive report, full report, deep dive, or similar, DO NOT force that short brief shape — build a professional multi-section research report with cover subtitle, executive summary, agency/buyer analysis, contractor/competition tables, contract history when researched, citations, assumptions, and actionable recommendations. Prefer real tables over long prose. Never invent federal dollars, award counts, or agency rankings; only include figures that appear in this conversation's tool results, and label estimates vs verified facts clearly. Title the document with the company or market name (not a bare 'Report'). To revise a document Mindy made earlier, pass its document_id as revises_document_id: a new version is saved and the old one is kept.",
+      "Create a document file — a client-ready PDF and an editable Word file (and Excel/CSV when the model has tables or the user asks for a spreadsheet) — and save it privately to the user's Vault. CALL THIS whenever the user asks to create, make, write up, export, download or save a document, report, PDF, Word file, Excel, spreadsheet, CSV, capability statement, brief or deliverable. Build it from the content already prepared in this conversation — INCLUDING the user's uploaded company material (capabilities, approach, company facts) and any rewrite you just gave them — not only the market research; do not run new searches first unless the user asks for new research. The user's own description of their company from their upload is a 'fact' that cites the upload: declare a source { kind: 'upload', recordId: <the upload's document_id>, label: <file name> } and cite it; never label it an assumption and never leave it out. Certifications, contract awards, past performance and eligibility may appear ONLY when the uploaded text states them, as facts citing the upload — never invented and never as assumptions. Label every block (an uncited fact is saved labeled \"Unverified — no source\"). Every declared source should be cited by at least one block. Write for a busy small-business owner who is not an AI expert: short sentences, plain English, no jargon without a one-line gloss in parentheses, concrete next steps. CHOOSING LENGTH: (1) If the user asks for a short strategy / capture / pursuit brief, use EXACTLY these body headings in order — 'About the company', 'Where demand is', 'How you fit', 'Next 30 days' — plus an optional role-'about' section 'How to read this'; keep each section to at most 3 short paragraphs or 1 table + 3 bullets. (2) If the user asks for a market research report, comprehensive report, full report, deep dive, or similar, DO NOT force that short brief shape — build a professional multi-section research report with a cover subtitle and an executive summary. ORDER: lead with the answer — the executive summary states the top prioritized opportunities and the recommended moves in plain English, followed by a 'Priority opportunities and recommendations' section (ranked; each with the buyer, why it fits, and the next step) — THEN the supporting evidence: agency/buyer analysis, contractor/competition tables, contract history when researched, then citations, assumptions and limits. PROCUREMENT PATHWAYS: when the conversation's tool results cover them, include a section on how the work is actually bought — contract vehicles / IDIQs / GWACs and who holds them now (current holders and incumbents), open sources-sought / RFI / pre-solicitation notices, forecasts, recompete and expiration timing, and the set-asides in play. Omit what was not researched or say plainly that it was not checked; never fill a gap with a guess. WHAT IT MEANS: do not stop at data. Turn the evidence into business meaning — where to compete, which buyers to approach first, which vehicles to get on, which incumbents to displace or team with, what drives the demand, and concrete next actions with a time frame; label these 'recommendation' and tie each to the facts that support it. CITATIONS: one source per underlying record when the tool results provide a record URL or id — a USAspending award page (usaspending.gov/award/...), a SAM.gov notice link, a vehicle or solicitation number — with kind, url and recordId filled in; a generic search-page URL (usaspending.gov/search) is only the fallback for an aggregate figure that has no record. Every figure cites the source it came from. Prefer real tables over long prose. PERCENT COLUMNS: format 'pct' (tables and charts) shows a value of 1 or less as a fraction (0.284 → 28.4%) and a value above 1 as percentage points (40.93 → 40.9%); state shares consistently in one style per column, and store a share under 1% as a fraction (0.005, not 0.5). IDS: give every section and block its own unique id (sec-exec-summary, sec-vehicles, blk-top-agencies-table); a repeated id is repaired by renaming, so never rely on one. Never invent federal dollars, award counts, or agency rankings; only include figures that appear in this conversation's tool results, and label estimates vs verified facts clearly. Title the document with the company or market name (not a bare 'Report'). To revise a document Mindy made earlier, pass its document_id as revises_document_id: a new version is saved and the old one is kept.",
     parameters: {
       type: 'object',
       properties: {
@@ -145,6 +146,17 @@ export interface GenerateDocumentDeps {
   chatSessionId: string | null;
   render?: typeof renderDocument;
   today?: () => string;
+  /**
+   * Federal Market Profile turn: run the step-8 write-up validator after DocModel
+   * repair/validate/demote and BEFORE render/save. Hard failures return
+   * `fmp_writeup_invalid` and save nothing.
+   */
+  federalMarketProfile?: boolean;
+  /**
+   * PAE section required when defenseBuyersAppear; optional requiredSnippets from
+   * host-extracted tool JSON (FmpWriteupContext.requiredSnippets).
+   */
+  fmpWriteupContext?: FmpWriteupContext;
 }
 
 type Row = { id: string; original_filename: string; mime_type: string | null; version: number | null; parent_id: string | null; doc_model: unknown };
@@ -262,11 +274,13 @@ export function makeGenerateDocumentTool(deps: GenerateDocumentDeps) {
     if (markers.length) return { ok: false, error: 'fixture_content', note: 'Example or test content cannot be saved as a document. Use the research from this conversation.' };
 
     // One call, one answer (Ask Mindy runs ONE tool round per turn, so a "fix and call again" retry is
-    // unreachable live — 2026-11-17 production test). When the only problems are unsupported facts, the
-    // document is repaired right away: uncited facts are saved labeled "Unverified — no source" and
-    // decision-critical ones are omitted (never refused just because a fact lacked a cite). Anything the
-    // repair cannot fix — structure, unknown values — is refused with the exact allowed values.
+    // unreachable live — 2026-11-17 production test). Repair shape first (duplicate ids / missing table
+    // columns — live 2026-11-19 comprehensive report failures), then unsupported facts: uncited facts
+    // are saved labeled "Unverified — no source" and decision-critical ones are omitted. Anything the
+    // repair cannot fix — unknown values / empty content — is refused with the exact allowed values.
     // Diagnostics (no content): what came in, what the repair changed and why, and declared sources nothing cites.
+    const structured = repairDocModelStructure(model);
+    model = structured.model;
     const unitsIn = countUnits(model);
     const omittedByReason: Record<string, number> = {};
     const preRepair = new Map<string, { claim?: string; text: string; critical?: boolean; cites?: string[] }>();
@@ -284,6 +298,7 @@ export function makeGenerateDocumentTool(deps: GenerateDocumentDeps) {
           issues: repaired.issues.slice(0, 25).map((i) => `${i.path}: ${i.message}`),
           allowed: { source_kind: [...SOURCE_KIND_VALUES], claim: [...CLAIM_VALUES], block_type: [...BLOCK_TYPE_VALUES] },
           note: 'The document could not be built and nothing was saved. Fix exactly these fields using the allowed values, then the user can ask again.',
+          ...(structured.changes.length ? { structure_repairs: structured.changes.slice(0, 20) } : {}),
         };
       }
       model = d.model; unverified = d.unverified; omitted = d.omitted; v = repaired;
@@ -300,10 +315,36 @@ export function makeGenerateDocumentTool(deps: GenerateDocumentDeps) {
     const citedIds = new Set<string>();
     for (const sec of model.sections) for (const b of sec.blocks) for (const u of labeledUnits(b)) for (const c of u.cites ?? []) citedIds.add(c);
     const uncitedSources = model.sources.filter((s) => !citedIds.has(s.id)).map((s) => ({ id: s.id, kind: s.kind, label: s.label }));
-    const diagnostics = { units_in: unitsIn, units_out: countUnits(model), unverified: unverified.length, omitted_by_reason: omittedByReason, uncited_sources: uncitedSources.map((s) => `${s.id}:${s.kind}`) };
+    const diagnostics = {
+      units_in: unitsIn,
+      units_out: countUnits(model),
+      unverified: unverified.length,
+      omitted_by_reason: omittedByReason,
+      uncited_sources: uncitedSources.map((s) => `${s.id}:${s.kind}`),
+      structure_repairs: structured.changes.length,
+    };
     console.info('[create_document] diagnostics', JSON.stringify(diagnostics));
     // Method boilerplate repeated across sections is reported, never a reason to refuse or cut.
     const repeats = repeatedSentences(model);
+
+    // FMP step 8: structure + ban gate (Choice B). Soft em-dash replace; hard refuse on missing sections / CTAs.
+    let fmpWarnings: string[] = [];
+    if (deps.federalMarketProfile) {
+      const fmpCtx: FmpWriteupContext = deps.fmpWriteupContext ?? { defenseBuyersAppear: false };
+      const fmp = validateFmpWriteup(model, fmpCtx);
+      if (fmp.model) model = fmp.model;
+      const hard = fmp.issues.filter((i) => i.severity === 'error');
+      fmpWarnings = fmp.issues.filter((i) => i.severity === 'warn').map((i) => i.message);
+      if (hard.length) {
+        return {
+          ok: false,
+          error: 'fmp_writeup_invalid',
+          issues: hard.map((i) => `${i.code}: ${i.message}`),
+          ...(fmpWarnings.length ? { warnings: fmpWarnings } : {}),
+          note: 'Federal Market Profile write-up failed the structure gate. Nothing was saved. Fix the listed issues and call create_document once more.',
+        };
+      }
+    }
 
     const text = docModelText(model);
     const marking = detectProhibitedMarkings(markingText(model));
@@ -401,8 +442,9 @@ export function makeGenerateDocumentTool(deps: GenerateDocumentDeps) {
       ...(pdfNote ? { pdf_note: pdfNote } : {}),
       ...(spreadsheetNote ? { spreadsheet_note: spreadsheetNote } : {}),
       ...(repeats.length ? { repeated_sentences: repeats.length } : {}),
+      ...(fmpWarnings.length ? { fmp_warnings: fmpWarnings } : {}),
       diagnostics,
-      note: 'Saved privately to the Vault (Documents → Generated). Download buttons appear under this answer — tell the user the file names and that they can download from those buttons or from Documents → Generated; do not paste download links.'
+      note: 'Saved privately to the Vault (Documents → Generated). Under this answer the user gets an "Open report" card (on the Map the report also opens in a reading pane beside the chat). Tell them they can read it there, open Export in the report for PDF/Word/Excel/CSV, ask you for changes (a new version is saved, the old one is kept), or find it under Documents → Generated. Do not paste download links or list format buttons in the chat text.'
         + (unverified.length ? ` ${unverified.length} statement(s) are labeled "Unverified — no source"; say so.` : '')
         + (omitted.length ? ` ${omitted.length} decision-critical statement(s) without a source were left out; say so.` : '')
         + (uncitedSources.some((s) => s.kind === 'upload')

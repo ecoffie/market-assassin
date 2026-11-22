@@ -52,6 +52,17 @@ describe('does not over-fire', () => {
     expect(findLegacyDestinations('<a href="https://getmindy.ai/app/reset-password?t=1">Reset</a>')).toEqual([]);
   });
 
+  it('a documented billing/cancel exception passes (Settings → Billing tab)', () => {
+    expect(findLegacyDestinations('<a href="https://getmindy.ai/app?panel=settings&amp;section=billing&amp;utm_source=resend">Settings</a>')).toEqual([]);
+    expect(findLegacyDestinations(undefined, 'Cancel: https://getmindy.ai/app?panel=settings&section=billing')).toEqual([]);
+  });
+
+  it('the billing exception is NARROW: other /app destinations are still caught', () => {
+    expect(findLegacyDestinations('<a href="https://getmindy.ai/app?panel=settings">x</a>')).toHaveLength(1);
+    expect(findLegacyDestinations('<a href="https://getmindy.ai/app?panel=pipeline&section=billing">x</a>')).toHaveLength(1);
+    expect(findLegacyDestinations('<a href="https://getmindy.ai/app/foo?panel=settings&section=billing">x</a>')).toHaveLength(1);
+  });
+
   it('a path merely CONTAINING the word passes', () => {
     // /alerts/preferences and /my-briefings-archive are not the legacy surfaces.
     expect(findLegacyDestinations('<a href="/alerts/preferences">x</a><a href="/my-briefings-archive">y</a>')).toEqual([]);

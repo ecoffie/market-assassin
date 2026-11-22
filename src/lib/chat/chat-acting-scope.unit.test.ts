@@ -160,8 +160,9 @@ describe('chat route: the system-prompt profile follows the acting scope (F1)', 
     const { readFileSync } = await import('node:fs');
     const src = readFileSync(`${process.cwd()}/src/app/api/app/chat/route.ts`, 'utf8');
     expect(src).toMatch(/const profileEmail = vaultEmailFor\(actingScope\);/);
-    expect(src).toMatch(/profileEmail \? await loadBidderProfile\(profileEmail\) : \{\}/);
-    expect(src).not.toMatch(/loadBidderProfile\(auth\.email/);
+    expect(src).toMatch(/profileEmail \? await loadBidderProfileResult\(profileEmail\) : null/);
+    expect(src).toMatch(/const profile: BidderProfile = profileResult\?\.profile \?\? \{\};/);
+    expect(src).not.toMatch(/loadBidderProfile(Result)?\(auth\.email/);
   });
 });
 

@@ -6,11 +6,17 @@
  */
 import { kv } from '@vercel/kv';
 import { sendEmail } from '@/lib/send-email';
+import { appendEmailUtm } from '@/lib/engagement';
 
 const LOGO_URL = 'https://getmindy.ai/brand/mindy-logo-3d.png';
-const BILLING_URL = 'https://getmindy.ai/app?panel=settings';
 const SUPPORT_EMAIL = 'admin@getmindy.ai';
-const APP_URL = 'https://getmindy.ai/app';
+// Day 11 of the trial onboarding sequence (trial-onboarding-emails.ts): same UTM campaign.
+const UTM = { campaign: 'trial_onboarding' } as const;
+// The Map is the product; /app is a legacy surface (src/lib/email/legacy-destination-guard.ts).
+const APP_URL = appendEmailUtm('https://getmindy.ai/opportunity-map', { ...UTM, content: 'day11' });
+// Cancel lives only in Settings → Billing & credits (SubscriptionsCard → Stripe portal). Deep-link
+// that TAB (section=billing), not the default Settings tab. A documented guard exception.
+const BILLING_URL = appendEmailUtm('https://getmindy.ai/app?panel=settings&section=billing', { ...UTM, content: 'day11_cancel' });
 
 export type TrialReminder = {
   email: string;

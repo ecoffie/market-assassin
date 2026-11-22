@@ -14,6 +14,7 @@
 import type { Metadata } from 'next';
 import MeetMindyStrip from '@/components/MeetMindyStrip';
 import Link from 'next/link';
+import { TRIAL_CTA_LABEL } from '@/lib/public-site/trial-cta';
 import type { AgencySeo } from '@/data/agencies-seo';
 import { listPublicAgencies } from '@/lib/seo/public-agency-pages';
 
@@ -215,7 +216,7 @@ export default function AgenciesIndexPage() {
             href="/pricing"
             className="inline-block px-8 py-4 bg-(--mp-navy) hover:bg-(--mp-navy-hover) text-white rounded-lg font-bold text-lg transition-colors"
           >
-            Start for free
+            {TRIAL_CTA_LABEL}
           </Link>
           <p className="text-(--mp-muted) text-sm mt-4">
             14-day free trial. Cancel anytime. First briefing lands tomorrow morning.

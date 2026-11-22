@@ -20,11 +20,10 @@
  *     the SBA profile lookup (a Data Core tool not built yet), so it is unknown, not assumed.
  *   - Past performance keeps prime and subcontract work apart: a sub award is never counted as prime.
  *
- * Known limit: both existing loaders degrade a query ERROR to an empty result (they log it). Through them a
- * failed read is indistinguishable from an empty Vault, so this module reports the fields as unknown in both
- * cases, which is the safe direction, but it cannot say "unavailable". Fixing that belongs in the loaders.
+ * Failed reads (#2265): loadBidderProfileResult and VaultContext.unavailable say which source failed. A field
+ * that is absent because its source failed is listed in `unavailable`, not `unknown`.
  */
-import { loadBidderProfile, loadVaultContext, ALL_VAULT_SECTIONS } from '@/lib/proposal/loaders';
+import { loadBidderProfileResult, loadVaultContext, ALL_VAULT_SECTIONS } from '@/lib/proposal/loaders';
 import type { BidderProfile, VaultContext } from '@/lib/proposal/types';
 import { vaultEmailFor, type ChatActingScope } from '@/lib/chat/chat-acting-scope';
 
@@ -60,7 +59,27 @@ export interface CompanyProfile {
   pastPerformance?: PastPerformanceSummary;
   /** Profile fields nothing filled, for the profile page. */
   unknown: ProfileField[];
+  /**
+   * Absent fields whose source read FAILED: unavailable this time, not unknown (CLAUDE.md rule 5). A field is
+   * listed here, never in `unknown`, when one of its sources failed. Absent = nothing failed.
+   */
+  unavailable?: ProfileField[];
 }
+
+/** Where each profile field comes from (settings = user_notification_settings; the rest are Vault sections). */
+export type ProfileSource = 'settings' | 'identity' | 'past_performance' | 'capabilities' | 'team';
+const FIELD_SOURCES: Readonly<Record<ProfileField, readonly ProfileSource[]>> = {
+  companyName: ['identity'],
+  uei: ['identity'],
+  naicsCodes: ['identity', 'settings'],
+  states: ['identity', 'settings'],
+  targetAgencies: ['settings'],
+  targetSetAsides: ['settings'],
+  certifications: ['identity'],
+  vehiclesHeld: ['identity'],
+  keywords: ['capabilities', 'past_performance'],
+  pastPerformance: ['past_performance'],
+};
 
 export type ProfileField =
   | 'companyName' | 'uei' | 'naicsCodes' | 'states' | 'targetAgencies' | 'targetSetAsides'
@@ -120,7 +139,7 @@ function summarizePastPerformance(rows: Array<Record<string, unknown>> | undefin
 }
 
 /** Pure: map what the existing loaders returned into the Ask Mindy profile. */
-export function buildCompanyProfile(input: { bidder: BidderProfile; vault: VaultContext }): CompanyProfile {
+export function buildCompanyProfile(input: { bidder: BidderProfile; vault: VaultContext; settingsUnavailable?: boolean }): CompanyProfile {
   const id = (input.vault.identity ?? {}) as Record<string, unknown>;
   const b = input.bidder;
 
@@ -141,7 +160,14 @@ export function buildCompanyProfile(input: { bidder: BidderProfile; vault: Vault
     pastPerformance: summarizePastPerformance(input.vault.past_performance),
   };
   const clean = Object.fromEntries(Object.entries(profile).filter(([, v]) => v !== undefined)) as Omit<CompanyProfile, 'unknown'>;
-  return { ...clean, unknown: FIELDS.filter((f) => clean[f] === undefined) };
+  const failed = new Set<ProfileSource>([...(input.vault.unavailable ?? []), ...(input.settingsUnavailable ? ['settings' as const] : [])]);
+  const absent = FIELDS.filter((f) => clean[f] === undefined);
+  const unavailable = absent.filter((f) => FIELD_SOURCES[f].some((src) => failed.has(src)));
+  return {
+    ...clean,
+    unknown: absent.filter((f) => !unavailable.includes(f)),
+    ...(unavailable.length ? { unavailable } : {}),
+  };
 }
 
 export type CompanyProfileLoad =
@@ -155,9 +181,10 @@ export type CompanyProfileLoad =
 export async function loadCompanyProfile(scope: ChatActingScope): Promise<CompanyProfileLoad> {
   const owner = vaultEmailFor(scope);
   if (!owner || scope.kind === 'unavailable') return { status: 'refused', reason: 'workspace_unconfirmed' };
-  const [bidder, vault] = await Promise.all([
-    loadBidderProfile(owner),
+  const [settings, vault] = await Promise.all([
+    loadBidderProfileResult(owner),
     loadVaultContext(owner, 'exec_summary', { sections: ALL_VAULT_SECTIONS }),
   ]);
-  return { status: 'ok', profile: buildCompanyProfile({ bidder, vault }), workspace: scope.kind };
+  const profile = buildCompanyProfile({ bidder: settings.profile, vault, settingsUnavailable: settings.status === 'unavailable' });
+  return { status: 'ok', profile, workspace: scope.kind };
 }

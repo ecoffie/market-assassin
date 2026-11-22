@@ -34,6 +34,7 @@ import { dodaacFromSolicitation } from '@/lib/opportunities/early-signal-pins';
 import { loadDodaacEarlySignal } from '@/lib/gov-contacts/dodaac-directory';
 import { upsertInChunks, staleCleanupOrFilters, staleCleanupMode } from '@/lib/sam/sync-upsert';
 import { reportCronOutcome, type CronOutcome } from '@/lib/cron-self-report';
+import { hasValidCronSecret } from '@/lib/cron/cron-request-auth';
 
 /**
  * The dispatcher records `dispatched` with a null http_status at 12s and then
@@ -440,7 +441,7 @@ export async function GET(request: NextRequest) {
 
   // Auth: password or cron secret
   const isAuthorized = password === ADMIN_PASSWORD ||
-    cronSecret === process.env.CRON_SECRET;
+    hasValidCronSecret(request);
 
   if (!isAuthorized) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
