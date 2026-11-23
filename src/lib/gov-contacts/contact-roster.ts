@@ -266,6 +266,10 @@ export interface FederalContact {
   director_verified?: string | null;
   /** OSBP rows only: "YYYY-MM" when the mailbox was seen on an official page; null = unverified. */
   email_verified?: string | null;
+  /** The SAM notice this person was listed on as POC (row provenance); null = not stated. */
+  notice_solicitation_number?: string | null;
+  /** That notice's posted date (YYYY-MM-DD); null = not stated. */
+  notice_posted_date?: string | null;
 }
 
 export interface ContactRosterInput {
@@ -330,7 +334,7 @@ export async function queryFederalContacts(input: ContactRosterInput): Promise<C
     let q = placeholderNameFilter(sb
       .from('federal_contacts')
       .select(
-        'id, contact_fullname, contact_title, contact_email, contact_phone, department_ind_agency, office, sub_tier, role_category, solicitation_number',
+        'id, contact_fullname, contact_title, contact_email, contact_phone, department_ind_agency, office, sub_tier, role_category, solicitation_number, posted_date',
         { count: 'exact' },
       )
       // GOVERNMENT decision makers only — mirror the app route. federal_contacts
@@ -460,6 +464,10 @@ export async function queryFederalContacts(input: ContactRosterInput): Promise<C
         derived_office: officeName,
         dodaac: dod?.dodaac || null,
         office_code: officeCode || null,
+        // Provenance: the SAM notice this person was listed on as a point of contact (the row's own
+        // solicitation_number / posted_date). Never federal_contacts.source — that column is a DEFAULT.
+        notice_solicitation_number: r.solicitation_number ? String(r.solicitation_number) : null,
+        notice_posted_date: r.posted_date ? String(r.posted_date).slice(0, 10) : null,
       } as FederalContact;
     })
     // second-pass foreign filter on the DECODED office name — skipped when
