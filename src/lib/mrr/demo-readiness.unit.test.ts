@@ -143,7 +143,7 @@ describe('agency small-business context compares like with like', () => {
         agency: 'Department of the Air Force',
         fiscal_year: 2025,
         goals: [
-          { category: 'Small Business (prime)', goal_pct: 23, actual_setaside_pct: 3.2, meets_goal: false },
+          { category: 'Small Business (prime)', goal_pct: 23, actual_setaside_pct: 4.7, meets_goal: false },
           { category: 'SDVOSB', goal_pct: 3, actual_setaside_pct: 0.2, meets_goal: false },
         ],
         _meta: { grounded: true, small_business_setaside_share: 4.7 },
@@ -151,7 +151,8 @@ describe('agency small-business context compares like with like', () => {
     });
     const text = s12.goalingContext.state === 'value' ? s12.goalingContext.value : '';
     expect(text).toMatch(/FY2025 \(latest complete fiscal year\): 4\.7% of contract obligations were made under small-business set-aside codes/);
-    expect(text).toMatch(/general small-business set-aside 3\.2%; SDVOSB 0\.2%/);
+    expect(text).toMatch(/By program: SDVOSB 0\.2%\./); // the combined row is the head line, not repeated as a program
+    expect(text).not.toMatch(/general small-business set-aside/);
     expect(text).toMatch(/not comparable to the government-wide small-business goals/);
     expect(text).not.toMatch(/vs goal|23%|below|meets/);
   });

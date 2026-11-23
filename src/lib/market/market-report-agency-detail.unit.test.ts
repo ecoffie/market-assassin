@@ -11,7 +11,7 @@ const VA = {
   agency: 'Department of Veterans Affairs', fiscal_year: 2026, total_obligated: 90_611_196_127.75,
   small_business_share: 9.4, sub_agencies: [],
   set_aside_breakdown: [
-    { label: 'Small Business (total set-aside)', amount: 536_760_447.19, pct_of_total: 0.6 },
+    { label: 'Small Business set-aside (SBA/SBP)', amount: 536_760_447.19, pct_of_total: 0.6 },
     { label: '8(a)', amount: 4_968_126.4, pct_of_total: 0 },
     { label: 'SDVOSB', amount: 7_969_480_362.56, pct_of_total: 8.8 },
     { label: 'WOSB / EDWOSB', amount: -1_188_271.82, pct_of_total: 0 },
@@ -33,7 +33,7 @@ describe('agency deep-dive renders shares in their real units', () => {
     expect(t).not.toMatch(/\b\d{3,}%/);
     expect(t).toContain('set-aside-code share 9.4%');
     expect(t).toMatch(/SDVOSB \$8\.0B 8\.8%/);
-    expect(t).toMatch(/Small Business \(total set-aside\) \$536\.8M 0\.6%/);
+    expect(t).toMatch(/Small Business set-aside \(SBA\/SBP\) \$536\.8M 0\.6%/);
   });
   it('a net de-obligation is shown signed and labelled, and has no share (not clamped, not zeroed)', () => {
     expect(t).toMatch(/WOSB \/ EDWOSB −\$1\.2M net n\/a \(net de-obligation\)/);
@@ -46,5 +46,14 @@ describe('agency deep-dive renders shares in their real units', () => {
   });
   it('a missing share is unavailable, never 0%', () => {
     expect(text(render({ ...VA, small_business_share: null }))).toContain('set-aside-code share unavailable');
+  });
+});
+
+describe('a failed set-aside lookup (null) is unavailable, never a de-obligation', () => {
+  it('renders unavailable for both amount and share', () => {
+    const failed = { ...VA, set_aside_breakdown: [...VA.set_aside_breakdown, { label: 'HUBZone', amount: null, pct_of_total: null }] };
+    const t = text(render(failed));
+    expect(t).toMatch(/HUBZone unavailable unavailable/);
+    expect(t).not.toMatch(/HUBZone [^|]*net de-obligation/);
   });
 });

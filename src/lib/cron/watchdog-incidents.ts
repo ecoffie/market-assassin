@@ -61,7 +61,7 @@
 
 export type Counts = Record<string, number>;
 
-export type IncidentKind = 'failing' | 'stuck' | 'overdue' | 'dispatcher_down';
+export type IncidentKind = 'failing' | 'stuck' | 'overdue' | 'dispatcher_down' | 'unclosed';
 
 export type WatchdogObservation = {
   key: string;
@@ -329,6 +329,7 @@ const KIND_LABEL: Record<string, string> = {
   failing: 'failing (consecutive failed runs)',
   stuck: 'stuck (lock never released)',
   overdue: 'overdue (scheduled run missed)',
+  unclosed: 'unclosed run (still running/dispatched past timeout — likely killed)',
   dispatcher_down: 'DISPATCHER LIKELY DOWN',
 };
 

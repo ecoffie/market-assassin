@@ -1,5 +1,5 @@
 {
-  "lastUpdated": "2026-11-09",
+  "lastUpdated": "2026-11-23",
   "lastFullReview": "2026-11-09",
   "eventSources": {
     "apex_accelerators": {
@@ -830,78 +830,6 @@
         "status": "verified_upcoming",
         "checked_at": "2026-11-09",
         "source_url": "https://www.wbenc.org/conference/"
-      }
-    },
-    {
-      "name": "U.S. DOT Veteran-Owned Small Business Summit",
-      "typical_month": "November",
-      "location": "Washington, DC",
-      "audience": "Veteran-owned small businesses; open to all small businesses",
-      "registration_cost": "Free",
-      "value": "DOT OSDBU summit with SBA and DoW: sessions plus one-on-one matchmaking with agency representatives. Registration closes Nov 12, 2026.",
-      "url": "https://www.transportation.gov/mission/administrations/office-small-and-disadvantaged-business-utilization/VOSB%20Summit",
-      "agencies": ["DOT", "Department of Transportation"],
-      "one_off": true,
-      "next_occurrence": {
-        "start": "2026-11-19",
-        "end": "2026-11-19",
-        "location": "U.S. DOT Headquarters, 1200 New Jersey Ave SE, Washington, DC",
-        "registration_url": "https://www.transportation.gov/mission/administrations/office-small-and-disadvantaged-business-utilization/VOSB%20Summit",
-        "verified_at": "2026-11-09",
-        "source_url": "https://www.transportation.gov/mission/administrations/office-small-and-disadvantaged-business-utilization/VOSB%20Summit"
-      },
-      "verification": {
-        "status": "verified_upcoming",
-        "checked_at": "2026-11-09",
-        "source_url": "https://www.transportation.gov/mission/administrations/office-small-and-disadvantaged-business-utilization/VOSB%20Summit"
-      }
-    },
-    {
-      "name": "GSA: How to do business with GSA and find opportunities",
-      "typical_month": "November",
-      "location": "Online",
-      "audience": "Small businesses new to GSA",
-      "registration_cost": "Free",
-      "value": "GSA Office of Small Business webinar.",
-      "url": "https://www.gsa.gov/events/how-to-do-business-with-gsa-and-find-opportunities",
-      "agencies": ["GSA", "General Services Administration"],
-      "one_off": true,
-      "next_occurrence": {
-        "start": "2026-11-17",
-        "end": "2026-11-17",
-        "location": "Online (1:00-2:00 PM ET)",
-        "registration_url": "https://www.gsa.gov/events/how-to-do-business-with-gsa-and-find-opportunities",
-        "verified_at": "2026-11-09",
-        "source_url": "https://www.gsa.gov/about-gsa/gsa-events"
-      },
-      "verification": {
-        "status": "verified_upcoming",
-        "checked_at": "2026-11-09",
-        "source_url": "https://www.gsa.gov/about-gsa/gsa-events"
-      }
-    },
-    {
-      "name": "GSA Monthly OSB National Training (MONT): Small Business Resources Overview, Part 2",
-      "typical_month": "November",
-      "location": "Online",
-      "audience": "Small businesses",
-      "registration_cost": "Free",
-      "value": "GSA Office of Small Business monthly national training.",
-      "url": "https://www.gsa.gov/events/monthly-osb-national-training-mont-series-small-business-resources-overview-part-2",
-      "agencies": ["GSA", "General Services Administration"],
-      "one_off": true,
-      "next_occurrence": {
-        "start": "2026-11-19",
-        "end": "2026-11-19",
-        "location": "Online (1:00-2:00 PM ET)",
-        "registration_url": "https://www.gsa.gov/events/monthly-osb-national-training-mont-series-small-business-resources-overview-part-2",
-        "verified_at": "2026-11-09",
-        "source_url": "https://www.gsa.gov/about-gsa/gsa-events"
-      },
-      "verification": {
-        "status": "verified_upcoming",
-        "checked_at": "2026-11-09",
-        "source_url": "https://www.gsa.gov/about-gsa/gsa-events"
       }
     },
     {
