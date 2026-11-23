@@ -92,6 +92,7 @@ import {
   ACQUISITION_STAGE_GROUPS,
   type AcquisitionStageGroup,
 } from '@/lib/opportunities/acquisition-stage';
+import { respondEarlyFor, respondEarlySummary, HOST_RULES_RESPOND_EARLY, type RespondEarly, type RespondEarlySummary } from '@/lib/opportunities/respond-early';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -193,6 +194,8 @@ export interface HorizonItemBase {
   match_basis?: MatchBasis[];
   /** Company-anchored FIND only (input.uei). Separate from relevance. */
   eligibility?: EligibilityVerdict;
+  /** Open now only: early-stage notice (sources sought / RFI / presolicitation), from the structured notice_type. */
+  respond_early?: RespondEarly;
 }
 
 export type HorizonItem = HorizonItemBase & Record<string, unknown>;
@@ -323,6 +326,8 @@ export interface FindOpportunitiesResult {
       holder_signal: number | null;
     };
     coming_soon: { status: HorizonStatus; matched_count: number | null };
+    /** Early-stage Open items among those RETURNED (presentation only; never a market-wide count). */
+    respond_early: RespondEarlySummary;
     headline: string;
     claim_hygiene: string;
   };
@@ -420,11 +425,12 @@ export const HOST_RULES_REGION = [
 
 export function buildFindPresentation(
   companyAnchored = false,
-  extra: { stage?: boolean; regionUnresolved?: boolean } = {},
+  extra: { stage?: boolean; regionUnresolved?: boolean; respondEarly?: boolean } = {},
 ): FindOpportunitiesResult['presentation'] {
   return {
     host_rules: [
       ...HOST_RULES_FIND_FIRST_VALUE,
+      ...(extra.respondEarly ? HOST_RULES_RESPOND_EARLY : []),
       ...(companyAnchored ? HOST_RULES_COMPANY_ANCHORED : []),
       ...(extra.stage ? HOST_RULES_STAGE : []),
       ...(extra.regionUnresolved ? HOST_RULES_REGION : []),
@@ -1013,6 +1019,7 @@ async function queryOpenNow(
       const eligibility = eligibilityFor(p.company, 'notice', r);
       const st = String(r.pop_state || office?.state || '');
       const city = String(r.pop_city || office?.city || '');
+      const early = respondEarlyFor(r.notice_type);
       return {
         horizon: 'open_now',
         title: String(r.title || 'Untitled opportunity'),
@@ -1029,6 +1036,7 @@ async function queryOpenNow(
         ...(loc ? { match_location: loc } : {}),
         ...(eligibility ? { eligibility } : {}),
         ...(stage ? { acquisition_stage: stageMatchFor(r, stage) } : {}),
+        ...(early ? { respond_early: early } : {}),
         notice_id: String(r.notice_id || ''),
         solicitation_number: String(r.solicitation_number || '') || null,
         response_deadline: (r.response_deadline as string) || null,
@@ -1718,6 +1726,7 @@ export async function findOpportunities(
           holder_signal: null,
         },
         coming_soon: { status: 'unavailable', matched_count: null },
+        respond_early: { returned_count: 0, notice_ids: [] },
         headline: 'query required',
         claim_hygiene:
           'Counts are per-horizon matches under this query — not unique procurements across horizons.',
@@ -1797,6 +1806,7 @@ export async function findOpportunities(
     ? 'Related-market rows are labeled RELATED_MARKET_CANDIDATE and are not confirmed capability demand. '
     : '';
 
+  const respondEarly = respondEarlySummary(open_now.items);
   return {
     query_summary: {
       query: interpreted.searchText,
@@ -1825,6 +1835,7 @@ export async function findOpportunities(
       open_now: { status: open_now.status, matched_count: open_now.matched_count },
       coming_back: comingBackSummary(coming_back),
       coming_soon: { status: coming_soon.status, matched_count: coming_soon.matched_count },
+      respond_early: respondEarly,
       headline: headlineFor(horizons),
       claim_hygiene:
         relatedNote +
@@ -1853,6 +1864,7 @@ export async function findOpportunities(
     presentation: buildFindPresentation(!!company, {
       stage: !!interpreted.stage && interpreted.stage !== 'invalid',
       regionUnresolved: !!interpreted.region?.unresolved.length,
+      respondEarly: respondEarly.returned_count > 0,
     }),
   };
 }
