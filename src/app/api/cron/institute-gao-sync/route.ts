@@ -278,7 +278,10 @@ export async function GET(request: NextRequest) {
   // ── 3b. Reconcile previously-unresolved held rows (phrase-map improvements) ─
   let reconcile = null;
   try {
-    reconcile = await reconcileUnresolvedGaoAgencies(db, names);
+    // Shares the run budget: a bounded, paged pass that never starves the IG lane
+    // by rewriting unchanged rows. A budget cut is an incomplete run (partial).
+    reconcile = await reconcileUnresolvedGaoAgencies(db, names, { deadlineMs: started + budgetMs });
+    if (reconcile.budgetExhausted) partial = true;
     // Derive for newly resolved rows.
     for (const d of reconcile.details) {
       if (!d.canonicalAgency) continue;
