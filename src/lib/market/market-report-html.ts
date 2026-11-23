@@ -233,8 +233,23 @@ export function provenanceRows(report: Pick<ReportLike, 'summary' | 'sections'>)
   }
   const basisTier = (report.summary.size_tiers ?? []).find((t) => t.role === 'sections_basis');
   if (basisTier?.method) rows.push({ section: 'Who is buying · Competitive landscape', source: '', window: basisTier.method });
-  const recompeteSync = dateSpan((report.sections.recompetes.contracts as Row[]).map((c) => c.last_synced_at));
-  if (recompeteSync) rows.push({ section: 'Recompetes on the horizon', source: '', window: `records last synced ${recompeteSync}` });
+  const contacts = report.sections.contacts as { source_label?: unknown; as_of?: unknown; as_of_label?: unknown; people?: unknown[] } | null | undefined;
+  if (contacts && contacts.people?.length) {
+    const asOf = longDate(contacts.as_of);
+    const source = typeof contacts.source_label === 'string' ? contacts.source_label : '';
+    const label = typeof contacts.as_of_label === 'string' ? contacts.as_of_label : 'as of';
+    if (source || asOf) rows.push({ section: 'Who to call', source, window: asOf ? `${label}: ${asOf}` : '' });
+  }
+  // Recompetes: each row's own provenance (Data Core #2399); a stored report from before it has only last_synced_at.
+  const recompetes = report.sections.recompetes as { contracts: unknown[]; sources?: Array<{ label?: unknown; count?: unknown }> };
+  const recRows = recompetes.contracts as Row[];
+  const recSources = (recompetes.sources ?? [])
+    .filter((x) => typeof x.label === 'string' && typeof x.count === 'number' && x.count > 0)
+    .map((x) => (x.label === 'not_stated' ? `not stated (${x.count})` : `${String(x.label)} (${x.count})`));
+  const recompeteSync = dateSpan(recRows.map((c) => (c.provenance as { as_of?: unknown } | undefined)?.as_of ?? c.last_synced_at));
+  if (recSources.length || recompeteSync) {
+    rows.push({ section: 'Recompetes on the horizon', source: recSources.join(', '), window: recompeteSync ? `records last synced ${recompeteSync}` : '' });
+  }
   const forecasts = report.sections.forecasts.forecasts as Row[];
   const hosts = [...new Set(forecasts.map((f) => hostOf(f.source_url)).filter(Boolean))];
   const asOf = dateSpan(forecasts.map((f) => f.as_of));

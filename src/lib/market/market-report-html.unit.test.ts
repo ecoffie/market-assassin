@@ -171,3 +171,30 @@ describe('market report — data and sources', () => {
     expect(renderMarketReportHtml(odd)).not.toContain('some_internal_table');
   });
 });
+
+describe('market report — data and sources: contacts and recompetes (Data Core #2399 fields)', () => {
+  const withRows = (contacts: unknown, recompetes: unknown) => ({ ...base, summary: summary(), sections: { ...base.sections, contacts, recompetes } }) as never;
+
+  it('lists Who to call from the contacts source_label and as_of, and recompetes from their row provenance', () => {
+    const rows = provenanceRows(withRows(
+      { agency: 'Dept', office: null, total: 3, people: [{ name: 'A', role: 'CO', email: 'a@x.gov', office: null, source: { kind: 'sam_notice_poc', solicitation_number: 'S1', notice_posted: '2026-11-18' } }],
+        source_label: 'SAM.gov notice points of contact (government buyers)', as_of: '2026-11-18', as_of_label: 'most recent notice listing these contacts' },
+      { contracts: [{ incumbent_name: 'A', provenance: { source_label: 'USASpending award record', source_url: null, as_of: '2026-11-22T00:00:00Z', as_of_label: 'last synced' } }, { incumbent_name: 'B', provenance: { source_label: null, source_url: null, as_of: null, as_of_label: 'last synced' } }],
+        sources: [{ label: 'USASpending award record', count: 1 }, { label: 'not_stated', count: 1 }] },
+    ));
+    expect(rows).toEqual([
+      { section: 'Who to call', source: 'SAM.gov notice points of contact (government buyers)', window: 'most recent notice listing these contacts: November 18, 2026' },
+      { section: 'Recompetes on the horizon', source: 'USASpending award record (1), not stated (1)', window: 'records last synced November 22, 2026' },
+    ]);
+  });
+
+  it('never defaults: null provenance gives no row, and a report stored before #2399 keeps its last_synced_at', () => {
+    expect(provenanceRows(withRows(
+      { agency: 'Dept', office: null, total: 1, people: [{ name: 'A', role: 'CO', email: 'a@x.gov', office: null }], source_label: undefined, as_of: null },
+      { contracts: [{ incumbent_name: 'A', provenance: { source_label: null, source_url: null, as_of: null, as_of_label: 'last synced' } }] },
+    ))).toEqual([]);
+    expect(provenanceRows(withRows(null, { contracts: [{ incumbent_name: 'A', last_synced_at: '2026-11-20T00:00:00Z' }] })))
+      .toEqual([{ section: 'Recompetes on the horizon', source: '', window: 'records last synced November 20, 2026' }]);
+  });
+});
+

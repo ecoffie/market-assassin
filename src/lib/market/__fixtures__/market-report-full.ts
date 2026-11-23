@@ -93,12 +93,12 @@ export const FULL_REPORT = {
         "basis": "market_awarding_offices",
         "office_codes": ["1111AA", "2222BB"],
         "people": [
-          { "name": "Contact Person 1", "role": "Contracting", "email": "contact1@example.gov", "office": null },
-          { "name": "Contact Person 2", "role": "Contracting", "email": "contact2@example.gov", "office": null },
-          { "name": "Contact Person 3", "role": "Contracting", "email": "contact3@example.gov", "office": null },
-          { "name": "Contact Person 4", "role": "Contracting", "email": "contact4@example.gov", "office": null },
-          { "name": "Contact Person 5", "role": "Contracting", "email": "contact5@example.gov", "office": null },
-          { "name": "Contact Person 6", "role": "Contracting", "email": "contact6@example.gov", "office": null }
+          { "name": "Contact Person 1", "role": "Contracting", "email": "contact1@example.gov", "office": null , "source": {"kind": "sam_notice_poc", "solicitation_number": "SYN-SOL-001", "notice_posted": "2026-11-18"} },
+          { "name": "Contact Person 2", "role": "Contracting", "email": "contact2@example.gov", "office": null , "source": {"kind": "sam_notice_poc", "solicitation_number": "SYN-SOL-002", "notice_posted": "2026-11-18"} },
+          { "name": "Contact Person 3", "role": "Contracting", "email": "contact3@example.gov", "office": null , "source": {"kind": "sam_notice_poc", "solicitation_number": "SYN-SOL-003", "notice_posted": "2026-11-18"} },
+          { "name": "Contact Person 4", "role": "Contracting", "email": "contact4@example.gov", "office": null , "source": {"kind": "sam_notice_poc", "solicitation_number": "SYN-SOL-004", "notice_posted": "2026-10-02"} },
+          { "name": "Contact Person 5", "role": "Contracting", "email": "contact5@example.gov", "office": null , "source": {"kind": "sam_notice_poc", "solicitation_number": "SYN-SOL-005", "notice_posted": "2026-10-02"} },
+          { "name": "Contact Person 6", "role": "Contracting", "email": "contact6@example.gov", "office": null , "source": {"kind": "sam_notice_poc", "solicitation_number": "SYN-SOL-006", "notice_posted": null} }
         ]
       },
       "competition": {
@@ -123,8 +123,8 @@ export const FULL_REPORT = {
       },
       "recompetes": {
         "contracts": [
-          { "piid": "SYN1C00000", "incumbent_name": "Synthetic Incumbent 1 LLC", "awarding_agency": "Department of the Treasury", "awarding_sub_agency": "Bureau of Engraving and Printing", "naics_code": "561210", "description": "WCF SECURITY SUPPORT ADMINISTRATIVE SERVICES", "total_obligation": 2348726, "potential_total_value": null, "period_of_performance_current_end": "2026-11-23", "recompete_likelihood": "high", "last_synced_at": "2026-11-22T16:25:30.611+00:00" },
-          { "piid": "SYN2C00001", "incumbent_name": "Synthetic Incumbent 2 LLC", "awarding_agency": "Department of Agriculture", "awarding_sub_agency": "Agricultural Research Service", "naics_code": "561210", "description": "WATER AND WASTEWATER SUPERINTENDENT SERVICES", "total_obligation": 120000, "potential_total_value": null, "period_of_performance_current_end": "2026-11-24", "recompete_likelihood": "medium", "last_synced_at": "2026-11-22T16:25:30.611+00:00" }
+          { "piid": "SYN1C00000", "incumbent_name": "Synthetic Incumbent 1 LLC", "awarding_agency": "Department of the Treasury", "awarding_sub_agency": "Bureau of Engraving and Printing", "naics_code": "561210", "description": "WCF SECURITY SUPPORT ADMINISTRATIVE SERVICES", "total_obligation": 2348726, "potential_total_value": null, "period_of_performance_current_end": "2026-11-23", "recompete_likelihood": "high", "last_synced_at": "2026-11-22T16:25:30.611+00:00", "provenance": { "source_label": "USASpending award record", "source_url": null, "as_of": "2026-11-22T16:25:30.611+00:00", "as_of_label": "last synced" } },
+          { "piid": "SYN2C00001", "incumbent_name": "Synthetic Incumbent 2 LLC", "awarding_agency": "Department of Agriculture", "awarding_sub_agency": "Agricultural Research Service", "naics_code": "561210", "description": "WATER AND WASTEWATER SUPERINTENDENT SERVICES", "total_obligation": 120000, "potential_total_value": null, "period_of_performance_current_end": "2026-11-24", "recompete_likelihood": "medium", "last_synced_at": "2026-11-22T16:25:30.611+00:00", "provenance": { "source_label": "USASpending award record", "source_url": null, "as_of": "2026-11-22T16:25:30.611+00:00", "as_of_label": "last synced" } }
         ],
         "count": 2
       },
