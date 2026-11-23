@@ -61,6 +61,9 @@ export function pdfOptions(subject: unknown) {
   };
 }
 
+/** The production options for a report with no subject (kept for callers that render without a stored report). */
+export const PDF_OPTIONS = pdfOptions('');
+
 const NO_STORE = { 'Cache-Control': 'private, no-store', 'X-Robots-Tag': 'noindex, nofollow' };
 
 type Failure = { status: number; error: string; message: string; retryAfter?: number };

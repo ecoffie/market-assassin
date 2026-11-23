@@ -299,10 +299,12 @@ function formatGoaling(call: ToolCall): GroundedField<string> {
   // award won by a small firm, set-aside or not. Set-aside-code obligations over
   // total obligations is a different population, so "x% vs goal 23%" would
   // compare unlike numbers. The goals are therefore not shown beside them.
-  const shares = r.goals.map(
-    (g) =>
-      `${/prime/i.test(g.category) ? 'general small-business set-aside' : g.category} ${g.actual_setaside_pct === null ? 'unavailable (lookup failed)' : `${g.actual_setaside_pct}%`}`,
-  );
+  // The Small Business (prime) row is the COMBINED set-aside share (sba-goaling scores it on set_aside_share),
+  // already stated in the head line, so it is not listed again as a program (it used to be printed as
+  // "general small-business set-aside" when it held only the SBA/SBP codes).
+  const shares = r.goals
+    .filter((g) => !/prime/i.test(g.category))
+    .map((g) => `${g.category} ${g.actual_setaside_pct === null ? 'unavailable (lookup failed)' : `${g.actual_setaside_pct}%`}`);
   const head =
     typeof sbShare === 'number'
       ? `${agency}, FY${fy} (latest complete fiscal year): ${sbShare}% of contract obligations were made under small-business set-aside codes.`
