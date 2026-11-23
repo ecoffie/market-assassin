@@ -314,7 +314,7 @@ function collectContactNames(results: readonly FmpToolContent[]): { names: strin
     try {
       const p = JSON.parse(content) as unknown;
       const strings: string[] = [];
-      walkStrings(p, strings);
+      walkPersonCandidateStrings(p, strings);
       for (const s of strings) {
         // A "name" value is walked as a plain string.
         if (looksLikePersonName(s) && !places.has(s.trim().toLowerCase())) names.push(s.trim());
@@ -374,6 +374,41 @@ function parseJson(content: string): unknown | null {
     return JSON.parse(content);
   } catch {
     return null;
+  }
+}
+
+/**
+ * Keys whose string values describe a notice, buyer or place, never a person. A notice title like
+ * "Ranger Station Cleaning" is person-shaped, so the value's KEY decides, not its shape.
+ */
+const NOT_A_PERSON_KEYS = new Set([
+  'title', 'subject', 'description', 'summary', 'notice_type', 'noticetype', 'type', 'naics_description',
+  'psc_description', 'office', 'agency', 'sub_agency', 'department', 'buyer', 'organization', 'recipient',
+  'vendor', 'awardee', 'place', 'location', 'set_aside', 'set_aside_description', 'solicitation_title', 'project',
+  'external_id', 'value_range', 'status',
+]);
+const NOTICE_ID_KEYS = ['notice_id', 'noticeid', 'solicitation_number', 'solicitationnumber'];
+
+/** Like walkStrings, but skips values under NOT_A_PERSON_KEYS, and a notice row's `name` (FIND uses it as the title). */
+function walkPersonCandidateStrings(node: unknown, out: string[], depth = 0): void {
+  if (depth > 8 || out.length > 400) return;
+  if (typeof node === 'string') {
+    if (node.trim()) out.push(node);
+    return;
+  }
+  if (Array.isArray(node)) {
+    for (const x of node) walkPersonCandidateStrings(x, out, depth + 1);
+    return;
+  }
+  if (node && typeof node === 'object') {
+    const o = node as Record<string, unknown>;
+    const lowerKeys = Object.keys(o).map((k) => k.toLowerCase());
+    const isNoticeRow = NOTICE_ID_KEYS.some((k) => lowerKeys.includes(k));
+    for (const [k, v] of Object.entries(o)) {
+      const lk = k.toLowerCase();
+      if (typeof v === 'string' && (NOT_A_PERSON_KEYS.has(lk) || (lk === 'name' && isNoticeRow))) continue;
+      walkPersonCandidateStrings(v, out, depth + 1);
+    }
   }
 }
 
@@ -593,7 +628,10 @@ function extractPathways(
         ?? firstString(o, ['notice_id', 'noticeId'])
         ?? (toolMatches && inFindList && kind !== 'forecast' ? firstString(o, ['id']) : undefined);
       if (!solicitation && !notice && !forecastRow) return;
-      const id = solicitation || notice || firstString(o, ['forecast_id', 'external_id', 'id'])!;
+      // A forecast row may carry no id at all: dedupe it by its title rather than crash (it never shows an id).
+      const id = solicitation || notice || firstString(o, ['forecast_id', 'external_id', 'id'])
+        || (forecastRow ? `forecast:${title}` : undefined);
+      if (!id) return;
       const idKey = id.toLowerCase();
       if (seen.has(idKey)) return;
       seen.add(idKey);
@@ -1368,6 +1406,20 @@ export function flattenDocModelText(model: DocModel): string {
 }
 
 /**
+ * Does THIS firm do construction? The defense construction-oversight (PAE) section is about how construction is
+ * bought and overseen, so it belongs only in a construction firm's profile, never because an Army or Navy buyer
+ * appears in a janitorial or IT firm's evidence. Evidence order: the firm's award NAICS, else its saved profile
+ * NAICS, else the customer's own words. Unknown is "no": the section is not added on a guess.
+ */
+export function fmpFirmDoesConstruction(evidence: Pick<FmpWriteupEvidence, 'dominantNaics'>, customerText: string, companyNaics?: string | null): boolean {
+  const award = String(evidence.dominantNaics ?? '').replace(/\D/g, '');
+  if (award) return award.startsWith('23');
+  const own = String(companyNaics ?? '').replace(/\D/g, '');
+  if (own) return own.startsWith('23');
+  return /\b(construction|civil works|heavy civil|general contractor|design[- ]build)\b/i.test(customerText || '');
+}
+
+/**
  * Host-built DocModel from accumulated FMP evidence. Claude-parity shell (the read, metrics,
  * pathways, proven awards, money, PAE, pressure, contacts, readiness) where EVERY row and figure
  * comes from tool JSON; a section whose evidence is absent is shorter, never invented.
@@ -1383,7 +1435,8 @@ export function buildFmpHostDocModel(
   const firm = identity.legalName || 'The firm';
   // Name-only asks omit "defense"/"PAE" in the prompt, but defense-buyer pathways in the evidence
   // still need the PAE section. OR evidence so a false prompt flag cannot suppress DoD buyers.
-  const defense = !!opts.defenseBuyersAppear || fmpDefenseBuyersAppearFromEvidence(evidence);
+  const defense = (!!opts.defenseBuyersAppear || fmpDefenseBuyersAppearFromEvidence(evidence))
+    && fmpFirmDoesConstruction(evidence, customerText);
   const date = (opts.today ?? (() => new Date().toISOString().slice(0, 10)))();
   const snippets = requiredSnippetsForWriteup(evidence);
   const naics = evidence.dominantNaics || snippets.find((s) => /^\d{6}$/.test(s)) || null;
