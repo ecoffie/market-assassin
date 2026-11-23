@@ -15,6 +15,7 @@ import {
 import { fromEntityApiNaicsList, type NaicsSbMap } from './naics-small-business';
 import { filterBlankPscList } from '@/lib/contractor/award-history-shape';
 import { interpretSbaCertifications, certFlag, type CertificationRecord } from './certification-status';
+import { registrationPurposeReadiness, type RegistrationPurposeReadiness } from './registration-purpose';
 
 // Types
 export interface SAMEntity {
@@ -24,7 +25,10 @@ export interface SAMEntity {
   dbaName?: string;
   registrationStatus: 'Active' | 'Inactive' | 'Expired' | 'Unknown';
   registrationExpirationDate?: string;
+  /** SAM purposeOfRegistrationDesc, verbatim (e.g. "All Awards", "Federal Assistance Awards"). */
   purposeOfRegistration?: string;
+  /** SAM purposeOfRegistrationCode, verbatim (Z1 = Federal Assistance Awards, Z2 = All Awards). Absent = SAM did not say. */
+  purposeOfRegistrationCode?: string;
   entityStructure?: string;
   physicalAddress?: {
     addressLine1?: string;
@@ -243,12 +247,15 @@ export function transformEntity(raw: Record<string, unknown>): SAMEntity {
     ? String(primaryNaicsRaw).trim()
     : undefined;
   const naicsRaw = (goodsServices.naicsList as Array<Record<string, unknown>>) || (raw.naicsList as Array<Record<string, unknown>>) || [];
-  const naicsList = naicsRaw.map(n => ({
-    naicsCode: String(n.naicsCode || ''),
+  // SAM ships a single placeholder row ({naicsCode:null}) on registrations with no NAICS — the
+  // assistance-only (Z1) case. Emitting it as naicsCode "" told clients a NAICS row existed.
+  // Drop it: an empty list is SAM's real answer.
+  const naicsList = naicsRaw.filter(n => n && n.naicsCode != null && String(n.naicsCode).trim() !== '').map(n => ({
+    naicsCode: String(n.naicsCode).trim(),
     naicsDescription: String(n.naicsDescription || ''),
     isPrimary: Boolean(
       n.isPrimary === 'Y' || n.isPrimary === true || n.primaryNaics === 'Y'
-      || (primaryNaics != null && String(n.naicsCode || '') === primaryNaics),
+      || (primaryNaics != null && String(n.naicsCode).trim() === primaryNaics),
     ),
     // P0-3: SAM ships per-NAICS small-business status here and this parser used to drop it,
     // leaving market-research.ts with no size signal — so it substituted socioeconomic
@@ -297,6 +304,9 @@ export function transformEntity(raw: Record<string, unknown>): SAMEntity {
     registrationStatus: status as SAMEntity['registrationStatus'],
     registrationExpirationDate: expirationDate,
     purposeOfRegistration: er.purposeOfRegistrationDesc ? String(er.purposeOfRegistrationDesc) : undefined,
+    ...(er.purposeOfRegistrationCode != null && String(er.purposeOfRegistrationCode).trim()
+      ? { purposeOfRegistrationCode: String(er.purposeOfRegistrationCode).trim() }
+      : {}),
     entityStructure: (core.entityStructure as Record<string, unknown>)?.entityStructureDesc as string | undefined,
     physicalAddress: {
       addressLine1: physAddr.addressLine1 ? String(physAddr.addressLine1) : undefined,
@@ -511,6 +521,8 @@ export async function verifySAMStatus(uei: string): Promise<{
   status: string;
   expirationDate?: string;
   daysUntilExpiration?: number;
+  /** Whether SAM's registration purpose covers contract awards (Z1 = assistance only → warning). */
+  registrationPurpose?: RegistrationPurposeReadiness;
 }> {
   const entity = await getEntityByUEI(uei);
 
@@ -527,7 +539,8 @@ export async function verifySAMStatus(uei: string): Promise<{
     isActive: entity.isActive,
     status: entity.registrationStatus,
     expirationDate: entity.registrationExpirationDate,
-    daysUntilExpiration: entity.daysUntilExpiration
+    daysUntilExpiration: entity.daysUntilExpiration,
+    registrationPurpose: registrationPurposeReadiness(entity.purposeOfRegistrationCode, entity.purposeOfRegistration),
   };
 }
 

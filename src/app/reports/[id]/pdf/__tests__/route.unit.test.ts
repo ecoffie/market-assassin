@@ -30,7 +30,7 @@ vi.mock('@vercel/kv', () => ({
   },
 }));
 
-import { GET, PDF_OPTIONS, PDF_LIMIT_PER_IP_HOUR, PDF_FALLBACK_PER_IP_HOUR, PDF_FALLBACK_PER_REPORT_HOUR, PDF_FALLBACK_INSTANCE_HOUR } from '../route';
+import { GET, pdfOptions, PDF_LIMIT_PER_IP_HOUR, PDF_FALLBACK_PER_IP_HOUR, PDF_FALLBACK_PER_REPORT_HOUR, PDF_FALLBACK_INSTANCE_HOUR } from '../route';
 import { resetFallbackWindows } from '@/lib/pdf/render-rate-limit';
 import { GET as PAGE } from '../../route';
 import { renderStoredReportHtml } from '@/lib/market/stored-report-html';
@@ -67,7 +67,7 @@ describe('GET /reports/[id]/pdf — download response', () => {
     expect(htmlToPdf).toHaveBeenCalledTimes(1);
     const [html, opts, mode] = htmlToPdf.mock.calls[0];
     expect(html).toBe(renderStoredReportHtml(REPORT as never));
-    expect(opts).toEqual(PDF_OPTIONS);
+    expect(opts).toEqual(pdfOptions(REPORT.subject));
     expect(mode).toEqual({ lockdown: true });
 
     const page = await (await PAGE(new Request('https://getmindy.ai/x'), params(REPORT.id))).text();

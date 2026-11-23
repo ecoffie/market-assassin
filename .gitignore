@@ -104,3 +104,5 @@ scripts/rollback_*.sql
 
 # scripts/agent-release.mts: throwaway merge worktrees for the merged-tree type check
 .agent-release/
+# Screenshot regression diff output (tests/visual)
+tests/visual/__output__/
