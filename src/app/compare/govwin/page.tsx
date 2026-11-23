@@ -17,6 +17,7 @@
  * SERP), and FAQPage (mirrors the visible FAQ for rich results).
  */
 import type { Metadata } from 'next';
+import { siteShareImages } from '@/lib/seo/share-image';
 import Link from 'next/link';
 
 export const metadata: Metadata = {
@@ -40,6 +41,7 @@ export const metadata: Metadata = {
       'Same federal market intelligence as GovWin (opportunities, recompetes, forecasts) at 1% of the price. No sales call, no annual contract.',
     type: 'website',
     url: 'https://getmindy.ai/compare/govwin',
+    images: siteShareImages(),
   },
 };
 

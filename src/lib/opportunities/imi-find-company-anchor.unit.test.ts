@@ -402,6 +402,9 @@ describe('findOpportunities end-to-end (fake client, frozen rows)', () => {
     expect(back.filter((i) => i.evidence_class === 'DIRECT_MATCH').every((i) => (i.match_basis || [])[0] === 'buy_side_text')).toBe(true);
     expect(res.horizons.open_now.eligibility_counts).toMatchObject({ NOT_ELIGIBLE: 1 });
     expect(res.presentation.host_rules).toEqual([...HOST_RULES_FIND_FIRST_VALUE, ...HOST_RULES_COMPANY_ANCHORED]);
+    // IMI's fixture registration is Z2 "All Awards": the company block reports it, with no warning.
+    expect(res.company?.registration_readiness).toMatchObject({ purpose_code: 'Z2', contract_awards: 'registered' });
+    expect(res.company?.registration_readiness?.warning).toBeUndefined();
   });
 
   it('no uei → beginner flow unchanged: no company block, no eligibility, P2 host_rules only', async () => {

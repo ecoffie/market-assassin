@@ -156,6 +156,7 @@ describe('weekly-alerts — a blocked send is never logged as sent', () => {
     const row = state.log.find((r) => r.user_email === 'bounced@example.com');
     expect(row?.delivery_status).toBe('skipped');
     expect(row?.error_message).toBe('send_guard_blocked');
+    expect((row?.opportunities_data as Row[])[0]).toMatchObject({ reason: 'send_guard_blocked', guard_reason: 'suppressed:hard_bounce' });
     expect(state.profileUpdates).toHaveLength(0); // no last_alert_sent / total_alerts_sent bump
     expect(body.results.sent).toBe(0);
   });

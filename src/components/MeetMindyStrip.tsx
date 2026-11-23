@@ -74,7 +74,7 @@ export default function MeetMindyStrip({
           <div className="min-w-0 flex-1">
             <p className={c.title}>New here? Meet Mindy.</p>
             <p className={c.body}>
-              Mindy is your 24/7 federal market intelligence analyst — it scans 24,000+ opportunities daily, scores your fit, and tells you what to bid on.
+              Mindy is your 24/7 federal market intelligence analyst — it scans federal opportunities daily, scores your fit, and tells you what to bid on.
             </p>
             <Link
               href="https://getmindy.ai/pricing"

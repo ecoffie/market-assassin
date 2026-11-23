@@ -15,6 +15,7 @@ vi.mock('@/lib/ops-alert', () => ({
 type Row = Record<string, unknown>;
 const tables: Record<string, Row[]> = {};
 let incidentsBroken = false;
+let runningReadBroken = false;
 
 function builder(table: string) {
   const filters: ((r: Row) => boolean)[] = [];
@@ -25,10 +26,14 @@ function builder(table: string) {
   let limit: number | null = null;
   let single = false;
   let ignoreDup = false;
+  let statusEq: unknown = undefined;
 
   const exec = async () => {
     if (table === 'ops_incidents' && incidentsBroken) {
       return { data: null, count: null, error: { code: '42P01', message: 'relation "ops_incidents" does not exist' } };
+    }
+    if (table === 'cron_job_runs' && runningReadBroken && statusEq === 'running') {
+      return { data: null, error: { code: '57014', message: 'canceling statement due to statement timeout' } };
     }
     const rows = (tables[table] ||= []);
     if (op === 'upsert') {
@@ -51,7 +56,7 @@ function builder(table: string) {
 
   const b: Record<string, unknown> = {
     select: () => b,
-    eq: (c: string, v: unknown) => { filters.push((r) => r[c] === v || String(r[c]) === String(v)); return b; },
+    eq: (c: string, v: unknown) => { if (c === 'status') statusEq = v; filters.push((r) => r[c] === v || String(r[c]) === String(v)); return b; },
     in: (c: string, vs: unknown[]) => { filters.push((r) => vs.includes(r[c])); return b; },
     not: (c: string, o: string, v: unknown) => { filters.push((r) => !(o === 'is' && v === null && (r[c] ?? null) === null)); return b; },
     gte: (c: string, v: string) => { filters.push((r) => String(r[c]) >= v); return b; },
@@ -99,6 +104,7 @@ beforeEach(() => {
   for (const k of Object.keys(tables)) delete tables[k];
   sent.length = 0;
   incidentsBroken = false;
+  runningReadBroken = false;
 });
 
 describe('dispatcher-watchdog incident wiring', () => {
@@ -134,5 +140,43 @@ describe('dispatcher-watchdog incident wiring', () => {
     expect(r.incidents.preview[0].subject).toBe('Cron watchdog: 2 opened');
     expect(sent).toHaveLength(0);
     expect(tables.ops_incidents ?? []).toHaveLength(0);
+  });
+
+  it('UNCLOSED: reports a self-reporting job\'s run still `dispatched` past timeout + margin (read-only)', async () => {
+    const now = '2026-11-23T12:00:29Z';
+    tables.cron_jobs = [
+      { job_name: 'sync-dibbs', cron_expr: '0 */6 * * *', enabled: true, last_run_at: '2026-11-23T06:00:10Z', last_status: 'running', locked_at: null, timeout_ms: 300000 },
+      { job_name: 'quiet-long', cron_expr: '0 */6 * * *', enabled: true, last_run_at: '2026-11-23T06:00:10Z', last_status: 'dispatched', locked_at: null, timeout_ms: 300000 },
+    ];
+    tables.cron_job_runs = [
+      // Earlier run closed by the route itself after the 12s ack → proof sync-dibbs self-reports.
+      { id: 'r0', job_name: 'sync-dibbs', started_at: '2026-11-22T18:00:10Z', status: 'success', duration_ms: 12002, error: null },
+      // Killed run: never closed.
+      { id: 'r1', job_name: 'sync-dibbs', started_at: '2026-11-23T06:00:10Z', status: 'dispatched', duration_ms: 12002, error: null },
+      // A job that never self-reports: `dispatched` is its healthy permanent record → not flagged.
+      { id: 'q1', job_name: 'quiet-long', started_at: '2026-11-23T06:00:10Z', status: 'dispatched', duration_ms: 12002, error: null },
+      { id: 'h', job_name: 'heartbeat', started_at: '2026-11-23T11:59:00Z', status: 'success', error: null },
+    ];
+    const before = JSON.stringify(tables.cron_job_runs);
+    const r = await (await call(now)).json();
+    expect(r.unclosedError).toBeNull();
+    expect(r.unclosed).toHaveLength(1);
+    expect(r.unclosed[0]).toMatchObject({ job_name: 'sync-dibbs', status: 'dispatched', runs: 1, run_ids: ['r1'] });
+    expect(r.ok).toBe(false);
+    expect(sent).toHaveLength(1);
+    expect(sent[0].text).toContain('OPENED sync-dibbs');
+    expect(sent[0].text).toContain("still 'dispatched' past timeout");
+    expect(JSON.stringify(tables.cron_job_runs)).toBe(before); // rows never mutated
+  });
+
+  it('UNCLOSED: a failed read reports the check as unknown (null), never as nothing unclosed', async () => {
+    runningReadBroken = true;
+    tables.cron_jobs = [
+      { job_name: 'health-check-email', cron_expr: '0 16 * * *', enabled: true, last_run_at: '2026-11-22T16:00:00Z', last_status: 'success', locked_at: null, timeout_ms: 50000 },
+    ];
+    tables.cron_job_runs = [{ id: 'h', job_name: 'heartbeat', started_at: '2026-11-23T11:59:00Z', status: 'success', error: null }];
+    const r = await (await call('2026-11-23T12:00:29Z')).json();
+    expect(r.unclosed).toBeNull();
+    expect(r.unclosedError).toContain('statement timeout');
   });
 });

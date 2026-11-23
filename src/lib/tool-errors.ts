@@ -48,6 +48,7 @@ export const ToolNames = {
   ANALYST: 'analyst', // AI bid/no-bid recommendation per opportunity (PRD-ai-bd-department.md Agent #2)
   AUTH_OAUTH: 'auth_oauth', // OAuth sign-in failures — enterprise tenant policy vs our misconfig
   ASK_MINDY: 'ask_mindy', // In-app chat: planner/answer provider failures and fallback events
+  AGENCY_SPENDING_DETAIL: 'agency_spending_detail', // USASpending set-aside bucket lookups that failed after one retry
 } as const;
 
 export type ToolName = (typeof ToolNames)[keyof typeof ToolNames];

@@ -4,7 +4,14 @@
 
 ## The source
 
-A single XLSX, sheet **`Sheet2`** (34 columns):
+A single XLSX, sheet **`Sheet2`**. Columns are located by **header name**, never
+by position: the 2026-11-18 edition grew from 34 to 37 columns (`Component`,
+`Actual Award Date`, `Contract Canceled Date` inserted ahead of `Incumbent
+Contractor PIID`), and the fixed-index parser wrote component codes into
+`incumbent_contract_number`. A missing or duplicated required header
+(`DOJ_REQUIRED_HEADERS` in `src/lib/forecasts/doj-parse.ts`) fails the run as
+`header_drift: missing …` before anything is read or written; added columns are
+ignored.
 
 ```
 https://www.justice.gov/media/1381791/dl        → 301 →

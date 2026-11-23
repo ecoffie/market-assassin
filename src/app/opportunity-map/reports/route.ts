@@ -16,6 +16,7 @@
  * tok()/email()/hdrs() client auth). The rail's Reports item is active (bar-chart icon). NO EMOJI —
  * every icon is an inline lucide-style SVG (Eric's standing rule).
  */
+import { STATE_BLOCK_CSS, signedOutStateHtml } from '@/lib/design/state-block';
 import { NextResponse, type NextRequest } from 'next/server';
 import { SUBPAGE_APP_SHELL_CSS, applyAppShell, isAppShellRequest } from '../app-shell';
 import { LOGIN_MODAL_CSS, LOGIN_MODAL_HTML, LOGIN_MODAL_JS } from '../login-modal';
@@ -179,7 +180,7 @@ const PAGE = `<!DOCTYPE html><html lang="en" class="mindy-map"><head>
   .errline h3,.blank h3{font-size:18px;color:var(--ink);margin-bottom:6px}
   .signin a,.blank a{color:var(--blue);font-weight:700;text-decoration:none}
   ${ACCOUNT_MENU_CSS}
-</style><style>${LOGIN_MODAL_CSS}</style></head><body>
+</style><style>${LOGIN_MODAL_CSS}</style><style>${STATE_BLOCK_CSS}</style></head><body>
 <header class="zhead">
   <nav class="zh-left">
     <a href="/opportunity-map">Opportunities</a>
@@ -235,7 +236,7 @@ const PAGE = `<!DOCTYPE html><html lang="en" class="mindy-map"><head>
   var btnShare=document.getElementById('btnShare'), btnExport=document.getElementById('btnExport'), btnWatch=document.getElementById('btnWatch');
   function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
 
-  if(!t||!em){ panel.innerHTML='<div class="signin">Please <a href="#" onclick="return window.__mapsSignIn()">sign in</a> to see your Market Intelligence.</div>'; mktList.innerHTML=''; return; }
+  if(!t||!em){ panel.innerHTML=${JSON.stringify(signedOutStateHtml({ title: 'Sign in to see your Market Intelligence', body: 'Your saved markets and their reports appear here.' }))}; mktList.innerHTML=''; return; }
   function hdrs(){ return {'Content-Type':'application/json','x-mi-auth-token':t,'x-user-email':em}; }
 
   function fmtMoney(n){

@@ -29,7 +29,10 @@ describe('throughput digest — query shape', () => {
     // customer_classifications is the audience source (fetchBriefingEntitlements),
     // NOT user_profiles.access_briefings — checking the wrong one reports 0 orphans.
     expect(src).toContain("from('customer_classifications')");
-    expect(src).toMatch(/'lifetime', '1_year', '6_month', 'subscription', 'beta_preview'/);
+    // The sender's own predicate, imported — never a re-typed access list, which
+    // ignored briefings_expiry and mislabelled free/none rows as "no row".
+    expect(src).toContain("import { classifyBriefingClassificationDrops } from '@/lib/briefings/delivery/rollout'");
+    expect(src).not.toMatch(/'lifetime', '1_year', '6_month', 'subscription', 'beta_preview'/);
   });
 
   it('counts DISTINCT users for alert coverage, not raw rows', () => {

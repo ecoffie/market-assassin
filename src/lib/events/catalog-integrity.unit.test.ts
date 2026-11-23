@@ -87,7 +87,9 @@ describe('federal events catalog integrity', () => {
   });
 
   it('one-off events are not labelled annual', () => {
-    const dot = getFederalEventSeries({ query: 'DOT Veteran-Owned Small Business Summit' }).series[0];
-    expect(dot.cadence).toMatch(/^dated event/);
+    // The DOT VOSB Summit (held 2026-11-19) left the catalog; the remaining one-off is GSA's Dec 15 cloud webinar.
+    const gsa = getFederalEventSeries({ query: 'Cloud Small Business on the GSA Multiple Award Schedule' }).series[0];
+    expect(gsa.name).toMatch(/Cloud Small Business/);
+    expect(gsa.cadence).toMatch(/^dated event/);
   });
 });

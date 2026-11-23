@@ -13,6 +13,10 @@
  * brand-new alert types or pre-launch periods), emit a warning email
  * to the admin address.
  *
+ * A count that could not be READ is never treated as zero: the type is
+ * reported `unknown` with the error (see ./throughput.ts) and the admin is
+ * told the check could not run, rather than receiving a false regression.
+ *
  * Written 2026-05-31 after the May 28-31 daily-alerts outage where
  * sends collapsed from ~919/day to 1/day and nobody noticed for 4
  * days. This cron closes that detection gap.
@@ -26,12 +30,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { sendOpsAlert } from '@/lib/ops-alert';
 import { hasValidCronSecret } from '@/lib/cron/cron-request-auth';
+import { judgeThroughput, windowSum, type AlertType, type ThroughputStatus } from './throughput';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
-type AlertType = 'daily' | 'weekly' | 'pursuit';
 const ALERT_TYPES: AlertType[] = ['daily', 'weekly', 'pursuit'];
 
 // Below this fraction of baseline → regression. 0.5 = "we sent less
@@ -67,58 +71,25 @@ function getAdminClient() {
   );
 }
 
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
 function ymd(d: Date): string {
   return d.toISOString().slice(0, 10);
-}
-
-async function distinctSentCount(client: ReturnType<typeof getAdminClient>, alertType: AlertType, date: string): Promise<number> {
-  // alert_log has a UNIQUE (user_email, alert_date, alert_type) constraint, so for a
-  // given type+date there is at most one row per user → count(*) == distinct users.
-  // Use a HEAD count so PostgREST returns the EXACT total (via Content-Range) instead
-  // of its default 1000-row page cap. The old fetch-and-dedupe silently undercounted a
-  // busy day (daily ~1468 read as 1000) and could hide a partial drop (1500→1050 both
-  // capping at 1000 = "100%").
-  const { count, error } = await client
-    .from('alert_log')
-    .select('*', { count: 'exact', head: true })
-    .eq('alert_type', alertType)
-    .eq('alert_date', date)
-    .eq('delivery_status', 'sent');
-  if (error) {
-    console.error(`[throughput-check] count failed (${alertType} ${date}):`, error.message);
-    return 0;
-  }
-  return count ?? 0;
-}
-
-// Sum of distinct-per-day sends over the `days`-long window ending `startOffset` days
-// before `now` (startOffset=1 → the window ends yesterday). For a weekly cron whose
-// sends land on one day, a trailing 7-day window always contains exactly one send day,
-// so the sum tracks the weekly volume regardless of which weekday "yesterday" is.
-async function windowSum(
-  client: ReturnType<typeof getAdminClient>,
-  alertType: AlertType,
-  now: Date,
-  startOffset: number,
-  days: number,
-): Promise<number> {
-  let total = 0;
-  for (let i = 0; i < days; i++) {
-    const d = new Date(now);
-    d.setUTCDate(d.getUTCDate() - (startOffset + i));
-    total += await distinctSentCount(client, alertType, ymd(d));
-  }
-  return total;
 }
 
 interface TypeReport {
   alertType: AlertType;
   windowDays: number;
-  yesterday: number; // recent cadence-window total (= yesterday's count when windowDays===1)
-  baseline: number;
-  baselineDays: number[];
-  status: 'healthy' | 'warning' | 'no-baseline';
-  ratio: number;
+  // recent cadence-window total (= yesterday's count when windowDays===1); null = unreadable
+  yesterday: number | null;
+  baseline: number | null;
+  baselineDays: (number | null)[];
+  status: ThroughputStatus;
+  ratio: number | null;
+  /** Read errors behind an `unknown` status. */
+  errors?: string[];
 }
 
 export async function GET(request: NextRequest) {
@@ -150,6 +121,7 @@ export async function GET(request: NextRequest) {
 
   const reports: TypeReport[] = [];
   const alerts: TypeReport[] = [];
+  const unknowns: TypeReport[] = [];
 
   for (const alertType of ALERT_TYPES) {
     const { days: w, baselineWindows } = CADENCE[alertType];
@@ -158,43 +130,51 @@ export async function GET(request: NextRequest) {
     // windows of the same length. daily (w=1) → yesterday vs prior 7 single days
     // (unchanged). weekly (w=7) → last 7 days vs prior weeks, so an off-day 0 can't
     // false-trigger; only a genuinely missed weekly cycle drops the window to 0.
-    const recent = await windowSum(client, alertType, now, 1, w);
-    const baselineCounts: number[] = [];
+    const recentWindow = await windowSum(client, alertType, now, 1, w);
+    const errors = [...recentWindow.errors];
+    const baselineCounts: (number | null)[] = [];
     for (let b = 1; b <= baselineWindows; b++) {
-      baselineCounts.push(await windowSum(client, alertType, now, 1 + w * b, w));
+      const bw = await windowSum(client, alertType, now, 1 + w * b, w);
+      errors.push(...bw.errors);
+      baselineCounts.push(bw.total);
     }
-    const baselineMean = baselineCounts.reduce((a, b) => a + b, 0) / baselineCounts.length;
-
-    let status: TypeReport['status'] = 'healthy';
-    if (baselineMean < MIN_BASELINE_FOR_ALERT) {
-      status = 'no-baseline';
-    } else if (recent < baselineMean * DROP_THRESHOLD) {
-      status = 'warning';
-    }
+    const verdict = judgeThroughput({
+      recent: recentWindow.total,
+      baselineCounts,
+      dropThreshold: DROP_THRESHOLD,
+      minBaseline: MIN_BASELINE_FOR_ALERT,
+    });
+    if (errors.length) console.error(`[throughput-check] ${alertType} UNKNOWN — count read failed:`, errors.join('; '));
 
     const report: TypeReport = {
       alertType,
       windowDays: w,
-      yesterday: recent,
-      baseline: Math.round(baselineMean),
+      yesterday: recentWindow.total,
+      baseline: verdict.baselineMean === null ? null : Math.round(verdict.baselineMean),
       baselineDays: baselineCounts,
-      status,
-      ratio: baselineMean > 0 ? +(recent / baselineMean).toFixed(2) : 0,
+      status: verdict.status,
+      ratio: verdict.ratio,
+      ...(errors.length ? { errors } : {}),
     };
     reports.push(report);
-    if (status === 'warning') alerts.push(report);
+    if (verdict.status === 'warning') alerts.push(report);
+    if (verdict.status === 'unknown') unknowns.push(report);
   }
 
   let emailSent = false;
-  if (alerts.length > 0) {
-    const subject = `⚠️ Alert throughput regression — ${alerts.map(a => a.alertType).join(', ')}`;
+  if (alerts.length > 0 || unknowns.length > 0) {
+    const subjectParts: string[] = [];
+    if (alerts.length) subjectParts.push(`regression — ${alerts.map(a => a.alertType).join(', ')}`);
+    if (unknowns.length) subjectParts.push(`UNKNOWN (count read failed) — ${unknowns.map(a => a.alertType).join(', ')}`);
+    const subject = `⚠️ Alert throughput ${subjectParts.join(' · ')}`;
     const html = `
 <div style="font-family: -apple-system, BlinkMacSystemFont, sans-serif; max-width: 600px; padding: 24px; color: #1a1a1a;">
-  <h2 style="color: #b91c1c; margin-top: 0;">Alert throughput regression</h2>
-  <p style="color: #444;">
+  <h2 style="color: #b91c1c; margin-top: 0;">Alert throughput ${alerts.length ? 'regression' : 'check could not run'}</h2>
+  ${unknowns.length ? `<p style="color: #92400e;"><strong>UNKNOWN — not zero:</strong> the alert_log count could not be read for ${unknowns.map(u => `<code>${u.alertType}</code>`).join(', ')}, so no regression verdict was made for ${unknowns.length === 1 ? 'it' : 'them'}. Errors: ${escapeHtml(unknowns.flatMap(u => u.errors ?? []).slice(0, 5).join('; '))}</p>` : ''}
+  ${alerts.length ? `<p style="color: #444;">
     One or more alert types sent less than ${Math.round(DROP_THRESHOLD * 100)}% of their cadence baseline (window ending ${yesterdayKey}).
-    ${alerts.some(a => a.windowDays > 1) ? `(weekly is judged over its full ${CADENCE.weekly.days}-day window, not a single day, so an off-day 0 will NOT trigger this.) ` : ''}This usually means the cron is failing silently after a recent deploy. Check Vercel cron logs for <code>/api/cron/${alerts[0].alertType}-alerts</code> first.
-  </p>
+    ${alerts.some(a => a.windowDays > 1) ? `(weekly is judged over its full ${CADENCE.weekly.days}-day window, not a single day, so an off-day 0 will NOT trigger this.) ` : ''}This usually means the cron is failing silently after a recent deploy. Check Vercel cron logs for <code>/api/cron/${alerts[0]?.alertType}-alerts</code> first.
+  </p>` : ''}
   <table style="width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 14px;">
     <thead>
       <tr style="background: #f3f4f6; text-align: left;">
@@ -209,15 +189,15 @@ export async function GET(request: NextRequest) {
       ${reports.map(r => `
       <tr style="border-bottom: 1px solid #e5e7eb;">
         <td style="padding: 10px; font-family: monospace;">${r.alertType}</td>
-        <td style="padding: 10px;">${r.yesterday}${r.windowDays > 1 ? ` <span style="color:#6b7280">(last ${r.windowDays}d)</span>` : ''}</td>
-        <td style="padding: 10px;">${r.baseline}${r.windowDays > 1 ? ` <span style="color:#6b7280">/window</span>` : ''}</td>
-        <td style="padding: 10px;">${Math.round(r.ratio * 100)}%</td>
-        <td style="padding: 10px; color: ${r.status === 'warning' ? '#b91c1c' : r.status === 'no-baseline' ? '#6b7280' : '#16a34a'};">${r.status.toUpperCase()}</td>
+        <td style="padding: 10px;">${r.yesterday ?? 'unknown'}${r.windowDays > 1 ? ` <span style="color:#6b7280">(last ${r.windowDays}d)</span>` : ''}</td>
+        <td style="padding: 10px;">${r.baseline ?? 'unknown'}${r.windowDays > 1 ? ` <span style="color:#6b7280">/window</span>` : ''}</td>
+        <td style="padding: 10px;">${r.ratio === null ? 'unknown' : `${Math.round(r.ratio * 100)}%`}</td>
+        <td style="padding: 10px; color: ${r.status === 'warning' ? '#b91c1c' : r.status === 'unknown' ? '#92400e' : r.status === 'no-baseline' ? '#6b7280' : '#16a34a'};">${r.status.toUpperCase()}</td>
       </tr>`).join('')}
     </tbody>
   </table>
   <p style="font-size: 12px; color: #6b7280;">
-    Per-day baseline: ${reports[0]?.baselineDays.map((c, i) => `${baselineDates[i]}=${c}`).join(', ')}
+    Per-day baseline: ${reports[0]?.baselineDays.map((c, i) => `${baselineDates[i]}=${c ?? 'unknown'}`).join(', ')}
   </p>
   <p style="font-size: 12px; color: #6b7280;">
     Threshold: ${Math.round(DROP_THRESHOLD * 100)}% of baseline · Minimum baseline to trigger: ${MIN_BASELINE_FOR_ALERT} sends
@@ -241,6 +221,8 @@ export async function GET(request: NextRequest) {
     baselineDates,
     reports,
     alerts: alerts.length,
+    // Types whose counts could not be read. Never folded into `alerts` or reported as 0 sends.
+    unknown: unknowns.map(u => u.alertType),
     emailSent,
   });
 }

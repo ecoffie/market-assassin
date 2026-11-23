@@ -17,6 +17,7 @@
  * results live on each /glossary/[slug] page.
  */
 import type { Metadata } from 'next';
+import { siteShareImages } from '@/lib/seo/share-image';
 import Link from 'next/link';
 import { glossaryTerms } from '@/data/glossary';
 
@@ -43,6 +44,14 @@ export const metadata: Metadata = {
       '45+ federal contracting acronyms and terms defined in plain English. From CAGE codes to IDIQs, the vocabulary you need to win federal work.',
     type: 'website',
     url: 'https://getmindy.ai/glossary',
+    images: siteShareImages(),
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'GovCon Glossary — Federal Contracting Terms Explained | Mindy',
+    description:
+      '45+ federal contracting acronyms and terms defined in plain English. From CAGE codes to IDIQs, the vocabulary you need to win federal work.',
+    images: siteShareImages(),
   },
 };
 
