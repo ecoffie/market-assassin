@@ -10,8 +10,10 @@
  *
  * - Scenario: { id, turns: [customer wording, ...] }. The repo ships only a synthetic one
  *   (tests/fixtures/ask-mindy-journey/ridgeline.json). A real company's wording stays outside the repo.
- * - Flags are OBSERVED from the turn notices. A run is labeled AFTER only when every --expect flag was observed on;
- *   otherwise UNCONFIRMED, and the script exits 1. Setting preview flags is not this script's job.
+ * - Flags are OBSERVED from the turn notices. The observed set must be EXACTLY --expect: every listed flag on and no
+ *   other flag on; otherwise the run is UNCONFIRMED and the script exits 1. AFTER needs at least one --expect.
+ *   BEFORE with no --expect = every flag off (the product as customers had it); BEFORE with the same --expect as
+ *   AFTER = option (A), isolating the code change. Setting preview flags is not this script's job.
  * - The target must serve trace events (ASK_MINDY_TRACE_EVENTS=true, ASK_MINDY_TRACE_RESULT_CHARS=200000); production
  *   ignores them by design, so this never runs against production.
  * - After the last turn the conversation is reopened exactly as History does (GET /api/app/chat-sessions) and its
