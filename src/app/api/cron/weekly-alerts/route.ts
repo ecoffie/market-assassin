@@ -620,7 +620,11 @@ async function runWeeklyAlertJob(options: WeeklyAlertJobOptions = {}): Promise<N
         // RESIDUAL (shared with daily-alerts, not changed here): the email is sent BEFORE its
         // `sent` row is written. If that write fails, the catch below writes a `failed` row,
         // which still dedups this cycle; a duplicate needs both writes to fail.
-        const delivered = await sendAlertEmail(user.user_email, topOpps, user, tier, scoredOpps.length);
+        // The send guard's reason (suppressed:<x> / synthetic_client_address / suppression_check_failed) is
+        // kept in the row's context as guard_reason; error_message stays exactly 'send_guard_blocked'.
+        let guardReason: string | null = null;
+        const onBlocked = (reason: string) => { guardReason = reason; };
+        const delivered = await sendAlertEmail(user.user_email, topOpps, user, tier, scoredOpps.length, onBlocked);
 
         // Parity with daily-alerts: a guard-blocked send (unsubscribed / bounced) is a visible
         // skip, never a phantom `sent` with last_alert_sent / total_alerts_sent bumped.
@@ -632,9 +636,10 @@ async function runWeeklyAlertJob(options: WeeklyAlertJobOptions = {}): Promise<N
             source: alertSource,
             tier,
             opportunitiesCount: topOpps.length,
+            opportunitiesData: [{ alertSource, tier, reason: 'send_guard_blocked', guard_reason: guardReason }],
             errorMessage: 'send_guard_blocked',
           });
-          console.warn(`[Weekly Alerts] Send guard blocked ${user.user_email} (suppression) — recorded as skipped, NOT sent`);
+          console.warn(`[Weekly Alerts] Guard blocked ${user.user_email} (${guardReason ?? '?'}): skipped, NOT sent`);
           results.skipped++;
           return;
         }
@@ -860,7 +865,8 @@ async function sendAlertEmail(
   opportunities: (SAMOpportunity & { score: number })[],
   user: AlertUser,
   tier: 'free' | 'pro' = 'free',
-  totalAvailable: number = 0
+  totalAvailable: number = 0,
+  onBlocked?: (reason: string) => void,
 ): Promise<boolean> {
   const emailDate = new Date().toISOString().split('T')[0];
   const tokenResult = await createEmailTrackingToken(email, 'weekly_alert', emailDate);
@@ -1047,6 +1053,7 @@ async function sendAlertEmail(
     text: `${opportunities.length} new opportunities matched your profile this week. Manage preferences: ${preferencesUrl}`,
     emailType: 'weekly_alert',
     eventSource: 'weekly_alert',
+    onBlocked,
     tags: {
       email_type: 'weekly_alert',
       alert_type: 'weekly',

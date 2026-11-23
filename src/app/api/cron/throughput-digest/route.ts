@@ -34,6 +34,7 @@ import { sendOpsAlert } from '@/lib/ops-alert';
 import { findMismatches, type StripeSub } from '@/lib/billing/paid-entitlement';
 import { MCP_CHANNEL_OR_FILTER } from '@/lib/mcp/channel-filter';
 import { hasValidCronSecret } from '@/lib/cron/cron-request-auth';
+import { sendGuardCheckFromRows } from '@/lib/email/guard-reason';
 import { classifyBriefingClassificationDrops } from '@/lib/briefings/delivery/rollout';
 import { customerDropCount, describeBriefingClassificationDrops } from '@/lib/briefings/classification-drop-summary';
 
@@ -78,7 +79,7 @@ function getSupabase() {
 
 /** Alert when a pipeline delivers less than this share of what it should have. */
 const MIN_COMPLETENESS = 0.9;
-/** Alert when more than this many alerts are blocked by the send guard in 24h. */
+/** Alert when more than this many alerts are LOST to the send guard in 24h (recipient suppression excluded). */
 const MAX_GUARD_BLOCKS = 5;
 /** Alert when more than this many real briefings-enabled users are dropped by the sender's classification gate. */
 const MAX_ORPHANED_ENTITLEMENTS = 20;
@@ -191,32 +192,36 @@ async function checkAlertCoverage(sb: ReturnType<typeof getSupabase>): Promise<C
   };
 }
 
-/** Send guard: how many real alerts were suppressed by the per-recipient daily cap? */
+/**
+ * Send guard: alerts generated but never sent, broken down by the guard's REASON.
+ *
+ * daily-alerts / weekly-alerts store sendEmail()'s onBlocked reason as `guard_reason` in the
+ * row's opportunities_data context (error_message stays exactly 'send_guard_blocked'). The
+ * breakdown separates the guard HONORING a recipient (mailbox suppression: unsubscribe /
+ * bounce / complaint — informational, not a delivery failure) from blocks that lost an alert
+ * the user should have had: a failed suppression lookup (fail-closed), a synthetic Coach-Mode
+ * address, and rows with no recorded reason (`unknown` — never assumed benign).
+ *
+ * The daily-cap bucket is STRUCTURALLY 0 for these rows: daily_alert and weekly_alert are in
+ * send-email.ts CAP_EXEMPT_TYPES, so the cap branch never blocks them. It is still counted so a
+ * regression that drops the exemption shows up here instead of hiding in "unknown".
+ */
 async function checkSendGuard(sb: ReturnType<typeof getSupabase>): Promise<Check> {
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-  const { count, error } = await sb
+  // Paged row read (not a HEAD count) because the reason lives in each row's context.
+  // A table that cannot be read returns an error here, never an empty "0 blocked".
+  const { rows, error } = await fetchAllRows<{ opportunities_data: unknown }>((from, to) => sb
     .from('alert_log')
-    .select('id', { count: 'exact', head: true })
+    .select('opportunities_data')
     .eq('error_message', 'send_guard_blocked')
-    .gte('alert_date', since);
+    .gte('alert_date', since)
+    .range(from, to));
 
   if (error) {
     return { name: 'Send guard', detail: `query failed: ${error.message}`, value: 'unknown', ok: false };
   }
-  // A missing table returns count=null with error=null and HTTP 204 — no error at all.
-  // `count ?? 0` would turn "I don't know" into "zero blocked", i.e. this monitor
-  // fabricating the exact healthy-looking number it exists to catch. UNKNOWN is a
-  // failure, not a pass.
-  if (count === null || count === undefined) {
-    return { name: 'Send guard', detail: 'count came back NULL — table missing or unreadable', value: 'unknown', ok: false };
-  }
-  const n = count;
-  return {
-    name: 'Send guard',
-    detail: n === 0 ? 'no alerts suppressed' : `${n} alert(s) generated but never sent (suppression or daily cap)`,
-    value: String(n),
-    ok: n <= MAX_GUARD_BLOCKS,
-  };
+  const c = sendGuardCheckFromRows(rows, MAX_GUARD_BLOCKS);
+  return { name: 'Send guard', detail: c.detail, value: c.value, ok: c.ok };
 }
 
 /**
@@ -476,7 +481,7 @@ async function checkPaidEntitlement(sb: ReturnType<typeof getSupabase>): Promise
       <table style="border-collapse:collapse;width:100%;max-width:640px;">${rows}</table>
       <p style="color:#666;font-size:12px;margin-top:12px;">
         Thresholds: completeness ≥ ${Math.round(MIN_COMPLETENESS * 100)}%,
-        send-guard blocks ≤ ${MAX_GUARD_BLOCKS}, classification-gate drops ≤ ${MAX_ORPHANED_ENTITLEMENTS}.
+        send-guard lost alerts ≤ ${MAX_GUARD_BLOCKS} (suppression excluded), classification-gate drops ≤ ${MAX_ORPHANED_ENTITLEMENTS}.
       </p>
     </div>`;
 
