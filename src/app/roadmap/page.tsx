@@ -7,6 +7,7 @@
  * never retyped here.
  */
 import type { Metadata } from 'next';
+import { siteShareImages } from '@/lib/seo/share-image';
 import RoadmapChecklist from './RoadmapChecklist';
 
 const PAGE_URL = 'https://getmindy.ai/roadmap';
@@ -17,7 +18,7 @@ export const metadata: Metadata = {
   title: TITLE,
   description: DESC,
   alternates: { canonical: PAGE_URL },
-  openGraph: { title: TITLE, description: DESC, url: PAGE_URL },
+  openGraph: { title: TITLE, description: DESC, url: PAGE_URL, images: siteShareImages() },
 };
 
 export default function RoadmapPage() {

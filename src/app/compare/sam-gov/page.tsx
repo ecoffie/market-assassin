@@ -18,6 +18,7 @@
  * visible FAQ for rich results.
  */
 import type { Metadata } from 'next';
+import { siteShareImages } from '@/lib/seo/share-image';
 import Link from 'next/link';
 
 export const metadata: Metadata = {
@@ -41,6 +42,7 @@ export const metadata: Metadata = {
       'Stop scrolling SAM.gov. Get personalized daily briefings with incumbent data, recompete alerts, and AI fit scoring SAM.gov cannot deliver.',
     type: 'website',
     url: 'https://getmindy.ai/compare/sam-gov',
+    images: siteShareImages(),
   },
 };
 

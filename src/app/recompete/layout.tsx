@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { siteShareImages } from '@/lib/seo/share-image';
 import PublicShell from '@/components/public-site/PublicShell';
 import Link from 'next/link';
 
@@ -33,6 +34,14 @@ export const metadata: Metadata = {
       'Find federal contracts approaching expiration and get in front of the recompete before the solicitation drops.',
     type: 'website',
     url: 'https://getmindy.ai/recompete',
+    images: siteShareImages(),
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Federal Contract Recompetes — Find Expiring Contracts | Mindy',
+    description:
+      'Find federal contracts approaching expiration and get in front of the recompete before the solicitation drops.',
+    images: siteShareImages(),
   },
 };
 
