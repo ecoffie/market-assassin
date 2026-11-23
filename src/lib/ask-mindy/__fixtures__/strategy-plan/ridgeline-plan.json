@@ -1,0 +1,515 @@
+{
+ "schema": "mindy.doc/1",
+ "title": "Ridgeline Test Facilities: Federal Strategy Plan",
+ "subtitle": "Where Ridgeline stands, where to focus first, and what to do in the next 90 days",
+ "preparedFor": "Ridgeline Test Facilities LLC (synthetic test company)",
+ "date": "2026-11-22",
+ "sources": [
+  {
+   "id": "s-profile",
+   "label": "Ridgeline saved company profile (synthetic test data)",
+   "kind": "vault",
+   "retrievedAt": "2026-11-22"
+  },
+  {
+   "id": "s-awards",
+   "label": "Mindy award history lookup: Ridgeline Test Facilities LLC",
+   "kind": "tool",
+   "retrievedAt": "2026-11-22"
+  },
+  {
+   "id": "s-find",
+   "label": "Mindy find_opportunities: janitorial, custodial, HVAC and grounds maintenance in GA and SC",
+   "kind": "tool",
+   "retrievedAt": "2026-11-22"
+  },
+  {
+   "id": "s-fs-open",
+   "label": "SAM.gov 12444127Q0002 Francis Marion Ranger District Office Janitorial Services",
+   "kind": "sam_notice",
+   "url": "https://sam.gov/workspace/contract/opp/a5d3706f07644fa88780fe9af4e07e70/view",
+   "recordId": "12444127Q0002",
+   "retrievedAt": "2026-11-22"
+  },
+  {
+   "id": "s-fs-fcst",
+   "label": "Agency forecast: Chattooga River Ranger District recreational janitorial and garbage services (USDA Forest Service)",
+   "kind": "tool",
+   "recordId": "GW-L:FY26-007573",
+   "retrievedAt": "2026-11-22"
+  },
+  {
+   "id": "s-dodea",
+   "label": "USAspending HE125425CE002 Fort Stewart custodial services (DoDEA)",
+   "kind": "usaspending",
+   "url": "https://www.usaspending.gov/award/CONT_AWD_HE125425CE002_9700_-NONE-_-NONE-",
+   "recordId": "HE125425CE002",
+   "retrievedAt": "2026-11-22"
+  },
+  {
+   "id": "s-cdc",
+   "label": "USAspending 75D30123C16401 CDC Atlanta campuses janitorial services",
+   "kind": "usaspending",
+   "url": "https://www.usaspending.gov/award/CONT_AWD_75D30123C16401_7523_-NONE-_-NONE-",
+   "recordId": "75D30123C16401",
+   "retrievedAt": "2026-11-22"
+  },
+  {
+   "id": "s-fletc",
+   "label": "USAspending 70LGLY25CGLB00004 FLETC dorm management services, Glynco GA",
+   "kind": "usaspending",
+   "url": "https://www.usaspending.gov/award/CONT_AWD_70LGLY25CGLB00004_7015_-NONE-_-NONE-",
+   "recordId": "70LGLY25CGLB00004",
+   "retrievedAt": "2026-11-22"
+  },
+  {
+   "id": "s-mkt",
+   "label": "Mindy market report: NAICS 561720 janitorial services, Georgia (agencies and contractors FY23-25)",
+   "kind": "tool",
+   "url": "https://getmindy.ai/reports/i16HHSVwpFCFeoMr2xP4Fg",
+   "retrievedAt": "2026-11-22"
+  },
+  {
+   "id": "s-players",
+   "label": "Mindy contractor search: NAICS 561720 contractors based in Georgia",
+   "kind": "tool",
+   "retrievedAt": "2026-11-22"
+  },
+  {
+   "id": "s-osbp",
+   "label": "Mindy OSBP directory: Air Force Reserve Command small business office (Robins AFB)",
+   "kind": "tool",
+   "retrievedAt": "2026-11-22"
+  },
+  {
+   "id": "s-far87",
+   "label": "FAR Subpart 8.7, Acquisition from Nonprofit Agencies Employing People Who Are Blind or Severely Disabled",
+   "kind": "web",
+   "url": "https://www.acquisition.gov/far/subpart-8.7",
+   "retrievedAt": "2026-11-22"
+  },
+  {
+   "id": "s-a1",
+   "label": "AbilityOne Procurement List: custodial services",
+   "kind": "web",
+   "url": "https://abilityone.gov/procurement_list/services_custodial.html",
+   "retrievedAt": "2026-11-22"
+  }
+ ],
+ "sections": [
+  {
+   "id": "sec-summary",
+   "heading": "Executive summary",
+   "blocks": [
+    {
+     "type": "paragraph",
+     "id": "blk-ask",
+     "claim": "fact",
+     "cites": [
+      "s-profile"
+     ],
+     "text": "You asked where Ridgeline should focus to win its first federal work. Ridgeline does janitorial, HVAC maintenance and grounds work for commercial clients in Georgia and has no federal awards on record yet."
+    },
+    {
+     "type": "paragraph",
+     "id": "blk-short",
+     "claim": "recommendation",
+     "cites": [
+      "s-find",
+      "s-fs-open",
+      "s-fs-fcst",
+      "s-dodea"
+     ],
+     "text": "**The short version:** the biggest janitorial contracts in Georgia are not open to Ridgeline, because the law reserves many of them for AbilityOne nonprofits. Go after the smaller, competed, small-business work instead: USDA Forest Service janitorial and recreation-area work in Georgia and South Carolina, the Defense Department schools custodial contract at Fort Stewart, and HVAC and grounds subcontracts under the large Georgia facility contracts. Bid the open Forest Service job due December 17 first."
+    }
+   ]
+  },
+  {
+   "id": "sec-stands",
+   "heading": "About the company: where Ridgeline stands",
+   "blocks": [
+    {
+     "type": "table",
+     "id": "blk-stands",
+     "claim": "fact",
+     "cites": [
+      "s-profile",
+      "s-awards"
+     ],
+     "columns": [
+      {
+       "key": "item",
+       "label": "Item"
+      },
+      {
+       "key": "shows",
+       "label": "What the record shows"
+      }
+     ],
+     "rows": [
+      {
+       "item": "Work",
+       "shows": "Janitorial, HVAC maintenance and grounds keeping for commercial clients in metro Atlanta (company-stated)"
+      },
+      {
+       "item": "Federal awards",
+       "shows": "None found in federal award data. This is a starting point, not a gap to hide"
+      },
+      {
+       "item": "Registered codes",
+       "shows": "561720 janitorial services and 238220 HVAC (company-stated). Award history cannot confirm them yet because there are no awards"
+      },
+      {
+       "item": "Certifications",
+       "shows": "Women-owned small business, self-reported. Not SBA-certified, so WOSB set-asides are not open yet"
+      },
+      {
+       "item": "Bonding and staff",
+       "shows": "About 40 staff and $1M bonding capacity (company-stated, not verified)"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "sec-focus",
+   "heading": "Pathways in priority order: where to focus",
+   "blocks": [
+    {
+     "type": "table",
+     "id": "blk-focus",
+     "claim": "recommendation",
+     "cites": [
+      "s-fs-open",
+      "s-fs-fcst",
+      "s-dodea",
+      "s-fletc",
+      "s-players"
+     ],
+     "columns": [
+      {
+       "key": "rank",
+       "label": "#"
+      },
+      {
+       "key": "path",
+       "label": "Pathway and buyer"
+      },
+      {
+       "key": "why",
+       "label": "Why it fits Ridgeline"
+      },
+      {
+       "key": "evidence",
+       "label": "Evidence"
+      }
+     ],
+     "rows": [
+      {
+       "rank": "1",
+       "path": "USDA Forest Service, Georgia and South Carolina ranger districts",
+       "why": "Small janitorial and recreation-site jobs set aside for small business, the right size for a first prime award, and they combine cleaning with grounds and trash, which is Ridgeline's mix",
+       "evidence": "Open: Francis Marion Ranger District office janitorial, small business set-aside, due Dec 17, 2026. Planned: Chattooga River recreation janitorial and garbage, $500K to $999K, FY2027, base plus 4 option years"
+      },
+      {
+       "rank": "2",
+       "path": "Defense Department schools (DoDEA), Fort Stewart custodial",
+       "why": "Competed under a small business set-aside and sized for a firm Ridgeline's size; it is a real target, unlike the AbilityOne contracts",
+       "evidence": "HE125425CE002, Residential Enhancements, $1.2M obligated of a $3.1M ceiling; current period ends Jan 31, 2027 with options to Jul 31, 2030"
+      },
+      {
+       "rank": "3",
+       "path": "Subcontracts under large Georgia facility contracts",
+       "why": "Builds the federal past performance Ridgeline lacks, using its HVAC and grounds crews, while it bids its own small jobs",
+       "evidence": "FLETC dorm management at Glynco, T47 International, $54.9M, runs to Sep 30, 2027. Commercial small primes already winning Georgia custodial work: Unique Cleaning Service (78 awards, 6 agencies), Nobis Enterprises, EBS-4U"
+      }
+     ]
+    },
+    {
+     "type": "paragraph",
+     "id": "blk-focus-why",
+     "claim": "recommendation",
+     "cites": [
+      "s-dodea"
+     ],
+     "text": "Fort Stewart is second, not first, because its options run to 2030: the work comes back early only if the school agency does not exercise the January 2027 option. Introduce Ridgeline now so it is on the list either way."
+    }
+   ]
+  },
+  {
+   "id": "sec-not",
+   "heading": "Why these and not others",
+   "blocks": [
+    {
+     "type": "table",
+     "id": "blk-not",
+     "claim": "fact",
+     "cites": [
+      "s-find",
+      "s-cdc",
+      "s-mkt",
+      "s-far87",
+      "s-a1"
+     ],
+     "columns": [
+      {
+       "key": "what",
+       "label": "Set aside"
+      },
+      {
+       "key": "why",
+       "label": "Why it is not a target now"
+      }
+     ],
+     "rows": [
+      {
+       "what": "CDC Atlanta campuses janitorial ($38.8M, Goodwill Industries of North Georgia) and most Air Force custodial work at Robins and Shaw",
+       "why": "Held by AbilityOne nonprofits. Federal buyers must buy services on the AbilityOne Procurement List from those nonprofits, so these are not open competitions"
+      },
+      {
+       "what": "Seven of the ten Georgia and South Carolina custodial contracts coming back that Mindy listed",
+       "why": "Awarded without competition (AbilityOne or 8(a) sole source). Only three were competed"
+      },
+      {
+       "what": "VA janitorial set aside for service-disabled veteran-owned firms",
+       "why": "Ridgeline is not eligible for that set-aside"
+      },
+      {
+       "what": "Santee Lab HVAC replacement (Forest Service)",
+       "why": "Equipment replacement, closer to construction than maintenance, and due Nov 24, too soon to bid well"
+      },
+      {
+       "what": "Priming the FLETC dorm management contract",
+       "why": "About 50 times the size of a first award; go in as a subcontractor instead"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "sec-problems",
+   "heading": "Buyer pain points: what these buyers are under pressure to fix",
+   "blocks": [
+    {
+     "type": "paragraph",
+     "id": "blk-money",
+     "claim": "fact",
+     "cites": [
+      "s-mkt"
+     ],
+     "text": "In Georgia, the Army, the Federal Law Enforcement Training Center, the Air Force and the CDC buy the most janitorial services (about $123M, $95M, $30M and $29M over FY2023 to FY2025). Most of that money sits in a few very large contracts."
+    },
+    {
+     "type": "paragraph",
+     "id": "blk-a1",
+     "claim": "fact",
+     "cites": [
+      "s-far87",
+      "s-a1"
+     ],
+     "text": "Policy shapes this market: under FAR Subpart 8.7, agencies must buy services on the AbilityOne Procurement List from AbilityOne nonprofits, with no other exception, and custodial work is one of the largest listed categories. Contracts not on the list are competed normally."
+    },
+    {
+     "type": "paragraph",
+     "id": "blk-money-means",
+     "claim": "recommendation",
+     "cites": [
+      "s-mkt",
+      "s-players"
+     ],
+     "text": "For Ridgeline this means the volume is with large primes and AbilityOne nonprofits. The open doors are the smaller civilian sites (Forest Service ranger districts, the school agency) and the specialty work large primes subcontract: HVAC maintenance and grounds."
+    }
+   ]
+  },
+  {
+   "id": "sec-who",
+   "heading": "Who to talk to and what to say",
+   "blocks": [
+    {
+     "type": "table",
+     "id": "blk-who",
+     "claim": "fact",
+     "cites": [
+      "s-fs-open",
+      "s-osbp",
+      "s-dodea",
+      "s-players"
+     ],
+     "columns": [
+      {
+       "key": "who",
+       "label": "Who"
+      },
+      {
+       "key": "why",
+       "label": "Why approach them"
+      },
+      {
+       "key": "ask",
+       "label": "The question to ask"
+      }
+     ],
+     "rows": [
+      {
+       "who": "Contracting officer named on the notice, USDA Forest Service CSA East 3",
+       "why": "Runs the open Francis Marion janitorial buy and the contracting area that also covers the Chattooga River forecast",
+       "ask": "Will the Chattooga River recreation janitorial and garbage work be set aside for small business, and when do you expect to post it?"
+      },
+      {
+       "who": "Air Force Reserve Command small business office, Robins AFB, (478) 327-1748 (email not verified)",
+       "why": "The Georgia Air Force buying office closest to Ridgeline",
+       "ask": "Which grounds or HVAC maintenance requirements at Robins are not on the AbilityOne list, and who are the current primes?"
+      },
+      {
+       "who": "DoDEA contracting office for the Fort Stewart custodial contract (find the contracting officer on the SAM notice or award record)",
+       "why": "Owns the one competed small business custodial contract in reach",
+       "ask": "Do you plan to exercise the option in January 2027, and will the follow-on stay a small business set-aside?"
+      },
+      {
+       "who": "Unique Cleaning Service, Marietta",
+       "why": "A commercial small business already winning Georgia federal custodial work across six agencies",
+       "ask": "Where do you need HVAC or grounds help on your current federal sites?"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "sec-fix",
+   "heading": "Readiness checklist: SAM and DSBS profile",
+   "blocks": [
+    {
+     "type": "table",
+     "id": "blk-fix",
+     "claim": "recommendation",
+     "cites": [
+      "s-profile",
+      "s-find"
+     ],
+     "columns": [
+      {
+       "key": "now",
+       "label": "Now"
+      },
+      {
+       "key": "why",
+       "label": "Why it matters"
+      },
+      {
+       "key": "change",
+       "label": "Change to"
+      }
+     ],
+     "rows": [
+      {
+       "now": "Codes 561720 and 238220 only",
+       "why": "Buyers also code grounds and facility support work under 561730 and 561210, and search by product codes",
+       "change": "Add 561730 and 561210 in SAM; list product codes S201 (custodial), S208 (landscaping and grounds) and J041 (HVAC maintenance)"
+      },
+      {
+       "now": "WOSB self-reported",
+       "why": "WOSB set-asides need SBA certification; self-reporting does not qualify",
+       "change": "Apply for SBA WOSB certification"
+      },
+      {
+       "now": "Generic DSBS keywords",
+       "why": "Contracting officers search the SBA profile by the work and the place",
+       "change": "DSBS keywords: janitorial, custodial, HVAC preventive maintenance, grounds maintenance, recreation site cleaning, Georgia, South Carolina, Atlanta"
+      },
+      {
+       "now": "No past performance listed",
+       "why": "The first thing a buyer or prime checks",
+       "change": "Add three commercial references with site size, crew size and length of service"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "sec-90",
+   "heading": "Next 90 days",
+   "blocks": [
+    {
+     "type": "table",
+     "id": "blk-90",
+     "claim": "recommendation",
+     "cites": [
+      "s-fs-open",
+      "s-fs-fcst",
+      "s-dodea",
+      "s-players"
+     ],
+     "columns": [
+      {
+       "key": "move",
+       "label": "Move"
+      },
+      {
+       "key": "step",
+       "label": "First step"
+      },
+      {
+       "key": "why",
+       "label": "Why first"
+      },
+      {
+       "key": "when",
+       "label": "By when"
+      }
+     ],
+     "rows": [
+      {
+       "move": "Bid Francis Marion janitorial",
+       "step": "Download the solicitation and send any questions to the contracting contact this week",
+       "why": "The only open job that fits now; a first award changes every other conversation",
+       "when": "Dec 17, 2026"
+      },
+      {
+       "move": "Fix SAM and DSBS",
+       "step": "Add the codes and keywords in the readiness table",
+       "why": "Every buyer and prime looks Ridgeline up before replying",
+       "when": "Dec 31, 2026"
+      },
+      {
+       "move": "Position for Chattooga River",
+       "step": "Ask the Forest Service contact the set-aside and timing question",
+       "why": "Planned for FY2027 and sized for Ridgeline",
+       "when": "Jan 15, 2027"
+      },
+      {
+       "move": "Get on Fort Stewart's radar",
+       "step": "Ask DoDEA contracting about the January option and the follow-on",
+       "why": "The one competed small business custodial contract in reach",
+       "when": "Jan 31, 2027"
+      },
+      {
+       "move": "Line up two subcontract partners",
+       "step": "Call Unique Cleaning Service and the FLETC prime about HVAC and grounds needs",
+       "why": "Builds federal past performance while Ridgeline waits on its own bids",
+       "when": "Feb 15, 2027"
+      },
+      {
+       "move": "Start WOSB certification",
+       "step": "Gather ownership and control documents and apply with SBA",
+       "why": "Opens WOSB set-asides for the next round of Forest Service and school work",
+       "when": "Feb 20, 2027"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "sec-about",
+   "heading": "How to read this",
+   "role": "about",
+   "blocks": [
+    {
+     "type": "paragraph",
+     "id": "blk-about",
+     "claim": "context",
+     "text": "This plan was built with Mindy's research tools for a synthetic test company. Company facts are company-stated unless a federal record confirms them. Forecasts are plans, not posted solicitations, and dates can slip."
+    }
+   ]
+  }
+ ]
+}

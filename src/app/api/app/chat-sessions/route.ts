@@ -20,6 +20,9 @@ import { isViewPreambleTitle, sessionTitleFrom } from '@/lib/chat/view-preamble'
 import { ledgerFromTrace } from '@/lib/chat/ledger-persistence';
 import { askMindyRecipesEnabledFor } from '@/lib/ask-mindy/flags';
 
+/** Same shape as a stored market report id (src/app/reports/[id]/pdf/route.ts ID_RE). */
+const REPORT_ID_RE = /^[A-Za-z0-9_-]{16,64}$/;
+
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
@@ -87,8 +90,14 @@ export async function GET(request: NextRequest) {
     const withLedger = askMindyRecipesEnabledFor(auth.email);
     const projected = (messages || []).map((m: {
       id: string; role: string; content: string; cited_sources?: unknown; created_at: string;
-      trace?: { deliverables?: { files?: unknown; pdf_note?: string } } | null;
+      trace?: { deliverables?: { files?: unknown; pdf_note?: string }; market_report?: { report_id?: unknown; title?: unknown } } | null;
     }) => {
+      // A packaged market report: its id and title only (the Map re-opens it from the hosted page, so its
+      // report card, preview and Export come back with the conversation). Never the url or html.
+      const mr = m.trace?.market_report;
+      const marketReport = mr && typeof mr.report_id === 'string' && REPORT_ID_RE.test(mr.report_id)
+        ? { report_id: mr.report_id, title: typeof mr.title === 'string' ? mr.title.slice(0, 160) : '' }
+        : null;
       const raw = m.trace?.deliverables;
       const files = Array.isArray(raw?.files)
         ? raw!.files!.filter((f): f is { format: string; document_id: string; file_name?: string; version?: number } =>
@@ -103,6 +112,7 @@ export async function GET(request: NextRequest) {
         ...(files && files.length
           ? { deliverables: { files, ...(typeof raw?.pdf_note === 'string' ? { pdf_note: raw.pdf_note } : {}) } }
           : {}),
+        ...(marketReport ? { market_report: marketReport } : {}),
       };
     });
     return NextResponse.json({
