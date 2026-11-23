@@ -1393,7 +1393,7 @@ export async function POST(request: NextRequest) {
                   splitViewPreamble(message).rest || message,
                 );
                 for (const c of reportArgs.changes) turnTrace.notices.push(`market_report_args_enforced:${c}`);
-                // Federal Market Profile identity gate: legal name / UEI — never trade alias alone (VRBA trap).
+                // Federal Market Profile identity gate: legal name / UEI — never trade alias alone (similar-name trap).
                 const identityArgs = enforceFederalMarketProfileIdentityArgs(
                   String(tc.function?.name || ''),
                   reportArgs.args,
@@ -1633,7 +1633,7 @@ export async function POST(request: NextRequest) {
                     tool: String(tc.function?.name || ''),
                     args: String(tc.function?.arguments ?? ''),
                   }));
-                // The defense construction-oversight (PAE) section is for construction firms (the RBA benchmark). On a
+                // The defense construction-oversight (PAE) section is for construction firms. On a
                 // strategy turn it applies only when the company's own work is construction (award or profile NAICS 23x).
                 const strategyDefenseSectionApplies = (evidence: FmpWriteupEvidence): boolean => {
                   if (!strategyPlanAsk) return true;
@@ -1828,7 +1828,7 @@ export async function POST(request: NextRequest) {
                       id: `call_fmp_force_${fmpRound}`,
                       function: { name: forcedToolName, arguments: forcedToolInjectArgs(forcedToolName) },
                     }];
-                    // Civil FMP: one FIND alone misses JBAB / Capitol / GWMP — add named follow-ups.
+                    // FMP: add follow-ups on the customer's own work keywords (buildFmpPathwaySupplementalCalls).
                     if (forcedToolName === 'find_opportunities') {
                       const supplements = buildFmpPathwaySupplementalCalls(customerFmpText, {
                         awardStates: awardStatesFromTools,
@@ -1972,8 +1972,8 @@ export async function POST(request: NextRequest) {
                       const s = supplements[si];
                       if (s.name === 'get_agency_forecasts') {
                         const kw = String(s.args.keyword || '').toLowerCase();
-                        // Do NOT skip all forecasts when one already ran — "GWMP parkway bridge"
-                        // as a single ILIKE misses "MD NP GWMP 6(2)"; Clara Barton must still fire.
+                        // Skip only a forecast keyword that already ran this turn, not every forecast: a multi-word
+                        // ILIKE can miss rows a different keyword finds.
                         if (kw && haveForecastKw.has(kw)) continue;
                       }
                       if (s.name === 'lookup_solicitation') {
