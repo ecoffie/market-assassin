@@ -118,6 +118,7 @@ import { ASK_MINDY_RULES_LAYER, askMindyRulesEnabledFor, askMindyRulesPromptBloc
 import { askMindyRecipesEnabledFor } from '@/lib/ask-mindy/flags';
 import { loadCompanyProfile } from '@/lib/ask-mindy/company-profile';
 import { fitRankingNote, rankFindResult } from '@/lib/ask-mindy/compose';
+import { provenanceRecords } from '@/lib/chat/doc-provenance';
 import { requestedDocSections, requestedSectionsPlannerNote, routeSectionedReport, sectionedReportPlannerNote, packagedReportGapNote } from '@/lib/chat/requested-doc-sections';
 /** How long the answer waits for the company profile before skipping the ranking note (value first). */
 const FIT_PROFILE_WAIT_MS = 1500;
@@ -1085,6 +1086,8 @@ export async function POST(request: NextRequest) {
               request,
               chatSessionId: body.sessionId === sessionId ? turnSessionId : null,
               ...(requestedSections.length ? { requestedSections } : {}),
+              // Read dates / links / record ids for DocSources, from this turn's tool results and earlier signed ledgers.
+              provenance: () => provenanceRecords(turnSources, priorLedgers.flatMap((l) => l.entries)),
               // FMP step-8 validator: refuse incomplete / banned profiles before Vault save.
               ...(federalMarketProfileAsk && fmpWriteupCtx
                 ? {

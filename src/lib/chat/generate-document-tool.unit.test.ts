@@ -70,6 +70,7 @@ function setup(opts: {
   federalMarketProfile?: boolean;
   defenseBuyersAppear?: boolean;
   requestedSections?: ReturnType<typeof requestedDocSections>;
+  provenance?: Array<{ retrievedAt: string; asOf?: string | null; url?: string | null; recordIds?: string[] }>;
 } = {}) {
   const tables: Record<string, R[]> = { user_boilerplate_docs: opts.rows ?? [], mindy_chat_sessions: [] };
   const storage = fakeStorage();
@@ -83,6 +84,7 @@ function setup(opts: {
     chatSessionId: null,
     today: () => '2026-11-17',
     ...(opts.requestedSections ? { requestedSections: opts.requestedSections } : {}),
+    ...(opts.provenance ? { provenance: () => opts.provenance! } : {}),
     ...(opts.federalMarketProfile
       ? {
         federalMarketProfile: true,
@@ -559,5 +561,25 @@ describe('create_document: the sections the customer asked for are in the saved 
     const r = await s.tool.execute({ doc_model: bodyOnly() });
     expect(r).not.toHaveProperty('requested_sections');
     expect(s.docs()[0].doc_model.sections.map((x: R) => x.heading)).toEqual(['Where demand is', 'How you fit']);
+  });
+});
+
+describe('create_document: source provenance from tool results (read dates, links, data-date subtitle)', () => {
+  it('fills DocSource read date and link from a matching tool result, and an empty subtitle from its as-of date', async () => {
+    const s = setup({ provenance: [{ retrievedAt: '2026-11-22T15:04:00Z', asOf: '2026-11-20', url: 'https://www.usaspending.gov/award/CONT_AWD_W9124D26D0005', recordIds: ['W9124D26D0005'] }] });
+    const r = await s.tool.execute({ doc_model: model({ sources: [{ id: 's1', kind: 'usaspending', label: 'USAspending award', recordId: 'W9124D26D0005' }] }) });
+    expect(r).toMatchObject({ ok: true, source_provenance: { filledRetrievedAt: 1, filledUrl: 1, unmatched: 0, subtitleSet: true } });
+    const saved = s.docs()[0].doc_model;
+    expect(saved.sources[0]).toMatchObject({ retrievedAt: '2026-11-22', url: 'https://www.usaspending.gov/award/CONT_AWD_W9124D26D0005', recordId: 'W9124D26D0005' });
+    expect(saved.subtitle).toBe('Data as of 2026-11-20');
+    // statements untouched
+    expect(saved.sections[0].blocks[0].text).toBe('VA obligated $412.5M for janitorial services.');
+  });
+
+  it('no matching tool result: the source is saved exactly as the model wrote it', async () => {
+    const s = setup({ provenance: [{ retrievedAt: '2026-11-22T15:04:00Z', url: 'https://sam.gov/opp/zzz/view', recordIds: ['zzz'] }] });
+    const r = await s.tool.execute({ doc_model: model() });
+    expect(r).toMatchObject({ ok: true, source_provenance: { unmatched: 1, filledRetrievedAt: 0, subtitleSet: false } });
+    expect(s.docs()[0].doc_model.sources[0]).toEqual({ id: 's1', kind: 'usaspending', label: 'USAspending award data', url: 'https://www.usaspending.gov/search' });
   });
 });
