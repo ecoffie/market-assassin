@@ -430,7 +430,7 @@ function MarketIntelligenceContent() {
       <div className="max-w-6xl mx-auto px-4 pb-16">
         <h2 className="text-2xl font-bold text-(--mp-ink) text-center mb-4 font-(family-name:--mp-font-serif)">Compare Plans</h2>
         <p className="text-(--mp-muted) text-center mb-10 max-w-2xl mx-auto">
-          Pick the tier that fits your team. Save $700+/month vs. Deltek GovWin at every tier.
+          Pick the tier that fits your team.
         </p>
 
         <div className="overflow-x-auto">
@@ -584,12 +584,18 @@ function MarketIntelligenceContent() {
               <p className="text-(--mp-muted)">Daily briefings, personalized by your NAICS + geography. Daily and weekly briefs with win probability scoring. Includes FHC training access.</p>
             </div>
             <div>
-              <p className="text-(--mp-muted) font-semibold mb-1">Deltek GovWin: $800-1,200/mo</p>
+              <p className="text-(--mp-muted) font-semibold mb-1">Deltek GovWin</p>
               <p className="text-(--mp-muted)">Enterprise platform with extensive data. Overkill for small businesses. Requires training.</p>
             </div>
             <div>
-              <p className="text-(--mp-ok) font-semibold mb-1">Your Savings: 85%+</p>
-              <p className="text-(--mp-muted)">Get the intelligence you need at a fraction of the cost. Built for small GovCon firms, not enterprise.</p>
+              <p className="text-(--mp-ok) font-semibold mb-1">Built for small GovCon firms</p>
+              <p className="text-(--mp-muted)">
+                Get the intelligence you need without an enterprise contract.{' '}
+                <Link href="/compare/govwin" className="text-(--mp-navy) hover:underline">
+                  See the full Mindy vs. GovWin comparison
+                </Link>
+                .
+              </p>
             </div>
           </div>
         </div>
