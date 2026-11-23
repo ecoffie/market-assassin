@@ -418,6 +418,27 @@ describe('Map report pane: the same-origin preview frame is locked down (Agent 4
     expect([...d.querySelectorAll('*')].flatMap((e) => [...e.attributes]).filter((a) => /^on/i.test(a.name))).toEqual([]);
   });
 
+  it.each([
+    ['"<head>" inside an attribute of <html>', '<!doctype html><html data-x="<head>"><head><title>R</title></head><body><p>REPORT BODY</p></body></html>'],
+    ['"<head>" inside an attribute in the body', '<!doctype html><html><head><title>R</title></head><body><p title="<head><meta>">REPORT BODY</p></body></html>'],
+    ['no head at all, attribute with "<head"', '<p data-y="<head x>">REPORT BODY</p>'],
+  ])('the policy is inserted through the DOM, so it is the first head child even when %s', async (_name, html) => {
+    const t = boot({ chat: reportTurn({ html }) });
+    await t.ask('market report');
+    const d = new t.w.DOMParser().parseFromString(frame(t.doc).srcdoc, 'text/html'); // parsed the way the frame parses it
+    const first = d.head.firstElementChild!;
+    expect(first.tagName).toBe('META');
+    expect(first.getAttribute('http-equiv')).toBe('Content-Security-Policy');
+    expect(first.getAttribute('content')).toBe("default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:; base-uri 'none'; form-action 'none'");
+    expect(d.querySelectorAll('meta[http-equiv="Content-Security-Policy"]').length).toBe(1); // never smuggled into an attribute
+    expect(d.body.textContent).toContain('REPORT BODY');
+  });
+
+  it('the policy is never spliced into the serialized string', () => {
+    expect(MAP).toContain('head.insertBefore(csp,head.firstChild);');
+    expect(MAP).not.toMatch(/serialized\.replace\(/);
+  });
+
   it('the old string-regex stripping is gone (it was bypassable)', () => {
     expect(MAP).toContain('new DOMParser().parseFromString');
     expect(MAP).not.toMatch(/replace\(\/<meta\[\^>\]\*http-equiv/);

@@ -11490,8 +11490,12 @@ const ASK_MINDY_JS = `<script>(function(){
     if(!doc) return REP_FRAME_CSP+'<p>This preview could not be shown. Use Open hosted link.</p>';
     var head=doc.head||doc.documentElement.insertBefore(doc.createElement('head'),doc.body);
     var st=doc.createElement('style'); st.textContent=REP_FRAME_CSS.replace(/^<style>|<[/]style>$/g,''); head.appendChild(st);
-    var serialized='<!doctype html>'+doc.documentElement.outerHTML;
-    return serialized.replace(/<head\\b[^>]*>/i,function(m){ return m+REP_FRAME_CSP; });
+    // The policy goes in THROUGH THE DOM, as the head's first child, before serializing. A string insert after
+    // the first "<head" could land inside an attribute value (the serializer does not escape "<" there, e.g.
+    // <html data-x="<head>">), and the policy would never apply.
+    var holder=doc.createElement('div'); holder.innerHTML=REP_FRAME_CSP; var csp=holder.firstChild;
+    head.insertBefore(csp,head.firstChild);
+    return '<!doctype html>'+doc.documentElement.outerHTML;
   }
   function repSetDoc(E,html){
     E.f.classList.remove('fit'); E.f.style.height='';
