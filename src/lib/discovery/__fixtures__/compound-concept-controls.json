@@ -1,6 +1,7 @@
 {
   "_meta": {
-    "built_from": "origin/main fb4b71f2f (DISCOVERY_PLAN_VERSION 4), ctx 2026-09-22, MCP_POLICY; `version` omitted"
+    "built_from": "origin/main fb4b71f2f (DISCOVERY_PLAN_VERSION 4), ctx 2026-09-22, MCP_POLICY; `version` omitted",
+    "road_negatives": "Agent 4 review 2026-11-23: a road word with no civil-works word (or only the FHWA agency name) must not pin to road construction. Frozen from the same origin/main export (DISCOVERY_PLAN_VERSION 4), same ctx, version omitted."
   },
   "controls": {
     "cybersecurity + agency=SOCOM": {
@@ -231,7 +232,7 @@
                 "reason": "publisher_without_forecasts",
                 "label": "U.S. Special Operations Command",
                 "parentWithData": "DOD",
-                "note": "No SOCOM/USSOCOM forecast publisher in agency_forecasts. DoD coverage is Navy/ONR/NRL/USACE only — not USSOCOM. Alias matching is not coverage."
+                "note": "No SOCOM/USSOCOM forecast publisher in agency_forecasts. DoD coverage is Navy/ONR/NRL/USACE only \u2014 not USSOCOM. Alias matching is not coverage."
               }
             ]
           }
@@ -573,6 +574,920 @@
           }
         },
         "notes": []
+      }
+    }
+  },
+  "road_negatives": {
+    "highway safety data analytics": {
+      "input": {
+        "query": "highway safety data analytics"
+      },
+      "plan": {
+        "pipeline": [
+          "structured_intent",
+          "concept_classification",
+          "eligibility",
+          "horizon_policy",
+          "ranking"
+        ],
+        "raw": "highway safety data analytics",
+        "status": "ok",
+        "refinement": null,
+        "intent": {
+          "agencies": [],
+          "states": [],
+          "setAsides": [],
+          "naics": [],
+          "psc": [],
+          "exclusions": [],
+          "horizonHint": null,
+          "stripped": [],
+          "residual": "highway safety data analytics",
+          "residualKind": "keyword"
+        },
+        "matcher": {
+          "mode": "lexical",
+          "normalized": "highway safety data analytics",
+          "phrase": null,
+          "alternatives": [
+            {
+              "shape": "capability_list",
+              "eligibility": "any",
+              "eligible": [
+                {
+                  "label": "highway",
+                  "cls": "distinctive",
+                  "basis": "not_in_generic_lists",
+                  "forms": [
+                    "highway"
+                  ],
+                  "aliases": [],
+                  "inflect": "full",
+                  "weight": 1
+                },
+                {
+                  "label": "safety",
+                  "cls": "distinctive",
+                  "basis": "not_in_generic_lists",
+                  "forms": [
+                    "safety"
+                  ],
+                  "aliases": [],
+                  "inflect": "full",
+                  "weight": 1
+                }
+              ],
+              "rankOnly": [
+                {
+                  "label": "data",
+                  "cls": "qualifier",
+                  "basis": "corpus_common_term",
+                  "forms": [
+                    "data"
+                  ],
+                  "aliases": [],
+                  "inflect": "full",
+                  "weight": 0.5
+                },
+                {
+                  "label": "analytics",
+                  "cls": "qualifier",
+                  "basis": "platform_generic_word",
+                  "forms": [
+                    "analytics"
+                  ],
+                  "aliases": [],
+                  "inflect": "full",
+                  "weight": 0.35
+                }
+              ],
+              "partnerRequired": [
+                "safety"
+              ]
+            }
+          ],
+          "excluded": []
+        },
+        "expansion": {
+          "capability_kind": "literal",
+          "direct": {
+            "naics": [],
+            "psc": [],
+            "terms": [
+              "highway safety data analytics"
+            ]
+          },
+          "related": null,
+          "term_of_art_naics": []
+        },
+        "buyers": [],
+        "states": [],
+        "setAsides": [],
+        "naics": [],
+        "psc": [],
+        "policy": {
+          "surface": "mcp",
+          "horizons": [
+            "open",
+            "recompete",
+            "forecast"
+          ],
+          "open": {
+            "sources": [
+              "sam"
+            ]
+          },
+          "recompete": {
+            "windowMonths": 18
+          },
+          "forecast": {
+            "includePastFiscalYears": false
+          }
+        },
+        "horizons": {
+          "open": {
+            "via": "text",
+            "mapFilters": {
+              "status": "active"
+            },
+            "ops": [
+              {
+                "op": "or",
+                "expr": "title.imatch.\"\\\\mhighway(s|es|ing|ed)?\\\\M\",description.imatch.\"\\\\mhighway(s|es|ing|ed)?\\\\M\",sow_text.imatch.\"\\\\mhighway(s|es|ing|ed)?\\\\M\",department.imatch.\"\\\\mhighway(s|es|ing|ed)?\\\\M\",solicitation_number.imatch.\"\\\\mhighway(s|es|ing|ed)?\\\\M\""
+              }
+            ]
+          },
+          "recompete": {
+            "via": "text",
+            "ops": [
+              {
+                "op": "is",
+                "col": "quality_flag",
+                "val": null
+              },
+              {
+                "op": "gte",
+                "col": "period_of_performance_current_end",
+                "val": "2026-09-22"
+              },
+              {
+                "op": "lte",
+                "col": "period_of_performance_current_end",
+                "val": "2028-03-22"
+              },
+              {
+                "op": "or",
+                "expr": "description.imatch.\"\\\\mhighway(s|es|ing|ed)?\\\\M\",psc_description.imatch.\"\\\\mhighway(s|es|ing|ed)?\\\\M\",naics_description.imatch.\"\\\\mhighway(s|es|ing|ed)?\\\\M\",incumbent_name.imatch.\"\\\\mhighway(s|es|ing|ed)?\\\\M\",awarding_agency.imatch.\"\\\\mhighway(s|es|ing|ed)?\\\\M\",awarding_sub_agency.imatch.\"\\\\mhighway(s|es|ing|ed)?\\\\M\""
+              }
+            ],
+            "naics": []
+          },
+          "forecast": {
+            "via": "text",
+            "forecastFilters": {
+              "q": null,
+              "naics": null,
+              "agency": null,
+              "state": null
+            },
+            "ops": [
+              {
+                "op": "or",
+                "expr": "title.imatch.\"\\\\mhighway(s|es|ing|ed)?\\\\M\",naics_description.imatch.\"\\\\mhighway(s|es|ing|ed)?\\\\M\",department.imatch.\"\\\\mhighway(s|es|ing|ed)?\\\\M\",description.imatch.\"\\\\mhighway(s|es|ing|ed)?\\\\M\""
+              },
+              {
+                "op": "or",
+                "expr": "fiscal_year.is.null,fiscal_year.ilike.%2026%,fiscal_year.ilike.%2027%,fiscal_year.ilike.%2028%,fiscal_year.ilike.%2029%,fiscal_year.ilike.%2030%,fiscal_year.ilike.%2031%,fiscal_year.ilike.%2032%,fiscal_year.ilike.%2033%,fiscal_year.ilike.%2034%,fiscal_year.ilike.%2035%,fiscal_year.ilike.%2036%,fiscal_year.ilike.%2037%,fiscal_year.ilike.%2038%,fiscal_year.ilike.%2039%,fiscal_year.ilike.%2040%,fiscal_year.ilike.%2041%"
+              }
+            ],
+            "coverage": "ok"
+          }
+        },
+        "notes": [
+          "capability_list: any distinctive concept admits; generic concepts rank only"
+        ]
+      }
+    },
+    "highway patrol radios": {
+      "input": {
+        "query": "highway patrol radios"
+      },
+      "plan": {
+        "pipeline": [
+          "structured_intent",
+          "concept_classification",
+          "eligibility",
+          "horizon_policy",
+          "ranking"
+        ],
+        "raw": "highway patrol radios",
+        "status": "ok",
+        "refinement": null,
+        "intent": {
+          "agencies": [],
+          "states": [],
+          "setAsides": [],
+          "naics": [],
+          "psc": [],
+          "exclusions": [],
+          "horizonHint": null,
+          "stripped": [],
+          "residual": "highway patrol radios",
+          "residualKind": "keyword"
+        },
+        "matcher": {
+          "mode": "lexical",
+          "normalized": "highway patrol radios",
+          "phrase": null,
+          "alternatives": [
+            {
+              "shape": "concept_query",
+              "eligibility": "all",
+              "eligible": [
+                {
+                  "label": "highway",
+                  "cls": "distinctive",
+                  "basis": "not_in_generic_lists",
+                  "forms": [
+                    "highway"
+                  ],
+                  "aliases": [],
+                  "inflect": "full",
+                  "weight": 1
+                },
+                {
+                  "label": "patrol",
+                  "cls": "distinctive",
+                  "basis": "not_in_generic_lists",
+                  "forms": [
+                    "patrol"
+                  ],
+                  "aliases": [],
+                  "inflect": "full",
+                  "weight": 1
+                },
+                {
+                  "label": "radios",
+                  "cls": "distinctive",
+                  "basis": "not_in_generic_lists",
+                  "forms": [
+                    "radios"
+                  ],
+                  "aliases": [],
+                  "inflect": "full",
+                  "weight": 1
+                }
+              ],
+              "rankOnly": []
+            }
+          ],
+          "excluded": []
+        },
+        "expansion": {
+          "capability_kind": "literal",
+          "direct": {
+            "naics": [],
+            "psc": [],
+            "terms": [
+              "highway patrol radios"
+            ]
+          },
+          "related": null,
+          "term_of_art_naics": []
+        },
+        "buyers": [],
+        "states": [],
+        "setAsides": [],
+        "naics": [],
+        "psc": [],
+        "policy": {
+          "surface": "mcp",
+          "horizons": [
+            "open",
+            "recompete",
+            "forecast"
+          ],
+          "open": {
+            "sources": [
+              "sam"
+            ]
+          },
+          "recompete": {
+            "windowMonths": 18
+          },
+          "forecast": {
+            "includePastFiscalYears": false
+          }
+        },
+        "horizons": {
+          "open": {
+            "via": "text",
+            "mapFilters": {
+              "status": "active"
+            },
+            "ops": [
+              {
+                "op": "or",
+                "expr": "and(or(title.imatch.\"\\\\mhighway(s|es|ing|ed)?\\\\M\",description.imatch.\"\\\\mhighway(s|es|ing|ed)?\\\\M\",sow_text.imatch.\"\\\\mhighway(s|es|ing|ed)?\\\\M\",department.imatch.\"\\\\mhighway(s|es|ing|ed)?\\\\M\",solicitation_number.imatch.\"\\\\mhighway(s|es|ing|ed)?\\\\M\"),or(title.imatch.\"\\\\mpatrol(s|es|ing|ed)?\\\\M\",description.imatch.\"\\\\mpatrol(s|es|ing|ed)?\\\\M\",sow_text.imatch.\"\\\\mpatrol(s|es|ing|ed)?\\\\M\",department.imatch.\"\\\\mpatrol(s|es|ing|ed)?\\\\M\",solicitation_number.imatch.\"\\\\mpatrol(s|es|ing|ed)?\\\\M\"),or(title.imatch.\"\\\\m(radios(s|es|ing|ed)?|radio(s|es|ing|ed)?)\\\\M\",description.imatch.\"\\\\m(radios(s|es|ing|ed)?|radio(s|es|ing|ed)?)\\\\M\",sow_text.imatch.\"\\\\m(radios(s|es|ing|ed)?|radio(s|es|ing|ed)?)\\\\M\",department.imatch.\"\\\\m(radios(s|es|ing|ed)?|radio(s|es|ing|ed)?)\\\\M\",solicitation_number.imatch.\"\\\\m(radios(s|es|ing|ed)?|radio(s|es|ing|ed)?)\\\\M\"))"
+              }
+            ]
+          },
+          "recompete": {
+            "via": "text",
+            "ops": [
+              {
+                "op": "is",
+                "col": "quality_flag",
+                "val": null
+              },
+              {
+                "op": "gte",
+                "col": "period_of_performance_current_end",
+                "val": "2026-09-22"
+              },
+              {
+                "op": "lte",
+                "col": "period_of_performance_current_end",
+                "val": "2028-03-22"
+              },
+              {
+                "op": "or",
+                "expr": "and(or(description.imatch.\"\\\\mhighway(s|es|ing|ed)?\\\\M\",psc_description.imatch.\"\\\\mhighway(s|es|ing|ed)?\\\\M\",naics_description.imatch.\"\\\\mhighway(s|es|ing|ed)?\\\\M\",incumbent_name.imatch.\"\\\\mhighway(s|es|ing|ed)?\\\\M\",awarding_agency.imatch.\"\\\\mhighway(s|es|ing|ed)?\\\\M\",awarding_sub_agency.imatch.\"\\\\mhighway(s|es|ing|ed)?\\\\M\"),or(description.imatch.\"\\\\mpatrol(s|es|ing|ed)?\\\\M\",psc_description.imatch.\"\\\\mpatrol(s|es|ing|ed)?\\\\M\",naics_description.imatch.\"\\\\mpatrol(s|es|ing|ed)?\\\\M\",incumbent_name.imatch.\"\\\\mpatrol(s|es|ing|ed)?\\\\M\",awarding_agency.imatch.\"\\\\mpatrol(s|es|ing|ed)?\\\\M\",awarding_sub_agency.imatch.\"\\\\mpatrol(s|es|ing|ed)?\\\\M\"),or(description.imatch.\"\\\\m(radios(s|es|ing|ed)?|radio(s|es|ing|ed)?)\\\\M\",psc_description.imatch.\"\\\\m(radios(s|es|ing|ed)?|radio(s|es|ing|ed)?)\\\\M\",naics_description.imatch.\"\\\\m(radios(s|es|ing|ed)?|radio(s|es|ing|ed)?)\\\\M\",incumbent_name.imatch.\"\\\\m(radios(s|es|ing|ed)?|radio(s|es|ing|ed)?)\\\\M\",awarding_agency.imatch.\"\\\\m(radios(s|es|ing|ed)?|radio(s|es|ing|ed)?)\\\\M\",awarding_sub_agency.imatch.\"\\\\m(radios(s|es|ing|ed)?|radio(s|es|ing|ed)?)\\\\M\"))"
+              }
+            ],
+            "naics": []
+          },
+          "forecast": {
+            "via": "text",
+            "forecastFilters": {
+              "q": null,
+              "naics": null,
+              "agency": null,
+              "state": null
+            },
+            "ops": [
+              {
+                "op": "or",
+                "expr": "and(or(title.imatch.\"\\\\mhighway(s|es|ing|ed)?\\\\M\",naics_description.imatch.\"\\\\mhighway(s|es|ing|ed)?\\\\M\",department.imatch.\"\\\\mhighway(s|es|ing|ed)?\\\\M\",description.imatch.\"\\\\mhighway(s|es|ing|ed)?\\\\M\"),or(title.imatch.\"\\\\mpatrol(s|es|ing|ed)?\\\\M\",naics_description.imatch.\"\\\\mpatrol(s|es|ing|ed)?\\\\M\",department.imatch.\"\\\\mpatrol(s|es|ing|ed)?\\\\M\",description.imatch.\"\\\\mpatrol(s|es|ing|ed)?\\\\M\"),or(title.imatch.\"\\\\m(radios(s|es|ing|ed)?|radio(s|es|ing|ed)?)\\\\M\",naics_description.imatch.\"\\\\m(radios(s|es|ing|ed)?|radio(s|es|ing|ed)?)\\\\M\",department.imatch.\"\\\\m(radios(s|es|ing|ed)?|radio(s|es|ing|ed)?)\\\\M\",description.imatch.\"\\\\m(radios(s|es|ing|ed)?|radio(s|es|ing|ed)?)\\\\M\"))"
+              },
+              {
+                "op": "or",
+                "expr": "fiscal_year.is.null,fiscal_year.ilike.%2026%,fiscal_year.ilike.%2027%,fiscal_year.ilike.%2028%,fiscal_year.ilike.%2029%,fiscal_year.ilike.%2030%,fiscal_year.ilike.%2031%,fiscal_year.ilike.%2032%,fiscal_year.ilike.%2033%,fiscal_year.ilike.%2034%,fiscal_year.ilike.%2035%,fiscal_year.ilike.%2036%,fiscal_year.ilike.%2037%,fiscal_year.ilike.%2038%,fiscal_year.ilike.%2039%,fiscal_year.ilike.%2040%,fiscal_year.ilike.%2041%"
+              }
+            ],
+            "coverage": "ok"
+          }
+        },
+        "notes": []
+      }
+    },
+    "Federal Highway Administration IT support": {
+      "input": {
+        "query": "Federal Highway Administration IT support"
+      },
+      "plan": {
+        "pipeline": [
+          "structured_intent",
+          "concept_classification",
+          "eligibility",
+          "horizon_policy",
+          "ranking"
+        ],
+        "raw": "Federal Highway Administration IT support",
+        "status": "ok",
+        "refinement": null,
+        "intent": {
+          "agencies": [
+            {
+              "mention": "federal highway administration",
+              "resolveAs": "Federal Highway Administration"
+            }
+          ],
+          "states": [],
+          "setAsides": [],
+          "naics": [],
+          "psc": [],
+          "exclusions": [],
+          "horizonHint": null,
+          "stripped": [],
+          "residual": "it support",
+          "residualKind": "keyword"
+        },
+        "matcher": {
+          "mode": "lexical",
+          "normalized": "it support",
+          "phrase": null,
+          "alternatives": [
+            {
+              "shape": "concept_query",
+              "eligibility": "all",
+              "eligible": [
+                {
+                  "label": "information technology",
+                  "cls": "distinctive",
+                  "basis": "recognized_concept",
+                  "forms": [
+                    "information technology"
+                  ],
+                  "aliases": [],
+                  "inflect": "full",
+                  "weight": 1,
+                  "acronyms": [
+                    "IT"
+                  ]
+                }
+              ],
+              "rankOnly": []
+            }
+          ],
+          "excluded": []
+        },
+        "expansion": {
+          "capability_kind": "literal",
+          "direct": {
+            "naics": [],
+            "psc": [],
+            "terms": [
+              "it support"
+            ]
+          },
+          "related": null,
+          "term_of_art_naics": []
+        },
+        "buyers": [
+          {
+            "requested": "Federal Highway Administration",
+            "canonical": null,
+            "kind": "passthrough",
+            "needles": [
+              "Federal Highway Administration"
+            ],
+            "identity": [
+              [
+                "federal",
+                "highway",
+                "administration"
+              ]
+            ]
+          }
+        ],
+        "states": [],
+        "setAsides": [],
+        "naics": [],
+        "psc": [],
+        "policy": {
+          "surface": "mcp",
+          "horizons": [
+            "open",
+            "recompete",
+            "forecast"
+          ],
+          "open": {
+            "sources": [
+              "sam"
+            ]
+          },
+          "recompete": {
+            "windowMonths": 18
+          },
+          "forecast": {
+            "includePastFiscalYears": false
+          }
+        },
+        "horizons": {
+          "open": {
+            "via": "text",
+            "mapFilters": {
+              "status": "active"
+            },
+            "ops": [
+              {
+                "op": "or",
+                "expr": "title.imatch.\"\\\\minformation[-\\\\s]+technology(s|es|ing|ed)?\\\\M\",title.match.\"\\\\mITs?\\\\M\",description.imatch.\"\\\\minformation[-\\\\s]+technology(s|es|ing|ed)?\\\\M\",description.match.\"\\\\mITs?\\\\M\",sow_text.imatch.\"\\\\minformation[-\\\\s]+technology(s|es|ing|ed)?\\\\M\",sow_text.match.\"\\\\mITs?\\\\M\",department.imatch.\"\\\\minformation[-\\\\s]+technology(s|es|ing|ed)?\\\\M\",department.match.\"\\\\mITs?\\\\M\",solicitation_number.imatch.\"\\\\minformation[-\\\\s]+technology(s|es|ing|ed)?\\\\M\",solicitation_number.match.\"\\\\mITs?\\\\M\""
+              },
+              {
+                "op": "or",
+                "expr": "and(department.imatch.\"\\\\mfederal\\\\M\",department.imatch.\"\\\\mhighway\\\\M\",department.imatch.\"\\\\madministration\\\\M\"),and(sub_tier.imatch.\"\\\\mfederal\\\\M\",sub_tier.imatch.\"\\\\mhighway\\\\M\",sub_tier.imatch.\"\\\\madministration\\\\M\")"
+              }
+            ]
+          },
+          "recompete": {
+            "via": "text",
+            "ops": [
+              {
+                "op": "is",
+                "col": "quality_flag",
+                "val": null
+              },
+              {
+                "op": "gte",
+                "col": "period_of_performance_current_end",
+                "val": "2026-09-22"
+              },
+              {
+                "op": "lte",
+                "col": "period_of_performance_current_end",
+                "val": "2028-03-22"
+              },
+              {
+                "op": "or",
+                "expr": "description.imatch.\"\\\\minformation[-\\\\s]+technology(s|es|ing|ed)?\\\\M\",description.match.\"\\\\mITs?\\\\M\",psc_description.imatch.\"\\\\minformation[-\\\\s]+technology(s|es|ing|ed)?\\\\M\",psc_description.match.\"\\\\mITs?\\\\M\",naics_description.imatch.\"\\\\minformation[-\\\\s]+technology(s|es|ing|ed)?\\\\M\",naics_description.match.\"\\\\mITs?\\\\M\",incumbent_name.imatch.\"\\\\minformation[-\\\\s]+technology(s|es|ing|ed)?\\\\M\",incumbent_name.match.\"\\\\mITs?\\\\M\",awarding_agency.imatch.\"\\\\minformation[-\\\\s]+technology(s|es|ing|ed)?\\\\M\",awarding_agency.match.\"\\\\mITs?\\\\M\",awarding_sub_agency.imatch.\"\\\\minformation[-\\\\s]+technology(s|es|ing|ed)?\\\\M\",awarding_sub_agency.match.\"\\\\mITs?\\\\M\""
+              },
+              {
+                "op": "or",
+                "expr": "and(awarding_agency.imatch.\"\\\\mfederal\\\\M\",awarding_agency.imatch.\"\\\\mhighway\\\\M\",awarding_agency.imatch.\"\\\\madministration\\\\M\"),and(awarding_sub_agency.imatch.\"\\\\mfederal\\\\M\",awarding_sub_agency.imatch.\"\\\\mhighway\\\\M\",awarding_sub_agency.imatch.\"\\\\madministration\\\\M\")"
+              }
+            ],
+            "naics": []
+          },
+          "forecast": {
+            "via": "coverage_unestablished",
+            "forecastFilters": {
+              "q": null,
+              "naics": null,
+              "agency": null,
+              "state": null
+            },
+            "ops": [
+              {
+                "op": "is",
+                "col": "id",
+                "val": null
+              }
+            ],
+            "coverage": "unestablished",
+            "coverageGaps": [
+              {
+                "requested": "Federal Highway Administration",
+                "reason": "unresolved_publisher"
+              }
+            ]
+          }
+        },
+        "notes": []
+      }
+    },
+    "pavement condition sensors": {
+      "input": {
+        "query": "pavement condition sensors"
+      },
+      "plan": {
+        "pipeline": [
+          "structured_intent",
+          "concept_classification",
+          "eligibility",
+          "horizon_policy",
+          "ranking"
+        ],
+        "raw": "pavement condition sensors",
+        "status": "ok",
+        "refinement": null,
+        "intent": {
+          "agencies": [],
+          "states": [],
+          "setAsides": [],
+          "naics": [],
+          "psc": [],
+          "exclusions": [],
+          "horizonHint": null,
+          "stripped": [],
+          "residual": "pavement condition sensors",
+          "residualKind": "keyword"
+        },
+        "matcher": {
+          "mode": "lexical",
+          "normalized": "pavement condition sensors",
+          "phrase": null,
+          "alternatives": [
+            {
+              "shape": "concept_query",
+              "eligibility": "all",
+              "eligible": [
+                {
+                  "label": "pavement",
+                  "cls": "distinctive",
+                  "basis": "not_in_generic_lists",
+                  "forms": [
+                    "pavement"
+                  ],
+                  "aliases": [],
+                  "inflect": "full",
+                  "weight": 1
+                },
+                {
+                  "label": "condition",
+                  "cls": "distinctive",
+                  "basis": "not_in_generic_lists",
+                  "forms": [
+                    "condition"
+                  ],
+                  "aliases": [],
+                  "inflect": "full",
+                  "weight": 1
+                },
+                {
+                  "label": "sensors",
+                  "cls": "distinctive",
+                  "basis": "not_in_generic_lists",
+                  "forms": [
+                    "sensors"
+                  ],
+                  "aliases": [],
+                  "inflect": "full",
+                  "weight": 1
+                }
+              ],
+              "rankOnly": []
+            }
+          ],
+          "excluded": []
+        },
+        "expansion": {
+          "capability_kind": "literal",
+          "direct": {
+            "naics": [],
+            "psc": [],
+            "terms": [
+              "pavement condition sensors"
+            ]
+          },
+          "related": null,
+          "term_of_art_naics": []
+        },
+        "buyers": [],
+        "states": [],
+        "setAsides": [],
+        "naics": [],
+        "psc": [],
+        "policy": {
+          "surface": "mcp",
+          "horizons": [
+            "open",
+            "recompete",
+            "forecast"
+          ],
+          "open": {
+            "sources": [
+              "sam"
+            ]
+          },
+          "recompete": {
+            "windowMonths": 18
+          },
+          "forecast": {
+            "includePastFiscalYears": false
+          }
+        },
+        "horizons": {
+          "open": {
+            "via": "text",
+            "mapFilters": {
+              "status": "active"
+            },
+            "ops": [
+              {
+                "op": "or",
+                "expr": "and(or(title.imatch.\"\\\\mpavement(s|es|ing|ed)?\\\\M\",description.imatch.\"\\\\mpavement(s|es|ing|ed)?\\\\M\",sow_text.imatch.\"\\\\mpavement(s|es|ing|ed)?\\\\M\",department.imatch.\"\\\\mpavement(s|es|ing|ed)?\\\\M\",solicitation_number.imatch.\"\\\\mpavement(s|es|ing|ed)?\\\\M\"),or(title.imatch.\"\\\\mcondition(s|es|ing|ed)?\\\\M\",description.imatch.\"\\\\mcondition(s|es|ing|ed)?\\\\M\",sow_text.imatch.\"\\\\mcondition(s|es|ing|ed)?\\\\M\",department.imatch.\"\\\\mcondition(s|es|ing|ed)?\\\\M\",solicitation_number.imatch.\"\\\\mcondition(s|es|ing|ed)?\\\\M\"),or(title.imatch.\"\\\\m(sensors(s|es|ing|ed)?|sensor(s|es|ing|ed)?)\\\\M\",description.imatch.\"\\\\m(sensors(s|es|ing|ed)?|sensor(s|es|ing|ed)?)\\\\M\",sow_text.imatch.\"\\\\m(sensors(s|es|ing|ed)?|sensor(s|es|ing|ed)?)\\\\M\",department.imatch.\"\\\\m(sensors(s|es|ing|ed)?|sensor(s|es|ing|ed)?)\\\\M\",solicitation_number.imatch.\"\\\\m(sensors(s|es|ing|ed)?|sensor(s|es|ing|ed)?)\\\\M\"))"
+              }
+            ]
+          },
+          "recompete": {
+            "via": "text",
+            "ops": [
+              {
+                "op": "is",
+                "col": "quality_flag",
+                "val": null
+              },
+              {
+                "op": "gte",
+                "col": "period_of_performance_current_end",
+                "val": "2026-09-22"
+              },
+              {
+                "op": "lte",
+                "col": "period_of_performance_current_end",
+                "val": "2028-03-22"
+              },
+              {
+                "op": "or",
+                "expr": "and(or(description.imatch.\"\\\\mpavement(s|es|ing|ed)?\\\\M\",psc_description.imatch.\"\\\\mpavement(s|es|ing|ed)?\\\\M\",naics_description.imatch.\"\\\\mpavement(s|es|ing|ed)?\\\\M\",incumbent_name.imatch.\"\\\\mpavement(s|es|ing|ed)?\\\\M\",awarding_agency.imatch.\"\\\\mpavement(s|es|ing|ed)?\\\\M\",awarding_sub_agency.imatch.\"\\\\mpavement(s|es|ing|ed)?\\\\M\"),or(description.imatch.\"\\\\mcondition(s|es|ing|ed)?\\\\M\",psc_description.imatch.\"\\\\mcondition(s|es|ing|ed)?\\\\M\",naics_description.imatch.\"\\\\mcondition(s|es|ing|ed)?\\\\M\",incumbent_name.imatch.\"\\\\mcondition(s|es|ing|ed)?\\\\M\",awarding_agency.imatch.\"\\\\mcondition(s|es|ing|ed)?\\\\M\",awarding_sub_agency.imatch.\"\\\\mcondition(s|es|ing|ed)?\\\\M\"),or(description.imatch.\"\\\\m(sensors(s|es|ing|ed)?|sensor(s|es|ing|ed)?)\\\\M\",psc_description.imatch.\"\\\\m(sensors(s|es|ing|ed)?|sensor(s|es|ing|ed)?)\\\\M\",naics_description.imatch.\"\\\\m(sensors(s|es|ing|ed)?|sensor(s|es|ing|ed)?)\\\\M\",incumbent_name.imatch.\"\\\\m(sensors(s|es|ing|ed)?|sensor(s|es|ing|ed)?)\\\\M\",awarding_agency.imatch.\"\\\\m(sensors(s|es|ing|ed)?|sensor(s|es|ing|ed)?)\\\\M\",awarding_sub_agency.imatch.\"\\\\m(sensors(s|es|ing|ed)?|sensor(s|es|ing|ed)?)\\\\M\"))"
+              }
+            ],
+            "naics": []
+          },
+          "forecast": {
+            "via": "text",
+            "forecastFilters": {
+              "q": null,
+              "naics": null,
+              "agency": null,
+              "state": null
+            },
+            "ops": [
+              {
+                "op": "or",
+                "expr": "and(or(title.imatch.\"\\\\mpavement(s|es|ing|ed)?\\\\M\",naics_description.imatch.\"\\\\mpavement(s|es|ing|ed)?\\\\M\",department.imatch.\"\\\\mpavement(s|es|ing|ed)?\\\\M\",description.imatch.\"\\\\mpavement(s|es|ing|ed)?\\\\M\"),or(title.imatch.\"\\\\mcondition(s|es|ing|ed)?\\\\M\",naics_description.imatch.\"\\\\mcondition(s|es|ing|ed)?\\\\M\",department.imatch.\"\\\\mcondition(s|es|ing|ed)?\\\\M\",description.imatch.\"\\\\mcondition(s|es|ing|ed)?\\\\M\"),or(title.imatch.\"\\\\m(sensors(s|es|ing|ed)?|sensor(s|es|ing|ed)?)\\\\M\",naics_description.imatch.\"\\\\m(sensors(s|es|ing|ed)?|sensor(s|es|ing|ed)?)\\\\M\",department.imatch.\"\\\\m(sensors(s|es|ing|ed)?|sensor(s|es|ing|ed)?)\\\\M\",description.imatch.\"\\\\m(sensors(s|es|ing|ed)?|sensor(s|es|ing|ed)?)\\\\M\"))"
+              },
+              {
+                "op": "or",
+                "expr": "fiscal_year.is.null,fiscal_year.ilike.%2026%,fiscal_year.ilike.%2027%,fiscal_year.ilike.%2028%,fiscal_year.ilike.%2029%,fiscal_year.ilike.%2030%,fiscal_year.ilike.%2031%,fiscal_year.ilike.%2032%,fiscal_year.ilike.%2033%,fiscal_year.ilike.%2034%,fiscal_year.ilike.%2035%,fiscal_year.ilike.%2036%,fiscal_year.ilike.%2037%,fiscal_year.ilike.%2038%,fiscal_year.ilike.%2039%,fiscal_year.ilike.%2040%,fiscal_year.ilike.%2041%"
+              }
+            ],
+            "coverage": "ok"
+          }
+        },
+        "notes": []
+      }
+    },
+    "highway traffic management software": {
+      "input": {
+        "query": "highway traffic management software"
+      },
+      "plan": {
+        "pipeline": [
+          "structured_intent",
+          "concept_classification",
+          "eligibility",
+          "horizon_policy",
+          "ranking"
+        ],
+        "raw": "highway traffic management software",
+        "status": "ok",
+        "refinement": null,
+        "intent": {
+          "agencies": [],
+          "states": [],
+          "setAsides": [],
+          "naics": [],
+          "psc": [],
+          "exclusions": [],
+          "horizonHint": null,
+          "stripped": [],
+          "residual": "highway traffic management software",
+          "residualKind": "keyword"
+        },
+        "matcher": {
+          "mode": "lexical",
+          "normalized": "highway traffic management software",
+          "phrase": null,
+          "alternatives": [
+            {
+              "shape": "capability_list",
+              "eligibility": "any",
+              "eligible": [
+                {
+                  "label": "highway",
+                  "cls": "distinctive",
+                  "basis": "not_in_generic_lists",
+                  "forms": [
+                    "highway"
+                  ],
+                  "aliases": [],
+                  "inflect": "full",
+                  "weight": 1
+                },
+                {
+                  "label": "traffic",
+                  "cls": "distinctive",
+                  "basis": "not_in_generic_lists",
+                  "forms": [
+                    "traffic"
+                  ],
+                  "aliases": [],
+                  "inflect": "full",
+                  "weight": 1
+                },
+                {
+                  "label": "software",
+                  "cls": "distinctive",
+                  "basis": "not_in_generic_lists",
+                  "forms": [
+                    "software"
+                  ],
+                  "aliases": [],
+                  "inflect": "full",
+                  "weight": 1
+                }
+              ],
+              "rankOnly": [
+                {
+                  "label": "management",
+                  "cls": "qualifier",
+                  "basis": "corpus_common_term",
+                  "forms": [
+                    "management"
+                  ],
+                  "aliases": [],
+                  "inflect": "full",
+                  "weight": 0.4
+                }
+              ],
+              "partnerRequired": [
+                "software"
+              ]
+            }
+          ],
+          "excluded": []
+        },
+        "expansion": {
+          "capability_kind": "literal",
+          "direct": {
+            "naics": [],
+            "psc": [],
+            "terms": [
+              "highway traffic management software"
+            ]
+          },
+          "related": null,
+          "term_of_art_naics": []
+        },
+        "buyers": [],
+        "states": [],
+        "setAsides": [],
+        "naics": [],
+        "psc": [],
+        "policy": {
+          "surface": "mcp",
+          "horizons": [
+            "open",
+            "recompete",
+            "forecast"
+          ],
+          "open": {
+            "sources": [
+              "sam"
+            ]
+          },
+          "recompete": {
+            "windowMonths": 18
+          },
+          "forecast": {
+            "includePastFiscalYears": false
+          }
+        },
+        "horizons": {
+          "open": {
+            "via": "text",
+            "mapFilters": {
+              "status": "active"
+            },
+            "ops": [
+              {
+                "op": "or",
+                "expr": "title.imatch.\"\\\\mhighway(s|es|ing|ed)?\\\\M\",description.imatch.\"\\\\mhighway(s|es|ing|ed)?\\\\M\",sow_text.imatch.\"\\\\mhighway(s|es|ing|ed)?\\\\M\",department.imatch.\"\\\\mhighway(s|es|ing|ed)?\\\\M\",solicitation_number.imatch.\"\\\\mhighway(s|es|ing|ed)?\\\\M\",title.imatch.\"\\\\mtraffic(s|es|ing|ed)?\\\\M\",description.imatch.\"\\\\mtraffic(s|es|ing|ed)?\\\\M\",sow_text.imatch.\"\\\\mtraffic(s|es|ing|ed)?\\\\M\",department.imatch.\"\\\\mtraffic(s|es|ing|ed)?\\\\M\",solicitation_number.imatch.\"\\\\mtraffic(s|es|ing|ed)?\\\\M\""
+              }
+            ]
+          },
+          "recompete": {
+            "via": "text",
+            "ops": [
+              {
+                "op": "is",
+                "col": "quality_flag",
+                "val": null
+              },
+              {
+                "op": "gte",
+                "col": "period_of_performance_current_end",
+                "val": "2026-09-22"
+              },
+              {
+                "op": "lte",
+                "col": "period_of_performance_current_end",
+                "val": "2028-03-22"
+              },
+              {
+                "op": "or",
+                "expr": "description.imatch.\"\\\\mhighway(s|es|ing|ed)?\\\\M\",psc_description.imatch.\"\\\\mhighway(s|es|ing|ed)?\\\\M\",naics_description.imatch.\"\\\\mhighway(s|es|ing|ed)?\\\\M\",incumbent_name.imatch.\"\\\\mhighway(s|es|ing|ed)?\\\\M\",awarding_agency.imatch.\"\\\\mhighway(s|es|ing|ed)?\\\\M\",awarding_sub_agency.imatch.\"\\\\mhighway(s|es|ing|ed)?\\\\M\",description.imatch.\"\\\\mtraffic(s|es|ing|ed)?\\\\M\",psc_description.imatch.\"\\\\mtraffic(s|es|ing|ed)?\\\\M\",naics_description.imatch.\"\\\\mtraffic(s|es|ing|ed)?\\\\M\",incumbent_name.imatch.\"\\\\mtraffic(s|es|ing|ed)?\\\\M\",awarding_agency.imatch.\"\\\\mtraffic(s|es|ing|ed)?\\\\M\",awarding_sub_agency.imatch.\"\\\\mtraffic(s|es|ing|ed)?\\\\M\""
+              }
+            ],
+            "naics": []
+          },
+          "forecast": {
+            "via": "text",
+            "forecastFilters": {
+              "q": null,
+              "naics": null,
+              "agency": null,
+              "state": null
+            },
+            "ops": [
+              {
+                "op": "or",
+                "expr": "title.imatch.\"\\\\mhighway(s|es|ing|ed)?\\\\M\",naics_description.imatch.\"\\\\mhighway(s|es|ing|ed)?\\\\M\",department.imatch.\"\\\\mhighway(s|es|ing|ed)?\\\\M\",description.imatch.\"\\\\mhighway(s|es|ing|ed)?\\\\M\",title.imatch.\"\\\\mtraffic(s|es|ing|ed)?\\\\M\",naics_description.imatch.\"\\\\mtraffic(s|es|ing|ed)?\\\\M\",department.imatch.\"\\\\mtraffic(s|es|ing|ed)?\\\\M\",description.imatch.\"\\\\mtraffic(s|es|ing|ed)?\\\\M\""
+              },
+              {
+                "op": "or",
+                "expr": "fiscal_year.is.null,fiscal_year.ilike.%2026%,fiscal_year.ilike.%2027%,fiscal_year.ilike.%2028%,fiscal_year.ilike.%2029%,fiscal_year.ilike.%2030%,fiscal_year.ilike.%2031%,fiscal_year.ilike.%2032%,fiscal_year.ilike.%2033%,fiscal_year.ilike.%2034%,fiscal_year.ilike.%2035%,fiscal_year.ilike.%2036%,fiscal_year.ilike.%2037%,fiscal_year.ilike.%2038%,fiscal_year.ilike.%2039%,fiscal_year.ilike.%2040%,fiscal_year.ilike.%2041%"
+              }
+            ],
+            "coverage": "ok"
+          }
+        },
+        "notes": [
+          "capability_list: any distinctive concept admits; generic concepts rank only"
+        ]
       }
     }
   }

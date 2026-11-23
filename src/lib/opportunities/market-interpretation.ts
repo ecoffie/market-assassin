@@ -120,8 +120,22 @@ export const PHYSICAL_SECURITY_RE =
  * "Direct match — the record itself establishes relevance". Neither record mentions janitorial work;
  * 561210 is Facilities Support Services, part of the Facilities & Maintenance family.
  */
+/**
+ * Road/bridge work needs BOTH a road word and a civil-works word (Agent 4 review 2026-11-23). A road word alone is not
+ * road construction: "highway safety data analytics", "highway patrol radios", "pavement condition sensors" and "highway
+ * traffic management software" keep their own market. The buyer's NAME never counts — "Federal Highway Administration
+ * IT support" / "FHWA …" is stripped of the agency before either test.
+ */
+const ROAD_WORK_WORD = /\b(?:highways?|roadways?|roads?|bridges?|pavements?|paving)\b/i;
+const CIVIL_WORKS_WORD = /\b(?:construction|civil|repairs?|rehabilitation|maintenance|replacement|resurfacing|paving|repaving)\b/i;
+const ROAD_AGENCY_NAME = /\bfederal\s+highway\s+administration\b|\bfhwa\b/gi;
+export function namesRoadBridgeWork(phrase: string): boolean {
+  const s = phrase.replace(ROAD_AGENCY_NAME, ' ');
+  return ROAD_WORK_WORD.test(s) && CIVIL_WORKS_WORD.test(s);
+}
+
 const PHRASE_PRESET: Array<{
-  match: RegExp; name: string; directNaics?: string[]; alsoDirect?: Array<{ match: RegExp; naics: string[] }>; relatedReason?: string;
+  match: RegExp | ((phrase: string) => boolean); name: string; directNaics?: string[]; alsoDirect?: Array<{ match: RegExp; naics: string[] }>; relatedReason?: string;
   /** A sub-market of the preset, pinned to its OWN codes, with no related family (the preset's other codes are not retrieved). */
   pin?: { source: string; naics: string[]; psc: string[] };
 }> = [
@@ -132,11 +146,11 @@ const PHRASE_PRESET: Array<{
    * VA went unreturned. It must precede Construction. Codes from Mindy's own crosswalk (src/data/psc-naics-crosswalk.json):
    * NAICS 237310 "Highway, Street, and Bridge Construction" → top road/bridge PSCs Y1LB (construction), Z2LB (repair or
    * alteration), Z1LB (maintenance) of highways/roads/streets/bridges; Z1LB/Z2LB cross back almost only to 237310.
-   * Y1BD (runways) is excluded — airfield work is not what was asked. A bare "bridge"/"road" needs a civil-works word
-   * beside it, so "bridge contract" never lands here.
+   * Y1BD (runways) is excluded — airfield work is not what was asked. EVERY road word needs a civil-works word beside
+   * it (namesRoadBridgeWork), so "bridge contract" or "highway safety data analytics" never lands here.
    */
   {
-    match: /\b(?:highways?|roadways?|pavements?|paving)\b|^(?=.*\b(?:roads?|bridges?)\b).*\b(?:construction|civil|repairs?|rehabilitation|maintenance|replacement|resurfacing)\b/i,
+    match: namesRoadBridgeWork,
     name: 'Construction',
     pin: { source: 'Highway, Street & Bridge Construction', naics: ['237310'], psc: ['Y1LB', 'Z1LB', 'Z2LB'] },
   },
@@ -316,7 +330,7 @@ export function interpretCapability(phrase: string): CapabilityInterpretation {
   }
 
   for (const row of PHRASE_PRESET) {
-    if (!row.match.test(requested)) continue;
+    if (!(typeof row.match === 'function' ? row.match(requested) : row.match.test(requested))) continue;
     if (row.pin) {
       return {
         requested,

@@ -16,7 +16,7 @@ import { join } from 'node:path';
 import { buildDiscoveryPlan, type DiscoveryInput, type PlanContext } from './plan';
 import { MCP_POLICY } from './policy';
 import { buildTextMatcher, matchesText, textPredicate, classifyWord } from './matcher';
-import { interpretCapability, classifyRecord } from '@/lib/opportunities/market-interpretation';
+import { interpretCapability, classifyRecord, namesRoadBridgeWork } from '@/lib/opportunities/market-interpretation';
 import { RBA_FEDERAL_MARKET_PROFILE_PROMPT } from '@/lib/chat/__fixtures__/rba-federal-market-profile';
 
 const CTX: PlanContext = { today: '2026-09-22', fiscalYear: 2026 };
@@ -133,5 +133,38 @@ describe('controls: unrelated plans are unchanged from origin/main (version stam
   }
   it('covers the three agreed controls', () => {
     expect(Object.keys(frozen.controls).sort()).toEqual(['IT services + state=VA', 'cybersecurity + agency=SOCOM', 'janitorial services']);
+  });
+});
+
+describe('road words without civil works do not pin to road construction (Agent 4 review 2026-11-23)', () => {
+  const frozen = JSON.parse(readFileSync(join(__dirname, '__fixtures__', 'compound-concept-controls.json'), 'utf8')) as {
+    road_negatives: Record<string, { input: DiscoveryInput; plan: Record<string, unknown> }>;
+  };
+  const NEGATIVES = [
+    'highway safety data analytics',
+    'highway patrol radios',
+    'Federal Highway Administration IT support',
+    'pavement condition sensors',
+    'highway traffic management software',
+  ];
+  for (const q of NEGATIVES) {
+    it(`"${q}" is not pinned to 237310 / road PSCs`, () => {
+      const c = interpretCapability(q);
+      expect(c.direct?.naics ?? []).not.toContain('237310');
+      expect(c.direct?.psc ?? []).not.toContain('Z2LB');
+    });
+    it(`"${q}" plan is byte-identical to v4 (version stamp aside)`, () => {
+      const { version: _v, ...rest } = plan(frozen.road_negatives[q].input);
+      expect(JSON.parse(JSON.stringify(rest))).toEqual(frozen.road_negatives[q].plan);
+    });
+  }
+  it('the agency name never triggers the pin; real road work with the agency named still does', () => {
+    expect(namesRoadBridgeWork('FHWA program support')).toBe(false);
+    expect(namesRoadBridgeWork('Federal Highway Administration maintenance of IT systems')).toBe(false);
+    expect(namesRoadBridgeWork('Federal Highway Administration bridge repair')).toBe(true);
+    expect(namesRoadBridgeWork('bridge and highway heavy civil construction')).toBe(true);
+    expect(namesRoadBridgeWork('road construction')).toBe(true);
+    expect(namesRoadBridgeWork('highway')).toBe(false);
+    expect(namesRoadBridgeWork('bridge contract')).toBe(false);
   });
 });
