@@ -54,7 +54,7 @@ export default function MindyLandingPage() {
         name: 'Mindy',
         applicationCategory: 'BusinessApplication',
         operatingSystem: 'Web',
-        description: 'Your 24/7 federal market intelligence analyst. Scans 24,000+ opportunities daily, tracks competitors, and delivers personalized briefings.',
+        description: 'Your 24/7 federal market intelligence analyst. Scans federal opportunities daily, tracks competitors, and delivers personalized briefings.',
         offers: [
           { '@type': 'Offer', name: 'Pro', price: '149', priceCurrency: 'USD', priceSpecification: { '@type': 'UnitPriceSpecification', price: '149', priceCurrency: 'USD', unitCode: 'MON' } },
           { '@type': 'Offer', name: 'Teams', price: '499', priceCurrency: 'USD', priceSpecification: { '@type': 'UnitPriceSpecification', price: '499', priceCurrency: 'USD', unitCode: 'MON' } },
