@@ -11,7 +11,8 @@
  *   - url / recordId are copied from the match only when the model left them empty, and only when the match has
  *     exactly one of them (an ambiguous match fills nothing).
  *   - The subtitle is set only when the model left it empty, from the matched results' own as-of dates
- *     ("Data as of 2026-11-20"). No as-of date in the evidence → no subtitle. The source system is not inferred.
+ *     ("Data as of 2026-11-20", or "Data as of 2026-09-30 to 2026-11-20" when they differ). No as-of date in the
+ *     evidence → no subtitle. The source system is not inferred.
  *   - The answer text and the document's statements are never touched.
  */
 import type { DocModel, DocSource } from '@/lib/documents/model';
@@ -83,7 +84,9 @@ export function applySourceProvenance(model: DocModel, records: readonly Provena
   });
   let subtitle = model.subtitle;
   if (!subtitle?.trim() && usedAsOf.length) {
-    subtitle = `Data as of ${[...usedAsOf].sort().pop()}`;
+    // A range when the matched results disagree: the latest date alone would overstate how current the older data is.
+    const dates = [...new Set(usedAsOf)].sort();
+    subtitle = dates.length === 1 ? `Data as of ${dates[0]}` : `Data as of ${dates[0]} to ${dates[dates.length - 1]}`;
     out.subtitleSet = true;
   }
   out.model = { ...model, sources, ...(subtitle ? { subtitle } : {}) };

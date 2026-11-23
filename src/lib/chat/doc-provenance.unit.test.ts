@@ -48,6 +48,24 @@ describe('applySourceProvenance', () => {
     expect(applySourceProvenance(doc([{ id: 's1', kind: 'usaspending', label: 'A', recordId: 'W9124D26D0005' }], 'Prepared for the board'), REC).model.subtitle).toBe('Prepared for the board');
   });
 
+  it('subtitle: a range when the matched results carry different as-of dates, a single date when they agree', () => {
+    const recs = [
+      { retrievedAt: '2026-11-22T10:00:00Z', asOf: '2026-11-20', recordIds: ['W9124D26D0005'] },
+      { retrievedAt: '2026-11-22T10:00:00Z', asOf: '2026-09-30', recordIds: ['36C24727Q0042'] },
+      { retrievedAt: '2026-11-22T10:00:00Z', asOf: '2026-11-20T08:00:00Z', recordIds: ['HQ003422D0002'] },
+    ];
+    const two = doc([
+      { id: 's1', kind: 'usaspending', label: 'A', recordId: 'W9124D26D0005' },
+      { id: 's2', kind: 'sam_notice', label: 'B', recordId: '36C24727Q0042' },
+    ]);
+    expect(applySourceProvenance(two, recs).model.subtitle).toBe('Data as of 2026-09-30 to 2026-11-20');
+    const agree = doc([
+      { id: 's1', kind: 'usaspending', label: 'A', recordId: 'W9124D26D0005' },
+      { id: 's3', kind: 'usaspending', label: 'C', recordId: 'HQ003422D0002' },
+    ]);
+    expect(applySourceProvenance(agree, recs).model.subtitle).toBe('Data as of 2026-11-20');
+  });
+
   it('never mutates its input; no records means the model is returned as is', () => {
     const m = doc([{ id: 's1', kind: 'usaspending', label: 'A', recordId: 'W9124D26D0005' }]);
     const before = JSON.stringify(m);
