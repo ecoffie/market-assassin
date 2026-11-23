@@ -163,7 +163,13 @@ export function filterToolsForTurn<T extends { function?: Record<string, unknown
   customerText: string,
   priorCustomerText?: string | null,
   /** strategyPlan: an Ask Mindy strategy-plan turn (flag-gated by the caller): runs the FMP research pipeline. */
-  opts: { strategyPlan?: boolean } = {},
+  /**
+   * sectionedDocument: the customer asked for a report with named sections the packaged market report does not
+   * carry, and create_document can build it from research already in this chat (requested-doc-sections.ts). The
+   * packaged report is not offered (its fixed template is never presented as fulfilling the request) and
+   * create_document stays offered.
+   */
+  opts: { strategyPlan?: boolean; sectionedDocument?: boolean } = {},
 ): {
   defs: T[];
   removed: string[];
@@ -182,7 +188,7 @@ export function filterToolsForTurn<T extends { function?: Record<string, unknown
     : filterToolsForQuestion(defs, customerText);
   const intent = federalMarketProfile ? 'OTHER' : inheritFindIntent(customerText, priorCustomerText);
   const openOnly = isOpenOnlyRequest(customerText);
-  const marketResearch = !federalMarketProfile && !opts.strategyPlan && isMarketResearchRequest(customerText);
+  const marketResearch = !federalMarketProfile && !opts.strategyPlan && !opts.sectionedDocument && isMarketResearchRequest(customerText);
   const findOffered = base.defs.some((d) => String(d.function?.name ?? '') === FIND_TOOL);
   const removed = [...base.removed];
   let kept = base.defs;
@@ -203,6 +209,16 @@ export function filterToolsForTurn<T extends { function?: Record<string, unknown
     kept = kept.filter((d) => {
       const name = String(d.function?.name ?? '');
       if (name === 'create_document' || name === 'capability_market_match') {
+        if (!removed.includes(name)) removed.push(name);
+        return false;
+      }
+      return true;
+    });
+  }
+  if (opts.sectionedDocument && !federalMarketProfile) {
+    kept = kept.filter((d) => {
+      const name = String(d.function?.name ?? '');
+      if (name === MARKET_REPORT_TOOL || name === 'capability_market_match') {
         if (!removed.includes(name)) removed.push(name);
         return false;
       }
