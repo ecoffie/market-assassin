@@ -72,6 +72,7 @@ import {
   federalMarketProfileOutsideWebNote,
   federalMarketProfileWriteupNote,
   isFederalMarketProfileRequest,
+  isMarketResearchRequest,
   SAM_ONLY_TOOL,
   MARKET_REPORT_TOOL,
   AWARD_HISTORY_TOOL,
@@ -116,6 +117,7 @@ import { ASK_MINDY_RULES_LAYER, askMindyRulesEnabledFor, askMindyRulesPromptBloc
 import { askMindyRecipesEnabledFor } from '@/lib/ask-mindy/flags';
 import { loadCompanyProfile } from '@/lib/ask-mindy/company-profile';
 import { fitRankingNote, rankFindResult } from '@/lib/ask-mindy/compose';
+import { requestedDocSections, requestedSectionsPlannerNote, routeSectionedReport, sectionedReportPlannerNote, packagedReportGapNote } from '@/lib/chat/requested-doc-sections';
 /** How long the answer waits for the company profile before skipping the ranking note (value first). */
 const FIT_PROFILE_WAIT_MS = 1500;
 import { findCompletionFooter, comingBackListLeadsWithNotCompeted, type FindResultWithItems } from '@/lib/chat/find-completeness';
@@ -722,6 +724,9 @@ export async function POST(request: NextRequest) {
         // layout and gets only the rules (truth, writing), never the top-picks answer format.
         const rulesLayer = askMindyRulesEnabledFor(auth.email);
         const customerAskForContract = splitViewPreamble(message).rest || message;
+        // Sections the customer named for the document ("executive summary, risks, actions and sources"): the planner
+        // is told to carry them and create_document completes any it left out from the document's own statements.
+        const requestedSections = requestedDocSections(customerAskForContract);
         const fmpTextAsk = !cardCtx && isFederalMarketProfileRequest(customerAskForContract);
         // Federal Strategy Plan (ASK_MINDY_STRATEGY_PLAN, default off; src/lib/ask-mindy/strategy-plan.ts): a plan for
         // this company runs the EXISTING Federal Market Profile research workflow (phase machine, write-up validator,
@@ -784,7 +789,19 @@ export async function POST(request: NextRequest) {
         // the CUSTOMER asks for a document the planner must see the uploaded text and the latest answer;
         // otherwise the company's own content is missing. Only on that turn (uploaded text in the planner is a
         // prompt-injection surface), and on that turn create_document is the only write tool (see executor).
-        const plannerBuildsDocuments = vaultDocEnabledFor('generate', auth.email) && isDocumentCreationRequest(customerWords);
+        // "A professional report with an executive summary, ..., risks, recommended actions and sources" (Claude
+        // Local repro 2026-11-22): the packaged market report's fixed template carries none of those, so it is
+        // never presented as fulfilling that ask. With research already in this chat and create_document available,
+        // the turn builds the report as a document (packaged report not offered, create_document forced); otherwise
+        // the answer states plainly which requested sections the packaged report lacks.
+        const sectionedRoute = routeSectionedReport({
+          requested: requestedSections,
+          asksForReport: !federalMarketProfileAsk && (isDocumentCreationRequest(customerWords) || isMarketResearchRequest(customerWords)),
+          createAvailable: !cardCtx && vaultDocEnabledFor('generate', auth.email),
+          hasPriorResearch: (Array.isArray(body.history) ? body.history : []).some((h: { role?: string; content?: unknown }) => h?.role === 'assistant' && String(h.content ?? '').trim().length > 0),
+        });
+        const sectionedDocument = sectionedRoute.route === 'document';
+        const plannerBuildsDocuments = vaultDocEnabledFor('generate', auth.email) && (isDocumentCreationRequest(customerWords) || sectionedDocument);
         let plannerDocumentText: string | null = null;
         if (isVaultChatDocumentsEnabled(auth.email) && profileEmail && body.sessionId === sessionId) {
           const loaded = await loadChatDocumentTexts(getSupabase(), { sessionId, ownerEmail: profileEmail });
@@ -1064,6 +1081,7 @@ export async function POST(request: NextRequest) {
               callerEmail: auth.email!,
               request,
               chatSessionId: body.sessionId === sessionId ? turnSessionId : null,
+              ...(requestedSections.length ? { requestedSections } : {}),
               // FMP step-8 validator: refuse incomplete / banned profiles before Vault save.
               ...(federalMarketProfileAsk && fmpWriteupCtx
                 ? {
@@ -1127,7 +1145,9 @@ export async function POST(request: NextRequest) {
           const priorCustomerAsk = priorCustomerRaw
             ? (splitViewPreamble(String(priorCustomerRaw)).rest || String(priorCustomerRaw))
             : null;
-          const toolOffer = filterToolsForTurn(executor.offeredToolDefs(), customerAskForContract, priorCustomerAsk, { strategyPlan: strategyPlanAsk });
+          const toolOffer = filterToolsForTurn(executor.offeredToolDefs(), customerAskForContract, priorCustomerAsk, { strategyPlan: strategyPlanAsk, sectionedDocument });
+          if (sectionedRoute.route !== 'none') turnTrace.notices.push(`sectioned_report:${sectionedRoute.route}${sectionedRoute.route === 'packaged_with_gap_note' ? `:${sectionedRoute.reason}` : ''}`);
+          if (sectionedRoute.route === 'packaged_with_gap_note') messages.push({ role: 'system', content: packagedReportGapNote(sectionedRoute) });
           if (strategyPlanAsk) turnTrace.notices.push('intent:strategy_plan');
           if (toolOffer.federalMarketProfile) turnTrace.notices.push('intent:federal_market_profile');
           if (toolOffer.marketResearch) turnTrace.notices.push('intent:market_research');
@@ -1172,6 +1192,14 @@ export async function POST(request: NextRequest) {
             const phaseNote = fmpPhaseHostNote(fmpState);
             messages.push({ role: 'system', content: phaseNote });
             toolRoundMessages.splice(1, 0, { role: 'system', content: phaseNote });
+          }
+          // Requested document sections: only when create_document is in this turn's catalog (FMP unlocks it later).
+          const requestedNote = fmpCatalogDefs.some((d) => (d.function as { name?: string })?.name === CREATE_DOCUMENT)
+            ? requestedSectionsPlannerNote(requestedSections) : null;
+          if (requestedNote) {
+            messages.push({ role: 'system', content: requestedNote });
+            toolRoundMessages.splice(1, 0, { role: 'system', content: requestedNote });
+            turnTrace.notices.push(`requested_doc_sections:${requestedSections.map((r) => r.key).join(',')}`);
           }
           turnTrace.tools_offered = ALL_TOOL_DEFS.length;
 
@@ -1218,11 +1246,12 @@ export async function POST(request: NextRequest) {
           let plannerMaxTokens = createOffered
             ? (federalMarketProfileAsk ? FMP_DOC_TOOL_ROUND_MAX_TOKENS : DOC_TOOL_ROUND_MAX_TOKENS)
             : TOOL_ROUND_MAX_TOKENS;
-          const forceCreate = !!revision && createOffered;
+          const forceCreate = (!!revision || sectionedDocument) && createOffered;
+          if (sectionedDocument && createOffered) toolRoundMessages.splice(1, 0, { role: 'system', content: sectionedReportPlannerNote(requestedSections) });
           const forceMarketReport = !forceCreate && !cardCtx && toolOffer.marketResearch && marketReportOffered;
           // FMP phase machine owns the forced tool (usually award history on round 1).
           const forceAwardHistory = !forceCreate && !forceMarketReport && !cardCtx && !!fmpPhaseForce && awardHistoryOffered && fmpPhaseForce === AWARD_HISTORY_TOOL;
-          if (forceCreate) turnTrace.notices.push('revision:create_document_forced');
+          if (forceCreate) turnTrace.notices.push(revision ? 'revision:create_document_forced' : 'sectioned_report:create_document_forced');
           if (forceMarketReport) turnTrace.notices.push('market_research:generate_market_report_forced');
           if (fmpPhaseForce) turnTrace.notices.push(`federal_market_profile:phase_forced:${fmpPhaseForce}`);
           let forcedToolName: string | null = forceCreate

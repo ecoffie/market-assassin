@@ -82,3 +82,16 @@ describe('real catalog, 2026-11-17: INL and NCMA Warfighter editions have passed
     }
   });
 });
+
+describe('real catalog, 2026-11-23: no held edition is shown as upcoming (ops Slack 2026-11-22)', () => {
+  it('no next_occurrence has passed; the three held one-off events (DOT VOSB Summit 11-19, GSA webinars 11-17 / 11-19) are gone', async () => {
+    const real = (await import('@/data/federal-events-sources.json')).default as unknown as EventCatalog & {
+      majorAnnualConferences: Array<{ name: string }>;
+    };
+    expect(catalogDateFindings(real, '2026-11-23').filter((f) => f.kind === 'occurrence_passed')).toEqual([]);
+    const names = real.majorAnnualConferences.map((c) => c.name);
+    expect(names).not.toContain('U.S. DOT Veteran-Owned Small Business Summit');
+    expect(names).not.toContain('GSA: How to do business with GSA and find opportunities');
+    expect(names).not.toContain('GSA Monthly OSB National Training (MONT): Small Business Resources Overview, Part 2');
+  });
+});

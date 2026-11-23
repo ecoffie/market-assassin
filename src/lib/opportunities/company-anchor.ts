@@ -30,6 +30,7 @@
 import type { SAMEntity } from '@/lib/sam/entity-api';
 import type { NaicsSbMap, SbStatus } from '@/lib/sam/naics-small-business';
 import { lookupSamEntity, type SamEntityResult } from '@/mcp/tools/sam-entity';
+import { registrationPurposeReadiness, type RegistrationPurposeReadiness } from '@/lib/sam/registration-purpose';
 
 export type AnchorSource = 'sam_entity_api' | 'local_registry';
 
@@ -63,6 +64,11 @@ export interface CompanyAnchor {
     sba_list_authoritative: boolean;
   };
   location: { city: string | null; state: string | null; zip: string | null; country: string | null };
+  /**
+   * SAM registration purpose (purposeOfRegistrationCode/Desc) and whether it covers contract
+   * awards. `contract_awards: 'unknown'` when SAM did not send it (always, for a mirror record).
+   */
+  registration_purpose: RegistrationPurposeReadiness;
 }
 
 export type AnchorResolutionStatus = 'resolved' | 'not_found' | 'lookup_failed' | 'invalid_uei';
@@ -128,6 +134,7 @@ export function anchorFromSamEntity(
       zip: addr.zipCode || null,
       country: addr.countryCode || null,
     },
+    registration_purpose: registrationPurposeReadiness(entity.purposeOfRegistrationCode, entity.purposeOfRegistration),
   };
 }
 

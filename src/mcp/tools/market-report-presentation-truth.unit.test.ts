@@ -261,3 +261,14 @@ describe('marketOfficeCodes', () => {
       .toEqual(['36C248', 'W912EQ']);
   });
 });
+
+describe('contact rows name their contracting office and code (Claude Local, 2026-11-22)', () => {
+  it('office reads "NAME (CODE)" when the roster derived a directory-known office code', async () => {
+    const { queryFederalContacts } = await import('@/lib/gov-contacts/contact-roster');
+    const mock = queryFederalContacts as unknown as ReturnType<typeof vi.fn>;
+    mock.mockClear();
+    mock.mockResolvedValueOnce({ contacts: [{ contact_fullname: 'Pat Example', contact_email: 'pat@example.gov', role_category_label: 'Contracting Officer', derived_office: 'Network Contract Office 8', office_code: '36C248' }], total: 1 });
+    const r = await generateMarketReport({ keyword: 'building construction and renovation' });
+    expect(r.sections.contacts?.people[0]).toMatchObject({ office: 'Network Contract Office 8 (36C248)', office_code: '36C248' });
+  });
+});
