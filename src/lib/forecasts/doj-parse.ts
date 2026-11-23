@@ -81,47 +81,116 @@ export function placeOf(v: unknown): { city?: string; state?: string } {
   return { city: s };
 }
 
-/** Map one sheet row (34 cols) onto the DB shape. */
-export function mapDojRow(r: unknown[]): DojParsedRow | null {
-  const atn = dojCell(r[1]);
+/**
+ * The DOJ headers this parser reads, keyed by the role each plays.
+ *
+ * ⚠️ COLUMNS ARE FOUND BY HEADER NAME, NEVER BY POSITION. The 2026-11-18 edition
+ * grew from 34 to 37 columns: DOJ inserted `Component`, `Actual Award Date` and
+ * `Contract Canceled Date` ahead of `Incumbent Contractor PIID`, which moved from
+ * index 30 to 33. A fixed-index parser kept reading index 30 and wrote component
+ * codes ('BOP', 'FBI', …) into incumbent_contract_number. Added columns are
+ * tolerated; a MISSING required header fails the run closed (`header_drift`)
+ * rather than silently mapping some other column onto a field.
+ */
+export const DOJ_REQUIRED_HEADERS = {
+  fiscalYear: 'Fiscal Year',
+  atn: 'Action Tracking Number',
+  bureau: 'Bureau',
+  sbPocName: 'DOJ Small Business POC - Name',
+  sbPocEmail: 'DOJ Small Business POC - Email Address',
+  title: 'Contract Name',
+  description: 'Description of Requirement',
+  contractType: 'Contract Type (Pricing)',
+  naics: 'NAICS Code',
+  psc: 'Product Service Code',
+  competition: 'Competition Approach',
+  setAside: 'Small Business Approach',
+  valueRange: 'Estimated Total Contract Value (Range)',
+  awardDate: 'Target Award Date',
+  place: 'Place of Performance',
+  country: 'Country',
+  status: 'Acquisition History',
+  incumbentName: 'Incumbent Contractor',
+  incumbentPiid: 'Incumbent Contractor PIID',
+} as const;
+
+export type DojColumn = keyof typeof DOJ_REQUIRED_HEADERS;
+export type DojColumnMap = Record<DojColumn, number>;
+
+/** Header comparison ignores case and whitespace runs only — no fuzzy matching. */
+function headerKey(v: unknown): string {
+  return v === null || v === undefined ? '' : String(v).replace(/\s+/g, ' ').trim().toLowerCase();
+}
+
+/**
+ * Resolve every required column from the header row. A required header that is
+ * absent — or present more than once (which column would be the real one?) —
+ * is reported by name; the caller must refuse the run.
+ */
+export function resolveDojColumns(header: unknown[]):
+  | { ok: true; columns: DojColumnMap }
+  | { ok: false; missing: string[]; duplicated: string[] } {
+  const positions = new Map<string, number[]>();
+  header.forEach((h, i) => {
+    const k = headerKey(h);
+    if (!k) return;
+    positions.set(k, [...(positions.get(k) ?? []), i]);
+  });
+  const missing: string[] = [];
+  const duplicated: string[] = [];
+  const columns = {} as DojColumnMap;
+  for (const [role, name] of Object.entries(DOJ_REQUIRED_HEADERS) as Array<[DojColumn, string]>) {
+    const at = positions.get(headerKey(name)) ?? [];
+    if (at.length === 0) missing.push(name);
+    else if (at.length > 1) duplicated.push(name);
+    else columns[role] = at[0];
+  }
+  if (missing.length || duplicated.length) return { ok: false, missing, duplicated };
+  return { ok: true, columns };
+}
+
+/** Map one sheet row onto the DB shape, reading each field from its NAMED column. */
+export function mapDojRow(r: unknown[], c: DojColumnMap): DojParsedRow | null {
+  const atn = dojCell(r[c.atn]);
   // No identity = not reconcilable. NEVER fall back to a status or title: that is
   // precisely how 'Active' and 'DOJ:**LES** Xone Outrider' became external_ids.
   if (!atn) return null;
-  const naics = splitCoded(r[15]);
-  const psc = splitCoded(r[16]);
-  const val = valueRange(r[23]);
-  const place = placeOf(r[26]);
-  const country = dojCell(r[27]);
+  const naics = splitCoded(r[c.naics]);
+  const psc = splitCoded(r[c.psc]);
+  const val = valueRange(r[c.valueRange]);
+  const place = placeOf(r[c.place]);
+  const country = dojCell(r[c.country]);
+  const bureau = dojCell(r[c.bureau]) ?? null;
   return {
     atn,
     fields: {
       external_id: atn,
-      title: dojCell(r[9]) ?? null,
-      description: dojCell(r[11]) ?? null,
+      title: dojCell(r[c.title]) ?? null,
+      description: dojCell(r[c.description]) ?? null,
       naics_code: naics.code ?? null,
       naics_description: naics.text ?? null,
       psc_code: psc.code ?? null,
-      bureau: dojCell(r[2]) ?? null,
-      contracting_office: dojCell(r[2]) ?? null,   // held stores the BUREAU code
-      program_office: dojCell(r[2]) ?? null,
+      bureau,
+      contracting_office: bureau,   // held stores the BUREAU code
+      program_office: bureau,
       estimated_value_min: val.min ?? null,
       estimated_value_max: val.max ?? null,
       estimated_value_range: val.label ?? null,
-      contract_type: dojCell(r[13]) ?? null,
-      set_aside_type: dojCell(r[18]) ?? null,
-      competition_type: dojCell(r[17]) ?? null,
-      poc_name: dojCell(r[5]) ?? null,
-      poc_email: dojCell(r[6]) ?? null,
-      incumbent_name: dojCell(r[29]) ?? null,
-      incumbent_contract_number: dojCell(r[30]) ?? null,
+      contract_type: dojCell(r[c.contractType]) ?? null,
+      set_aside_type: dojCell(r[c.setAside]) ?? null,
+      competition_type: dojCell(r[c.competition]) ?? null,
+      poc_name: dojCell(r[c.sbPocName]) ?? null,
+      poc_email: dojCell(r[c.sbPocEmail]) ?? null,
+      incumbent_name: dojCell(r[c.incumbentName]) ?? null,
+      incumbent_contract_number: dojCell(r[c.incumbentPiid]) ?? null,
       pop_state: place.state ?? null,
       pop_city: place.city ?? null,
       pop_country: country === 'United States' ? 'USA' : (country ?? null),
-      status: dojCell(r[28]) ?? null,
+      status: dojCell(r[c.status]) ?? null,
     },
     derived: {
-      fiscal_year: fyOf(r[0]) ?? null,
-      anticipated_quarter: quarterOf(r[25]) ?? null,   // AWARD date, not solicitation
+      fiscal_year: fyOf(r[c.fiscalYear]) ?? null,
+      anticipated_quarter: quarterOf(r[c.awardDate]) ?? null,   // AWARD date, not solicitation
     },
   };
 }

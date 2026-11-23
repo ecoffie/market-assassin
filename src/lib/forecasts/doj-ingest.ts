@@ -7,7 +7,7 @@
 import { applyInsertGuard } from './writer';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import * as XLSX from 'xlsx';
-import { mapDojRow } from './doj-parse';
+import { mapDojRow, resolveDojColumns, type DojColumnMap } from './doj-parse';
 import {
   auditDojIdentity, planDojReconciliation, dojPlanReconciles, dojPlanIsSemanticallySane,
   dojWorkbookFingerprint, dojDataAdvanced, DOJ_SOURCE_OWNED_FIELDS, type DojRow,
@@ -97,20 +97,32 @@ export async function runDojIngest(
   if (!fingerprint) return { ...base, failure: 'not_xlsx' };
 
   let rows: unknown[][];
+  let columns: DojColumnMap;
   try {
     const wb = XLSX.read(bytes, { type: 'array' });
     const ws = wb.Sheets[DOJ_SHEET];
     if (!ws) return { ...base, fingerprint, sourceLastModified: lastModified, failure: `sheet_missing:${DOJ_SHEET}` };
     const aoa = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, defval: null });
+    // Columns are located by HEADER NAME. A missing required header fails closed —
+    // never a silent shift of some other column onto a source-owned field.
+    const resolved = resolveDojColumns(aoa[0] ?? []);
+    if (!resolved.ok) {
+      const parts = [
+        ...(resolved.missing.length ? [`missing ${resolved.missing.join(', ')}`] : []),
+        ...(resolved.duplicated.length ? [`duplicated ${resolved.duplicated.join(', ')}`] : []),
+      ];
+      return { ...base, fingerprint, sourceLastModified: lastModified, failure: `header_drift: ${parts.join('; ')}` };
+    }
+    columns = resolved.columns;
     rows = aoa.slice(1).filter((r) => Array.isArray(r) && r.some((c) => c != null && String(c).trim() !== ''));
   } catch (e) {
     return { ...base, fingerprint, sourceLastModified: lastModified, failure: `parse: ${(e as Error).message}` };
   }
   if (rows.length === 0) return { ...base, fingerprint, sourceLastModified: lastModified, failure: 'no_data_rows' };
 
-  const audit = auditDojIdentity(rows.map((r) => String(r[1] ?? '')));
+  const audit = auditDojIdentity(rows.map((r) => String(r[columns.atn] ?? '')));
   const rejectedAtns = new Set(audit.duplicateAtnGroups);
-  const parsed = rows.map(mapDojRow).filter((x): x is NonNullable<typeof x> => !!x)
+  const parsed = rows.map((row) => mapDojRow(row, columns)).filter((x): x is NonNullable<typeof x> => !!x)
     .filter((p) => !rejectedAtns.has(p.atn));
 
   // ── HELD. Paged; an unranged read caps at 1,000 and would fabricate the plan. ──
