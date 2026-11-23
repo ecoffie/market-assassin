@@ -15,6 +15,7 @@
  */
 import Link from 'next/link';
 import FirstQuestions from './FirstQuestions';
+import { ANY_ASSISTANT_LINE, OTHER_ASSISTANTS, CLAUDE_COMPUTER_NOTE } from './setup-copy';
 import Image from 'next/image';
 import type { Metadata } from 'next';
 
@@ -108,6 +109,9 @@ export default function McpSetupPage() {
           <p className="mt-3 text-[16px] leading-relaxed text-(--mp-muted)">
             Ask Mindy for real federal-contracting data right inside Claude or ChatGPT. One-time setup. No coding.
           </p>
+          <p className="mt-2 text-[14px] leading-relaxed text-(--mp-muted)">
+            {ANY_ASSISTANT_LINE} <a href="#other" className="text-(--mp-navy) underline underline-offset-2">Other assistants</a>
+          </p>
         </div>
 
         {/* The address, once, up top */}
@@ -133,6 +137,7 @@ export default function McpSetupPage() {
         <section id="claude" className="mt-14 scroll-mt-6">
           <h2 className="text-[22px] font-bold text-(--mp-ink) font-(family-name:--mp-font-serif)">Claude — connect Mindy</h2>
           <p className="mt-1 text-[14px] text-(--mp-muted)">In the Claude desktop or web app. This is the easy one.</p>
+          <p className="mt-2 text-[14px] text-(--mp-body)">{CLAUDE_COMPUTER_NOTE}</p>
           <StepList steps={CLAUDE} />
           <div className="mt-6 rounded-none border border-(--mp-ok-line) bg-(--mp-ok-bg) px-4 py-3">
             <p className="text-[14px] text-(--mp-body)">
@@ -153,6 +158,15 @@ export default function McpSetupPage() {
           <div className="mt-6 rounded-none border border-(--mp-ok-line) bg-(--mp-ok-bg) px-4 py-3">
             <p className="text-[14px] font-semibold text-(--mp-ok)">That&rsquo;s it for ChatGPT.</p>
           </div>
+        </section>
+
+        <section id="other" className="mt-16 scroll-mt-6">
+          <h2 className="text-[22px] font-bold text-(--mp-ink) font-(family-name:--mp-font-serif)">{OTHER_ASSISTANTS.heading}</h2>
+          <p className="mt-1 text-[14px] text-(--mp-muted)">{OTHER_ASSISTANTS.intro}</p>
+          <ol className="mt-4 list-decimal space-y-2 pl-5 text-[14px] leading-relaxed text-(--mp-muted)">
+            {OTHER_ASSISTANTS.steps.map((step) => <li key={step}>{step}</li>)}
+          </ol>
+          <p className="mt-4 rounded-none border border-(--mp-line) bg-(--mp-surface) px-4 py-3 text-[14px] text-(--mp-body)">{OTHER_ASSISTANTS.adminNote}</p>
         </section>
 
         {/* The question every single demo attendee asked: "do I have to say Mindy?"
