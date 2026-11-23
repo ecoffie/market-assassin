@@ -41,6 +41,22 @@ const STATIC_METADATA: Array<[string, () => Promise<{ metadata: Metadata }>]> = 
   ['/roadmap', () => import('@/app/roadmap/page')],
   ['/lifetime', () => import('@/app/lifetime/page')],
   ['/lazy-contractors-blueprint', () => import('@/app/lazy-contractors-blueprint/page')],
+  // 2026-11-23: the remaining 5 of 177 — pages that set their own openGraph without images.
+  ['/agencies', () => import('@/app/agencies/page')],
+  ['/awards', () => import('@/app/awards/page')],
+  ['/discover', () => import('@/app/discover/page')],
+  ['/spending', () => import('@/app/spending/page')],
+  ['/recompete', () => import('@/app/recompete/layout')],
+];
+
+// Pages that also declare their own `twitter` block must list the image there too, or the
+// twitter:image from the root layout is dropped along with it.
+const STATIC_TWITTER: Array<[string, () => Promise<{ metadata: Metadata }>]> = [
+  ['/agencies', () => import('@/app/agencies/page')],
+  ['/recompete', () => import('@/app/recompete/layout')],
+  ['/awards', () => import('@/app/awards/page')],
+  ['/discover', () => import('@/app/discover/page')],
+  ['/spending', () => import('@/app/spending/page')],
 ];
 
 describe('static page metadata carries og:image', () => {
@@ -48,6 +64,15 @@ describe('static page metadata carries og:image', () => {
     it(path, async () => {
       const { metadata } = await load();
       expect(ogUrl(metadata)).toBe(SITE_SHARE_IMAGE.url);
+    });
+  }
+
+  for (const [path, load] of STATIC_TWITTER) {
+    it(`${path} twitter image`, async () => {
+      const { metadata } = await load();
+      expect(twUrl(metadata)).toBe(SITE_SHARE_IMAGE.url);
+      expect(twTitle(metadata)).toBeTruthy();
+      expect(twTitle(metadata)).not.toBe('Meet Mindy.');
     });
   }
 
