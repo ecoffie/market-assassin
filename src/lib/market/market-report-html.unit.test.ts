@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { renderMarketReportHtml } from './market-report-html';
+import { renderMarketReportHtml, provenanceRows } from './market-report-html';
 
 /**
  * The measurement bridge must actually reach the page.
@@ -126,3 +126,46 @@ describe('RC-5: no internal implementation detail in rendered HTML', () => {
   });
 });
 
+
+/**
+ * Track C3 (Design & Output, 2026-11-23): "Data and sources" is built ONLY from metadata the stored report carries.
+ * A missing source or date is left out (or reads "Not stated"), never filled in.
+ */
+describe('market report — data and sources', () => {
+  const withProvenance = {
+    ...base,
+    summary: summary({ size_tiers: [{ ...TIERS[1], method: 'Award text contains the terms (FY23-25, contract awards).' }] }),
+    sections: {
+      ...base.sections,
+      market_size: { source: 'bigquery_usaspending_awards', windowLabel: 'FY2026 (1 complete fiscal year · description match)', sourceMaxActionDate: '2026-09-30' },
+      recompetes: { contracts: [{ incumbent_name: 'A', last_synced_at: '2026-11-22T16:25:30Z' }, { incumbent_name: 'B', last_synced_at: '2026-11-20T01:00:00Z' }] },
+      forecasts: { forecasts: [{ title: 'X', as_of: '2026-08-01T20:06:17Z', source_url: 'https://www.acquisitiongateway.gov/forecast' }, { title: 'Y', as_of: '2026-07-15T00:00:00Z', source_url: 'https://osdbu.hhs.gov/x' }] },
+    },
+  } as never;
+
+  it('lists each section with the source and window its own data states', () => {
+    expect(provenanceRows(withProvenance)).toEqual([
+      { section: 'Total market and market composition', source: 'USASpending.gov award records', window: 'FY2026 (1 complete fiscal year · description match); awards through September 30, 2026' },
+      { section: 'Who is buying · Competitive landscape', source: '', window: 'Award text contains the terms (FY23-25, contract awards).' },
+      { section: 'Recompetes on the horizon', source: '', window: 'records last synced November 20, 2026 to November 22, 2026' },
+      { section: 'Upcoming forecasts', source: 'acquisitiongateway.gov, osdbu.hhs.gov', window: 'records as of July 15, 2026 to August 1, 2026' },
+    ]);
+    const html = renderMarketReportHtml(withProvenance);
+    expect(html).toContain('Data and sources');
+    expect(html).toContain('Award data through September 30, 2026');
+    expect(html).not.toMatch(/<td class="txt">USASpending\.gov award records<\/td><td class="txt">Award text/); // a source the row's data does not name is left blank, not guessed
+  });
+
+  it('invents nothing: no metadata, no section and no header date', () => {
+    expect(provenanceRows({ ...base, summary: summary() } as never)).toEqual([]);
+    const html = renderMarketReportHtml({ ...base, summary: summary() } as never);
+    expect(html).not.toContain('Data and sources');
+    expect(html).not.toContain('Award data through');
+  });
+
+  it('hides an unknown source key and ignores dates that are not dates', () => {
+    const odd = { ...base, summary: summary(), sections: { ...base.sections, market_size: { source: 'some_internal_table', windowLabel: '', sourceMaxActionDate: 'n/a' } } } as never;
+    expect(provenanceRows(odd)).toEqual([]);
+    expect(renderMarketReportHtml(odd)).not.toContain('some_internal_table');
+  });
+});
