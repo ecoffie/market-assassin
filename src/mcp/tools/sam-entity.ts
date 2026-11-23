@@ -20,6 +20,7 @@ import {
   certFlag, downgradeOnExtractConflict, downgradeUncheckedPlaceholderNegatives, unestablishedPrograms,
   type CertProgram, type CertificationRecord,
 } from '@/lib/sam/certification-status';
+import { registrationPurposeReadiness, type RegistrationPurposeReadiness } from '@/lib/sam/registration-purpose';
 
 type CertCrossCheck = 'not_needed' | 'checked' | 'unavailable';
 
@@ -129,6 +130,13 @@ export interface SamEntityResult {
   certification_status?: CertificationRecord[];
   /** Present only when some program is not_established — the sentence to repeat, not override. */
   certification_note?: string;
+  /**
+   * Whether SAM's registration PURPOSE covers contract awards (purposeOfRegistrationCode/Desc).
+   * `warning` is present only when SAM positively lists an assistance-only purpose (Z1) — repeat it.
+   * `contract_awards: 'unknown'` + `note` when the field is absent (e.g. a mirror record): never a
+   * warning, never "registered". Present whenever `entity` is.
+   */
+  registration_readiness?: RegistrationPurposeReadiness;
   _ai_hint?: { summary: string; how_to_use: string; key_caveats: string[] };
   _meta: {
     grounded: boolean;
@@ -432,6 +440,10 @@ export async function lookupSamEntity(input: SamEntityInput): Promise<SamEntityR
     add('EDWOSB', statusOf('EDWOSB') === 'active', 'sba');
   }
 
+  const registrationReadiness = entity
+    ? registrationPurposeReadiness(entity.purposeOfRegistrationCode, entity.purposeOfRegistration)
+    : undefined;
+
   const reconciliation: SamEntityReconciliation | undefined =
     mode === 'name' && lookupStatus === 'not_found'
       ? {
@@ -464,6 +476,7 @@ export async function lookupSamEntity(input: SamEntityInput): Promise<SamEntityR
     ...(certProvenance.length ? { cert_provenance: certProvenance } : {}),
     ...(entity?.certificationStatus ? { certification_status: entity.certificationStatus } : {}),
     ...(certificationNote(entity?.certificationStatus) ? { certification_note: certificationNote(entity?.certificationStatus) } : {}),
+    ...(registrationReadiness ? { registration_readiness: registrationReadiness } : {}),
     _meta: {
       grounded, degraded, match_count: matchCount, mode,
       // Where the answer came from. A consumer must not present a cached row as a live SAM
@@ -505,6 +518,7 @@ export async function lookupSamEntity(input: SamEntityInput): Promise<SamEntityR
         'Set-aside eligibility depends on the CURRENT registration status + certifications shown — not on past awards.',
         'SDVOSB is SAM SELF-IDENTIFIED, not the authoritative SBA VetCert determination. 8(a), HUBZone, and WOSB/EDWOSB when cert_provenance says "sba" come from SBA certifications listed in SAM.gov. See cert_provenance.',
         'certification_status "not_established" means UNKNOWN — never say the firm is not certified. An absent has8a/hasHUBZone/hasWOSB flag means the same. Repeat certification_note when present.',
+        ...(registrationReadiness?.warning ? [registrationReadiness.warning] : []),
         ...(reconciliation
           ? ['See _meta.reconciliation for the legal / DBA / local hit counts that established this miss.']
           : []),

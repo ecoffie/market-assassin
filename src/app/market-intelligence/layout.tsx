@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { siteShareImages } from '@/lib/seo/share-image';
 import PublicShell from '@/components/public-site/PublicShell';
 import Link from 'next/link';
 
@@ -34,6 +35,7 @@ export const metadata: Metadata = {
       'Who buys what you sell, who holds the work now, and when it comes up again — from federal award records.',
     type: 'website',
     url: 'https://getmindy.ai/market-intelligence',
+    images: siteShareImages(),
   },
 };
 

@@ -18,6 +18,7 @@
  *   firms must be SBA-certified or third-party certified
  */
 import type { Metadata } from 'next';
+import { siteShareImages } from '@/lib/seo/share-image';
 import Link from 'next/link';
 
 export const metadata: Metadata = {
@@ -42,6 +43,7 @@ export const metadata: Metadata = {
       'Mindy filters SAM.gov, agency forecasts, and recompetes for WOSB and EDWOSB set-asides in the specific NAICS codes where the program applies.',
     type: 'website',
     url: 'https://getmindy.ai/set-asides/wosb',
+    images: siteShareImages(),
   },
 };
 

@@ -15,6 +15,7 @@
  * @id + ItemList of the four programs).
  */
 import type { Metadata } from 'next';
+import { siteShareImages } from '@/lib/seo/share-image';
 import Link from 'next/link';
 
 export const metadata: Metadata = {
@@ -39,6 +40,7 @@ export const metadata: Metadata = {
       'Daily federal set-aside opportunities for 8(a), HUBZone, SDVOSB, and WOSB firms. Alerts from SAM.gov, agency forecasts, and recompetes.',
     type: 'website',
     url: 'https://getmindy.ai/set-asides',
+    images: siteShareImages(),
   },
 };
 

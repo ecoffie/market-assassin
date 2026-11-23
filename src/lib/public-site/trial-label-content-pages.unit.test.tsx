@@ -35,16 +35,14 @@ describe('content pages: /pricing buttons use the trial label, not "Start for fr
     // Signed-out first render (session check still loading): the two /pricing buttons.
     ['/mcp', () => <McpConsole />, [LABEL, LABEL]],
     ['/mindy-intelligence', () => <MindyIntelligencePage />, [LABEL, LABEL]],
-    // The embedded MindySignupForm's own /pricing tab is relabelled by open PR #2287, so this
-    // page's check covers the page's three buttons, not the form.
-    ['/mindy-landing', () => <MindyLandingPage />, [LABEL, LABEL, `Meet Mindy — ${LABEL}`]],
+    // Three page buttons plus the embedded MindySignupForm's /pricing tab (relabelled by #2287).
+    ['/mindy-landing', () => <MindyLandingPage />, [LABEL, LABEL, LABEL, `Meet Mindy — ${LABEL}`]],
   ] as const)('%s', (path, el, expected) => {
     const { html, labels } = pricingLinks(el());
-    if (path !== '/mindy-landing') expect(html).not.toContain('Start for free');
-    else expect(read('src/app/mindy-landing/page.tsx')).not.toContain('Start for free');
+    expect(html).not.toContain('Start for free');
     for (const want of expected) expect(labels).toContain(want);
     expect(labels.filter((l) => l.includes(LABEL))).toHaveLength(expected.length);
-    expect(labels.filter((l) => l.includes('Start for free')).length).toBeLessThanOrEqual(path === '/mindy-landing' ? 1 : 0);
+    expect(labels.filter((l) => l.includes('Start for free'))).toHaveLength(0);
   });
 
   it('/glossary/[slug]', async () => {

@@ -40,11 +40,14 @@ gate_slot_acquire() {
   local timeout="${MINDY_GATE_SLOT_TIMEOUT_S:-2700}"
   local poll="${MINDY_GATE_SLOT_POLL_S:-5}"
   local owner="${GATE_SLOT_OWNER_PID:-$$}"
-  local start now waited last_note=0 i slot
+  local start waited last_note=0 i slot
   mkdir -p "$dir" 2>/dev/null || { echo "✗ gate slot: cannot create $dir — blocking push." >&2; return 1; }
-  start=$(date +%s)
+  # Bash builtins only inside the loop ($SECONDS, C-style for): no $(seq)/$(date) subprocess per iteration.
+  # Under heavy load a failed fork there silently skipped the slot scan or broke the clock (#2348 CI,
+  # 2026-11-22). Both work in macOS's bash 3.2.
+  start=$SECONDS
   while :; do
-    for i in $(seq 1 "$slots"); do
+    for ((i = 1; i <= slots; i++)); do
       slot="$dir/slot-$i"
       _gate_slot_reclaim_if_stale "$slot"
       if mkdir "$slot" 2>/dev/null; then
@@ -54,7 +57,7 @@ gate_slot_acquire() {
         return 0
       fi
     done
-    now=$(date +%s); waited=$((now - start))
+    waited=$((SECONDS - start))
     if [ "$waited" -ge "$timeout" ]; then
       echo "✗ gate slot: all $slots slots busy for ${waited}s — push BLOCKED (fail closed). Retry when other gate runs finish; never --no-verify." >&2
       for slot in "$dir"/slot-*; do [ -d "$slot" ] && echo "    held by pid $(cat "$slot/pid" 2>/dev/null) — $(cat "$slot/label" 2>/dev/null)" >&2; done

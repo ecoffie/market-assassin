@@ -119,9 +119,16 @@ export interface FmpPhaseState {
   budgetExhausted: boolean;
 }
 
-export function initialFmpPhaseState(customerText: string): FmpPhaseState {
-  const states = extractProfileStates(customerText);
-  const target = states.length > 0 ? states.length : 3;
+export function initialFmpPhaseState(customerText: string, opts: { companyStates?: readonly string[] } = {}): FmpPhaseState {
+  const textStates = extractProfileStates(customerText);
+  // A strategy plan with saved company states runs one market report per state (at most 3); with none, one
+  // national report. The RBA benchmark default (3) applies only when no company context is given.
+  const companyStates = opts.companyStates;
+  const target = textStates.length > 0
+    ? textStates.length
+    : companyStates
+      ? Math.max(1, Math.min(3, companyStates.length))
+      : 3;
   return {
     completed: new Set(),
     marketReportCount: 0,
