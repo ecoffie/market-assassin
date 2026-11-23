@@ -1,6 +1,6 @@
 {
   "5413": {
-    "version": 4,
+    "version": 5,
     "pipeline": [
       "structured_intent",
       "concept_classification",
@@ -132,7 +132,7 @@
     "notes": []
   },
   "541320": {
-    "version": 4,
+    "version": 5,
     "pipeline": [
       "structured_intent",
       "concept_classification",
@@ -264,7 +264,7 @@
     "notes": []
   },
   "pam": {
-    "version": 4,
+    "version": 5,
     "pipeline": [
       "structured_intent",
       "concept_classification",
@@ -411,7 +411,7 @@
     "notes": []
   },
   "ai governance": {
-    "version": 4,
+    "version": 5,
     "pipeline": [
       "structured_intent",
       "concept_classification",
@@ -572,7 +572,7 @@
     "notes": []
   },
   "artificial intelligence governance": {
-    "version": 4,
+    "version": 5,
     "pipeline": [
       "structured_intent",
       "concept_classification",
@@ -733,7 +733,7 @@
     "notes": []
   },
   "cybersecurity": {
-    "version": 4,
+    "version": 5,
     "pipeline": [
       "structured_intent",
       "concept_classification",
@@ -907,7 +907,7 @@
     "notes": []
   },
   "janitorial": {
-    "version": 4,
+    "version": 5,
     "pipeline": [
       "structured_intent",
       "concept_classification",
@@ -1067,7 +1067,7 @@
     "notes": []
   },
   "market research": {
-    "version": 4,
+    "version": 5,
     "pipeline": [
       "structured_intent",
       "concept_classification",
@@ -1225,7 +1225,7 @@
     "notes": []
   },
   "zzzxxyyqqq": {
-    "version": 4,
+    "version": 5,
     "pipeline": [
       "structured_intent",
       "concept_classification",
@@ -1373,7 +1373,7 @@
     "notes": []
   },
   "veterans affairs": {
-    "version": 4,
+    "version": 5,
     "pipeline": [
       "structured_intent",
       "concept_classification",
@@ -1524,7 +1524,7 @@
     "notes": []
   },
   "agency=VA janitorial": {
-    "version": 4,
+    "version": 5,
     "pipeline": [
       "structured_intent",
       "concept_classification",
@@ -1716,7 +1716,7 @@
     "notes": []
   },
   "management": {
-    "version": 4,
+    "version": 5,
     "pipeline": [
       "structured_intent",
       "concept_classification",
@@ -1863,7 +1863,7 @@
     "notes": []
   },
   "drones": {
-    "version": 4,
+    "version": 5,
     "pipeline": [
       "structured_intent",
       "concept_classification",
@@ -2025,7 +2025,7 @@
     "notes": []
   },
   "\"ai governance\"": {
-    "version": 4,
+    "version": 5,
     "pipeline": [
       "structured_intent",
       "concept_classification",
@@ -2153,7 +2153,7 @@
     "notes": []
   },
   "8a": {
-    "version": 4,
+    "version": 5,
     "pipeline": [
       "structured_intent",
       "concept_classification",
@@ -2283,7 +2283,7 @@
     "notes": []
   },
   "follow-on support": {
-    "version": 4,
+    "version": 5,
     "pipeline": [
       "structured_intent",
       "concept_classification",
@@ -2430,7 +2430,7 @@
     "notes": []
   },
   "Show me USDA opportunities": {
-    "version": 4,
+    "version": 5,
     "pipeline": [
       "structured_intent",
       "concept_classification",
@@ -2585,7 +2585,7 @@
     ]
   },
   "SDVOSB cybersecurity opportunities in Virginia": {
-    "version": 4,
+    "version": 5,
     "pipeline": [
       "structured_intent",
       "concept_classification",
@@ -2788,7 +2788,7 @@
     ]
   },
   "cyber cloud compliance network server": {
-    "version": 4,
+    "version": 5,
     "pipeline": [
       "structured_intent",
       "concept_classification",
@@ -3009,7 +3009,7 @@
     ]
   },
   "cyber, cloud": {
-    "version": 4,
+    "version": 5,
     "pipeline": [
       "structured_intent",
       "concept_classification",
@@ -3201,7 +3201,7 @@
     "notes": []
   },
   "Pro Audio": {
-    "version": 4,
+    "version": 5,
     "pipeline": [
       "structured_intent",
       "concept_classification",
@@ -3360,7 +3360,7 @@
     "notes": []
   },
   "541512 -computers": {
-    "version": 4,
+    "version": 5,
     "pipeline": [
       "structured_intent",
       "concept_classification",
@@ -3520,7 +3520,7 @@
     "notes": []
   },
   "-computers": {
-    "version": 4,
+    "version": 5,
     "pipeline": [
       "structured_intent",
       "concept_classification",
@@ -3646,7 +3646,7 @@
     "notes": []
   },
   "agency=USDA": {
-    "version": 4,
+    "version": 5,
     "pipeline": [
       "structured_intent",
       "concept_classification",
@@ -3791,7 +3791,7 @@
     "notes": []
   },
   "agency=VA": {
-    "version": 4,
+    "version": 5,
     "pipeline": [
       "structured_intent",
       "concept_classification",
@@ -3937,7 +3937,7 @@
     "notes": []
   },
   "Naval facilities in Nevada": {
-    "version": 4,
+    "version": 5,
     "pipeline": [
       "structured_intent",
       "concept_classification",
@@ -4104,7 +4104,7 @@
     "notes": []
   },
   "software license": {
-    "version": 4,
+    "version": 5,
     "pipeline": [
       "structured_intent",
       "concept_classification",
@@ -4281,7 +4281,7 @@
     "notes": []
   },
   "software licenses": {
-    "version": 4,
+    "version": 5,
     "pipeline": [
       "structured_intent",
       "concept_classification",
@@ -4458,7 +4458,7 @@
     "notes": []
   },
   "agency=NOAA": {
-    "version": 4,
+    "version": 5,
     "pipeline": [
       "structured_intent",
       "concept_classification",
@@ -4612,7 +4612,7 @@
     "notes": []
   },
   "agency=FAA": {
-    "version": 4,
+    "version": 5,
     "pipeline": [
       "structured_intent",
       "concept_classification",
@@ -4765,7 +4765,7 @@
     "notes": []
   },
   "agency=HUD janitorial": {
-    "version": 4,
+    "version": 5,
     "pipeline": [
       "structured_intent",
       "concept_classification",
@@ -4952,6 +4952,200 @@
             "reason": "unresolved_publisher"
           }
         ]
+      }
+    },
+    "notes": []
+  },
+  "bridge and highway heavy civil construction (VA,MD,DC)": {
+    "version": 5,
+    "pipeline": [
+      "structured_intent",
+      "concept_classification",
+      "eligibility",
+      "horizon_policy",
+      "ranking"
+    ],
+    "raw": "bridge and highway heavy civil construction",
+    "status": "ok",
+    "refinement": null,
+    "intent": {
+      "agencies": [],
+      "states": [],
+      "setAsides": [],
+      "naics": [],
+      "psc": [],
+      "exclusions": [],
+      "horizonHint": null,
+      "stripped": [],
+      "residual": "bridge and highway heavy civil construction",
+      "residualKind": "keyword"
+    },
+    "matcher": {
+      "mode": "lexical",
+      "normalized": "bridge and highway heavy civil construction",
+      "phrase": null,
+      "alternatives": [
+        {
+          "shape": "concept_query",
+          "eligibility": "all",
+          "eligible": [
+            {
+              "label": "highway and bridge",
+              "cls": "distinctive",
+              "basis": "recognized_concept",
+              "forms": [
+                "highway",
+                "bridge",
+                "road",
+                "roadway",
+                "pavement",
+                "paving"
+              ],
+              "aliases": [],
+              "inflect": "full",
+              "weight": 1
+            }
+          ],
+          "rankOnly": [
+            {
+              "label": "heavy civil",
+              "cls": "distinctive",
+              "basis": "recognized_concept",
+              "forms": [
+                "heavy civil",
+                "heavy and civil"
+              ],
+              "aliases": [],
+              "inflect": "full",
+              "weight": 1
+            },
+            {
+              "label": "construction",
+              "cls": "qualifier",
+              "basis": "platform_generic_word",
+              "forms": [
+                "construction"
+              ],
+              "aliases": [],
+              "inflect": "full",
+              "weight": 0.35
+            }
+          ]
+        }
+      ],
+      "excluded": []
+    },
+    "expansion": {
+      "capability_kind": "industry_preset",
+      "direct": {
+        "naics": [
+          "237310"
+        ],
+        "psc": [
+          "Y1LB",
+          "Z1LB",
+          "Z2LB"
+        ],
+        "terms": [
+          "Highway, Street & Bridge Construction",
+          "bridge and highway heavy civil construction"
+        ]
+      },
+      "related": null,
+      "term_of_art_naics": []
+    },
+    "buyers": [],
+    "states": [
+      "VA",
+      "MD",
+      "DC"
+    ],
+    "setAsides": [],
+    "naics": [],
+    "psc": [],
+    "policy": {
+      "surface": "mcp",
+      "horizons": [
+        "open",
+        "recompete",
+        "forecast"
+      ],
+      "open": {
+        "sources": [
+          "sam"
+        ]
+      },
+      "recompete": {
+        "windowMonths": 18
+      },
+      "forecast": {
+        "includePastFiscalYears": false
+      }
+    },
+    "horizons": {
+      "open": {
+        "via": "text_or_taxonomy",
+        "mapFilters": {
+          "status": "active",
+          "state": "VA,MD,DC"
+        },
+        "ops": [
+          {
+            "op": "or",
+            "expr": "title.imatch.\"\\\\m(highway(s|es|ing|ed)?|(bridge(s|es|ing|ed)?|bridg(ing|ed))|road(s|es|ing|ed)?|roadway(s|es|ing|ed)?|pavement(s|es|ing|ed)?|paving(s|es|ing|ed)?)\\\\M\",description.imatch.\"\\\\m(highway(s|es|ing|ed)?|(bridge(s|es|ing|ed)?|bridg(ing|ed))|road(s|es|ing|ed)?|roadway(s|es|ing|ed)?|pavement(s|es|ing|ed)?|paving(s|es|ing|ed)?)\\\\M\",sow_text.imatch.\"\\\\m(highway(s|es|ing|ed)?|(bridge(s|es|ing|ed)?|bridg(ing|ed))|road(s|es|ing|ed)?|roadway(s|es|ing|ed)?|pavement(s|es|ing|ed)?|paving(s|es|ing|ed)?)\\\\M\",department.imatch.\"\\\\m(highway(s|es|ing|ed)?|(bridge(s|es|ing|ed)?|bridg(ing|ed))|road(s|es|ing|ed)?|roadway(s|es|ing|ed)?|pavement(s|es|ing|ed)?|paving(s|es|ing|ed)?)\\\\M\",solicitation_number.imatch.\"\\\\m(highway(s|es|ing|ed)?|(bridge(s|es|ing|ed)?|bridg(ing|ed))|road(s|es|ing|ed)?|roadway(s|es|ing|ed)?|pavement(s|es|ing|ed)?|paving(s|es|ing|ed)?)\\\\M\",naics_code.eq.237310,psc_code.eq.Y1LB,psc_code.eq.Z1LB,psc_code.eq.Z2LB"
+          }
+        ]
+      },
+      "recompete": {
+        "via": "industry_preset",
+        "ops": [
+          {
+            "op": "is",
+            "col": "quality_flag",
+            "val": null
+          },
+          {
+            "op": "gte",
+            "col": "period_of_performance_current_end",
+            "val": "2026-09-22"
+          },
+          {
+            "op": "lte",
+            "col": "period_of_performance_current_end",
+            "val": "2028-03-22"
+          },
+          {
+            "op": "or",
+            "expr": "naics_code.eq.237310,psc_code.eq.Y1LB,psc_code.eq.Z1LB,psc_code.eq.Z2LB"
+          },
+          {
+            "op": "or",
+            "expr": "place_of_performance_state.eq.VA,place_of_performance_state.eq.MD,place_of_performance_state.eq.DC"
+          }
+        ],
+        "naics": [
+          "237310"
+        ]
+      },
+      "forecast": {
+        "via": "text",
+        "forecastFilters": {
+          "q": null,
+          "naics": null,
+          "agency": null,
+          "state": "VA,MD,DC"
+        },
+        "ops": [
+          {
+            "op": "or",
+            "expr": "title.imatch.\"\\\\m(highway(s|es|ing|ed)?|(bridge(s|es|ing|ed)?|bridg(ing|ed))|road(s|es|ing|ed)?|roadway(s|es|ing|ed)?|pavement(s|es|ing|ed)?|paving(s|es|ing|ed)?)\\\\M\",naics_description.imatch.\"\\\\m(highway(s|es|ing|ed)?|(bridge(s|es|ing|ed)?|bridg(ing|ed))|road(s|es|ing|ed)?|roadway(s|es|ing|ed)?|pavement(s|es|ing|ed)?|paving(s|es|ing|ed)?)\\\\M\",department.imatch.\"\\\\m(highway(s|es|ing|ed)?|(bridge(s|es|ing|ed)?|bridg(ing|ed))|road(s|es|ing|ed)?|roadway(s|es|ing|ed)?|pavement(s|es|ing|ed)?|paving(s|es|ing|ed)?)\\\\M\",description.imatch.\"\\\\m(highway(s|es|ing|ed)?|(bridge(s|es|ing|ed)?|bridg(ing|ed))|road(s|es|ing|ed)?|roadway(s|es|ing|ed)?|pavement(s|es|ing|ed)?|paving(s|es|ing|ed)?)\\\\M\""
+          },
+          {
+            "op": "or",
+            "expr": "fiscal_year.is.null,fiscal_year.ilike.%2026%,fiscal_year.ilike.%2027%,fiscal_year.ilike.%2028%,fiscal_year.ilike.%2029%,fiscal_year.ilike.%2030%,fiscal_year.ilike.%2031%,fiscal_year.ilike.%2032%,fiscal_year.ilike.%2033%,fiscal_year.ilike.%2034%,fiscal_year.ilike.%2035%,fiscal_year.ilike.%2036%,fiscal_year.ilike.%2037%,fiscal_year.ilike.%2038%,fiscal_year.ilike.%2039%,fiscal_year.ilike.%2040%,fiscal_year.ilike.%2041%"
+          }
+        ],
+        "coverage": "ok"
       }
     },
     "notes": []

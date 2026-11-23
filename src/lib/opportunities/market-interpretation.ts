@@ -120,7 +120,26 @@ export const PHYSICAL_SECURITY_RE =
  * "Direct match — the record itself establishes relevance". Neither record mentions janitorial work;
  * 561210 is Facilities Support Services, part of the Facilities & Maintenance family.
  */
-const PHRASE_PRESET: Array<{ match: RegExp; name: string; directNaics?: string[]; alsoDirect?: Array<{ match: RegExp; naics: string[] }>; relatedReason?: string }> = [
+const PHRASE_PRESET: Array<{
+  match: RegExp; name: string; directNaics?: string[]; alsoDirect?: Array<{ match: RegExp; naics: string[] }>; relatedReason?: string;
+  /** A sub-market of the preset, pinned to its OWN codes, with no related family (the preset's other codes are not retrieved). */
+  pin?: { source: string; naics: string[]; psc: string[] };
+}> = [
+  /**
+   * ROAD / BRIDGE work (Agent 4, 2026-11-23 — RBA benchmark "bridge and highway heavy civil construction", VA/MD/DC).
+   * Before this row the phrase fell to the generic Construction preset (236/237/238) and every Coming-back DIRECT_MATCH
+   * was a building, roof, HVAC or electrical job (236220, 238160, 238210, 237110) while 237310 road/bridge recompetes in
+   * VA went unreturned. It must precede Construction. Codes from Mindy's own crosswalk (src/data/psc-naics-crosswalk.json):
+   * NAICS 237310 "Highway, Street, and Bridge Construction" → top road/bridge PSCs Y1LB (construction), Z2LB (repair or
+   * alteration), Z1LB (maintenance) of highways/roads/streets/bridges; Z1LB/Z2LB cross back almost only to 237310.
+   * Y1BD (runways) is excluded — airfield work is not what was asked. A bare "bridge"/"road" needs a civil-works word
+   * beside it, so "bridge contract" never lands here.
+   */
+  {
+    match: /\b(?:highways?|roadways?|pavements?|paving)\b|^(?=.*\b(?:roads?|bridges?)\b).*\b(?:construction|civil|repairs?|rehabilitation|maintenance|replacement|resurfacing)\b/i,
+    name: 'Construction',
+    pin: { source: 'Highway, Street & Bridge Construction', naics: ['237310'], psc: ['Y1LB', 'Z1LB', 'Z2LB'] },
+  },
   { match: /\bconstruction\b/i, name: 'Construction' },
   {
     match: /\bjanitorial\b|\bcustodial\b/i,
@@ -298,6 +317,21 @@ export function interpretCapability(phrase: string): CapabilityInterpretation {
 
   for (const row of PHRASE_PRESET) {
     if (!row.match.test(requested)) continue;
+    if (row.pin) {
+      return {
+        requested,
+        kind: 'industry_preset',
+        direct: {
+          source: row.pin.source,
+          naics: [...row.pin.naics],
+          psc: [...row.pin.psc],
+          terms: uniqueFold([row.pin.source, requested]),
+          reason: `Customer phrase names road/bridge work: “${row.pin.source}” (NAICS ${row.pin.naics.join(', ')}; PSC ${row.pin.psc.join(', ')}), not all of “${row.name}”.`,
+        },
+        related_market: null,
+        excluded,
+      };
+    }
     const preset = getIndustryPreset(row.name);
     if (!preset) continue;
     const reason = `Customer phrase maps to the “${preset.name}” industry preset.`;

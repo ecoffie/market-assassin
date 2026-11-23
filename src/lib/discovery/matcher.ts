@@ -97,7 +97,15 @@ export const DISCOVERY_SUPPORTING: ReadonlySet<string> = new Set([
  * "market research" (measured 2026-09-22, was 40) — so it may never admit by itself in a list,
  * but inside a short query it is part of what was asked.
  */
-export const DISCOVERY_QUALIFIERS: ReadonlySet<string> = new Set(['market']);
+export const DISCOVERY_QUALIFIERS: ReadonlySet<string> = new Set([
+  'market',
+  // Size / sector qualifiers of civil works (Agent 4, 2026-11-23). Corpus df < 1%, so as "distinctive" words each one
+  // ADMITTED a capability list on its own: "bridge and highway heavy civil construction" (RBA benchmark, VA/MD/DC)
+  // returned a DDG-1000 warship "Heavy Lift" RFI as Open #1 and USCG "Office of Civil Engineering" program support as
+  // a direct match. They are broad but meaningful: required inside a short query ("heavy lift", "civil engineering"),
+  // rank only in a list. Their compound "heavy civil" is a recognized concept (CONCEPTS).
+  'heavy', 'civil',
+]);
 
 /**
  * Pronouns never name a market and never establish eligibility (Agent 3, 2026-11-14). They still COUNT toward the
@@ -143,7 +151,7 @@ export const FUNCTION_WORDS: ReadonlySet<string> = new Set([
  * alone, "cyber" stopped matching "cybersecurity" — 249 active notices say cybersecurity, 25 say cyber
  * (measured 2026-09-22) — so a "cyber" search would have lost ~90% of its market.
  */
-export const CONCEPTS: ReadonlyArray<{ id: string; forms: string[]; acronyms?: string[]; cooccur?: string[]; names?: string[] }> = [
+export const CONCEPTS: ReadonlyArray<{ id: string; forms: string[]; acronyms?: string[]; cooccur?: string[]; names?: string[]; implies?: string[] }> = [
   { id: 'artificial intelligence', forms: ['artificial intelligence'], acronyms: ['AI'] },
   { id: 'machine learning', forms: ['machine learning'], acronyms: ['ML'] },
   { id: 'information technology', forms: ['information technology'], acronyms: ['IT'] },
@@ -174,7 +182,40 @@ export const CONCEPTS: ReadonlyArray<{ id: string; forms: string[]; acronyms?: s
     // measured (+6,632 recompetes for "license renewal") and is not what those users asked for.
     names: ['software license'],
   },
+  /**
+   * HIGHWAY AND BRIDGE (Agent 4, 2026-11-23 — RBA benchmark "bridge and highway heavy civil construction").
+   * Recognized ONLY from a compound that names road/bridge work; a bare "bridge" ("bridge contract") or "road" in a
+   * query keeps its plain-word meaning. Once recognized, the concept is satisfied by any of the words agencies use for
+   * that work: forecasts say "road", "roadway", "pavement" or "paving" far more often than "bridge and highway".
+   * `implies`: the sector words the user typed around it ("construction", "heavy civil") are already MEANT by this
+   * concept, so they rank only. Without that, the query became bridge ∧ highway ∧ heavy civil ∧ construction (or, as
+   * shipped, ANY of bridge · highway · heavy · civil) — the first starves recall, the second admitted warships.
+   * Taxonomy for the same intent (NAICS 237310 + PSC Y1LB/Z1LB/Z2LB) lives in market-interpretation.ts PHRASE_PRESET.
+   * Not a form, on purpose: bare "lane" (swim lane, street names) and "street" (every postal address).
+   */
+  {
+    id: 'highway and bridge',
+    forms: ['highway', 'bridge', 'road', 'roadway', 'pavement', 'paving'],
+    names: [
+      'bridge and highway', 'bridges and highways', 'highway and bridge', 'highways and bridges',
+      'bridge & highway', 'highway & bridge', 'road and bridge', 'roads and bridges', 'bridge and road', 'bridges and roads',
+      'highway bridge',
+    ],
+    implies: ['construction', 'heavy civil', 'heavy', 'civil'],
+  },
+  /** HEAVY CIVIL — the trade name of NAICS 237 ("Heavy and Civil Engineering Construction"). The phrase only. */
+  { id: 'heavy civil', forms: ['heavy civil', 'heavy and civil'] },
 ];
+
+/** Labels a recognized concept already means (CONCEPTS[].implies). Those concepts rank only, beside it. */
+function impliedLabels(concepts: Concept[]): Set<string> {
+  const out = new Set<string>();
+  for (const c of concepts) {
+    if (c.basis !== 'recognized_concept') continue;
+    for (const l of CONCEPTS.find((x) => x.id === c.label)?.implies || []) if (l !== c.label) out.add(l);
+  }
+  return out;
+}
 
 /** User-typed domain acronyms (the /try SHORT_DOMAIN_TOKENS) — matched case-sensitively in upper case. */
 const TOKEN_ACRONYMS: ReadonlySet<string> = new Set([...SHORT_DOMAIN_TOKENS]);
@@ -302,7 +343,17 @@ function capabilityListTiers(distinctive: Concept[]): { common: Concept[]; admit
 }
 
 function alternativeOf(text: string): Alternative | null {
-  const all = conceptsOf(text);
+  const found = conceptsOf(text);
+  if (!found.length) return null;
+  // Concepts another recognized concept already means never shape, admit or pair; they rank only.
+  const implied = impliedLabels(found);
+  const all = found.filter((c) => !implied.has(c.label));
+  const redundant = found.filter((c) => implied.has(c.label));
+  const alt = alternativeOfCore(all);
+  return alt && redundant.length ? { ...alt, rankOnly: [...alt.rankOnly, ...redundant] } : alt;
+}
+
+function alternativeOfCore(all: Concept[]): Alternative | null {
   if (!all.length) return null;
   const pronouns = all.filter((c) => FUNCTION_WORDS.has(c.label));
   // Shape is decided on every concept (unchanged); pronouns are then removed from eligibility and only rank.

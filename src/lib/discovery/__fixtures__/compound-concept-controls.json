@@ -1,0 +1,579 @@
+{
+  "_meta": {
+    "built_from": "origin/main fb4b71f2f (DISCOVERY_PLAN_VERSION 4), ctx 2026-09-22, MCP_POLICY; `version` omitted"
+  },
+  "controls": {
+    "cybersecurity + agency=SOCOM": {
+      "input": {
+        "query": "cybersecurity",
+        "agency": "SOCOM"
+      },
+      "plan": {
+        "pipeline": [
+          "structured_intent",
+          "concept_classification",
+          "eligibility",
+          "horizon_policy",
+          "ranking"
+        ],
+        "raw": "cybersecurity",
+        "status": "ok",
+        "refinement": null,
+        "intent": {
+          "agencies": [],
+          "states": [],
+          "setAsides": [],
+          "naics": [],
+          "psc": [],
+          "exclusions": [],
+          "horizonHint": null,
+          "stripped": [],
+          "residual": "cybersecurity",
+          "residualKind": "keyword"
+        },
+        "matcher": {
+          "mode": "lexical",
+          "normalized": "cybersecurity",
+          "phrase": null,
+          "alternatives": [
+            {
+              "shape": "concept_query",
+              "eligibility": "all",
+              "eligible": [
+                {
+                  "label": "cybersecurity",
+                  "cls": "distinctive",
+                  "basis": "recognized_concept",
+                  "forms": [
+                    "cybersecurity",
+                    "cyber security",
+                    "cyber"
+                  ],
+                  "aliases": [],
+                  "inflect": "full",
+                  "weight": 1
+                }
+              ],
+              "rankOnly": []
+            }
+          ],
+          "excluded": []
+        },
+        "expansion": {
+          "capability_kind": "cyber_with_related_it",
+          "direct": {
+            "naics": [
+              "518210"
+            ],
+            "psc": [
+              "DJ01",
+              "DJ10"
+            ],
+            "terms": [
+              "Cybersecurity",
+              "cyber",
+              "information security",
+              "network security",
+              "infosec",
+              "zero trust",
+              "SIEM"
+            ]
+          },
+          "related": {
+            "naics": [
+              "541511",
+              "541512",
+              "541513",
+              "541519"
+            ],
+            "psc": []
+          },
+          "term_of_art_naics": []
+        },
+        "buyers": [
+          {
+            "requested": "SOCOM",
+            "canonical": "U.S. Special Operations Command (SOCOM)",
+            "kind": "normalization",
+            "needles": [
+              "SOCOM",
+              "U.S. Special Operations Command (SOCOM)",
+              "U.S. Special Operations Command",
+              "USSOCOM",
+              "UNITED STATES SPECIAL OPERATIONS COMMAND",
+              "SPECIAL OPS",
+              "SPECIAL OPERATIONS"
+            ],
+            "identity": [
+              [
+                "socom"
+              ],
+              [
+                "special",
+                "operations",
+                "command"
+              ],
+              [
+                "ussocom"
+              ],
+              [
+                "united",
+                "states",
+                "special",
+                "operations",
+                "command"
+              ],
+              [
+                "special",
+                "ops"
+              ],
+              [
+                "special",
+                "operations"
+              ]
+            ]
+          }
+        ],
+        "states": [],
+        "setAsides": [],
+        "naics": [],
+        "psc": [],
+        "policy": {
+          "surface": "mcp",
+          "horizons": [
+            "open",
+            "recompete",
+            "forecast"
+          ],
+          "open": {
+            "sources": [
+              "sam"
+            ]
+          },
+          "recompete": {
+            "windowMonths": 18
+          },
+          "forecast": {
+            "includePastFiscalYears": false
+          }
+        },
+        "horizons": {
+          "open": {
+            "via": "text_or_taxonomy",
+            "mapFilters": {
+              "status": "active"
+            },
+            "ops": [
+              {
+                "op": "or",
+                "expr": "title.imatch.\"\\\\m(cybersecurity(s|es|ing|ed)?|cyber[-\\\\s]+security(s|es|ing|ed)?|cyber(s|es|ing|ed)?)\\\\M\",description.imatch.\"\\\\m(cybersecurity(s|es|ing|ed)?|cyber[-\\\\s]+security(s|es|ing|ed)?|cyber(s|es|ing|ed)?)\\\\M\",sow_text.imatch.\"\\\\m(cybersecurity(s|es|ing|ed)?|cyber[-\\\\s]+security(s|es|ing|ed)?|cyber(s|es|ing|ed)?)\\\\M\",department.imatch.\"\\\\m(cybersecurity(s|es|ing|ed)?|cyber[-\\\\s]+security(s|es|ing|ed)?|cyber(s|es|ing|ed)?)\\\\M\",solicitation_number.imatch.\"\\\\m(cybersecurity(s|es|ing|ed)?|cyber[-\\\\s]+security(s|es|ing|ed)?|cyber(s|es|ing|ed)?)\\\\M\",naics_code.eq.518210,psc_code.eq.DJ01,psc_code.eq.DJ10"
+              },
+              {
+                "op": "or",
+                "expr": "department.imatch.\"\\\\msocom\\\\M\",sub_tier.imatch.\"\\\\msocom\\\\M\",and(department.imatch.\"\\\\mspecial\\\\M\",department.imatch.\"\\\\moperations\\\\M\",department.imatch.\"\\\\mcommand\\\\M\"),and(sub_tier.imatch.\"\\\\mspecial\\\\M\",sub_tier.imatch.\"\\\\moperations\\\\M\",sub_tier.imatch.\"\\\\mcommand\\\\M\"),department.imatch.\"\\\\mussocom\\\\M\",sub_tier.imatch.\"\\\\mussocom\\\\M\",and(department.imatch.\"\\\\munited\\\\M\",department.imatch.\"\\\\mstates\\\\M\",department.imatch.\"\\\\mspecial\\\\M\",department.imatch.\"\\\\moperations\\\\M\",department.imatch.\"\\\\mcommand\\\\M\"),and(sub_tier.imatch.\"\\\\munited\\\\M\",sub_tier.imatch.\"\\\\mstates\\\\M\",sub_tier.imatch.\"\\\\mspecial\\\\M\",sub_tier.imatch.\"\\\\moperations\\\\M\",sub_tier.imatch.\"\\\\mcommand\\\\M\"),and(department.imatch.\"\\\\mspecial\\\\M\",department.imatch.\"\\\\mops\\\\M\"),and(sub_tier.imatch.\"\\\\mspecial\\\\M\",sub_tier.imatch.\"\\\\mops\\\\M\"),and(department.imatch.\"\\\\mspecial\\\\M\",department.imatch.\"\\\\moperations\\\\M\"),and(sub_tier.imatch.\"\\\\mspecial\\\\M\",sub_tier.imatch.\"\\\\moperations\\\\M\")"
+              }
+            ]
+          },
+          "recompete": {
+            "via": "industry_preset",
+            "ops": [
+              {
+                "op": "is",
+                "col": "quality_flag",
+                "val": null
+              },
+              {
+                "op": "gte",
+                "col": "period_of_performance_current_end",
+                "val": "2026-09-22"
+              },
+              {
+                "op": "lte",
+                "col": "period_of_performance_current_end",
+                "val": "2028-03-22"
+              },
+              {
+                "op": "or",
+                "expr": "naics_code.eq.518210,naics_code.eq.541511,naics_code.eq.541512,naics_code.eq.541513,naics_code.eq.541519,psc_code.eq.DJ01,psc_code.eq.DJ10,incumbent_name.imatch.\"\\\\mcybersecurity\\\\M\",naics_description.imatch.\"\\\\mcybersecurity\\\\M\",description.imatch.\"\\\\mcybersecurity\\\\M\",incumbent_name.imatch.\"\\\\mcyber\\\\M\",naics_description.imatch.\"\\\\mcyber\\\\M\",description.imatch.\"\\\\mcyber\\\\M\",incumbent_name.imatch.\"\\\\minformation[-\\\\s]+security\\\\M\",naics_description.imatch.\"\\\\minformation[-\\\\s]+security\\\\M\",description.imatch.\"\\\\minformation[-\\\\s]+security\\\\M\",incumbent_name.imatch.\"\\\\mnetwork[-\\\\s]+security\\\\M\",naics_description.imatch.\"\\\\mnetwork[-\\\\s]+security\\\\M\",description.imatch.\"\\\\mnetwork[-\\\\s]+security\\\\M\",incumbent_name.imatch.\"\\\\minfosec\\\\M\",naics_description.imatch.\"\\\\minfosec\\\\M\",description.imatch.\"\\\\minfosec\\\\M\",incumbent_name.imatch.\"\\\\mzero[-\\\\s]+trust\\\\M\",naics_description.imatch.\"\\\\mzero[-\\\\s]+trust\\\\M\",description.imatch.\"\\\\mzero[-\\\\s]+trust\\\\M\",incumbent_name.imatch.\"\\\\msiem\\\\M\",naics_description.imatch.\"\\\\msiem\\\\M\",description.imatch.\"\\\\msiem\\\\M\""
+              },
+              {
+                "op": "or",
+                "expr": "awarding_agency.imatch.\"\\\\msocom\\\\M\",awarding_sub_agency.imatch.\"\\\\msocom\\\\M\",and(awarding_agency.imatch.\"\\\\mspecial\\\\M\",awarding_agency.imatch.\"\\\\moperations\\\\M\",awarding_agency.imatch.\"\\\\mcommand\\\\M\"),and(awarding_sub_agency.imatch.\"\\\\mspecial\\\\M\",awarding_sub_agency.imatch.\"\\\\moperations\\\\M\",awarding_sub_agency.imatch.\"\\\\mcommand\\\\M\"),awarding_agency.imatch.\"\\\\mussocom\\\\M\",awarding_sub_agency.imatch.\"\\\\mussocom\\\\M\",and(awarding_agency.imatch.\"\\\\munited\\\\M\",awarding_agency.imatch.\"\\\\mstates\\\\M\",awarding_agency.imatch.\"\\\\mspecial\\\\M\",awarding_agency.imatch.\"\\\\moperations\\\\M\",awarding_agency.imatch.\"\\\\mcommand\\\\M\"),and(awarding_sub_agency.imatch.\"\\\\munited\\\\M\",awarding_sub_agency.imatch.\"\\\\mstates\\\\M\",awarding_sub_agency.imatch.\"\\\\mspecial\\\\M\",awarding_sub_agency.imatch.\"\\\\moperations\\\\M\",awarding_sub_agency.imatch.\"\\\\mcommand\\\\M\"),and(awarding_agency.imatch.\"\\\\mspecial\\\\M\",awarding_agency.imatch.\"\\\\mops\\\\M\"),and(awarding_sub_agency.imatch.\"\\\\mspecial\\\\M\",awarding_sub_agency.imatch.\"\\\\mops\\\\M\"),and(awarding_agency.imatch.\"\\\\mspecial\\\\M\",awarding_agency.imatch.\"\\\\moperations\\\\M\"),and(awarding_sub_agency.imatch.\"\\\\mspecial\\\\M\",awarding_sub_agency.imatch.\"\\\\moperations\\\\M\")"
+              }
+            ],
+            "naics": [
+              "518210",
+              "541511",
+              "541512",
+              "541513",
+              "541519"
+            ]
+          },
+          "forecast": {
+            "via": "coverage_unestablished",
+            "forecastFilters": {
+              "q": null,
+              "naics": null,
+              "agency": null,
+              "state": null
+            },
+            "ops": [
+              {
+                "op": "is",
+                "col": "id",
+                "val": null
+              }
+            ],
+            "coverage": "unestablished",
+            "coverageGaps": [
+              {
+                "requested": "SOCOM",
+                "reason": "publisher_without_forecasts",
+                "label": "U.S. Special Operations Command",
+                "parentWithData": "DOD",
+                "note": "No SOCOM/USSOCOM forecast publisher in agency_forecasts. DoD coverage is Navy/ONR/NRL/USACE only — not USSOCOM. Alias matching is not coverage."
+              }
+            ]
+          }
+        },
+        "notes": []
+      }
+    },
+    "janitorial services": {
+      "input": {
+        "query": "janitorial services"
+      },
+      "plan": {
+        "pipeline": [
+          "structured_intent",
+          "concept_classification",
+          "eligibility",
+          "horizon_policy",
+          "ranking"
+        ],
+        "raw": "janitorial services",
+        "status": "ok",
+        "refinement": null,
+        "intent": {
+          "agencies": [],
+          "states": [],
+          "setAsides": [],
+          "naics": [],
+          "psc": [],
+          "exclusions": [],
+          "horizonHint": null,
+          "stripped": [],
+          "residual": "janitorial services",
+          "residualKind": "keyword"
+        },
+        "matcher": {
+          "mode": "lexical",
+          "normalized": "janitorial services",
+          "phrase": null,
+          "alternatives": [
+            {
+              "shape": "concept_query",
+              "eligibility": "all",
+              "eligible": [
+                {
+                  "label": "janitorial",
+                  "cls": "distinctive",
+                  "basis": "not_in_generic_lists",
+                  "forms": [
+                    "janitorial"
+                  ],
+                  "aliases": [],
+                  "inflect": "full",
+                  "weight": 1
+                }
+              ],
+              "rankOnly": []
+            }
+          ],
+          "excluded": []
+        },
+        "expansion": {
+          "capability_kind": "industry_preset",
+          "direct": {
+            "naics": [
+              "561720"
+            ],
+            "psc": [],
+            "terms": [
+              "Facilities & Maintenance",
+              "janitorial services"
+            ]
+          },
+          "related": {
+            "naics": [
+              "561210",
+              "561730"
+            ],
+            "psc": []
+          },
+          "term_of_art_naics": []
+        },
+        "buyers": [],
+        "states": [],
+        "setAsides": [],
+        "naics": [],
+        "psc": [],
+        "policy": {
+          "surface": "mcp",
+          "horizons": [
+            "open",
+            "recompete",
+            "forecast"
+          ],
+          "open": {
+            "sources": [
+              "sam"
+            ]
+          },
+          "recompete": {
+            "windowMonths": 18
+          },
+          "forecast": {
+            "includePastFiscalYears": false
+          }
+        },
+        "horizons": {
+          "open": {
+            "via": "text_or_taxonomy",
+            "mapFilters": {
+              "status": "active"
+            },
+            "ops": [
+              {
+                "op": "or",
+                "expr": "title.imatch.\"\\\\mjanitorial(s|es|ing|ed)?\\\\M\",description.imatch.\"\\\\mjanitorial(s|es|ing|ed)?\\\\M\",sow_text.imatch.\"\\\\mjanitorial(s|es|ing|ed)?\\\\M\",department.imatch.\"\\\\mjanitorial(s|es|ing|ed)?\\\\M\",solicitation_number.imatch.\"\\\\mjanitorial(s|es|ing|ed)?\\\\M\",naics_code.eq.561720,naics_code.eq.561210,naics_code.eq.561730"
+              }
+            ]
+          },
+          "recompete": {
+            "via": "industry_preset",
+            "ops": [
+              {
+                "op": "is",
+                "col": "quality_flag",
+                "val": null
+              },
+              {
+                "op": "gte",
+                "col": "period_of_performance_current_end",
+                "val": "2026-09-22"
+              },
+              {
+                "op": "lte",
+                "col": "period_of_performance_current_end",
+                "val": "2028-03-22"
+              },
+              {
+                "op": "or",
+                "expr": "naics_code.eq.561720,naics_code.eq.561210,naics_code.eq.561730"
+              }
+            ],
+            "naics": [
+              "561720",
+              "561210",
+              "561730"
+            ]
+          },
+          "forecast": {
+            "via": "text",
+            "forecastFilters": {
+              "q": null,
+              "naics": null,
+              "agency": null,
+              "state": null
+            },
+            "ops": [
+              {
+                "op": "or",
+                "expr": "title.imatch.\"\\\\mjanitorial(s|es|ing|ed)?\\\\M\",naics_description.imatch.\"\\\\mjanitorial(s|es|ing|ed)?\\\\M\",department.imatch.\"\\\\mjanitorial(s|es|ing|ed)?\\\\M\",description.imatch.\"\\\\mjanitorial(s|es|ing|ed)?\\\\M\""
+              },
+              {
+                "op": "or",
+                "expr": "fiscal_year.is.null,fiscal_year.ilike.%2026%,fiscal_year.ilike.%2027%,fiscal_year.ilike.%2028%,fiscal_year.ilike.%2029%,fiscal_year.ilike.%2030%,fiscal_year.ilike.%2031%,fiscal_year.ilike.%2032%,fiscal_year.ilike.%2033%,fiscal_year.ilike.%2034%,fiscal_year.ilike.%2035%,fiscal_year.ilike.%2036%,fiscal_year.ilike.%2037%,fiscal_year.ilike.%2038%,fiscal_year.ilike.%2039%,fiscal_year.ilike.%2040%,fiscal_year.ilike.%2041%"
+              }
+            ],
+            "coverage": "ok"
+          }
+        },
+        "notes": []
+      }
+    },
+    "IT services + state=VA": {
+      "input": {
+        "query": "IT services",
+        "state": "VA"
+      },
+      "plan": {
+        "pipeline": [
+          "structured_intent",
+          "concept_classification",
+          "eligibility",
+          "horizon_policy",
+          "ranking"
+        ],
+        "raw": "IT services",
+        "status": "ok",
+        "refinement": null,
+        "intent": {
+          "agencies": [],
+          "states": [],
+          "setAsides": [],
+          "naics": [],
+          "psc": [],
+          "exclusions": [],
+          "horizonHint": null,
+          "stripped": [],
+          "residual": "it services",
+          "residualKind": "keyword"
+        },
+        "matcher": {
+          "mode": "lexical",
+          "normalized": "it services",
+          "phrase": null,
+          "alternatives": [
+            {
+              "shape": "concept_query",
+              "eligibility": "all",
+              "eligible": [
+                {
+                  "label": "information technology",
+                  "cls": "distinctive",
+                  "basis": "recognized_concept",
+                  "forms": [
+                    "information technology"
+                  ],
+                  "aliases": [],
+                  "inflect": "full",
+                  "weight": 1,
+                  "acronyms": [
+                    "IT"
+                  ]
+                }
+              ],
+              "rankOnly": []
+            }
+          ],
+          "excluded": []
+        },
+        "expansion": {
+          "capability_kind": "industry_preset",
+          "direct": {
+            "naics": [
+              "541511",
+              "541512",
+              "541513",
+              "541519"
+            ],
+            "psc": [],
+            "terms": [
+              "IT Services"
+            ]
+          },
+          "related": null,
+          "term_of_art_naics": []
+        },
+        "buyers": [],
+        "states": [
+          "VA"
+        ],
+        "setAsides": [],
+        "naics": [],
+        "psc": [],
+        "policy": {
+          "surface": "mcp",
+          "horizons": [
+            "open",
+            "recompete",
+            "forecast"
+          ],
+          "open": {
+            "sources": [
+              "sam"
+            ]
+          },
+          "recompete": {
+            "windowMonths": 18
+          },
+          "forecast": {
+            "includePastFiscalYears": false
+          }
+        },
+        "horizons": {
+          "open": {
+            "via": "text_or_taxonomy",
+            "mapFilters": {
+              "status": "active",
+              "state": "VA"
+            },
+            "ops": [
+              {
+                "op": "or",
+                "expr": "title.imatch.\"\\\\minformation[-\\\\s]+technology(s|es|ing|ed)?\\\\M\",title.match.\"\\\\mITs?\\\\M\",description.imatch.\"\\\\minformation[-\\\\s]+technology(s|es|ing|ed)?\\\\M\",description.match.\"\\\\mITs?\\\\M\",sow_text.imatch.\"\\\\minformation[-\\\\s]+technology(s|es|ing|ed)?\\\\M\",sow_text.match.\"\\\\mITs?\\\\M\",department.imatch.\"\\\\minformation[-\\\\s]+technology(s|es|ing|ed)?\\\\M\",department.match.\"\\\\mITs?\\\\M\",solicitation_number.imatch.\"\\\\minformation[-\\\\s]+technology(s|es|ing|ed)?\\\\M\",solicitation_number.match.\"\\\\mITs?\\\\M\",naics_code.eq.541511,naics_code.eq.541512,naics_code.eq.541513,naics_code.eq.541519,psc_code.like.DA%,psc_code.like.DB%,psc_code.like.DJ%"
+              }
+            ]
+          },
+          "recompete": {
+            "via": "industry_preset",
+            "ops": [
+              {
+                "op": "is",
+                "col": "quality_flag",
+                "val": null
+              },
+              {
+                "op": "gte",
+                "col": "period_of_performance_current_end",
+                "val": "2026-09-22"
+              },
+              {
+                "op": "lte",
+                "col": "period_of_performance_current_end",
+                "val": "2028-03-22"
+              },
+              {
+                "op": "or",
+                "expr": "naics_code.eq.541511,naics_code.eq.541512,naics_code.eq.541513,naics_code.eq.541519"
+              },
+              {
+                "op": "or",
+                "expr": "place_of_performance_state.eq.VA"
+              }
+            ],
+            "naics": [
+              "541511",
+              "541512",
+              "541513",
+              "541519"
+            ]
+          },
+          "forecast": {
+            "via": "text",
+            "forecastFilters": {
+              "q": null,
+              "naics": null,
+              "agency": null,
+              "state": "VA"
+            },
+            "ops": [
+              {
+                "op": "or",
+                "expr": "title.imatch.\"\\\\minformation[-\\\\s]+technology(s|es|ing|ed)?\\\\M\",title.match.\"\\\\mITs?\\\\M\",naics_description.imatch.\"\\\\minformation[-\\\\s]+technology(s|es|ing|ed)?\\\\M\",naics_description.match.\"\\\\mITs?\\\\M\",department.imatch.\"\\\\minformation[-\\\\s]+technology(s|es|ing|ed)?\\\\M\",department.match.\"\\\\mITs?\\\\M\",description.imatch.\"\\\\minformation[-\\\\s]+technology(s|es|ing|ed)?\\\\M\",description.match.\"\\\\mITs?\\\\M\""
+              },
+              {
+                "op": "or",
+                "expr": "fiscal_year.is.null,fiscal_year.ilike.%2026%,fiscal_year.ilike.%2027%,fiscal_year.ilike.%2028%,fiscal_year.ilike.%2029%,fiscal_year.ilike.%2030%,fiscal_year.ilike.%2031%,fiscal_year.ilike.%2032%,fiscal_year.ilike.%2033%,fiscal_year.ilike.%2034%,fiscal_year.ilike.%2035%,fiscal_year.ilike.%2036%,fiscal_year.ilike.%2037%,fiscal_year.ilike.%2038%,fiscal_year.ilike.%2039%,fiscal_year.ilike.%2040%,fiscal_year.ilike.%2041%"
+              }
+            ],
+            "coverage": "ok"
+          }
+        },
+        "notes": []
+      }
+    }
+  }
+}
