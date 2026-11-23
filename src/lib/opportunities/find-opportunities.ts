@@ -272,6 +272,11 @@ export interface FindCompanySummary {
   /** Per-NAICS SAM size representation, verbatim tri-state. */
   size_by_naics: CompanyAnchor['size_by_naics'] | null;
   location: CompanyAnchor['location'] | null;
+  /**
+   * SAM registration purpose and whether it covers contract awards. `warning` is present only
+   * when SAM lists an assistance-only purpose (Z1) — the host must repeat it. Null when unresolved.
+   */
+  registration_readiness: CompanyAnchor['registration_purpose'] | null;
 }
 
 export interface FindOpportunitiesResult {
@@ -350,6 +355,7 @@ export const HOST_RULES_FIND_FIRST_VALUE = [
 /** Added to host_rules ONLY for a company-anchored call (input.uei). The beginner first turn is unchanged. */
 export const HOST_RULES_COMPANY_ANCHORED = [
   'COMPANY-ANCHORED: this FIND used the company\'s own SAM registration (see `company`). Items with match_basis company_registered_psc / company_registered_naics were recalled by a code the company REGISTERED — say so; they are not a match on the words typed and never a DIRECT_MATCH.',
+  'REGISTRATION: if company.registration_readiness.warning is present, say it plainly before the items (SAM lists the registration as assistance-only, so the company is not currently registered for contract awards). If contract_awards is "unknown", do not claim either way.',
   'ELIGIBILITY is separate from relevance. Report each item\'s eligibility.status with its reason: ELIGIBLE, NOT_ELIGIBLE (say why — e.g. not small under the notice NAICS), or UNKNOWN. Never turn UNKNOWN into eligible or not eligible. A missing set-aside is UNKNOWN, not unrestricted. Size is per NAICS — never call the company "small" in general.',
   'Coming back eligibility is always UNKNOWN: a recompete is not a live solicitation and its set-aside is not stated yet. Coming soon eligibility reflects the agency\'s ANTICIPATED set-aside only.',
   'ALREADY AWARDED: a coming_soon item with already_awarded_to_company matches an award already made to this company (exact rule in company_award_check.rule). Show it with its label (e.g. "already awarded to you (PIID, date)") — never present it as a new lead, never drop it. No flag means no match among the awards checked, not "not awarded to you".',
@@ -1590,6 +1596,7 @@ function companySummary(c: CompanyAnchorResolution, plan: DiscoveryPlan): FindCo
     recall_codes: plan.company ?? null,
     size_by_naics: a ? a.size_by_naics : null,
     location: a?.location ?? null,
+    registration_readiness: a ? a.registration_purpose : null,
   };
 }
 
