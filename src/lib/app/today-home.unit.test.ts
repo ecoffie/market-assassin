@@ -146,4 +146,9 @@ describe('call sites in /app', () => {
     expect(todayPanel).toContain("onPanelChange?.('chat')");
     expect(todayPanel).toContain("onPanelChange?.('map')");
   });
+  it("treats mi-dashboard's 'Unknown Agency' placeholder as an unknown buyer, not a name", () => {
+    const r = parseTodayMatches({ success: true, opportunities: [{ notice_id: '3'.repeat(32), title: 'Opp 3', department: 'Unknown Agency', response_deadline: '2026-12-05' }] });
+    expect(r.state).toBe('ok');
+    if (r.state === 'ok') expect(r.value[0].buyer).toBe('');
+  });
 });

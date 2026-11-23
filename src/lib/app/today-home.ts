@@ -118,11 +118,16 @@ export function parseTodayMatches(json: unknown): Loadable<TodayMatch[]> {
     out.push({
       noticeId,
       title,
-      buyer: str(o.department) || str(o.agency) || str(o.sub_tier),
+      buyer: knownBuyer(str(o.department)) || knownBuyer(str(o.agency)) || knownBuyer(str(o.sub_tier)),
       deadline: str(o.response_deadline).slice(0, 10),
     });
   }
   return { state: 'ok', value: out };
+}
+
+/** mi-dashboard fills a missing department with 'Unknown Agency'; that is unknown, not a buyer name. */
+function knownBuyer(v: string): string {
+  return /^unknown agency$/i.test(v.trim()) ? '' : v;
 }
 
 /** The request URLs Today reads (exported so a test pins them to the existing APIs). */

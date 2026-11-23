@@ -61,7 +61,7 @@ export function TodayView({ searches, matches, onAskMindy, onOpenMap, onOpenWatc
 
       <section aria-label="Closing soonest" data-testid="today-matches" className="rounded-xl border border-surface bg-ground p-4">
         <h2 className="text-base font-semibold">Closing soonest</h2>
-        <p className="text-xs text-muted mb-3">Open opportunities matched to your profile, soonest deadline first.</p>
+        <p className="text-xs text-muted mb-3">Open opportunities, soonest deadline first.</p>
         {matches.state === 'loading' && <p className="text-sm text-muted">Loading…</p>}
         {matches.state === 'unavailable' && <p className="text-sm text-muted" data-testid="today-matches-unavailable">{UNAVAILABLE}</p>}
         {matches.state === 'ok' && matches.value.length === 0 && (
