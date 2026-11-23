@@ -76,6 +76,9 @@ import {
   holderSignalWhy,
   buyerNameWhy,
   relatedCodeWhy,
+  designServiceWhy,
+  purchaseTypeFor,
+  productNote,
   companyCodeWhy,
   type ComingBackClass,
   type MatchBasis,
@@ -1029,7 +1032,7 @@ async function queryOpenNow(
         relevant_date_label: 'response_deadline',
         value_label: null,
         source,
-        why_this_matched: loc === 'description' || loc === 'statement_of_work' ? BODY_ONLY_WHY(phrase, loc) : openWhy(label, phrase, r),
+        why_this_matched: (loc === 'description' || loc === 'statement_of_work' ? BODY_ONLY_WHY(phrase, loc) : openWhy(label, phrase, r)) + productNote(r.psc_code),
         identity: { kind: 'notice_id', id: String(r.notice_id || '') },
         evidence_class: cls === 'WEAK_NON_MARKET' ? undefined : cls,
         match_basis: label.basis,
@@ -1043,6 +1046,7 @@ async function queryOpenNow(
         set_aside: (r.set_aside_description as string) || (r.set_aside_code as string) || null,
         sam_url: (r.ui_link as string) || null,
         notice_type: (r.notice_type as string) || null,
+        purchase_type: purchaseTypeFor(r.psc_code),
         naics_code: (r.naics_code as string) || null,
         psc_code: (r.psc_code as string) || null,
         sub_agency: (r.sub_tier as string) || null,
@@ -1239,7 +1243,8 @@ async function queryComingBack(
           ? holderSignalWhy(phraseBack, r as { incumbent_name?: string; naics_code?: string; psc_code?: string })
           : basis[0] === 'buyer_name' ? buyerNameWhy(phraseBack)
           : basis[0] === 'related_market_code' ? relatedCodeWhy(phraseBack, r as { naics_code?: string; naics_description?: string })
-          : evidenceWhy(cls, phraseBack),
+          : basis[0] === 'design_service_code' ? designServiceWhy(phraseBack, r as { psc_code?: string })
+          : evidenceWhy(cls, phraseBack) + productNote(r.psc_code),
       identity: { kind: 'contract_id', id: String(r.contract_id || '') },
       ...(cls ? { evidence_class: cls } : {}),
       match_basis: basis,
@@ -1256,6 +1261,7 @@ async function queryComingBack(
       set_aside_type: (r.set_aside_type as string) || null,
       naics_code: (r.naics_code as string) || null,
       psc_code: (r.psc_code as string) || null,
+      purchase_type: purchaseTypeFor(r.psc_code),
       description: (r.description as string) || null,
       awarding_sub_agency: (r.awarding_sub_agency as string) || null,
       // Structured place of performance for the shared fit scorer (#2252); null = USASpending reported none.
