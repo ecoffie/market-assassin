@@ -21,6 +21,7 @@
  * All figures are live USASpending contract obligations for the fiscal year.
  */
 import { fetchAllUSASpendingAgencies } from '@/lib/utils/agency-list-builder';
+import { logToolError, ToolNames, ErrorTypes } from '@/lib/tool-errors';
 import { fiscalYearTimePeriod, latestCompleteFiscalYear } from '@/lib/utils/fiscal-year';
 import { DOD_SUBTIER_ALIASES } from '@/lib/usaspending/awarding-agency-filter';
 import {
@@ -34,21 +35,43 @@ import {
 const USASPENDING = 'https://api.usaspending.gov/api/v2';
 const CONTRACT_AWARD_TYPES = ['A', 'B', 'C', 'D'];
 
-const SET_ASIDE_BUCKETS: Array<{ label: string; codes: string[] }> = [
-  { label: 'Small Business (total set-aside)', codes: ['SBA', 'SBP'] },
+// WOSB/EDWOSB include their SOLE-SOURCE codes (WOSBSS, EDWOSBSS), as admin set-aside-stats and the map
+// already do — the bucket used to count only the competed codes, understating WOSB (VA report 2026-11-22).
+// VA's veteran codes (VSA "Veteran Set Aside" / veteran sole source) are deliberately NOT in SDVOSB: they
+// are Veteran-Owned (VOSB), a wider group, and counting them would overstate SDVOSB against its 3% goal.
+// SBA is "Total Small Business Set-Aside (FAR 19.5)": TOTAL means the whole requirement was set aside, as
+// opposed to SBP "Partial". It is NOT an aggregate of all set-asides. The old label "Small Business (total
+// set-aside)" read as one (0.6% beside a 9.4% combined share for VA FY2026). The combined share is
+// set_aside_share, the sum of every disjoint bucket below.
+export const SET_ASIDE_BUCKETS: Array<{ label: string; codes: string[] }> = [
+  { label: 'Small Business set-aside (SBA/SBP)', codes: ['SBA', 'SBP'] },
   { label: '8(a)', codes: ['8A', '8AN'] },
   { label: 'SDVOSB', codes: ['SDVOSBC', 'SDVOSBS'] },
-  { label: 'WOSB / EDWOSB', codes: ['WOSB', 'EDWOSB'] },
+  { label: 'WOSB / EDWOSB', codes: ['WOSB', 'WOSBSS', 'EDWOSB', 'EDWOSBSS'] },
   { label: 'HUBZone', codes: ['HZC', 'HZS'] },
 ];
+
+// Veteran-Owned (VOSB) set-aside codes are VA-only (open.gsa.gov SAM set-aside table: VSA "Veteran-Owned
+// Small Business Set-Aside (specific to Department of Veterans Affairs)", VSS its sole source). A DISTINCT
+// bucket, never merged into SDVOSB, and only queried for VA: for any other agency the category does not
+// apply, so it is omitted rather than shown as $0. FY2026 live: VSA $33,153,515 + VSS −$2,350,278 net.
+export const VA_TOPTIER_CODE = '036';
+export const VA_VOSB_BUCKET: { label: string; codes: string[] } = { label: 'VOSB (VA only)', codes: ['VSA', 'VSS'] };
+
+/** The set-aside buckets that apply to this agency. VOSB only for VA (and never for a DoD sub-tier). */
+export function setAsideBucketsFor(toptierCode: string | null | undefined, subAgency?: string): Array<{ label: string; codes: string[] }> {
+  return toptierCode === VA_TOPTIER_CODE && !subAgency ? [...SET_ASIDE_BUCKETS, VA_VOSB_BUCKET] : SET_ASIDE_BUCKETS;
+}
 
 export interface AgencySpendingDetailInput {
   agency: string;
   fiscalYear?: number;
 }
 
-export interface SetAsideSlice { label: string; codes: string[]; amount: number; pct_of_total: number }
+/** amount / pct_of_total are null when that bucket's lookup FAILED (unknown, never $0). */
+export interface SetAsideSlice { label: string; codes: string[]; amount: number | null; pct_of_total: number | null }
 export interface SubAgencySlice { name: string; amount: number; pct_of_total: number }
+export type SubAgencyStructure = 'breakdown' | 'single_self_named' | 'none' | 'unavailable' | 'not_applicable';
 
 export interface NestedSpending {
   scope: SpendingScope;
@@ -67,7 +90,18 @@ export interface AgencySpendingDetailResult {
    * on `spending.total`, never here.
    */
   total_obligated: number | null;
-  sub_agencies: SubAgencySlice[];
+  /** null = the sub-agency lookup FAILED (unknown, never "none"); [] = see sub_agency_structure. */
+  sub_agencies: SubAgencySlice[] | null;
+  /**
+   * breakdown          — component sub-agencies listed.
+   * single_self_named  — USASpending files every award under ONE sub-agency named like the department
+   *                      (VA: "Department of Veterans Affairs", $90.61B FY2026, confirmed live 2026-11-22);
+   *                      spending splits by contracting OFFICE, not sub-agency. Not an empty breakdown.
+   * none               — the lookup succeeded and returned no rows.
+   * unavailable        — the lookup failed (sub_agencies null).
+   * not_applicable     — a command/service request whose own spend is not established (parent-service path).
+   */
+  sub_agency_structure: SubAgencyStructure;
   set_aside_breakdown: SetAsideSlice[];
   /** Set-aside-code share (SBA+8(a)+SDVOSB+WOSB+HUBZone) ÷ requested total. Not goaling. */
   small_business_share: number | null;
@@ -146,15 +180,58 @@ async function spendingByCategory(
   };
   if (setAsideCodes && setAsideCodes.length) filters.set_aside_type_codes = setAsideCodes;
   if (recipientTypeNames && recipientTypeNames.length) filters.recipient_type_names = recipientTypeNames;
-  const res = await fetch(`${USASPENDING}/search/spending_by_category/${category}/`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ filters, category, limit: category === 'awarding_subagency' ? 50 : 5, page: 1 }),
-    signal: AbortSignal.timeout(20000),
-  });
-  if (!res.ok) throw new Error(`spending_by_category/${category} → ${res.status}`);
-  const j = (await res.json()) as { results?: CategoryRow[] };
-  return j.results || [];
+  const body = JSON.stringify({ filters, category, limit: category === 'awarding_subagency' ? 50 : 5, page: 1 });
+
+  // ONE bounded retry, inside the same 20 s budget the single call always had. Only a transient failure is
+  // retried (network error, 5xx, 429); a 4xx is a bad request and a timeout has already spent the budget.
+  const deadline = Date.now() + CATEGORY_BUDGET_MS;
+  for (let attempt = 1; ; attempt++) {
+    try {
+      const res = await fetch(`${USASPENDING}/search/spending_by_category/${category}/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body,
+        signal: AbortSignal.timeout(Math.max(1, deadline - Date.now())),
+      });
+      if (!res.ok) throw new UsaspendingHttpError(res.status, `spending_by_category/${category} → ${res.status}`);
+      const j = (await res.json()) as { results?: CategoryRow[] };
+      return j.results || [];
+    } catch (e) {
+      const backoff = RETRY_BASE_MS + Math.floor(Math.random() * RETRY_JITTER_MS);
+      const budgetLeft = deadline - Date.now() - backoff;
+      if (attempt >= 2 || !isRetryableUsaspendingError(e) || budgetLeft < RETRY_MIN_BUDGET_MS) throw e;
+      await new Promise((r) => setTimeout(r, backoff));
+    }
+  }
+}
+
+const CATEGORY_BUDGET_MS = 20_000;
+const RETRY_BASE_MS = 150;
+const RETRY_JITTER_MS = 250;
+/** A retry is only worth sending with at least this much of the budget left. */
+const RETRY_MIN_BUDGET_MS = 2_000;
+
+export class UsaspendingHttpError extends Error {
+  constructor(readonly status: number, message: string) { super(message); this.name = 'UsaspendingHttpError'; }
+}
+
+/** Network error, 5xx or 429. Never a 4xx, never a timeout/abort (the budget is already spent). */
+export function isRetryableUsaspendingError(e: unknown): boolean {
+  if (e instanceof UsaspendingHttpError) return e.status === 429 || e.status >= 500;
+  const name = (e as { name?: string } | null)?.name;
+  if (name === 'TimeoutError' || name === 'AbortError') return false;
+  return e instanceof TypeError; // undici: "fetch failed" (DNS, reset, refused)
+}
+
+/**
+ * Why a set-aside answer is incomplete, or null when every bucket answered. Set as `_meta.incomplete_reason`
+ * by get_agency_spending_detail and get_sba_goaling_share, which makes result_state 'partial'
+ * (result-contract.ts) while grounded/degraded stay truthful: the total and the other buckets are real.
+ */
+export function setAsideIncompleteReason(breakdown: SetAsideSlice[]): string | null {
+  const failed = breakdown.filter((b) => b.amount === null).map((b) => b.label);
+  if (!failed.length) return null;
+  return `Set-aside bucket${failed.length > 1 ? 's' : ''} ${failed.join(', ')} unavailable from USASpending; the combined set-aside share is unknown (not zero).`;
 }
 
 function emptyResult(
@@ -170,6 +247,7 @@ function emptyResult(
     window,
     total_obligated: null,
     sub_agencies: [],
+    sub_agency_structure: 'not_applicable',
     set_aside_breakdown: [],
     small_business_share: null,
     set_aside_share: null,
@@ -182,6 +260,33 @@ function emptyResult(
     trace,
     ...extras,
   };
+}
+
+
+/**
+ * Sub-agency breakdown with an explicit structure. The self-named row ("Department of Veterans Affairs" under
+ * Department of Veterans Affairs) is dropped as a duplicate of the department — but when it is the ONLY row,
+ * the department records every award under one sub-agency: that is a fact about the source, not an empty
+ * breakdown. A FAILED fetch (rows null) is unknown, never "none".
+ */
+export function classifySubAgencies(
+  rows: Array<{ name?: string | null; amount?: number | null }> | null,
+  departmentName: string,
+  parentService: boolean,
+  pct: (n: number) => number,
+): { sub_agencies: SubAgencySlice[] | null; sub_agency_structure: SubAgencyStructure } {
+  if (parentService) return { sub_agencies: [], sub_agency_structure: 'not_applicable' };
+  if (rows === null) return { sub_agencies: null, sub_agency_structure: 'unavailable' };
+  const dept = departmentName.toLowerCase();
+  const positive = rows.filter((r) => (r.name || '') && (r.amount || 0) > 0);
+  const listed = positive
+    .filter((r) => String(r.name).toLowerCase() !== dept)
+    .map((r) => ({ name: String(r.name), amount: r.amount || 0, pct_of_total: pct(r.amount || 0) }))
+    .sort((a, b) => b.amount - a.amount)
+    .slice(0, 15);
+  if (listed.length) return { sub_agencies: listed, sub_agency_structure: 'breakdown' };
+  if (positive.some((r) => String(r.name).toLowerCase() === dept)) return { sub_agencies: [], sub_agency_structure: 'single_self_named' };
+  return { sub_agencies: [], sub_agency_structure: 'none' };
 }
 
 export async function getAgencySpendingDetail(input: AgencySpendingDetailInput): Promise<AgencySpendingDetailResult> {
@@ -251,6 +356,8 @@ export async function getAgencySpendingDetail(input: AgencySpendingDetailInput):
   trace.push(`resolved "${input.agency}" → ${displayName}${sub ? ` (sub-tier under ${resolved.name})` : ''} (${resolved.toptierCode})`);
 
   const parentService = grain.spendingScope === 'PARENT_SERVICE';
+  const buckets = setAsideBucketsFor(resolved.toptierCode, sub);
+  const bucketFailures: Array<{ label: string; codes: string[]; message: string }> = [];
 
   const [totalRows, subRows, recipientSbRows, ...bucketRows] = await Promise.all([
     spendingByCategory('awarding_agency', resolved.name, window, undefined, sub).catch((e) => { trace.push(`total: ${e.message}`); return null; }),
@@ -258,10 +365,25 @@ export async function getAgencySpendingDetail(input: AgencySpendingDetailInput):
       ? Promise.resolve([] as CategoryRow[])
       : spendingByCategory('awarding_subagency', resolved.name, window, undefined, sub).catch((e) => { trace.push(`subagency: ${e.message}`); return null; }),
     spendingByCategory('awarding_agency', resolved.name, window, undefined, sub, ['small_business']).catch((e) => { trace.push(`recipient_sb: ${e.message}`); return null; }),
-    ...SET_ASIDE_BUCKETS.map((b) =>
-      spendingByCategory('awarding_agency', resolved!.name, window, b.codes, sub).catch((e) => { trace.push(`${b.label}: ${e.message}`); return null; }),
+    ...buckets.map((b) =>
+      spendingByCategory('awarding_agency', resolved!.name, window, b.codes, sub).catch((e) => {
+        trace.push(`${b.label}: ${e.message}`);
+        bucketFailures.push({ label: b.label, codes: b.codes, message: String(e?.message ?? e) });
+        return null;
+      }),
     ),
   ]);
+
+  // Persist bucket failures (after the retry) so the real failure rate is measurable; the trace is in-memory only.
+  if (bucketFailures.length) {
+    await logToolError({
+      tool: ToolNames.AGENCY_SPENDING_DETAIL,
+      errorType: ErrorTypes.API_ERROR,
+      errorMessage: `USASpending set-aside bucket lookup failed after retry: ${bucketFailures.map((f) => `${f.label} (${f.message})`).join('; ')}`,
+      requestPath: 'usaspending/search/spending_by_category/awarding_agency',
+      requestParams: { agency: resolved.name, sub_agency: sub ?? null, fiscal_year: fy, failed_buckets: bucketFailures.map((f) => f.codes.join('/')), bucket_count: buckets.length },
+    }).catch(() => null);
+  }
 
   const identityFields = grain.established
     ? {
@@ -290,22 +412,27 @@ export async function getAgencySpendingDetail(input: AgencySpendingDetailInput):
   const total = (totalRows || []).reduce((s, r) => s + (r.amount || 0), 0);
   const pct = (n: number) => (total > 0 ? Math.round((n / total) * 1000) / 10 : 0);
 
-  const sub_agencies: SubAgencySlice[] = parentService
-    ? []
-    : (subRows || [])
-      .map((r) => ({ name: r.name || '', amount: r.amount || 0, pct_of_total: pct(r.amount || 0) }))
-      .filter((s) => s.name && s.amount > 0 && s.name.toLowerCase() !== resolved!.name.toLowerCase())
-      .sort((a, b) => b.amount - a.amount)
-      .slice(0, 15);
+  const { sub_agencies, sub_agency_structure } = classifySubAgencies(subRows, resolved.name, parentService, pct);
 
-  const set_aside_breakdown: SetAsideSlice[] = SET_ASIDE_BUCKETS.map((b, i) => {
+  // A small nonzero bucket keeps two decimals (VA VOSB is 0.034%): one decimal printed it as "0.0%".
+  const bucketPct = (n: number) => {
+    const p = total > 0 ? (n / total) * 100 : 0;
+    return p !== 0 && Math.abs(p) < 0.1 ? Math.round(p * 100) / 100 : pct(n);
+  };
+  const set_aside_breakdown: SetAsideSlice[] = buckets.map((b, i) => {
       const rows = bucketRows[i];
-      const amount = (rows || []).reduce((s, r) => s + (r.amount || 0), 0);
-      return { label: b.label, codes: b.codes, amount, pct_of_total: pct(amount) };
+      // A failed bucket lookup is UNKNOWN — summing `null` rows to 0 printed "$0 / 0%" for a lookup that never answered.
+      if (rows === null) return { label: b.label, codes: b.codes, amount: null, pct_of_total: null };
+      // Signed NET of de-obligations (VSS FY2026 is negative) — never clamped, never gross.
+      const amount = rows.reduce((s, r) => s + (r.amount || 0), 0);
+      return { label: b.label, codes: b.codes, amount, pct_of_total: bucketPct(amount) };
     });
 
-  const sbTotal = set_aside_breakdown.reduce((s, b) => s + b.amount, 0);
-  const set_aside_share = total <= 0 ? null : Math.round((sbTotal / total) * 1000) / 10;
+  // The combined set-aside share is only known when every bucket answered. It sums every applicable
+  // set-aside code, including VA's VOSB bucket (a set-aside code; FY2026 it moves 9.4% by 0.03 points).
+  const anyBucketFailed = set_aside_breakdown.some((b) => b.amount === null);
+  const sbTotal = set_aside_breakdown.reduce((s, b) => s + (b.amount ?? 0), 0);
+  const set_aside_share = total <= 0 || anyBucketFailed ? null : Math.round((sbTotal / total) * 1000) / 10;
   const recipientAmount = recipientSbRows === null
     ? null
     : (recipientSbRows || []).reduce((s, r) => s + (r.amount || 0), 0);
@@ -323,6 +450,7 @@ export async function getAgencySpendingDetail(input: AgencySpendingDetailInput):
     window,
     total_obligated: parentService ? null : total,
     sub_agencies,
+    sub_agency_structure,
     set_aside_breakdown,
     small_business_share: set_aside_share,
     set_aside_share,

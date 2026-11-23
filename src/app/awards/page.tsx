@@ -15,6 +15,7 @@
  * then KV-cached.
  */
 import type { Metadata } from 'next';
+import { siteShareImages } from '@/lib/seo/share-image';
 import MeetMindyStrip from '@/components/MeetMindyStrip';
 import Link from 'next/link';
 import { getLatestAwards, getLargestAwards, awardListKey } from '@/lib/bigquery/awards';
@@ -49,11 +50,13 @@ export const metadata: Metadata = {
     url: `${SITE_URL}/awards`,
     type: 'website',
     siteName: 'Mindy',
+    images: siteShareImages(),
   },
   twitter: {
     card: 'summary_large_image',
     title: 'Federal Contract Awards Database | Mindy',
     description: 'Search 63M federal contract awards. Live from USAspending.gov.',
+    images: siteShareImages(),
   },
 };
 

@@ -16,6 +16,7 @@
  * cache keeps subsequent renders sub-50ms.
  */
 import type { Metadata } from 'next';
+import { siteShareImages } from '@/lib/seo/share-image';
 import Link from 'next/link';
 import MemberAwareCta from '@/components/MemberAwareCta';
 import { notFound } from 'next/navigation';
@@ -76,11 +77,13 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       url: `${SITE_URL}/top/${slug}`,
       type: 'article',
       siteName: 'Mindy',
+      images: siteShareImages(),
     },
     twitter: {
       card: 'summary_large_image',
       title: listicle.title,
       description: listicle.description,
+      images: siteShareImages(),
     },
   };
 }

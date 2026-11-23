@@ -29,6 +29,7 @@ import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/works
 import { getEntityByUEI } from '@/lib/sam/entity-api';
 import { resolveLegalNamePatch, normalizeLegalName, type LegalNameWriter } from '@/lib/vault/legal-name';
 import { resolveUei, ueiMessage } from '@/lib/sam/resolve-uei';
+import { registrationPurposeReadiness } from '@/lib/sam/registration-purpose';
 import { retrieveRagContext, formatChunksForPrompt } from '@/lib/rag/retrieve';
 import { getNaics } from '@/lib/codes/lookup';
 import { deriveSemanticKeywords } from '@/lib/market/semantic-keywords';
@@ -360,6 +361,9 @@ export async function GET(request: NextRequest) {
     summary: {
       sam_registration_status: entity.registrationStatus,
       sam_active: entity.isActive,
+      // Purpose of registration (Z1 = assistance only → not registered for contract awards).
+      // contract_awards 'unknown' when SAM did not send it (e.g. a mirror record) — never a warning.
+      sam_registration_purpose: registrationPurposeReadiness(entity.purposeOfRegistrationCode, entity.purposeOfRegistration),
       contracts_found: awards.length,
       total_value: awards.reduce((acc, a) => acc + (a.contract_value || 0), 0),
       capabilities_drafted: ai_coach?.capabilities.length || 0,

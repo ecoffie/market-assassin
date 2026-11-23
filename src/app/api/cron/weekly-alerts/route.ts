@@ -107,25 +107,70 @@ async function fetchBuyerEmails(): Promise<Set<string>> {
   }
 }
 
+type AlertTier = { limit: number; tier: 'free' | 'pro'; lookupFailed?: boolean };
+
 /**
- * Get alert limit for a user based on purchase history
+ * Get alert limit for a user based on purchase history.
+ * `buyerEmails` is the run's shop buyer list, fetched ONCE by the caller (fetchBuyerEmails does not
+ * cache a failed fetch, so calling it per user would re-hit the shop on every lookup).
  */
-async function getAlertLimit(email: string): Promise<{ limit: number; tier: 'free' | 'pro' }> {
+async function getAlertLimit(email: string, buyerEmails: ReadonlySet<string>): Promise<AlertTier> {
   const normalizedEmail = email.toLowerCase();
+  let lookupFailed = false;
 
   // Mindy Pro / Team / an active trial get the Pro limit. Before 2026-11-13 only the legacy shop
   // purchase list below counted, so a paying Mindy Pro subscriber got the free 5/week.
   try {
     if (await hasProAccess(normalizedEmail)) return { limit: ALERT_LIMITS.pro, tier: 'pro' };
   } catch (err) {
+    lookupFailed = true;
     console.warn('[Weekly Alerts] Pro check failed; falling back to the purchase list', err);
   }
 
-  const buyerEmails = await fetchBuyerEmails();
   if (buyerEmails.has(normalizedEmail)) {
-    return { limit: ALERT_LIMITS.pro, tier: 'pro' };
+    return { limit: ALERT_LIMITS.pro, tier: 'pro', lookupFailed };
   }
-  return { limit: ALERT_LIMITS.free, tier: 'free' };
+  return { limit: ALERT_LIMITS.free, tier: 'free', lookupFailed };
+}
+
+// TIER RESOLUTION (fixed 2026-11-23). #2009 added hasProAccess() to getAlertLimit, and the
+// eligibility loop called it SERIALLY for every active user (resolveAccess ≈ 4 sequential round
+// trips) BEFORE the drain — and the drain then called it a SECOND time per user. Over ~2,000 users
+// that exceeded maxDuration (300s) before a single alert_log row was written, so the 2026-11-15 and
+// 2026-11-22 cycles sent zero emails and never self-reported. Now: one lookup per user, bounded
+// concurrency, counted against the run budget.
+const TIER_LOOKUP_CONCURRENCY = 25;
+
+interface TierResolution {
+  tiers: Map<string, AlertTier>;
+  /** Users whose Pro check threw (they fell back to the shop purchase list, as before). */
+  lookupFailed: string[];
+  /** True when the run budget ran out before every user's tier was resolved. */
+  stoppedForBudget: boolean;
+}
+
+async function resolveTiers(
+  emails: readonly string[],
+  buyerEmails: ReadonlySet<string>,
+  deadline: number,
+): Promise<TierResolution> {
+  const unique = [...new Set(emails.map((e) => e.toLowerCase()))];
+  const tiers = new Map<string, AlertTier>();
+  const lookupFailed: string[] = [];
+  let next = 0;
+  let stoppedForBudget = false;
+  const worker = async () => {
+    while (next < unique.length) {
+      // Never START a lookup past the deadline; in-flight lookups finish.
+      if (Date.now() >= deadline) { stoppedForBudget = true; return; }
+      const email = unique[next++];
+      const result = await getAlertLimit(email, buyerEmails);
+      tiers.set(email, result);
+      if (result.lookupFailed) lookupFailed.push(email);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(TIER_LOOKUP_CONCURRENCY, unique.length) }, worker));
+  return { tiers, lookupFailed, stoppedForBudget };
 }
 
 interface AlertUser {
@@ -278,6 +323,10 @@ async function persistProcessedWeeklyAlert({
  * 2. Free tier users with alert_frequency='daily' (skipped by daily-alerts cron)
  */
 async function runWeeklyAlertJob(options: WeeklyAlertJobOptions = {}): Promise<NextResponse> {
+  // The run budget starts at job ENTRY: user reads, buyer list and tier resolution all count
+  // against it, not only the drain (they once consumed the whole 300s before the drain began).
+  const jobStartedAt = Date.now();
+  const deadline = jobStartedAt + RUN_BUDGET_MS;
   try {
     console.log('[Weekly Alerts] Starting weekly alert job...');
     const alertDate = getWeeklyCycleDate();
@@ -320,37 +369,61 @@ async function runWeeklyAlertJob(options: WeeklyAlertJobOptions = {}): Promise<N
       console.log(`[Weekly Alerts] Vault certifications loaded for ${vaultEligibility.size} user(s)`);
     }
 
-    // Refresh buyer cache first
+    // Refresh buyer cache first — fetched ONCE for the whole run.
     buyerEmailsCache = null;
-    await fetchBuyerEmails();
+    const buyerEmails = await fetchBuyerEmails();
 
     // Suppress fallback weekly alerts for users already receiving the richer Weekly Deep Dive.
     // If a user explicitly chose weekly alerts, honor that preference.
     const weeklyDeepDiveAudienceEmails = options.email ? new Set<string>() : await getWeeklyDeepDiveAudienceEmails();
 
+    // Candidates whose eligibility can still depend on tier (Deep Dive suppression needs no tier).
+    let candidates: AlertUser[] = allUsers.filter((user) =>
+      user.alert_frequency === 'weekly' || !weeklyDeepDiveAudienceEmails.has(user.user_email.toLowerCase()));
+    if (options.email) {
+      candidates = candidates.filter(user => user.user_email.toLowerCase() === options.email?.toLowerCase());
+    }
+
+    // Each candidate's tier is resolved ONCE (bounded concurrency) and reused by the drain.
+    const tierResolution = await resolveTiers(candidates.map((u) => u.user_email), buyerEmails, deadline);
+    const tierByEmail = tierResolution.tiers;
+    const jobName = new Date().getUTCDay() === 1 ? 'weekly-alerts-mon' : 'weekly-alerts';
+    if (tierResolution.lookupFailed.length > 0) {
+      console.warn(`[Weekly Alerts] Pro check failed for ${tierResolution.lookupFailed.length} user(s); they fell back to the purchase list`);
+    }
+
+    if (tierResolution.stoppedForBudget) {
+      // Out of budget before eligibility finished. Do not guess anyone's tier and do not send:
+      // report it (never a silent kill), and a later window of the cycle starts over.
+      const unresolved = candidates.length - tierByEmail.size;
+      const message = `weekly cycle ${alertDate}: run budget (${RUN_BUDGET_MS}ms) spent resolving tiers; ${unresolved} of ${candidates.length} candidates unresolved, 0 processed this run`;
+      console.error(`[Weekly Alerts] ${message}`);
+      if (!options.email) {
+        await reportCronOutcome(jobName, jobName === 'weekly-alerts-mon' ? 'error' : 'partial', message);
+      }
+      return NextResponse.json({
+        success: false,
+        stoppedForBudget: true,
+        phase: 'tier_resolution',
+        message,
+        tiers: {
+          candidates: candidates.length,
+          resolved: tierByEmail.size,
+          unresolved,
+          lookupFailed: tierResolution.lookupFailed.length,
+        },
+        runBudgetMs: RUN_BUDGET_MS,
+        elapsedMs: Date.now() - jobStartedAt,
+        alertDate,
+      });
+    }
+
     // Filter to:
     // 1. Users who chose weekly
     // 2. Free tier users (no product purchase) regardless of preference
     // 3. Exclude users already covered by Weekly Deep Dive unless they explicitly chose weekly alerts
-    let users: AlertUser[] = [];
-    for (const user of allUsers) {
-      const { tier } = await getAlertLimit(user.user_email);
-      const normalizedEmail = user.user_email.toLowerCase();
-      const explicitlyWeekly = user.alert_frequency === 'weekly';
-
-      if (!explicitlyWeekly && weeklyDeepDiveAudienceEmails.has(normalizedEmail)) {
-        continue;
-      }
-
-      // Include if explicitly weekly OR free tier
-      if (explicitlyWeekly || tier === 'free') {
-        users.push(user as AlertUser);
-      }
-    }
-
-    if (options.email) {
-      users = users.filter(user => user.user_email.toLowerCase() === options.email?.toLowerCase());
-    }
+    const users: AlertUser[] = candidates.filter((user) =>
+      user.alert_frequency === 'weekly' || tierByEmail.get(user.user_email.toLowerCase())?.tier === 'free');
 
     if (users.length === 0) {
       console.log('[Weekly Alerts] No users to process after tier filtering');
@@ -410,14 +483,13 @@ async function runWeeklyAlertJob(options: WeeklyAlertJobOptions = {}): Promise<N
       errors: [] as string[],
     };
 
-    // Clear buyer cache for fresh data
-    buyerEmailsCache = null;
-
-    // Drain this cycle's pending users until done or the run budget is spent.
+    // Drain this cycle's pending users until done or the run budget (counted from job entry) is spent.
     const drain = await drainCycle(pending, async (user) => {
       try {
-        // Determine user's alert tier based on purchase history
-        const { limit: alertLimit, tier } = await getAlertLimit(user.user_email);
+        // The tier resolved ONCE for this run (resolveTiers) — no second per-user lookup.
+        const resolvedTier = tierByEmail.get(user.user_email.toLowerCase());
+        if (!resolvedTier) throw new Error('tier_unresolved');
+        const { limit: alertLimit, tier } = resolvedTier;
         const alertSource = getAlertSource(user, tier);
 
         if (!alertSource) {
@@ -548,7 +620,11 @@ async function runWeeklyAlertJob(options: WeeklyAlertJobOptions = {}): Promise<N
         // RESIDUAL (shared with daily-alerts, not changed here): the email is sent BEFORE its
         // `sent` row is written. If that write fails, the catch below writes a `failed` row,
         // which still dedups this cycle; a duplicate needs both writes to fail.
-        const delivered = await sendAlertEmail(user.user_email, topOpps, user, tier, scoredOpps.length);
+        // The send guard's reason (suppressed:<x> / synthetic_client_address / suppression_check_failed) is
+        // kept in the row's context as guard_reason; error_message stays exactly 'send_guard_blocked'.
+        let guardReason: string | null = null;
+        const onBlocked = (reason: string) => { guardReason = reason; };
+        const delivered = await sendAlertEmail(user.user_email, topOpps, user, tier, scoredOpps.length, onBlocked);
 
         // Parity with daily-alerts: a guard-blocked send (unsubscribed / bounced) is a visible
         // skip, never a phantom `sent` with last_alert_sent / total_alerts_sent bumped.
@@ -560,9 +636,10 @@ async function runWeeklyAlertJob(options: WeeklyAlertJobOptions = {}): Promise<N
             source: alertSource,
             tier,
             opportunitiesCount: topOpps.length,
+            opportunitiesData: [{ alertSource, tier, reason: 'send_guard_blocked', guard_reason: guardReason }],
             errorMessage: 'send_guard_blocked',
           });
-          console.warn(`[Weekly Alerts] Send guard blocked ${user.user_email} (suppression) — recorded as skipped, NOT sent`);
+          console.warn(`[Weekly Alerts] Guard blocked ${user.user_email} (${guardReason ?? '?'}): skipped, NOT sent`);
           results.skipped++;
           return;
         }
@@ -591,7 +668,7 @@ async function runWeeklyAlertJob(options: WeeklyAlertJobOptions = {}): Promise<N
 
       } catch (userError: unknown) {
         console.error(`[Weekly Alerts] Error processing ${user.user_email}:`, userError);
-        const { tier } = await getAlertLimit(user.user_email);
+        const tier = tierByEmail.get(user.user_email.toLowerCase())?.tier ?? 'free';
         const alertSource = getAlertSource(user, tier) || 'free_weekly_fallback';
         const errorMessage = getErrorMessage(userError);
         await persistProcessedWeeklyAlert({
@@ -608,7 +685,7 @@ async function runWeeklyAlertJob(options: WeeklyAlertJobOptions = {}): Promise<N
         results.failed++;
         results.errors.push(`${user.user_email}: ${errorMessage}`);
       }
-        }, { budgetMs: RUN_BUDGET_MS });
+        }, { budgetMs: Math.max(0, deadline - Date.now()) });
 
     const remainingUsers = drain.remaining;
     console.log(`[Weekly Alerts] Run done. Sent: ${results.sent}, Skipped: ${results.skipped}, Failed: ${results.failed}, Remaining this cycle: ${remainingUsers}`);
@@ -617,7 +694,6 @@ async function runWeeklyAlertJob(options: WeeklyAlertJobOptions = {}): Promise<N
     // Users still pending is never silent: Sunday windows mark the job `partial`
     // (later windows continue the drain); on the Monday catch-up windows it is an
     // `error`, because the cycle is about to end with users unevaluated.
-    const jobName = new Date().getUTCDay() === 1 ? 'weekly-alerts-mon' : 'weekly-alerts';
     if (!options.email) {
       if (remainingUsers > 0) {
         await reportCronOutcome(
@@ -640,7 +716,14 @@ async function runWeeklyAlertJob(options: WeeklyAlertJobOptions = {}): Promise<N
         totalEligible: users.length,
         stoppedForBudget: drain.stoppedForBudget,
         runBudgetMs: RUN_BUDGET_MS,
+        elapsedMs: Date.now() - jobStartedAt,
         alertDate,
+      },
+      tiers: {
+        candidates: candidates.length,
+        resolved: tierByEmail.size,
+        lookupFailed: tierResolution.lookupFailed.length,
+        lookupFailedEmails: tierResolution.lookupFailed.slice(0, 50),
       },
       cycle: await cycleTruth(alertDate, users),
     });
@@ -782,7 +865,8 @@ async function sendAlertEmail(
   opportunities: (SAMOpportunity & { score: number })[],
   user: AlertUser,
   tier: 'free' | 'pro' = 'free',
-  totalAvailable: number = 0
+  totalAvailable: number = 0,
+  onBlocked?: (reason: string) => void,
 ): Promise<boolean> {
   const emailDate = new Date().toISOString().split('T')[0];
   const tokenResult = await createEmailTrackingToken(email, 'weekly_alert', emailDate);
@@ -969,6 +1053,7 @@ async function sendAlertEmail(
     text: `${opportunities.length} new opportunities matched your profile this week. Manage preferences: ${preferencesUrl}`,
     emailType: 'weekly_alert',
     eventSource: 'weekly_alert',
+    onBlocked,
     tags: {
       email_type: 'weekly_alert',
       alert_type: 'weekly',
