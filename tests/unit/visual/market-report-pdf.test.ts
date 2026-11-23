@@ -40,6 +40,9 @@ const unexpected = (found: string[], known: string[]) => found.filter((x) => !kn
  */
 const KNOWN_PRINT_DEFECTS = { missingLines: [] as string[], overflowingTables: [] as string[], clippedText: [] as string[] };
 
+/** Pages the full fixture may use. It printed 8 (two of them a third full or less) before the layout fix. */
+const PAGE_BUDGET = 6;
+
 /** Section headings this report must carry, in reading order. Each one is backed by data in the fixture. */
 const SECTIONS = [
   'Market composition',
@@ -84,7 +87,10 @@ describe.runIf(!!CHROME)('market report PDF — full report', () => {
     const lines = htmlLines(html);
     expect(lines.length).toBeGreaterThan(100);
     if (PDFTOTEXT) {
-      const all = squash(execFileSync(PDFTOTEXT, ['-enc', 'UTF-8', '-', '-'], { input: pdf, encoding: 'utf8' }));
+      // The running footer is printed on every page; drop it so a paragraph that continues on the next page
+      // still reads as one line.
+      const all = squash(execFileSync(PDFTOTEXT, ['-enc', 'UTF-8', '-', '-'], { input: pdf, encoding: 'utf8' })
+        .replace(/Mindy · Federal market report · .*|Page \d+ of \d+/g, ''));
       expect(unexpected(lines.filter((l) => !all.includes(squash(l))), KNOWN_PRINT_DEFECTS.missingLines)).toEqual([]);
     } else {
       // pdf.js drops tabular digits and can extract a wrapped line out of reading order (after a page header),
@@ -112,6 +118,27 @@ describe.runIf(!!CHROME)('market report PDF — full report', () => {
 
   it('never prints a blank page', () => {
     expect(pages.map((p, i) => [i + 1, p.trim().length] as const).filter(([, n]) => n === 0)).toEqual([]);
+  });
+
+  it('numbers every page: "Page X of Y" on each', () => {
+    expect(pages.map((p, i) => squash(p).includes(squash(`Page ${i + 1} of ${pages.length}`))).every(Boolean)).toBe(true);
+  });
+
+  it('does not waste pages: no near-empty page, no page holding only the closing footer, within budget', () => {
+    const footer = /Mindy · Federal market report.*|Page \d+ of \d+/g;
+    const body = pages.map((p) => p.replace(footer, '').replace(/\s+/g, ' ').trim());
+    const sizes = body.map((b) => b.length);
+    const median = [...sizes].sort((a, b) => a - b)[Math.floor(sizes.length / 2)];
+    // Every page but the last is at least 40% as full as a typical page.
+    expect(sizes.slice(0, -1).map((n, i) => [i + 1, n] as const).filter(([, n]) => n < median * 0.4)).toEqual([]);
+    // The last page carries report content, not only "Powered by Mindy …".
+    expect(squash(body[body.length - 1].replace(/Powered by Mindy[\s\S]*$/, '')).length).toBeGreaterThan(80);
+    expect(pages.length).toBeLessThanOrEqual(PAGE_BUDGET);
+  });
+
+  it('keeps every section heading with its content (no heading at the foot of a page)', () => {
+    const lastLine = (p: string) => p.replace(/Mindy · Federal market report.*|Page \d+ of \d+/g, '').trim().split('\n').map((l) => l.trim()).filter(Boolean).pop() || '';
+    expect(pages.map((p, i) => [i + 1, lastLine(p)] as const).filter(([, l]) => SECTIONS.some((h) => squash(l) === squash(h)))).toEqual([]);
   });
 
   it('prints tables a reader can read: nothing clipped, no cell under 9px', async () => {
