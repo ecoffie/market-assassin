@@ -22,8 +22,10 @@ export interface ProCreditAddon {
   credits: number;
   monthlyUsd: number;
   monthlyHref: string;
+  monthlyPriceId: string;
   annualPerMonthUsd: number;
   annualHref: string;
+  annualPriceId: string;
 }
 
 export const PRO_CREDIT_ADDONS: ProCreditAddon[] = ADDON_PLAN_IDS.map((id) => {
@@ -34,10 +36,17 @@ export const PRO_CREDIT_ADDONS: ProCreditAddon[] = ADDON_PLAN_IDS.map((id) => {
     credits: p.creditsPerMonth,
     monthlyUsd: p.monthly.usd,
     monthlyHref: p.monthly.checkoutUrl,
+    monthlyPriceId: p.monthly.priceId,
     annualPerMonthUsd: p.annual.usdPerMonth,
     annualHref: p.annual.checkoutUrl,
+    annualPriceId: p.annual.priceId,
   };
 });
+
+/** One checkout for Pro (14-day trial) + this add-on: /api/checkout/pro-credits. */
+export function proWithAddonCheckoutHref(a: ProCreditAddon, annual: boolean): string {
+  return `/api/checkout/pro-credits?addon=${a.id}&billing=${annual ? 'annual' : 'monthly'}`;
+}
 
 /** Remembers an add-on picked on /pricing before the visitor has an account (per browser). */
 export const PENDING_ADDON_KEY = 'mindy_pending_addon';

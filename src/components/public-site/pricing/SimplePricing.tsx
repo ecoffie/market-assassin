@@ -25,7 +25,7 @@ import {
   PRO_ANNUAL_USD, PRO_MONTHLY_USD, PRO_TRIAL_ANNUAL, PRO_TRIAL_MONTHLY, SALES_URL,
   TEAM_ANNUAL_PER_MONTH, TEAM_ANNUAL_USD, TEAM_MONTHLY_USD, TEAM_TRIAL_ANNUAL, TEAM_TRIAL_MONTHLY, pctOff,
 } from './app-plan-links';
-import { PRO_CREDIT_ADDONS, PENDING_ADDON_KEY, addonCheckoutHref, addonPrice, type ProCreditAddon } from '@/lib/billing/pro-credit-addons';
+import { PRO_CREDIT_ADDONS, PENDING_ADDON_KEY, addonCheckoutHref, addonPrice, proWithAddonCheckoutHref, type ProCreditAddon } from '@/lib/billing/pro-credit-addons';
 
 type Feature = [title: string, detail: string];
 type Plan = {
@@ -196,7 +196,8 @@ export default function SimplePricing({ proCredits, teamCredits, forecastsLabel,
       price: `$${fmt((annual ? Math.round(PRO_ANNUAL_USD / 12) : PRO_MONTHLY_USD) + (addon ? addonPrice(addon, annual) : 0))}`,
       was: annual && !addon ? `$${PRO_MONTHLY_USD}` : undefined,
       per: annual ? '/ mo, billed annually' : '/ mo, billed monthly', trial: true,
-      cta: 'Start free trial', href: annual ? PRO_TRIAL_ANNUAL : PRO_TRIAL_MONTHLY,
+      // With extra credits picked: ONE checkout for Pro + the add-on (/api/checkout/pro-credits).
+      cta: 'Start free trial', href: addon ? proWithAddonCheckoutHref(addon, annual) : (annual ? PRO_TRIAL_ANNUAL : PRO_TRIAL_MONTHLY),
       lead: 'Find and win your own contracts.', base: 'Everything you need to start',
       features: [
         ['Opportunities matched to you', 'Daily alerts and briefings for your NAICS, keywords and agencies.'],
@@ -324,7 +325,7 @@ export default function SimplePricing({ proCredits, teamCredits, forecastsLabel,
                   if (p.name === 'Pro') rememberAddon(addon);
                 } : undefined}>{p.cta}</a>}
             {p.name === 'Pro' && addon && !p.current && p.trial && (
-              <p className="addon-note">Your extra {fmt(addon.credits)} credits (+${fmt(addonPrice(addon, annual))}/mo) are not part of the free trial. After you sign up, add them in one click from Billing.</p>
+              <p className="addon-note">Pro and your extra {fmt(addon.credits)} credits are both free for 14 days, then ${fmt((annual ? Math.round(PRO_ANNUAL_USD / 12) : PRO_MONTHLY_USD) + addonPrice(addon, annual))}/mo. The extra credits start when the trial ends.</p>
             )}
             {p.name === 'Pro' && addon && p.current && (
               <>

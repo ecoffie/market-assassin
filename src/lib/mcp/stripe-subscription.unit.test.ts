@@ -120,3 +120,23 @@ describe('handleMcpSubscriptionInvoice — pooled (multi-seat) subscriptions', (
     expect(credits.applyCreditOnce).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('credit add-on bought with a Pro trial (2026-11-23)', () => {
+  it('the $0 trial invoice grants no add-on credits', async () => {
+    const r = await handleMcpSubscriptionInvoice(invoice({
+      lines: { data: [{ amount: 0, price: { id: 'price_pro', unit_amount: 14900 } }, { amount: 0, price: { id: MID_MONTHLY } }] },
+    }));
+    expect(r).toEqual({ handled: false });
+    expect(credits.applyCreditOnce).not.toHaveBeenCalled();
+  });
+
+  it('the first paid invoice after the trial grants the add-on credits', async () => {
+    m(credits.applyCreditOnce).mockResolvedValue({ applied: true, newBalance: MID_CR });
+    const r = await handleMcpSubscriptionInvoice(invoice({
+      billing_reason: 'subscription_cycle',
+      lines: { data: [{ amount: 14900, price: { id: 'price_pro', unit_amount: 14900 } }, { amount: 24900, price: { id: MID_MONTHLY } }] },
+    }));
+    expect(r).toMatchObject({ handled: true, credits: MID_CR, plan: 'mid' });
+  });
+});
+

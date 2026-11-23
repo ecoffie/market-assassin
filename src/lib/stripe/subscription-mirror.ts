@@ -19,6 +19,7 @@
 import type Stripe from 'stripe';
 import { getStripe } from '@/lib/stripe';
 import { getWriteClient } from '@/lib/supabase/server-clients';
+import { primaryItem } from '@/lib/billing/subscription-items';
 
 const iso = (t?: number | null) => (t ? new Date(t * 1000).toISOString() : null);
 
@@ -26,7 +27,9 @@ const iso = (t?: number | null) => (t ? new Date(t * 1000).toISOString() : null)
 export function subscriptionMirrorRow(sub: Stripe.Subscription): Record<string, unknown> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const s = sub as any;
-  const item = s.items?.data?.[0];
+  // Pro + credit add-on (2026-11-23): mirror the Pro/Team item as "the plan".
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const item = primaryItem(s) as any;
   const plan = item?.plan ?? item?.price;
   return {
     id: s.id,

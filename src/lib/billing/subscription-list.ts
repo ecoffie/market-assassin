@@ -14,6 +14,7 @@ import { subscriptionGrantForPriceId } from '@/lib/mcp/packages';
 import { MCP_SUBSCRIPTION_TYPE } from '@/lib/mcp/stripe-subscription';
 import { appTierForAmount } from '@/lib/mcp/app-tier-subscription';
 import { hasEarlyUpgradeFlag } from '@/lib/mcp/trial-upgrade-bonus';
+import { appTierItem, primaryItem, subscriptionTotalCents } from './subscription-items';
 
 export type SubscriptionKind = 'mcp' | 'app';
 
@@ -40,6 +41,9 @@ const LIVE = new Set(['active', 'trialing', 'past_due', 'unpaid']);
 
 /** MCP credit plans are recognised by their Stripe price id, else by checkout metadata. */
 export function subscriptionKind(sub: Pick<Stripe.Subscription, 'metadata' | 'items'>): SubscriptionKind {
+  // Pro + credit add-on (2026-11-23): in a subscription with SEVERAL items the app plan wins, so
+  // the add-on never relabels Pro as MCP. One-item subscriptions are classified exactly as before.
+  if ((sub.items?.data?.length ?? 0) > 1 && appTierItem(sub)) return 'app';
   if (sub.metadata?.type === MCP_SUBSCRIPTION_TYPE) return 'mcp';
   for (const item of sub.items?.data ?? []) {
     const priceId = typeof item.price === 'string' ? item.price : item.price?.id;
@@ -53,8 +57,10 @@ export function describeSubscription(
   productName: string | null,
   billedTo: string,
 ): SubscriptionRow {
-  const item = sub.items?.data?.[0];
+  const item = primaryItem(sub);
   const price = item && typeof item.price === 'object' ? item.price : null;
+  const total = subscriptionTotalCents(sub);
+  const extraItems = (sub.items?.data?.length ?? 0) - 1;
   const periodEndUnix =
     (item as unknown as { current_period_end?: number } | undefined)?.current_period_end ??
     (sub as unknown as { current_period_end?: number }).current_period_end ??
@@ -63,9 +69,10 @@ export function describeSubscription(
   return {
     id: sub.id,
     kind,
-    planName: productName || price?.nickname || (kind === 'mcp' ? 'MCP credits plan' : 'Mindy subscription'),
+    planName: (productName || price?.nickname || (kind === 'mcp' ? 'MCP credits plan' : 'Mindy subscription'))
+      + (kind === 'app' && extraItems > 0 ? ' + extra credits' : ''),
     status: sub.status,
-    amount: typeof price?.unit_amount === 'number' ? price.unit_amount / 100 : null,
+    amount: typeof total === 'number' ? total / 100 : null,
     currency: (price?.currency || 'usd').toUpperCase(),
     interval: price?.recurring?.interval || null,
     currentPeriodEnd: periodEndUnix ? new Date(periodEndUnix * 1000).toISOString() : null,
@@ -97,7 +104,7 @@ export async function listLiveSubscriptions(stripe: Stripe, emails: string[]): P
     for (const sub of subs.data) {
       if (!LIVE.has(sub.status) || seen.has(sub.id)) continue;
       seen.add(sub.id);
-      const price = sub.items.data[0]?.price;
+      const price = primaryItem(sub)?.price;
       const productId = price && typeof price.product === 'string' ? price.product : null;
       let name: string | null = null;
       if (productId) {

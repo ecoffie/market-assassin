@@ -22,6 +22,7 @@
  * on 2026-07-30 for exactly that reason. A mid-cycle heal fires a Slack alert,
  * because a heal means the purchase path missed someone.
  */
+import { primaryItem } from '@/lib/billing/subscription-items';
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { applyCreditOnce } from '@/lib/mcp/credits';
@@ -80,7 +81,8 @@ async function activeSubscribers(): Promise<{ subs: Candidate[]; activeIds: Set<
       // EVERY active subscription id is recorded: a pooled org can sit on ANY plan
       // (Team, or a multi-seat MCP plan like Growth), not only the app tiers below.
       activeIds.add(s.id);
-      const amt = s.items.data[0]?.price?.unit_amount ?? 0;
+      // Pro + credit add-on subscriptions have two items: read the Pro/Team one.
+      const amt = primaryItem(s)?.price?.unit_amount ?? 0;
       const cust = s.customer;
       const email = (cust && typeof cust !== 'string' && !cust.deleted ? cust.email : null)?.toLowerCase();
       if (!email) continue;
