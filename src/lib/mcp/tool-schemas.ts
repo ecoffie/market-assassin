@@ -118,6 +118,8 @@ const TOOL_META: Readonly<Record<string, ToolMeta>> = {
   add_contacts_to_crm: { title: 'Add Contacts to CRM (one-shot)', write: 'destructive' },
   schedule_market_search: { title: SCHEDULE_MARKET_SEARCH_TITLE, write: 'additive' },
   list_market_schedules: { title: 'List Market Watches / Schedules' },
+  get_company_profile: { title: 'Get Company Profile (your Vault)' },
+  save_past_performance: { title: 'Save Past Performance (to your Vault)', write: 'additive' },
   update_market_schedule: { title: 'Update Market Watch / Schedule', write: 'additive' },
   delete_market_schedule: { title: 'Delete Market Watch / Schedule', write: 'destructive' },
   assess_market_depth: { title: 'Assess Market Depth (Rule of Two)' },

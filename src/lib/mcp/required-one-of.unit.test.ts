@@ -20,6 +20,7 @@ const USEFUL_OR_SELF_GUARDED = new Set([
   'get_expiring_contracts', 'search_idv_contracts', 'search_past_contracts',
   'search_federal_contacts', 'get_federal_event_series',
   'get_balance', 'list_market_schedules', 'verify_m_scale',
+  'get_company_profile', // free read of the caller's own Vault; no args by design
   'evaluate_bid_decision', // scored=false: returns the gate/factor framework
   'one_click_proposal', // hidden; not exercised empty because it creates a job
 ]);

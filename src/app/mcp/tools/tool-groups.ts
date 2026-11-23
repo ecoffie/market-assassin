@@ -122,6 +122,8 @@ export const TOOL_GROUPS: ToolGroup[] = [
     label: 'Proposal Pipeline',
     blurb: 'Decide, extract, draft, referee. Each step runs on what you pass it, so an agent can enter anywhere.',
     tools: [
+      'get_company_profile',
+      'save_past_performance',
       'evaluate_bid_decision',
       'extract_compliance_matrix',
       'get_solicitation_documents',
