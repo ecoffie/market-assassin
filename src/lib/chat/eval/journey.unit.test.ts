@@ -6,7 +6,7 @@ import { describe, it, expect } from 'vitest';
 import { mkdtempSync, readFileSync, existsSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { runJourney, observeFlags, labelRun, runWarnings, captureFromEvents, type JourneyScenario, type SseEvent } from './journey';
+import { runJourney, observeFlags, labelRun, runWarnings, captureFromEvents, reopenConversation, reopenContinuity, type JourneyScenario, type SseEvent } from './journey';
 import { writeTurnArtifacts, compareIndexHtml } from './journey-artifacts';
 
 const SID = '11111111-2222-4333-8444-555555555555';
@@ -156,5 +156,51 @@ describe('artifacts', () => {
     expect(html).toContain('old &lt;b&gt;answer&lt;/b&gt;');
     expect(html).toContain('href="after/turn-1.answer.md"');
     expect(html).not.toMatch(/score|grade|pass|fail/i);
+  });
+});
+
+describe('saved conversation reopen (Track A)', () => {
+  const saved = (turns: Awaited<ReturnType<typeof runJourney>>) => turns.flatMap((t) => [
+    { role: 'user', content: t.prompt },
+    { role: 'assistant', content: t.answer, cited_sources: t.citations, ...(t.deliverables.length ? { deliverables: { files: t.deliverables } } : {}) },
+  ]);
+
+  it('reopens exactly as History does and reports every turn kept', async () => {
+    const s = fakeServer();
+    const turns = await runJourney({ host: 'https://p', email: 'test@example.com', token: 'tok', scenario: SCENARIO, fetchImpl: s.f });
+    const seen: string[] = [];
+    const f = (async (url: string, init?: RequestInit) => {
+      seen.push(`${url} ${(init?.headers as Record<string, string>)['x-mi-auth-token']}`);
+      return Response.json({ success: true, session: { id: SID, title: 'Look us up' }, messages: saved(turns) });
+    }) as unknown as typeof fetch;
+    const r = await reopenConversation({ host: 'https://p/', email: 'test@example.com', token: 'tok', sessionId: SID, fetchImpl: f });
+    expect(seen).toEqual([`https://p/api/app/chat-sessions?email=test%40example.com&sessionId=${SID} tok`]);
+    expect(r.title).toBe('Look us up');
+    expect(reopenContinuity(turns, r)).toEqual({ ok: true, differences: [] });
+  });
+
+  it('lists each difference plainly: a lost answer edit, lost citations, a lost document chip, a missing turn', async () => {
+    const s = fakeServer();
+    const turns = await runJourney({ host: 'https://p', email: 'e', token: 't', scenario: SCENARIO, fetchImpl: s.f });
+    const msgs = saved(turns);
+    msgs[1] = { ...msgs[1], content: 'Something else entirely.' };
+    msgs[3] = { ...msgs[3], cited_sources: [] };
+    msgs[5] = { role: 'assistant', content: turns[2].answer, cited_sources: turns[2].citations };
+    const r = { httpStatus: 200, title: null, messages: msgs, error: null };
+    const c = reopenContinuity(turns, r);
+    expect(c.ok).toBe(false);
+    expect(c.differences).toEqual([
+      expect.stringMatching(/^turn 1: saved answer differs from the streamed answer/),
+      'turn 2: 1 citation(s) streamed, 0 saved',
+      'turn 3: document chips streamed [00000000-0000-4000-8000-000000000001] but saved []',
+    ]);
+    const short = reopenContinuity(turns, { ...r, messages: saved(turns).slice(0, 4) });
+    expect(short.differences).toEqual(expect.arrayContaining(['saved 2 question(s), the journey asked 3', 'saved 2 answer(s), the journey received 3']));
+  });
+
+  it('a reopen that fails is a difference, never "kept"', async () => {
+    const r = await reopenConversation({ host: 'https://p', email: 'e', token: 't', sessionId: SID, fetchImpl: (async () => new Response('nope', { status: 404 })) as unknown as typeof fetch });
+    expect(r.error).toMatch(/^HTTP 404/);
+    expect(reopenContinuity([], r)).toEqual({ ok: false, differences: ['reopen failed: HTTP 404: nope'] });
   });
 });

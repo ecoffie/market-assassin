@@ -14,12 +14,14 @@
  *   otherwise UNCONFIRMED, and the script exits 1. Setting preview flags is not this script's job.
  * - The target must serve trace events (ASK_MINDY_TRACE_EVENTS=true, ASK_MINDY_TRACE_RESULT_CHARS=200000); production
  *   ignores them by design, so this never runs against production.
+ * - After the last turn the conversation is reopened exactly as History does (GET /api/app/chat-sessions) and its
+ *   continuity is recorded (every question, answer, citation count and document chip kept); a difference exits 1.
  * - Output goes OUTSIDE the repo by default (answers can carry customer-adjacent data). Never commit it.
  */
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join, relative, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
-import { runJourney, observeFlags, labelRun, runWarnings, type FlagKey, type JourneyScenario } from '../src/lib/chat/eval/journey';
+import { runJourney, observeFlags, labelRun, runWarnings, reopenConversation, reopenContinuity, type FlagKey, type JourneyScenario } from '../src/lib/chat/eval/journey';
 import { writeTurnArtifacts, compareIndexHtml, type ArtifactRecord } from '../src/lib/chat/eval/journey-artifacts';
 
 const arg = (k: string, d?: string) => {
@@ -75,6 +77,12 @@ const turns = await runJourney({
   },
 });
 
+// Track A ends with a saved conversation the customer can reopen: reopen it exactly as History does.
+const sessionId = turns.map((t) => t.sessionId).find(Boolean) ?? null;
+const reopened = sessionId ? await reopenConversation({ host, email, token, sessionId }) : null;
+const continuity = reopened ? reopenContinuity(turns, reopened) : { ok: false, differences: ['no session id was returned, so the conversation could not be reopened'] };
+if (reopened) writeFileSync(join(outDir, 'reopen.json'), JSON.stringify(reopened, null, 2));
+
 const flags = observeFlags(turns);
 const label = labelRun(intent, expected, flags);
 const warnings = runWarnings(turns);
@@ -90,12 +98,15 @@ writeFileSync(join(outDir, 'manifest.json'), JSON.stringify({
   finished_at: new Date().toISOString(),
   turns: turns.map((t) => ({ turn: t.turn, prompt: t.prompt, ms: t.ms, http_status: t.httpStatus, error: t.error, tools: t.tools.map((x) => `${x.tool}:${x.status}`), notices: t.notices, deliverables: t.deliverables, market_report: t.marketReport ? { url: t.marketReport.url, report_id: t.marketReport.report_id, title: t.marketReport.title } : null })),
   artifacts,
+  reopen: { session_id: sessionId, http_status: reopened?.httpStatus ?? null, title: reopened?.title ?? null, ok: continuity.ok, differences: continuity.differences },
   warnings,
   graded: false,
 }, null, 2));
 
 console.log(`\nRun label: ${label.label}${label.reasons.length ? ` (${label.reasons.join('; ')})` : ''}`);
 for (const [k, v] of Object.entries(flags)) console.log(`  ${k}: ${v.state}${v.evidence.length ? `  [${v.evidence.slice(0, 3).join(', ')}]` : ''}`);
+console.log(`Saved conversation reopen: ${continuity.ok ? 'every turn kept' : 'DIFFERENCES'}`);
+for (const x of continuity.differences) console.log(`  ${x}`);
 for (const w of warnings) console.warn(`  warning: ${w}`);
 console.log(`Artifacts: ${outDir}`);
-process.exit(label.label === 'UNCONFIRMED' || turns.some((t) => t.error) ? 1 : 0);
+process.exit(label.label === 'UNCONFIRMED' || turns.some((t) => t.error) || !continuity.ok ? 1 : 0);
