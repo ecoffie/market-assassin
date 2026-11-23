@@ -2,7 +2,7 @@
  * Shared harness for the market-report regression tests (Design & Output, 2026-11-22).
  *
  * Every render goes through the PRODUCTION path: renderStoredReportHtml → htmlToPdf (lockdown) with the
- * route's own PDF_OPTIONS, in a real headless Chromium. Nothing here re-implements the report.
+ * route's own pdfOptions(), in a real headless Chromium. Nothing here re-implements the report.
  *
  * Chromium: PUPPETEER_EXECUTABLE_PATH, the cloud sessions' Playwright Chromium, or the Google Chrome that
  * GitHub's ubuntu runners ship. Suites using this harness skip (and say so) when none exists.

@@ -109,6 +109,17 @@ describe('find_opportunities coming_soon — company-anchored flag', () => {
     expect(soon.company_award_check).toMatchObject({ status: 'checked', flagged: 1 });
     expect(res.presentation.host_rules.some((r) => r.startsWith('ALREADY AWARDED'))).toBe(true);
   });
+  it('runs on the DEDUPED rows (#2379): gateway + legacy twins of the awarded forecast collapse to ONE flagged row', async () => {
+    const LEGACY = { ...KNGMN, id: 'legacy-167', external_id: 'FHWA_2026_167', last_synced_at: '2026-06-26T00:00:00Z' };
+    const twinTables = { ...tables, agency_forecasts: [KNGMN, LEGACY, OTHER] };
+    const companyAwardsLookup: CompanyAwardsLookup = async () => ({ status: 'checked', awards: [RBA_AWARD], note: 'checked 1' });
+    const res = await findOpportunities(q, { client: client(twinTables), entityLookup, competitionLookup: null, companyAwardsLookup });
+    const soon = res.horizons.coming_soon;
+    const kng = soon.items.filter((i) => i.title === 'VA ST FB KNGMN-WLKR GTS');
+    expect(kng).toHaveLength(1);
+    expect(kng[0]).toHaveProperty('already_awarded_to_company');
+    expect(soon.company_award_check).toMatchObject({ status: 'checked', flagged: 1 });
+  });
   it('awards unavailable → nothing flagged and the check says unavailable (not "not awarded")', async () => {
     const res = await findOpportunities(q, { client: client(tables), entityLookup, competitionLookup: null, companyAwardsLookup: async () => ({ status: 'unavailable', awards: [], note: 'not cached' }) });
     expect(res.horizons.coming_soon.items.some((i) => 'already_awarded_to_company' in i)).toBe(false);
