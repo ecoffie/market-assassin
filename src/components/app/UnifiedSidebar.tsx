@@ -10,12 +10,14 @@ import {
   MapPin,
   Bell,
   Heart,
+  Sun,
 } from 'lucide-react';
 import { MindyLogo } from '@/components/mindy/MindyLogo';
 import WorkspaceSwitcher from './WorkspaceSwitcher';
 import { UpgradeModal } from './UpgradeModal';
 import { useAppTracker } from './track';
 import { authedFetch } from './authHeaders';
+import { isTodayHomeEnabled } from '@/lib/app/today-home';
 import {
   NAV_GROUPS,
   type NavGroup,
@@ -32,6 +34,7 @@ import {
 
 // Panel types for the unified MI platform
 export type AppPanel =
+  | 'today'          // Today — one home after sign-in (src/lib/app/today-home.ts); only while NEXT_PUBLIC_TODAY_HOME is on
   | 'map'            // Opportunity Map inside the app shell (iframe, ?shell=app) — first sidebar item
   | 'watchlist'      // Map Watchlist (saved searches + new matches) inside the app shell
   | 'saved'          // Map Saved (hearted opportunities) inside the app shell
@@ -71,7 +74,10 @@ export type AppTier = 'free' | 'pro' | 'team' | 'enterprise';
 // switches to the `map` panel, which shows the map route in the app shell (MapShellPanel, ?shell=app).
 // Free for everyone. Watchlist and Saved — the map's own rail items — sit under a "Saved" heading.
 // The standalone /opportunity-map is unchanged for signed-out visitors, SEO and existing links.
-type ShellItem = { id: 'map' | 'watchlist' | 'saved'; label: string; icon: typeof MapPin; description: string };
+type ShellItem = { id: 'today' | 'map' | 'watchlist' | 'saved'; label: string; icon: typeof MapPin; description: string };
+// Today sits above Map only while the switch is on (default OFF — the sidebar is unchanged).
+const TODAY_HOME = isTodayHomeEnabled();
+const TODAY_ITEM: ShellItem = { id: 'today', label: 'Today', icon: Sun, description: 'Your saved searches, three matches and the Map' };
 const MAP_ITEM: ShellItem = { id: 'map', label: 'Map', icon: MapPin, description: 'Open, recompete and forecast on one map' };
 const SAVED_ITEMS: ShellItem[] = [
   { id: 'watchlist', label: 'Watchlist', icon: Bell, description: 'Saved searches and new matches' },
@@ -333,6 +339,7 @@ export default function UnifiedSidebar({
       <nav className="flex-1 py-4 overflow-y-auto">
         <div className="space-y-1 px-2">
           {/* Map — the first item. A panel switch (onClick), not an href: the map renders inside the app shell. */}
+          {TODAY_HOME && renderShellItem(TODAY_ITEM)}
           {renderShellItem(MAP_ITEM)}
 
           {NAV_GROUPS.filter((g) => isGroupInSidebar(g, navCtx)).map((group) => {
