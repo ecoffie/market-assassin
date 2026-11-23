@@ -33,15 +33,17 @@ export const maxDuration = 300;
 export async function GET(request: NextRequest) {
   const auth = request.headers.get('authorization');
   const pw = request.nextUrl.searchParams.get('password');
-  const authorized =
-    hasValidCronSecret(request) || pw === process.env.ADMIN_PASSWORD;
+  const cronAuthed = hasValidCronSecret(request);
+  const authorized = cronAuthed || pw === process.env.ADMIN_PASSWORD;
   if (!authorized) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
   // DRY = ZERO persistent writes: no clocks, no alert state, no alert send.
   const dry = request.nextUrl.searchParams.get('dry') === '1';
   const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
-  // Only a dispatcher-fired, persisting run may write cron status — never a dry or manual curl.
-  const selfReport = request.headers.get('x-cron-dispatch') === '1' && !dry;
+  // Only a cron-secret (dispatcher) run that persists may write cron status — never a dry run or a manual
+  // admin-password curl. Decided from the verified auth, never from a caller-set header
+  // (header-grant-guard.unit.test.ts: nothing but the saved-search-alerts post-auth hint reads x-cron-dispatch).
+  const selfReport = cronAuthed && !dry;
 
   try {
     // Tunable without a redeploy — the source throttles datacenter egress harder than a laptop.
