@@ -65,14 +65,19 @@ export async function pdfPageCount(pdf: Buffer): Promise<number> {
   }
 }
 
-/** Visible text of the report HTML, one normalised line per block (the print-hidden button excluded). */
+/**
+ * Visible text of a report or document HTML, one normalised line per block (the print-hidden button, SVG
+ * titles and style/script excluded). Shared by the market-report and the Vault-document parity suites.
+ */
 export function htmlLines(html: string): string[] {
   const body = html
     .replace(/<head>[\s\S]*?<\/head>/, '')
     .replace(/<(button|a) class="pdfbtn"[\s\S]*?<\/\1>/g, '')
-    .replace(/<\/(p|div|h1|h2|h3|td|th|li|header|footer)>|(?=<(?:div|td|th)[\s>])|<br\s*\/?>/g, '\n')
+    .replace(/<(title|desc|style|script)[^>]*>[\s\S]*?<\/\1>/g, '')
+    .replace(/<\/(p|div|h1|h2|h3|h4|h5|td|th|li|header|footer|section|caption|figcaption|dt|dd|text|tspan)>|(?=<(?:div|td|th)[\s>])|<br\s*\/?>/g, '\n')
     .replace(/<[^>]+>/g, '')
     .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'")
+    .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(Number(n))).replace(/&nbsp;/g, ' ')
     .replace(/&ldquo;|&rdquo;/g, '"');
   return body.split('\n').map((l) => l.replace(/\s+/g, ' ').trim()).filter((l) => l.length > 2);
 }
