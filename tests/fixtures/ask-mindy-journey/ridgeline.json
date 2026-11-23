@@ -1,0 +1,10 @@
+{
+  "id": "ridgeline-synthetic",
+  "description": "Synthetic company (no real identity). Customer wording only: company -> market -> where to compete -> report. The realistic scenario file for a real company stays outside this public repo and is passed with --scenario.",
+  "turns": [
+    "We're Ridgeline Test Facilities, a small environmental testing lab in South Carolina. Can you look us up and tell me what you can see about us?",
+    "What does the federal market look like for the testing work we do, in the Southeast?",
+    "Where should we compete first, and why?",
+    "Turn this research into a professional report with an executive summary, where to compete, risks, recommended actions and sources."
+  ]
+}

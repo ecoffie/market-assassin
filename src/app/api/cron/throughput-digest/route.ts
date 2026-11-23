@@ -35,6 +35,8 @@ import { findMismatches, type StripeSub } from '@/lib/billing/paid-entitlement';
 import { MCP_CHANNEL_OR_FILTER } from '@/lib/mcp/channel-filter';
 import { hasValidCronSecret } from '@/lib/cron/cron-request-auth';
 import { sendGuardCheckFromRows } from '@/lib/email/guard-reason';
+import { classifyBriefingClassificationDrops } from '@/lib/briefings/delivery/rollout';
+import { customerDropCount, describeBriefingClassificationDrops } from '@/lib/briefings/classification-drop-summary';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -79,7 +81,7 @@ function getSupabase() {
 const MIN_COMPLETENESS = 0.9;
 /** Alert when more than this many alerts are LOST to the send guard in 24h (recipient suppression excluded). */
 const MAX_GUARD_BLOCKS = 5;
-/** Alert when more than this many users are entitled but unreachable by the job. */
+/** Alert when more than this many real briefings-enabled users are dropped by the sender's classification gate. */
 const MAX_ORPHANED_ENTITLEMENTS = 20;
 // MCP activation: of the users who AUTHENTICATED to an MCP surface, what share hold a
 // credit row? Below this, the activation wall is back. Starting guess like the others —
@@ -222,45 +224,46 @@ async function checkSendGuard(sb: ReturnType<typeof getSupabase>): Promise<Check
   return { name: 'Send guard', detail: c.detail, value: c.value, ok: c.ok };
 }
 
-/** Briefings: users entitled in one table but invisible to the job's audience query. */
+/**
+ * Briefings: briefings-enabled users the sender's classification gate drops.
+ * Uses the sender's own predicate (classifyBriefingClassificationDrops →
+ * isBriefingEntitled), never a re-derived access list.
+ */
 async function checkBriefingEntitlements(sb: ReturnType<typeof getSupabase>): Promise<Check> {
-  // Both reads are paged: 779 briefings_enabled profiles and 1,732 classification
-  // rows both exceed the 1,000 cap as they grow, and a truncated `entitled` set
-  // would invent orphans that do not exist.
+  // Both reads are paged: briefings_enabled profiles and classification rows both
+  // exceed the 1,000 cap, and a truncated classification set would invent drops.
   const { rows: enabled, error: eErr } = await fetchAllRows<{ user_email: string }>((from, to) => sb
     .from('user_notification_settings')
     .select('user_email')
     .eq('briefings_enabled', true)
     .eq('is_active', true)
     .range(from, to));
-  const { rows: classified, error: cErr } = await fetchAllRows<{ email: string; briefings_access: string }>((from, to) => sb
+  // ALL rows, not only entitling ones: a row of access free/none/excluded is a
+  // different finding from no row at all, and expiry must be read to match the sender.
+  const { rows: classified, error: cErr } = await fetchAllRows<{ email: string; briefings_access: string | null; briefings_expiry: string | null }>((from, to) => sb
     .from('customer_classifications')
-    .select('email, briefings_access')
-    .in('briefings_access', ['lifetime', '1_year', '6_month', 'subscription', 'beta_preview'])
+    .select('email, briefings_access, briefings_expiry')
     .range(from, to));
 
   if (eErr || cErr) {
     return { name: 'Briefing entitlement', detail: `query failed: ${(eErr || cErr)?.message}`, value: 'unknown', ok: false };
   }
-  const entitled = new Set(classified.map(r => String(r.email).toLowerCase()));
-  const allOrphans = enabled.filter(r => !entitled.has(String(r.user_email).toLowerCase()));
 
   // Synthetic accounts are not a customer-facing problem. 171 of the 586 orphans on
   // 2026-08-04 were healthcheck-*/@test.* rows this repo creates itself; counting
   // them inflates the number a human is asked to act on by ~40%.
   const isSynthetic = (e: string) => /@test\.|^healthcheck-|@example\./i.test(e);
-  const realOrphans = allOrphans.filter(r => !isSynthetic(String(r.user_email)));
-  const synthetic = allOrphans.length - realOrphans.length;
-  const orphaned = realOrphans.length;
+  const enabledEmails = enabled.map(r => String(r.user_email || ''));
+  const realEnabled = enabledEmails.filter(e => !isSynthetic(e));
+  const report = classifyBriefingClassificationDrops(realEnabled, classified);
+  const syntheticDrops = classifyBriefingClassificationDrops(enabledEmails.filter(isSynthetic), classified).droppedByClassification;
+  const dropped = customerDropCount(report);
 
   return {
     name: 'Briefing entitlement',
-    detail: orphaned === 0
-      ? 'every briefings-enabled user is reachable by the cron'
-      : `${orphaned} real user(s) have briefings_enabled but NO customer_classifications row — the cron cannot see them`
-        + (synthetic > 0 ? ` (+${synthetic} test/healthcheck accounts ignored)` : ''),
-    value: String(orphaned),
-    ok: orphaned <= MAX_ORPHANED_ENTITLEMENTS,
+    detail: describeBriefingClassificationDrops(report, syntheticDrops),
+    value: String(dropped),
+    ok: dropped <= MAX_ORPHANED_ENTITLEMENTS,
   };
 }
 
@@ -478,7 +481,7 @@ async function checkPaidEntitlement(sb: ReturnType<typeof getSupabase>): Promise
       <table style="border-collapse:collapse;width:100%;max-width:640px;">${rows}</table>
       <p style="color:#666;font-size:12px;margin-top:12px;">
         Thresholds: completeness ≥ ${Math.round(MIN_COMPLETENESS * 100)}%,
-        send-guard lost alerts ≤ ${MAX_GUARD_BLOCKS} (suppression excluded), orphaned entitlements ≤ ${MAX_ORPHANED_ENTITLEMENTS}.
+        send-guard lost alerts ≤ ${MAX_GUARD_BLOCKS} (suppression excluded), classification-gate drops ≤ ${MAX_ORPHANED_ENTITLEMENTS}.
       </p>
     </div>`;
 

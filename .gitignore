@@ -101,3 +101,6 @@ tasks/cache/
 *unmatched*.json
 scripts/rollback_*.sql
 /"email"
+
+# Screenshot regression diff output (tests/visual)
+tests/visual/__output__/
