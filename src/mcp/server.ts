@@ -51,6 +51,7 @@ import {
   scheduleMarketSearch,
   updateMarketSchedule,
 } from './tools/schedule-market-search';
+import { getCompanyProfile, savePastPerformance } from './tools/company-profile';
 import { contractorAwardHistory } from './tools/contractor-award-history';
 import { assessMarketDepth } from './tools/market-depth';
 import { solicitationDocuments } from './tools/solicitation-documents';
@@ -968,6 +969,54 @@ server.registerTool(
   async (args) => {
     const userEmail = process.env.MCP_STDIO_USER_EMAIL || 'stdio@localhost';
     const result = await scheduleMarketSearch({ userEmail, ...args, filters: args.filters as Record<string, unknown> });
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }], structuredContent: result as unknown as Record<string, unknown> };
+  },
+);
+
+server.registerTool(
+  'get_company_profile',
+  {
+    title: 'Get Company Profile (your Vault)',
+    annotations: { readOnlyHint: true, openWorldHint: false },
+    description:
+      "What Mindy knows about the caller's own company (name, UEI, NAICS, certifications, saved past performance) and what is missing. Every draft is grounded in it.",
+    inputSchema: {},
+  },
+  async () => {
+    const userEmail = process.env.MCP_STDIO_USER_EMAIL || 'stdio@localhost';
+    const result = await getCompanyProfile({ userEmail });
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }], structuredContent: result as unknown as Record<string, unknown> };
+  },
+);
+
+server.registerTool(
+  'save_past_performance',
+  {
+    title: 'Save Past Performance (to your Vault)',
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    description:
+      "Save ONE real project (federal, state/local, commercial or subcontract) to the caller's company record so drafts cite it. Never invent or save an example project; confirm_real=true is required.",
+    inputSchema: {
+      title: z.string(),
+      customer: z.string(),
+      scope: z.string(),
+      role: z.enum(['prime', 'sub', 'jv_partner', 'key_personnel']).optional(),
+      outcomes: z.string().optional(),
+      period_start: z.string().optional(),
+      period_end: z.string().optional(),
+      value: z.number().optional(),
+      contract_number: z.string().optional(),
+      reference_name: z.string().optional(),
+      reference_title: z.string().optional(),
+      reference_email: z.string().optional(),
+      reference_phone: z.string().optional(),
+      naics_codes: z.array(z.string()).optional(),
+      confirm_real: z.boolean(),
+    },
+  },
+  async (args) => {
+    const userEmail = process.env.MCP_STDIO_USER_EMAIL || 'stdio@localhost';
+    const result = await savePastPerformance({ ...args, userEmail });
     return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }], structuredContent: result as unknown as Record<string, unknown> };
   },
 );
