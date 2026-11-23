@@ -9,7 +9,7 @@
 import { describe, it, expect, vi, beforeAll } from 'vitest';
 import { execFileSync } from 'node:child_process';
 import { FULL_REPORT } from '@/lib/market/__fixtures__/market-report-full';
-import { CHROME, PDFTOTEXT, launch, pdfPages, htmlLines, printLayout, squash, norm, lettersOnly } from './report-harness';
+import { CHROME, PDFTOTEXT, launch, pdfPages, htmlLines, printLayout, squash, norm } from './report-harness';
 
 const getMarketReport = vi.fn();
 vi.mock('@/lib/market/report-store', async (importOriginal) => ({
@@ -29,22 +29,16 @@ import { renderStoredReportHtml } from '@/lib/market/stored-report-html';
 /** Letter (8.5in) minus the route's 0.5in side margins, at 96 CSS px per inch. */
 const PDF_CONTENT_WIDTH_PX = (8.5 - 1) * 96;
 
-/**
- * Print defects present on main when this suite landed (2026-11-22). Whether each one shows depends on font
- * metrics (the report uses the system font stack: it reproduces with the cloud sessions' Chromium, not with the
- * fonts on GitHub's runner), so the suite allows ONLY these and fails on anything else. The print-layout PR that
- * fixes them empties these lists, which makes every check strict. Each is material the
- * reader loses in the PDF only (the hosted page shows it): the headline's basis is cut by an ellipsis,
- * and the Recompetes table is wider than the page, so its Likelihood column is clipped off.
- */
 /** Anything found that is not a known defect. */
 const unexpected = (found: string[], known: string[]) => found.filter((x) => !known.includes(x));
 
-const KNOWN_PRINT_DEFECTS = {
-  missingLines: ['FY2026 (1 complete fiscal year · description match)', 'Likelihood', 'high', 'medium'],
-  overflowingTables: ['Recompetes on the horizon'],
-  clippedText: ['FY2026 (1 complete fiscal year · description match)', 'HOUSEKEEPING- CUSTODIAL JANITORIAL'],
-};
+/**
+ * Print defects this suite found when it was written (2026-11-22): the headline's basis cut by an ellipsis, the
+ * top PSC name line-clamped, and the Recompetes table wider than the page (its Likelihood column clipped off).
+ * Fixed on main by #2362 and #2360 and measured here with the real renderer: these lists stay EMPTY, so every
+ * check is strict. Anything added here is material a PDF reader loses.
+ */
+const KNOWN_PRINT_DEFECTS = { missingLines: [] as string[], overflowingTables: [] as string[], clippedText: [] as string[] };
 
 /** Section headings this report must carry, in reading order. Each one is backed by data in the fixture. */
 const SECTIONS = [
@@ -93,11 +87,13 @@ describe.runIf(!!CHROME)('market report PDF — full report', () => {
       const all = squash(execFileSync(PDFTOTEXT, ['-enc', 'UTF-8', '-', '-'], { input: pdf, encoding: 'utf8' }));
       expect(unexpected(lines.filter((l) => !all.includes(squash(l))), KNOWN_PRINT_DEFECTS.missingLines)).toEqual([]);
     } else {
-      // pdf.js drops tabular digits: compare letters only. A short line ("high") is found inside other words by a
-      // letters-only search, so it proves nothing either way; only lines of 8+ letters are compared here.
-      const all = lettersOnly(pages.join(''));
-      const comparable = (l: string) => lettersOnly(l).length >= 8;
-      expect(unexpected(lines.filter((l) => comparable(l) && !all.includes(lettersOnly(l))), KNOWN_PRINT_DEFECTS.missingLines)).toEqual([]);
+      // pdf.js drops tabular digits and can extract a wrapped line out of reading order (after a page header),
+      // so the fallback compares WORDS: a line counts as present when each of its words (4+ letters) appears in
+      // the PDF. A truncated word ("descripti…") or a clipped column still fails.
+      const words = (x: string) => x.toLowerCase().match(/[a-z]{4,}/g) ?? [];
+      const inPdf = new Set(words(pages.join(' ')));
+      const missing = lines.filter((l) => words(l).length > 0 && !words(l).every((w) => inPdf.has(w)));
+      expect(unexpected(missing, KNOWN_PRINT_DEFECTS.missingLines)).toEqual([]);
     }
   });
 
