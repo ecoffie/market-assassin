@@ -28,6 +28,12 @@ already reads the Vault, but an MCP user could neither see nor fill it.
   (`source='mcp'`), then embeds it for requirement matching. `confirm_real=true` is required;
   owner is always the verified caller, never an arg.
 
+**`find_opportunities` respond early** (no price or recall change): Open items whose structured SAM
+notice type is Sources Sought, Request for Information or Presolicitation carry `respond_early`
+(what it means, what to do). `summary.respond_early` counts them among RETURNED items only, and a
+host rule tells the host to point them out first and that a sources-sought response is a short
+capability answer, not a proposal. Title keywords never trigger it. Ranking is unchanged.
+
 Also fixed: a past-performance section with nothing saved is no longer sent to the model. It
 returns a fill-in template (`meta.pastPerformanceGap`) instead of invented past work.
 

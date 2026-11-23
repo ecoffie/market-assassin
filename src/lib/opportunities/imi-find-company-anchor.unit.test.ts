@@ -34,6 +34,7 @@ import {
   HOST_RULES_COMPANY_ANCHORED,
   type FindOpportunitiesInput,
 } from './find-opportunities';
+import { HOST_RULES_RESPOND_EARLY } from './respond-early';
 import type { SamEntityResult } from '@/mcp/tools/sam-entity';
 
 type Row = Record<string, unknown>;
@@ -401,7 +402,9 @@ describe('findOpportunities end-to-end (fake client, frozen rows)', () => {
     expect(res.summary.coming_back.direct_match).toBe(3);
     expect(back.filter((i) => i.evidence_class === 'DIRECT_MATCH').every((i) => (i.match_basis || [])[0] === 'buy_side_text')).toBe(true);
     expect(res.horizons.open_now.eligibility_counts).toMatchObject({ NOT_ELIGIBLE: 1 });
-    expect(res.presentation.host_rules).toEqual([...HOST_RULES_FIND_FIRST_VALUE, ...HOST_RULES_COMPANY_ANCHORED]);
+    // The frozen fixtures carry real Sources Sought / Presolicitation notices → the respond-early rule is present.
+    expect(res.summary.respond_early.returned_count).toBeGreaterThan(0);
+    expect(res.presentation.host_rules).toEqual([...HOST_RULES_FIND_FIRST_VALUE, ...HOST_RULES_RESPOND_EARLY, ...HOST_RULES_COMPANY_ANCHORED]);
   });
 
   it('no uei → beginner flow unchanged: no company block, no eligibility, P2 host_rules only', async () => {
@@ -409,7 +412,9 @@ describe('findOpportunities end-to-end (fake client, frozen rows)', () => {
     expect(res.horizons.open_now.status).toBe('grounded');
     expect(res.company).toBeUndefined();
     expect(Object.values(res.horizons).every((h) => h.items.every((i) => i.eligibility === undefined))).toBe(true);
-    expect(res.presentation.host_rules).toEqual([...HOST_RULES_FIND_FIRST_VALUE]);
+    // The frozen fixtures carry real Sources Sought / Presolicitation notices → the respond-early rule is present.
+    expect(res.summary.respond_early.returned_count).toBeGreaterThan(0);
+    expect(res.presentation.host_rules).toEqual([...HOST_RULES_FIND_FIRST_VALUE, ...HOST_RULES_RESPOND_EARLY]);
     // …but the holder-name fix applies to everyone.
     expect(res.horizons.coming_back.items.filter((i) => /TYONEK/.test(String(i.incumbent_name))).every((i) => i.evidence_class === 'HOLDER_SIGNAL')).toBe(true);
   });
