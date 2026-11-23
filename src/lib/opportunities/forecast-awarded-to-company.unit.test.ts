@@ -11,6 +11,7 @@ import type { SamEntityResult } from '@/mcp/tools/sam-entity';
 import {
   alreadyAwardedFlag,
   awardNamesForecastProject,
+  isSpecificForecastTitle,
   sameDepartment,
   type CompanyAwardAction,
   type CompanyAwardsLookup,
@@ -118,5 +119,24 @@ describe('find_opportunities coming_soon — company-anchored flag', () => {
     const res = await findOpportunities({ query: q.query, limit_per_horizon: 25 }, { client: client(tables), competitionLookup: null, companyAwardsLookup: async () => { called = true; return { status: 'checked', awards: [RBA_AWARD], note: '' }; } });
     expect(called).toBe(false);
     expect(res.horizons.coming_soon.company_award_check).toBeUndefined();
+  });
+});
+
+describe('only a SPECIFIC forecast title can be "already awarded to you" (Agent 4 review 2026-11-23)', () => {
+  const FHWA = 'Department of Transportation';
+  it('generic titles never flag, even with a matching PROJECT award from the same department', () => {
+    expect(isSpecificForecastTitle('Road Maintenance')).toBe(false);
+    expect(isSpecificForecastTitle('Construction Services')).toBe(false);
+    expect(isSpecificForecastTitle('Road Maintenance Repair Services')).toBe(false); // 4 tokens, all generic
+    expect(awardNamesForecastProject('Road Maintenance', 'PROJECT ROAD MAINTENANCE ON PARKWAY')).toBe(false);
+    expect(awardNamesForecastProject('Construction Services', 'PROJECT CONSTRUCTION SERVICES')).toBe(false);
+    expect(alreadyAwardedFlag(
+      { title: 'Road Maintenance', source_agency: 'DOT' },
+      [{ piid: 'X1', award_id: 'A1', awarding_agency: FHWA, description: 'PROJECT ROAD MAINTENANCE ON PARKWAY', action_date: '2026-01-01', amount: 1 }] as never,
+    )).toBeNull();
+  });
+  it('the real Kingman-Walker title is specific and still flags', () => {
+    expect(isSpecificForecastTitle('VA ST FB KNGMN-WLKR GTS')).toBe(true);
+    expect(awardNamesForecastProject('VA ST FB KNGMN-WLKR GTS', 'PROJECT VA ST FB KNGMN-WLKR GTS THE PROJECT CONSISTS OF GEOMETRIC ROAD IMPROVEMENTS')).toBe(true);
   });
 });

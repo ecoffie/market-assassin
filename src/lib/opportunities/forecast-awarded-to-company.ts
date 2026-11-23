@@ -31,6 +31,7 @@
  */
 import { gatewayAgencyCode } from '@/lib/forecasts/gateway-forecast';
 import { getContractorHistoryByUei } from '@/lib/contractor/history-by-uei';
+import { GENERIC_SINGLE_WORDS } from '@/lib/market/keyword-sanitize';
 
 export interface CompanyAwardAction {
   award_id: string | null;
@@ -70,8 +71,27 @@ const PROJECT_LABEL = 'PROJECT ';
 
 const canon = (v: unknown): string => String(v ?? '').toUpperCase().replace(/\s+/g, ' ').trim();
 
-/** Rule 2: the award description's leading project identifier IS the forecast title. */
+/**
+ * A false "already awarded to you" tells a customer they won work they did not — worse than missing the flag
+ * (Agent 4 review 2026-11-23). So the rule applies only to a SPECIFIC forecast title: at least 3 tokens AND at
+ * least one token that is not a generic federal word. Generic = the shared GENERIC_SINGLE_WORDS stoplist plus
+ * the construction/vehicle words it lacks. "Road Maintenance" or "Construction Services" never qualify, even
+ * when an award reads "PROJECT ROAD MAINTENANCE …"; "VA ST FB KNGMN-WLKR GTS" does.
+ */
+const EXTRA_GENERIC = new Set([
+  'road', 'roads', 'roadway', 'roadways', 'highway', 'highways', 'street', 'streets', 'bridge', 'bridges',
+  'pavement', 'paving', 'idiq', 'idc', 'matoc', 'satoc', 'macc', 'bpa', 'contract', 'contracts', 'task', 'order',
+  'and', 'of', 'the', 'for', 'at', 'in', 'on', 'to', 'a', 'an', 'various', 'misc', 'miscellaneous', 'phase', 'base',
+]);
+export function isSpecificForecastTitle(forecastTitle: unknown): boolean {
+  const tokens = String(forecastTitle ?? '').toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+  if (tokens.length < 3) return false;
+  return tokens.some((t) => !GENERIC_SINGLE_WORDS.has(t) && !EXTRA_GENERIC.has(t));
+}
+
+/** Rule 2: the award description's leading project identifier IS the (specific) forecast title. */
 export function awardNamesForecastProject(forecastTitle: unknown, awardDescription: unknown): boolean {
+  if (!isSpecificForecastTitle(forecastTitle)) return false;
   const title = canon(forecastTitle);
   if (!title) return false;
   const desc = canon(awardDescription);
