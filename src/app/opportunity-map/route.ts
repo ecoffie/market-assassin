@@ -11403,7 +11403,7 @@ const ASK_MINDY_JS = `<script>(function(){
     var panel=document.createElement('div'); panel.className='amk-exp-panel'; panel.hidden=true; panel.setAttribute('role','menu');
     items.forEach(function(it){
       var b;
-      if(it.href){ b=document.createElement('a'); b.href=it.href; b.target='_blank'; b.rel='noopener'; b.className='amk-exp-link'; }
+      if(it.href){ b=document.createElement('a'); b.href=it.href; b.target='_blank'; b.rel='noopener'; b.className='amk-exp-link'; b.title='Opens in a new tab'; b.setAttribute('aria-label',it.label+' (opens in a new tab)'); }
       else { b=document.createElement('button'); b.type='button'; }
       b.setAttribute('data-fmt',it.fmt); b.setAttribute('role','menuitem'); b.textContent=it.label;
       b.onclick=function(){ it.run(b); panel.hidden=true; toggle.setAttribute('aria-expanded','false'); };

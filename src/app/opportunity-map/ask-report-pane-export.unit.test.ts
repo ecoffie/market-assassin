@@ -126,6 +126,9 @@ describe('Map report pane: a packaged market report exports a real PDF', () => {
     expect(a.getAttribute('rel')).toBe('noopener');
     expect(a.hasAttribute('download')).toBe(false); // a failure must show the route's error page, never save it as a file
     expect(a.getAttribute('role')).toBe('menuitem');
+    expect(a.textContent).toBe('Download PDF');
+    expect(a.getAttribute('title')).toBe('Opens in a new tab'); // says where it goes
+    expect(a.getAttribute('aria-label')).toBe('Download PDF (opens in a new tab)');
     // The browser follows the link itself; the handler only records the export and closes the menu.
     const track = vi.fn();
     (t.w as unknown as { __track: typeof track }).__track = track;
