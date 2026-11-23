@@ -34,6 +34,9 @@ import { sendOpsAlert } from '@/lib/ops-alert';
 import { findMismatches, type StripeSub } from '@/lib/billing/paid-entitlement';
 import { MCP_CHANNEL_OR_FILTER } from '@/lib/mcp/channel-filter';
 import { hasValidCronSecret } from '@/lib/cron/cron-request-auth';
+import { sendGuardCheckFromRows } from '@/lib/email/guard-reason';
+import { classifyBriefingClassificationDrops } from '@/lib/briefings/delivery/rollout';
+import { customerDropCount, describeBriefingClassificationDrops } from '@/lib/briefings/classification-drop-summary';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -76,9 +79,9 @@ function getSupabase() {
 
 /** Alert when a pipeline delivers less than this share of what it should have. */
 const MIN_COMPLETENESS = 0.9;
-/** Alert when more than this many alerts are blocked by the send guard in 24h. */
+/** Alert when more than this many alerts are LOST to the send guard in 24h (recipient suppression excluded). */
 const MAX_GUARD_BLOCKS = 5;
-/** Alert when more than this many users are entitled but unreachable by the job. */
+/** Alert when more than this many real briefings-enabled users are dropped by the sender's classification gate. */
 const MAX_ORPHANED_ENTITLEMENTS = 20;
 // MCP activation: of the users who AUTHENTICATED to an MCP surface, what share hold a
 // credit row? Below this, the activation wall is back. Starting guess like the others —
@@ -189,73 +192,78 @@ async function checkAlertCoverage(sb: ReturnType<typeof getSupabase>): Promise<C
   };
 }
 
-/** Send guard: how many real alerts were suppressed by the per-recipient daily cap? */
+/**
+ * Send guard: alerts generated but never sent, broken down by the guard's REASON.
+ *
+ * daily-alerts / weekly-alerts store sendEmail()'s onBlocked reason as `guard_reason` in the
+ * row's opportunities_data context (error_message stays exactly 'send_guard_blocked'). The
+ * breakdown separates the guard HONORING a recipient (mailbox suppression: unsubscribe /
+ * bounce / complaint — informational, not a delivery failure) from blocks that lost an alert
+ * the user should have had: a failed suppression lookup (fail-closed), a synthetic Coach-Mode
+ * address, and rows with no recorded reason (`unknown` — never assumed benign).
+ *
+ * The daily-cap bucket is STRUCTURALLY 0 for these rows: daily_alert and weekly_alert are in
+ * send-email.ts CAP_EXEMPT_TYPES, so the cap branch never blocks them. It is still counted so a
+ * regression that drops the exemption shows up here instead of hiding in "unknown".
+ */
 async function checkSendGuard(sb: ReturnType<typeof getSupabase>): Promise<Check> {
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-  const { count, error } = await sb
+  // Paged row read (not a HEAD count) because the reason lives in each row's context.
+  // A table that cannot be read returns an error here, never an empty "0 blocked".
+  const { rows, error } = await fetchAllRows<{ opportunities_data: unknown }>((from, to) => sb
     .from('alert_log')
-    .select('id', { count: 'exact', head: true })
+    .select('opportunities_data')
     .eq('error_message', 'send_guard_blocked')
-    .gte('alert_date', since);
+    .gte('alert_date', since)
+    .range(from, to));
 
   if (error) {
     return { name: 'Send guard', detail: `query failed: ${error.message}`, value: 'unknown', ok: false };
   }
-  // A missing table returns count=null with error=null and HTTP 204 — no error at all.
-  // `count ?? 0` would turn "I don't know" into "zero blocked", i.e. this monitor
-  // fabricating the exact healthy-looking number it exists to catch. UNKNOWN is a
-  // failure, not a pass.
-  if (count === null || count === undefined) {
-    return { name: 'Send guard', detail: 'count came back NULL — table missing or unreadable', value: 'unknown', ok: false };
-  }
-  const n = count;
-  return {
-    name: 'Send guard',
-    detail: n === 0 ? 'no alerts suppressed' : `${n} alert(s) generated but never sent (suppression or daily cap)`,
-    value: String(n),
-    ok: n <= MAX_GUARD_BLOCKS,
-  };
+  const c = sendGuardCheckFromRows(rows, MAX_GUARD_BLOCKS);
+  return { name: 'Send guard', detail: c.detail, value: c.value, ok: c.ok };
 }
 
-/** Briefings: users entitled in one table but invisible to the job's audience query. */
+/**
+ * Briefings: briefings-enabled users the sender's classification gate drops.
+ * Uses the sender's own predicate (classifyBriefingClassificationDrops →
+ * isBriefingEntitled), never a re-derived access list.
+ */
 async function checkBriefingEntitlements(sb: ReturnType<typeof getSupabase>): Promise<Check> {
-  // Both reads are paged: 779 briefings_enabled profiles and 1,732 classification
-  // rows both exceed the 1,000 cap as they grow, and a truncated `entitled` set
-  // would invent orphans that do not exist.
+  // Both reads are paged: briefings_enabled profiles and classification rows both
+  // exceed the 1,000 cap, and a truncated classification set would invent drops.
   const { rows: enabled, error: eErr } = await fetchAllRows<{ user_email: string }>((from, to) => sb
     .from('user_notification_settings')
     .select('user_email')
     .eq('briefings_enabled', true)
     .eq('is_active', true)
     .range(from, to));
-  const { rows: classified, error: cErr } = await fetchAllRows<{ email: string; briefings_access: string }>((from, to) => sb
+  // ALL rows, not only entitling ones: a row of access free/none/excluded is a
+  // different finding from no row at all, and expiry must be read to match the sender.
+  const { rows: classified, error: cErr } = await fetchAllRows<{ email: string; briefings_access: string | null; briefings_expiry: string | null }>((from, to) => sb
     .from('customer_classifications')
-    .select('email, briefings_access')
-    .in('briefings_access', ['lifetime', '1_year', '6_month', 'subscription', 'beta_preview'])
+    .select('email, briefings_access, briefings_expiry')
     .range(from, to));
 
   if (eErr || cErr) {
     return { name: 'Briefing entitlement', detail: `query failed: ${(eErr || cErr)?.message}`, value: 'unknown', ok: false };
   }
-  const entitled = new Set(classified.map(r => String(r.email).toLowerCase()));
-  const allOrphans = enabled.filter(r => !entitled.has(String(r.user_email).toLowerCase()));
 
   // Synthetic accounts are not a customer-facing problem. 171 of the 586 orphans on
   // 2026-08-04 were healthcheck-*/@test.* rows this repo creates itself; counting
   // them inflates the number a human is asked to act on by ~40%.
   const isSynthetic = (e: string) => /@test\.|^healthcheck-|@example\./i.test(e);
-  const realOrphans = allOrphans.filter(r => !isSynthetic(String(r.user_email)));
-  const synthetic = allOrphans.length - realOrphans.length;
-  const orphaned = realOrphans.length;
+  const enabledEmails = enabled.map(r => String(r.user_email || ''));
+  const realEnabled = enabledEmails.filter(e => !isSynthetic(e));
+  const report = classifyBriefingClassificationDrops(realEnabled, classified);
+  const syntheticDrops = classifyBriefingClassificationDrops(enabledEmails.filter(isSynthetic), classified).droppedByClassification;
+  const dropped = customerDropCount(report);
 
   return {
     name: 'Briefing entitlement',
-    detail: orphaned === 0
-      ? 'every briefings-enabled user is reachable by the cron'
-      : `${orphaned} real user(s) have briefings_enabled but NO customer_classifications row — the cron cannot see them`
-        + (synthetic > 0 ? ` (+${synthetic} test/healthcheck accounts ignored)` : ''),
-    value: String(orphaned),
-    ok: orphaned <= MAX_ORPHANED_ENTITLEMENTS,
+    detail: describeBriefingClassificationDrops(report, syntheticDrops),
+    value: String(dropped),
+    ok: dropped <= MAX_ORPHANED_ENTITLEMENTS,
   };
 }
 
@@ -473,7 +481,7 @@ async function checkPaidEntitlement(sb: ReturnType<typeof getSupabase>): Promise
       <table style="border-collapse:collapse;width:100%;max-width:640px;">${rows}</table>
       <p style="color:#666;font-size:12px;margin-top:12px;">
         Thresholds: completeness ≥ ${Math.round(MIN_COMPLETENESS * 100)}%,
-        send-guard blocks ≤ ${MAX_GUARD_BLOCKS}, orphaned entitlements ≤ ${MAX_ORPHANED_ENTITLEMENTS}.
+        send-guard lost alerts ≤ ${MAX_GUARD_BLOCKS} (suppression excluded), classification-gate drops ≤ ${MAX_ORPHANED_ENTITLEMENTS}.
       </p>
     </div>`;
 

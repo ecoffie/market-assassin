@@ -44,6 +44,7 @@
     "test:unit": "vitest run",
     "test:live": "vitest run --config vitest.live.config.ts",
     "test:unit:watch": "vitest",
+    "test:visual": "vitest run --config vitest.visual.config.ts",
     "test:bq-integration": "RUN_LIVE_BQ_TESTS=1 vitest run --config vitest.bq-integration.config.ts",
     "mcp:dev": "node scripts/mcp-dev.mjs",
     "mcp:smoke": "node scripts/mcp-smoke.mjs",

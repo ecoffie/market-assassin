@@ -27,6 +27,7 @@
  * NO EMOJI — every icon is an inline sized SVG (fill:none;stroke:currentColor). The
  * artifact's pen / target / trend / check / plus glyphs are all replaced with lucide-style SVGs.
  */
+import { STATE_BLOCK_CSS, signedOutStateHtml } from '@/lib/design/state-block';
 import { NextResponse, type NextRequest } from 'next/server';
 import { SUBPAGE_APP_SHELL_CSS, applyAppShell, isAppShellRequest } from '../app-shell';
 import { LOGIN_MODAL_CSS, LOGIN_MODAL_HTML, LOGIN_MODAL_JS } from '../login-modal';
@@ -230,7 +231,7 @@ const PAGE = `<!DOCTYPE html><html lang="en" class="mindy-map"><head>
   .signin,.loading{padding:60px 20px;text-align:center;color:var(--sub);font-size:15px}
   .signin a{color:var(--blue);font-weight:700;text-decoration:none}
   ${ACCOUNT_MENU_CSS}
-</style><style>${LOGIN_MODAL_CSS}</style></head><body>
+</style><style>${LOGIN_MODAL_CSS}</style><style>${STATE_BLOCK_CSS}</style></head><body>
 <header class="zhead">
   <nav class="zh-left">
     <a href="/opportunity-map">Opportunities</a>
@@ -262,7 +263,7 @@ const PAGE = `<!DOCTYPE html><html lang="en" class="mindy-map"><head>
   function email(){ try{ var t=tok()||''; var s=t.split('.')[0].replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4)s+='='; var j=JSON.parse(atob(s)); if(j&&j.email)return String(j.email).toLowerCase(); }catch(e){} try{ var b=localStorage.getItem('briefings_access_email'); return b?b.toLowerCase().trim():''; }catch(e2){return '';} }
   var t=tok(), em=email(), root=document.getElementById('root');
   function h(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
-  if(!t||!em){ root.innerHTML='<div class="signin">Please <a href="#" onclick="return window.__mapsSignIn()">sign in</a> to open your Company Vault.</div>'; return; }
+  if(!t||!em){ root.innerHTML=${JSON.stringify(signedOutStateHtml({ title: 'Sign in to open your Company Vault', body: 'Your company profile and documents, kept in one place.' }))}; return; }
   function hdrs(){ return {'Content-Type':'application/json','x-mi-auth-token':t,'x-user-email':em}; }
 
   // ── SVG icon set (all inline; NO emoji). ──
