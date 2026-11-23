@@ -37,6 +37,7 @@ import { hasProAccess } from '@/lib/access/resolve-access';
 // podcast retrieval (retrieveRagContext / retrievePodcastEpisodes) is gone entirely.
 import { loadBidderProfileResult, formatProfileForPrompt } from '@/lib/proposal/loaders';
 import { contractIdentityNote, contractEvidence, contractEvidenceNote, priorAwardIds } from '@/lib/chat/contract-evidence';
+import { ledgerForTrace } from '@/lib/chat/ledger-persistence';
 import { askMindyStrategyPlanEnabledFor, isStrategyPlanRequest, STRATEGY_PLAN_CHAT_CONTRACT, strategyPlanCheck, strategyProfileNote, strategyCompanyContext, strategyFitNote, type StrategyProfileInput } from '@/lib/ask-mindy/strategy-plan';
 import { isUserOverBudget, recordLlmUsage } from '@/lib/llm/usage-cost';
 import { makeTier0Tools, TIER0_TOOL_DEFS, TIER0_TOOL_NAMES } from '@/lib/chat/tier0-tools';
@@ -994,6 +995,8 @@ export async function POST(request: NextRequest) {
           };
           /** Packaged generate_market_report deliverable (hosted URL + inline HTML for the Ask pane). */
           market_report?: { report_id: string | null; url: string | null; title: string; html: string };
+          /** The signed source ledger this turn sent the client (ASK_MINDY_RECIPES): restored when History reopens. */
+          ledger?: SourceLedger;
         } = { planner: null, planner_attempts: [], tools_offered: 0, tool_executions: [], answer: null, answer_attempts: [], notices: [],
               ...(selectedCtx ? { context: { kind: 'opportunity' as const, notice_id: selectedCtx.noticeId } } : {}) };
         if (selectedNoticeMiss) turnTrace.notices.push(`selected_notice:${selectedNoticeMiss}`);
@@ -2738,7 +2741,15 @@ export async function POST(request: NextRequest) {
           });
         }
         // P3 (A2): the compact source ledger, kept by the client and re-sent with history.
-        send({ type: 'sources', ledger: ledgerFromSources(turnSources) });
+        const turnLedger = ledgerFromSources(turnSources);
+        send({ type: 'sources', ledger: turnLedger });
+        // Persist the same signed ledger with the assistant row (ASK_MINDY_RECIPES, default off): a reopened
+        // conversation keeps its "#12" references and contract identity. Capped; never tool bodies.
+        if (askMindyRecipesEnabledFor(auth.email)) {
+          const stored = ledgerForTrace(turnLedger);
+          if ('ledger' in stored) turnTrace.ledger = stored.ledger;
+          else turnTrace.notices.push(stored.notice);
+        }
         send({ type: 'citations', sources: citedSources });
 
         // Card chat charge: ONCE PER QUESTION. A complete answer is saved with its sources and debited in ONE
