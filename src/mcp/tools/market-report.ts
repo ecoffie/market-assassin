@@ -47,6 +47,12 @@ import {
   dedupeRecompetes,
   normalizeForecastSetAside,
   presentRecompete,
+  recompeteProvenance,
+  recompeteSourceSummary,
+  contactsAsOf,
+  CONTACTS_SOURCE_LABEL,
+  type RecompeteProvenance,
+  type RecompeteSourceLabel,
 } from '@/lib/market/report-presentation';
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://getmindy.ai';
@@ -228,7 +234,16 @@ export interface MarketReportContacts {
   /** The buying office the roster is anchored on, when one is identifiable. */
   office: string | null;
   /** A few real, emailable POCs (CO / small-business / specialists). */
-  people: Array<{ name: string; role: string; email: string; office: string | null }>;
+  people: Array<{
+    name: string; role: string; email: string; office: string | null;
+    /** Row provenance: the SAM notice this person was listed on as POC. null fields = not stated (never a default). */
+    source: { kind: 'sam_notice_poc'; solicitation_number: string | null; notice_posted: string | null };
+  }>;
+  /** Where these people come from (federal_contacts, government buyers only). */
+  source_label?: typeof CONTACTS_SOURCE_LABEL;
+  /** Newest notice_posted among the shown people; null when none states one. */
+  as_of?: string | null;
+  as_of_label?: 'most recent notice listing these contacts';
   /** Total matched (before the display cap) so truncation is explicit. */
   total: number;
   /**
@@ -294,7 +309,11 @@ export interface MarketReportResult {
      *  when nothing was cut. */
     top_agencies_total: number;
     competition: { contractors: unknown[]; count: number };
-    recompetes: { contracts: unknown[]; count: number };
+    recompetes: {
+      contracts: unknown[]; count: number;
+      /** Distinct row source labels with counts (contracts[i].provenance); "not_stated" = no evidence on the row. */
+      sources?: Array<{ label: RecompeteSourceLabel | 'not_stated'; count: number }>;
+    };
     forecasts: { forecasts: unknown[]; count: number };
     /** Who to call — the market's #1 buyer's office + a few real contacts. */
     contacts: MarketReportContacts | null;
@@ -627,7 +646,9 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
 
   const contractors = competitionR.value?.contractors ?? [];
   // LIST — one row per customer-visible record, labelled for what it is.
-  const contracts = dedupeRecompetes((recompetesR.value?.contracts ?? []) as Array<Record<string, unknown>>).map((c) => presentRecompete(c));
+  // Each row carries its own provenance, from evidence on the row (report-presentation.recompeteProvenance).
+  const contracts = dedupeRecompetes((recompetesR.value?.contracts ?? []) as Array<Record<string, unknown>>)
+    .map((c) => ({ ...presentRecompete(c), provenance: recompeteProvenance(c) }));
   const forecastDedupe = dedupeForecasts(forecastsR.value?.forecasts ?? []);
   const forecasts = forecastDedupe.rows.map((f) => ({
     ...f,
@@ -671,6 +692,11 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
         ? `${c.derived_office || 'Contracting office'} (${c.office_code})`
         : (c.derived_office || c.sub_agency || null),
       office_code: c.office_code ?? null,
+      source: {
+        kind: 'sam_notice_poc' as const,
+        solicitation_number: c.notice_solicitation_number ?? null,
+        notice_posted: c.notice_posted_date ?? null,
+      },
     }))
     .filter((p) => p.name && p.email)
     .slice(0, CONTACTS_CAP);
@@ -687,6 +713,7 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
         agency: contactAgency || String((recompetesR.value?.contracts?.[0] as { awarding_agency?: string } | undefined)?.awarding_agency || ''),
         office: people[0].office, people, total: roster?.total ?? people.length,
         basis: 'market_awarding_offices', office_codes: officeCodes,
+        source_label: CONTACTS_SOURCE_LABEL, as_of: contactsAsOf(people), as_of_label: 'most recent notice listing these contacts',
       };
     }
   }
@@ -701,6 +728,7 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
         people,
         total: roster?.total ?? people.length,
         basis: 'department_roster',
+        source_label: CONTACTS_SOURCE_LABEL, as_of: contactsAsOf(people), as_of_label: 'most recent notice listing these contacts',
       };
     }
   }
@@ -900,7 +928,7 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
     top_agencies: topAgencies,
     top_agencies_total: agenciesWithSpend.length,
     competition: { contractors, count: contractors.length },
-    recompetes: { contracts, count: contracts.length },
+    recompetes: { contracts, count: contracts.length, sources: recompeteSourceSummary(contracts.map((c) => c.provenance as RecompeteProvenance)) },
     forecasts: { forecasts, count: forecasts.length },
     contacts: contactsSection,
     agency_detail: agencyDetailR.value ?? null,
