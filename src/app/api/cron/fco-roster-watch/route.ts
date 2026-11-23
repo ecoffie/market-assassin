@@ -9,6 +9,12 @@
  *
  * WHY WEEKLY: Department of State joined FCO on 2026-08-19/20 and went unnoticed for ~3.5 weeks.
  * Weekly bounds that at 7 days. `?dry=1` plans without persisting anything.
+ *
+ * RUN TRUTH: a run is `success` ONLY when the census completed. A partial census (time budget or a
+ * 503 mid-walk) is `partial` (HTTP 503) and a census that read nothing is `error` (HTTP 500) —
+ * reported through the shared self-report (`reportCronOutcome`) because the dispatcher
+ * fire-and-forgets this long job, and mirrored in the HTTP status (`cronOutcomeHttpStatus`) so a
+ * lost self-report still records not-success. Same convention as saved-search-alerts.
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
@@ -16,6 +22,9 @@ import { runFcoWatch } from '@/lib/forecasts/fco-watch-run';
 import { sendOpsAlert } from '@/lib/ops-alert';
 import { shouldSendAlert, fingerprint } from '@/lib/ops-alert-dedup';
 import { hasValidCronSecret } from '@/lib/cron/cron-request-auth';
+import { cronOutcomeHttpStatus, reportCronOutcome, type CronOutcome } from '@/lib/cron-self-report';
+
+const JOB_NAME = 'fco-roster-watch';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -31,6 +40,8 @@ export async function GET(request: NextRequest) {
   // DRY = ZERO persistent writes: no clocks, no alert state, no alert send.
   const dry = request.nextUrl.searchParams.get('dry') === '1';
   const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+  // Only a dispatcher-fired, persisting run may write cron status — never a dry or manual curl.
+  const selfReport = request.headers.get('x-cron-dispatch') === '1' && !dry;
 
   try {
     // Tunable without a redeploy — the source throttles datacenter egress harder than a laptop.
@@ -66,9 +77,22 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ success: true, alerted, reason, ...run });
+    // A completed census is the only success. A partial read is degraded, not dead (error is
+    // reserved for a source we could not read at all).
+    const outcome: CronOutcome = run.census.complete ? 'success'
+      : run.census.pagesFetched > 0 ? 'partial' : 'error';
+    const outcomeNote = outcome === 'success' ? undefined
+      : `census incomplete: ${run.census.uniqueRows} of ${run.census.reportedTotal} rows, ${run.census.pagesFetched} pages read, ${run.census.pagesFailed} failed`;
+    if (selfReport) await reportCronOutcome(JOB_NAME, outcome, outcomeNote);
+
+    return NextResponse.json(
+      { success: outcome === 'success', outcome, ...(outcomeNote ? { note: outcomeNote } : {}), alerted, reason, ...run },
+      { status: cronOutcomeHttpStatus(outcome) },
+    );
   } catch (e) {
     // Surface it — a watch that dies silently is exactly what this replaces.
-    return NextResponse.json({ success: false, error: (e as Error).message }, { status: 500 });
+    const message = (e as Error).message;
+    if (selfReport) await reportCronOutcome(JOB_NAME, 'error', message);
+    return NextResponse.json({ success: false, outcome: 'error', error: message }, { status: 500 });
   }
 }
