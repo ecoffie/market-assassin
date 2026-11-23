@@ -13,7 +13,9 @@
  *   3. Export → Download PDF saves a file that starts with %PDF- and is byte-identical to what the route
  *      sent, and the request is a browser NAVIGATION (hidden frame), not a script fetch + blob. The blob
  *      version passed here in headless Chromium yet saved nothing in production (2026-11-22);
- *   4. a failed export shows the server's message in the pane, and the button offers "Try again".
+ *   4. a failed export shows the route's readable error page in the new tab (never a silent no-op).
+ *   Download PDF is a REAL LINK opening /reports/<id>/pdf in a new tab: script-driven downloads inside the
+ *   Map's frames (blob, then a hidden frame) saved nothing in a production browser while a real link did.
  *
  * Usage:  npx next dev -p 3100
  *         node scripts/acceptance/map-report-pane.mjs --pdf <file.pdf> [--base http://localhost:3100]
@@ -63,6 +65,8 @@ const browser = await chromium.launch();
 for (const [label, opts] of [['desktop 1440x900', { viewport: { width: 1440, height: 900 } }], ['iPhone 13', devices['iPhone 13']]]) {
   for (const mode of ['ok', 'error']) {
     const ctx = await browser.newContext({ ...opts, acceptDownloads: true });
+    // The site's timed event popup (src/lib/events/event-popup.ts) is unrelated to this pane; mark it seen.
+    await ctx.addCookies([{ name: 'mindy_lcb_popup_s', value: '1', url: base }]);
     await ctx.addInitScript((t) => { try { localStorage.setItem('mi_beta_auth_token', t); } catch {} }, `${tokPayload}.sig`);
     const page = await ctx.newPage();
     const pageErrors = [];
@@ -75,7 +79,7 @@ for (const [label, opts] of [['desktop 1440x900', { viewport: { width: 1440, hei
     ]) }));
     let pdfRequests = 0;
     const pdfKinds = [];
-    await page.route(`**/reports/${REPORT_ID}/pdf`, (r) => {
+    await ctx.route(`**/reports/${REPORT_ID}/pdf`, (r) => {
       pdfRequests++;
       pdfKinds.push(`${r.request().resourceType()}${r.request().isNavigationRequest() ? ':nav' : ''}`);
       if (mode === 'error') return r.fulfill({ status: 503, headers: { 'content-type': 'text/html; charset=utf-8' }, body: ERROR_PAGE });
@@ -102,22 +106,26 @@ for (const [label, opts] of [['desktop 1440x900', { viewport: { width: 1440, hei
     }
     // 3/4. Export → Download PDF
     await page.click('[data-testid="amk-export-toggle"]');
-    const item = page.locator('.amk-exp-panel button[data-fmt="pdf"]');
+    const item = page.locator('.amk-exp-panel a[data-fmt="pdf"]');
     check(`${tag} Export offers Download PDF`, (await item.textContent()) === 'Download PDF');
+    check(`${tag} Download PDF is a real link to the PDF route in a new tab`,
+      (await item.getAttribute('href')) === `/reports/${REPORT_ID}/pdf` && (await item.getAttribute('target')) === '_blank' && (await item.getAttribute('download')) === null);
+    // A real user click (Playwright's mouse), as the customer does.
+    const dlFromAnyPage = new Promise((res) => { const on = (p) => p.on('download', res); ctx.pages().forEach(on); ctx.on('page', on); });
+    const popupP = ctx.waitForEvent('page', { timeout: 15000 });
+    await item.click();
+    const popup = await popupP;
     if (mode === 'ok') {
-      const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 15000 }), item.click()]);
+      const dl = await Promise.race([dlFromAnyPage, new Promise((_, rej) => setTimeout(() => rej(new Error('no download within 15s')), 15000))]);
       const saved = readFileSync(await dl.path());
       check(`${tag} downloads a real PDF`, saved.subarray(0, 5).toString('latin1') === '%PDF-' && saved.equals(PDF), `${saved.length} bytes`);
       check(`${tag} file name`, dl.suggestedFilename() === 'facilities-maintenance-market-report.pdf', dl.suggestedFilename());
-      check(`${tag} no error shown`, await page.locator('[data-testid="amk-report-error"]').isHidden());
+      check(`${tag} the map page stays where it was`, /\/opportunity-map/.test(page.url()), page.url());
     } else {
-      await item.click();
-      const err = page.locator('[data-testid="amk-report-error"]');
-      await err.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
-      const text = (await err.isVisible()) ? await err.textContent() : '';
-      check(`${tag} failure is visible and actionable`, /Try again in a minute/.test(text), JSON.stringify(text));
-      await page.click('[data-testid="amk-export-toggle"]');
-      check(`${tag} button offers Try again`, (await item.textContent()) === 'Try again');
+      await popup.waitForLoadState('domcontentloaded').catch(() => {});
+      const text = await popup.locator('body').innerText().catch(() => '');
+      check(`${tag} failure is visible and actionable (route error page in the new tab)`, /PDF not available/.test(text) && /Try again in a minute/.test(text), JSON.stringify(text.slice(0, 120)));
+      check(`${tag} the map page stays where it was`, /\/opportunity-map/.test(page.url()), page.url());
     }
     check(`${tag} one PDF request`, pdfRequests === 1, String(pdfRequests));
     check(`${tag} the PDF is requested by navigation, not fetch`, pdfKinds[0] === 'document:nav', pdfKinds.join(','));
