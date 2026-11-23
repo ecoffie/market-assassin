@@ -157,5 +157,8 @@ export interface DraftResult {
     factGuardRemoved?: string[];
     /** Clearance/cert guard (FM-P02): credentials asserted but not vault-backed, neutralized (capped). */
     credentialsStripped?: string[];
+    /** Set when a past-performance section was NOT drafted because the vault holds none
+     *  ('none_on_file') or could not be read ('unavailable'); the draft is a fill-in template. */
+    pastPerformanceGap?: 'none_on_file' | 'unavailable';
   };
 }
