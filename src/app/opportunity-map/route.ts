@@ -11451,10 +11451,47 @@ const ASK_MINDY_JS = `<script>(function(){
   // model string escaped.
   var REP_FRAME_CSP='<meta http-equiv="Content-Security-Policy" content="default-src \\'none\\'; style-src \\'unsafe-inline\\'; img-src data:; font-src data:; base-uri \\'none\\'; form-action \\'none\\'">';
   var REP_FRAME_CSS='<style>.pdfbtn{display:none!important}html{height:auto!important;overflow:auto!important}body{height:auto!important;min-height:0!important;overflow:visible!important}</style>';
+  // The HTML is parsed into an INERT document (DOMParser: no scripts run, nothing loads) and cleaned there,
+  // then serialized. String regexes are bypassable (an entity-encoded http-equiv="&#114;efresh" still
+  // decodes to refresh), and a same-origin frame that navigates to our origin carries our cookies, which
+  // the old opaque frame did not. Removed: script, iframe, frame, frameset, object, embed, applet, form,
+  // base, link, noscript, template, portal, math, SVG animation (it can rewrite attributes), style inside
+  // SVG, every meta except charset / viewport, every on* attribute, any URL attribute that is not
+  // http(s)/mailto/#fragment (data: is allowed only for images, which the CSP also permits).
+  var REP_KILL='script,iframe,frame,frameset,object,embed,applet,form,base,link,noscript,template,portal,math,svg style,animate,set,animateMotion,animateTransform,discard';
+  var REP_URL_ATTR=/^(href|xlink:href|src|srcset|action|formaction|poster|background|data|ping|lowsrc|dynsrc|cite|longdesc|usemap|codebase|manifest|icon)$/i;
+  function repSanitize(html){
+    var doc=null; try{ doc=new DOMParser().parseFromString(String(html||''),'text/html'); }catch(e){ doc=null; }
+    if(!doc||!doc.documentElement) return null;
+    var kill=doc.querySelectorAll(REP_KILL), i, j;
+    for(i=kill.length-1;i>=0;i--){ if(kill[i].parentNode) kill[i].parentNode.removeChild(kill[i]); }
+    var metas=doc.querySelectorAll('meta');
+    for(i=metas.length-1;i>=0;i--){
+      var mt=metas[i], keep=!mt.hasAttribute('http-equiv')&&(mt.hasAttribute('charset')||String(mt.getAttribute('name')||'').toLowerCase()==='viewport');
+      if(!keep&&mt.parentNode) mt.parentNode.removeChild(mt);
+    }
+    var all=doc.getElementsByTagName('*');
+    for(i=0;i<all.length;i++){
+      var el=all[i], attrs=[];
+      for(j=0;j<el.attributes.length;j++) attrs.push(el.attributes[j]);
+      for(j=0;j<attrs.length;j++){
+        var a=attrs[j], n=a.name, v=String(a.value||'').replace(/[\\u0000-\\u0020\\u007f]+/g,'');
+        if(/^on/i.test(n)){ el.removeAttribute(n); continue; }
+        if(REP_URL_ATTR.test(n)){
+          var ok=/^(href|xlink:href)$/i.test(n)?/^(https?:|mailto:|#)/i.test(v):(/^(src|srcset)$/i.test(n)&&/^data:image\\//i.test(v));
+          if(!ok) el.removeAttribute(n);
+        }
+      }
+    }
+    return doc;
+  }
   function repFrameHtml(html){
-    var h=String(html||'').replace(/<meta[^>]*http-equiv\\s*=\\s*["']?refresh[^>]*>/gi,'').replace(/<base\\b[^>]*>/gi,'');
-    h=/<[/]head>/i.test(h)?h.replace(/<[/]head>/i,REP_FRAME_CSS+'</head>'):REP_FRAME_CSS+h;
-    return /<head\\b[^>]*>/i.test(h)?h.replace(/<head\\b[^>]*>/i,function(m){ return m+REP_FRAME_CSP; }):REP_FRAME_CSP+h;
+    var doc=repSanitize(html);
+    if(!doc) return REP_FRAME_CSP+'<p>This preview could not be shown. Use Open hosted link.</p>';
+    var head=doc.head||doc.documentElement.insertBefore(doc.createElement('head'),doc.body);
+    var st=doc.createElement('style'); st.textContent=REP_FRAME_CSS.replace(/^<style>|<[/]style>$/g,''); head.appendChild(st);
+    var serialized='<!doctype html>'+doc.documentElement.outerHTML;
+    return serialized.replace(/<head\\b[^>]*>/i,function(m){ return m+REP_FRAME_CSP; });
   }
   function repSetDoc(E,html){
     E.f.classList.remove('fit'); E.f.style.height='';

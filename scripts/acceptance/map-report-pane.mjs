@@ -37,7 +37,7 @@ const REPORT_ID = 'AbCdEfGhIjKlMnOpQrStUv';
 const sections = Array.from({ length: 30 }, (_, i) => `<div class="sec"><h2>Section ${i + 1}</h2><p>Line of report text.</p></div>`).join('');
 // Stand-in for a renderer bug: raw markup that would act with our cookies in a same-origin frame. The
 // frame's CSP must block the request, the refresh must be gone, and the frame must not navigate.
-const HOSTILE = '<img id="probe-img" src="/api/should-never-load.png"><meta http-equiv="refresh" content="0;url=/api/should-never-navigate"><base href="https://evil.example/">';
+const HOSTILE = '<img id="probe-img" src="/api/should-never-load.png"><meta http-equiv="refresh" content="0;url=/api/should-never-navigate"><meta http-equiv="&#114;efresh" content="0;url=/api/should-never-navigate-2"><base href="https://evil.example/"><a id="probe-a" href="/api/should-never-follow">x</a>';
 const HTML = `<!doctype html><html><head><meta charset="utf-8"><style>.sec{padding:20px;border:1px solid #ddd;margin:12px}</style></head><body><header class="rp" style="position:relative"><h1>Facilities maintenance</h1><button class="pdfbtn" onclick="window.print()">Save as PDF</button></header>${sections}${HOSTILE}</body></html>`;
 // Same shape as fail() in src/app/reports/[id]/pdf/route.ts for a non-JSON request (a navigation).
 const ERROR_PAGE = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>PDF not available</title></head><body><div class="c"><h1>PDF not available</h1><p>We couldn't create the PDF just now. Try again in a minute. The report itself is unchanged.</p><p style="margin-top:16px"><a href="/reports/${REPORT_ID}">Back to the report</a></p></div></body></html>`;
@@ -151,7 +151,9 @@ for (const [label, opts] of [['desktop 1440x900', { viewport: { width: 1440, hei
       check(`${tag} a request-blocking CSP is the first element of the frame head`, lock.firstInHead === 'Content-Security-Policy', String(lock.firstInHead));
       check(`${tag} no refresh or base tag reached the frame`, !lock.refresh && !lock.base, JSON.stringify(lock));
       check(`${tag} the frame never navigated`, lock.url === 'about:srcdoc', lock.url);
-      check(`${tag} nothing left the frame: the probe image was blocked by the CSP`, forbidden.length === 0 && blocked.length === 1 && lock.img === 0, `blocked=${blocked.join(',')} forbidden=${forbidden.join(',')}`);
+      check(`${tag} nothing left the frame (the sanitizer removed the probe image's src; the CSP backs it up)`, forbidden.length === 0 && lock.img <= 0, `blocked=${blocked.join(',')} forbidden=${forbidden.join(',')}`);
+      const probe = await page.evaluate(() => { const d = document.querySelector('.amk-rep-f').contentDocument; const i = d.getElementById('probe-img'); const a = d.getElementById('probe-a'); return { imgSrc: i ? i.getAttribute('src') : 'gone', aHref: a ? a.getAttribute('href') : 'gone', metas: [...d.querySelectorAll('meta')].map((m) => m.getAttribute('http-equiv') || m.getAttribute('name') || 'charset') }; });
+      check(`${tag} sanitized in the live frame: no image src, no relative link, only the CSP/charset/viewport metas`, probe.imgSrc === null && probe.aHref === null && probe.metas[0] === 'Content-Security-Policy' && probe.metas.every((m) => ['Content-Security-Policy', 'charset', 'viewport'].includes(m)), JSON.stringify(probe));
     }
     await ctx.close();
   }

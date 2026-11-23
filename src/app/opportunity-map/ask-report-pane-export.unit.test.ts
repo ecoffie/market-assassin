@@ -331,6 +331,7 @@ describe('Map report pane: the same-origin preview frame is locked down (Agent 4
     await t.ask('market report');
     const sb = frame(t.doc).getAttribute('sandbox');
     expect(sb).toBe('allow-same-origin');
+    expect((sb ?? '').split(/\s+/).filter(Boolean)).toEqual(['allow-same-origin']); // the exact token list
     for (const token of ['allow-scripts', 'allow-forms', 'allow-popups', 'allow-modals', 'allow-top-navigation', 'allow-downloads']) expect(sb).not.toContain(token);
     expect(MAP.match(/sandbox="[^"]*"/g)?.filter((m) => m.includes('allow-')) ?? []).toEqual(['sandbox="allow-same-origin"']); // the only token anywhere in the Map page
   });
@@ -350,7 +351,76 @@ describe('Map report pane: the same-origin preview frame is locked down (Agent 4
   it('HTML without a head still gets the policy first', async () => {
     const t = boot({ chat: reportTurn({ html: '<p>BARE</p>' }) });
     await t.ask('market report');
-    expect(frame(t.doc).srcdoc.startsWith('<meta http-equiv="Content-Security-Policy"')).toBe(true);
+    const srcdoc = frame(t.doc).srcdoc;
+    expect(srcdoc).toMatch(/^<!doctype html><html><head><meta http-equiv="Content-Security-Policy"/);
+    expect(srcdoc).toContain('<p>BARE</p>');
+  });
+
+  // Parsed the way the frame will parse it, so entity-encoded or reordered attributes cannot slip through.
+  const cleaned = async (hostile: string) => {
+    const t = boot({ chat: reportTurn({ html: `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">${hostile}</head><body><p>REPORT BODY</p>${hostile}</body></html>` }) });
+    await t.ask('market report');
+    const srcdoc = frame(t.doc).srcdoc;
+    const d = new t.w.DOMParser().parseFromString(srcdoc, 'text/html');
+    return { srcdoc, d };
+  };
+
+  it.each([
+    ['plain refresh', '<meta http-equiv="refresh" content="0;url=/api/app/chat-sessions?email=a@b.c">'],
+    ['entity-encoded http-equiv', '<meta http-equiv="&#114;efresh" content="0;url=/api/x">'],
+    ['hex entity, mixed case', '<META HTTP-EQUIV="&#x52;EFRESH" CONTENT="0; URL=/api/x">'],
+    ['content before http-equiv', '<meta content="0;url=/api/x" http-equiv=refresh>'],
+    ['unquoted, extra whitespace', '<meta   http-equiv = refresh   content=0;url=/api/x>'],
+    ['any other http-equiv', '<meta http-equiv="set-cookie" content="a=b">'],
+    ['refresh in body inside noscript', '<noscript><meta http-equiv="refresh" content="0;url=/api/x"></noscript>'],
+  ])('no meta except charset/viewport survives: %s', async (_name, hostile) => {
+    const { d } = await cleaned(hostile);
+    const metas = [...d.querySelectorAll('meta')].map((m) => m.getAttribute('http-equiv') ?? m.getAttribute('name') ?? (m.hasAttribute('charset') ? 'charset' : '?'));
+    expect(metas).toEqual(['Content-Security-Policy', 'charset', 'viewport']); // the policy first, then the two harmless ones
+    expect(d.querySelector('meta[http-equiv="Content-Security-Policy"]')).toBe(d.head.firstElementChild);
+  });
+
+  it.each([
+    ['base', '<base href="https://evil.example/">'],
+    ['form', '<form action="/api/app/vault/documents" method="post"><input name="x"></form>'],
+    ['script', '<script>alert(1)</script>'],
+    ['iframe', '<iframe src="/api/x"></iframe>'],
+    ['object / embed', '<object data="/api/x"></object><embed src="/api/x">'],
+    ['link prefetch', '<link rel="prefetch" href="/api/x">'],
+    ['template', '<template><meta http-equiv="refresh" content="0;url=/api/x"></template>'],
+    ['svg animation rewriting href', '<svg><a href="https://ok.example/"><animate attributeName="href" to="/api/x"/><text>t</text></a></svg>'],
+    ['math', '<math><mi xlink:href="/api/x">x</mi></math>'],
+  ])('dangerous elements are removed: %s', async (_name, hostile) => {
+    const { d } = await cleaned(hostile);
+    expect(d.querySelector('base,form,script,iframe,object,embed,link,template,animate,set,math')).toBeNull();
+    expect(d.body.textContent).toContain('REPORT BODY');
+  });
+
+  it('on* attributes and non-http(s)/mailto/# URLs are removed; safe links and data: images stay', async () => {
+    const { d } = await cleaned(
+      '<a id="js" href="javascript:alert(1)">a</a><a id="js2" href=" jav&#x09;ascript:alert(1)">b</a><a id="rel" href="/api/app/vault/documents/download?id=1">c</a>'
+      + '<a id="ext" href="https://www.sam.gov/opp/1">d</a><a id="mail" href="mailto:x@example.com">e</a><a id="frag" href="#sec">f</a>'
+      + '<img id="img" src="/api/should-not-load.png" onerror="alert(1)"><img id="data" src="data:image/png;base64,AAAA"><div id="h" onclick="x()" onmouseover="y()">h</div>'
+      + '<svg><a id="sv" xlink:href="/api/x"><text>s</text></a></svg>',
+    );
+    const href = (id: string) => d.getElementById(id)?.getAttribute('href') ?? null;
+    expect(href('js')).toBeNull();
+    expect(href('js2')).toBeNull();
+    expect(href('rel')).toBeNull();
+    expect(href('ext')).toBe('https://www.sam.gov/opp/1');
+    expect(href('mail')).toBe('mailto:x@example.com');
+    expect(href('frag')).toBe('#sec');
+    expect(d.getElementById('img')!.hasAttribute('src')).toBe(false);
+    expect(d.getElementById('img')!.hasAttribute('onerror')).toBe(false);
+    expect(d.getElementById('data')!.getAttribute('src')).toBe('data:image/png;base64,AAAA');
+    expect([...d.getElementById('h')!.attributes].map((a) => a.name)).toEqual(['id']);
+    expect(d.querySelector('[id="sv"]')!.getAttribute('xlink:href')).toBeNull();
+    expect([...d.querySelectorAll('*')].flatMap((e) => [...e.attributes]).filter((a) => /^on/i.test(a.name))).toEqual([]);
+  });
+
+  it('the old string-regex stripping is gone (it was bypassable)', () => {
+    expect(MAP).toContain('new DOMParser().parseFromString');
+    expect(MAP).not.toMatch(/replace\(\/<meta\[\^>\]\*http-equiv/);
   });
 
   it('links never navigate the frame: http(s) opens a new tab with noopener, mailto goes to the mail app, anything else does nothing', async () => {
