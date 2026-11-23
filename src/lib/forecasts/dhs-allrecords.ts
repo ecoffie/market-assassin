@@ -51,7 +51,9 @@ export function dhsParseDollarRange(v: unknown): [number | null, number | null] 
   if (!s) return [null, null];
   const mult = (u: string) => (u === 'b' ? 1e9 : u === 'm' ? 1e6 : u === 'k' ? 1e3 : 1);
   const nums = [...s.matchAll(/\$?\s*([\d.,]+)\s*([bmk])?/g)]
-    .map((m) => Number(m[1].replace(/,/g, '')) * mult(m[2] || ''))
+    // Whole dollars: estimated_value_min/max are BIGINT. Unrounded, "$1.9M" is 1899999.9999999998 and an exact
+    // "$2,053,499.20" is 2053499.2 — Postgres rejected the whole DHS batch (invalid input syntax for type bigint).
+    .map((m) => Math.round(Number(m[1].replace(/,/g, '')) * mult(m[2] || '')))
     .filter((n) => Number.isFinite(n) && n > 0);
   if (!nums.length) return [null, null];
   return [nums[0], nums.length > 1 ? nums[nums.length - 1] : null];

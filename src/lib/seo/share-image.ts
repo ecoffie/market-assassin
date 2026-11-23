@@ -31,6 +31,25 @@ export function siteShareImages(): ShareImage[] {
   return [{ ...SITE_SHARE_IMAGE }];
 }
 
+const escAttr = (s: string) =>
+  s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+/**
+ * The root card as raw `<meta>` tags, for pages rendered as HTML strings by route handlers
+ * (/learn, the gov shell behind /research), which never receive Next's metadata output.
+ */
+export function shareImageMetaTags(img: ShareImage = SITE_SHARE_IMAGE): string {
+  const url = escAttr(img.url);
+  return [
+    `<meta property="og:image" content="${url}">`,
+    `<meta property="og:image:width" content="${img.width}">`,
+    `<meta property="og:image:height" content="${img.height}">`,
+    `<meta property="og:image:alt" content="${escAttr(img.alt)}">`,
+    `<meta name="twitter:card" content="summary_large_image">`,
+    `<meta name="twitter:image" content="${url}">`,
+  ].join('\n');
+}
+
 /**
  * The per-opportunity card. The route renders a generic card for an unknown id, so this never
  * points at a broken image; an id that is not a SAM notice id falls back to the site card.

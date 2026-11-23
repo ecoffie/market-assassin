@@ -37,6 +37,7 @@ import { hasProAccess } from '@/lib/access/resolve-access';
 // podcast retrieval (retrieveRagContext / retrievePodcastEpisodes) is gone entirely.
 import { loadBidderProfileResult, formatProfileForPrompt } from '@/lib/proposal/loaders';
 import { contractIdentityNote, contractEvidence, contractEvidenceNote, priorAwardIds } from '@/lib/chat/contract-evidence';
+import { askMindyStrategyPlanEnabledFor, isStrategyPlanRequest, STRATEGY_PLAN_CHAT_CONTRACT, strategyPlanCheck, strategyProfileNote, strategyCompanyContext, strategyFitNote, type StrategyProfileInput } from '@/lib/ask-mindy/strategy-plan';
 import { isUserOverBudget, recordLlmUsage } from '@/lib/llm/usage-cost';
 import { makeTier0Tools, TIER0_TOOL_DEFS, TIER0_TOOL_NAMES } from '@/lib/chat/tier0-tools';
 import { makeMyDocumentsTool, MY_DOCUMENTS_TOOL_DEF, FIND_MY_DOCUMENTS } from '@/lib/chat/my-documents-tool';
@@ -55,6 +56,7 @@ import { customerErrorMessage } from '@/lib/chat/customer-errors';
 import { boundToolResult, perResultBudget } from '@/lib/chat/bound-tool-result';
 import {
   filterToolsForTurn,
+  type FmpCompanyContext,
   enforceFindArgs,
   enforceMarketReportArgs,
   enforceFederalMarketProfileIdentityArgs,
@@ -70,6 +72,7 @@ import {
   federalMarketProfileOutsideWebNote,
   federalMarketProfileWriteupNote,
   isFederalMarketProfileRequest,
+  isMarketResearchRequest,
   SAM_ONLY_TOOL,
   MARKET_REPORT_TOOL,
   AWARD_HISTORY_TOOL,
@@ -114,6 +117,7 @@ import { ASK_MINDY_RULES_LAYER, askMindyRulesEnabledFor, askMindyRulesPromptBloc
 import { askMindyRecipesEnabledFor } from '@/lib/ask-mindy/flags';
 import { loadCompanyProfile } from '@/lib/ask-mindy/company-profile';
 import { fitRankingNote, rankFindResult } from '@/lib/ask-mindy/compose';
+import { requestedDocSections, requestedSectionsPlannerNote, routeSectionedReport, sectionedReportPlannerNote, packagedReportGapNote } from '@/lib/chat/requested-doc-sections';
 /** How long the answer waits for the company profile before skipping the ranking note (value first). */
 const FIT_PROFILE_WAIT_MS = 1500;
 import { findCompletionFooter, comingBackListLeadsWithNotCompeted, type FindResultWithItems } from '@/lib/chat/find-completeness';
@@ -720,13 +724,30 @@ export async function POST(request: NextRequest) {
         // layout and gets only the rules (truth, writing), never the top-picks answer format.
         const rulesLayer = askMindyRulesEnabledFor(auth.email);
         const customerAskForContract = splitViewPreamble(message).rest || message;
-        const federalMarketProfileAsk = !cardCtx && isFederalMarketProfileRequest(customerAskForContract);
+        // Sections the customer named for the document ("executive summary, risks, actions and sources"): the planner
+        // is told to carry them and create_document completes any it left out from the document's own statements.
+        const requestedSections = requestedDocSections(customerAskForContract);
+        const fmpTextAsk = !cardCtx && isFederalMarketProfileRequest(customerAskForContract);
+        // Federal Strategy Plan (ASK_MINDY_STRATEGY_PLAN, default off; src/lib/ask-mindy/strategy-plan.ts): a plan for
+        // this company runs the EXISTING Federal Market Profile research workflow (phase machine, write-up validator,
+        // create_document preview/export) with the general strategy contract and the saved company profile as its
+        // first input. Off -> this turn is exactly as before.
+        const strategyPlanAsk = !cardCtx && !fmpTextAsk && askMindyStrategyPlanEnabledFor(auth.email) && isStrategyPlanRequest(customerAskForContract);
+        const federalMarketProfileAsk = fmpTextAsk || strategyPlanAsk;
+        const strategyProfile: StrategyProfileInput | null = strategyPlanAsk
+          ? await loadCompanyProfile(actingScope)
+            .then((r): StrategyProfileInput => (r.status === 'ok' ? { status: 'ok', profile: r.profile } : { status: 'refused' }))
+            .catch((): StrategyProfileInput => ({ status: 'unavailable' }))
+          : null;
+        const strategyCompany: FmpCompanyContext | null = strategyProfile ? strategyCompanyContext(strategyProfile) : null;
         const findContract = rulesLayer ? rulesLayerFindContract() : CURRENT_FIND_CHAT_CONTRACT;
         const hostContract = cardCtx
           ? ''
-          : federalMarketProfileAsk
-            ? `\n\n${FEDERAL_MARKET_PROFILE_CHAT_CONTRACT}`
-            : `\n\n${findContract}`;
+          : strategyPlanAsk
+            ? `\n\n${STRATEGY_PLAN_CHAT_CONTRACT}`
+            : federalMarketProfileAsk
+              ? `\n\n${FEDERAL_MARKET_PROFILE_CHAT_CONTRACT}`
+              : `\n\n${findContract}`;
         const rulesBlock = !rulesLayer ? '' : federalMarketProfileAsk ? `\n\n${ASK_MINDY_RULES_LAYER}` : `\n\n${askMindyRulesPromptBlock()}`;
         const systemPrompt = SYSTEM_PROMPT_TEMPLATE.replace('{today}', today).replace('{userProfile}', userProfileBlock)
           + hostContract
@@ -768,7 +789,19 @@ export async function POST(request: NextRequest) {
         // the CUSTOMER asks for a document the planner must see the uploaded text and the latest answer;
         // otherwise the company's own content is missing. Only on that turn (uploaded text in the planner is a
         // prompt-injection surface), and on that turn create_document is the only write tool (see executor).
-        const plannerBuildsDocuments = vaultDocEnabledFor('generate', auth.email) && isDocumentCreationRequest(customerWords);
+        // "A professional report with an executive summary, ..., risks, recommended actions and sources" (Claude
+        // Local repro 2026-11-22): the packaged market report's fixed template carries none of those, so it is
+        // never presented as fulfilling that ask. With research already in this chat and create_document available,
+        // the turn builds the report as a document (packaged report not offered, create_document forced); otherwise
+        // the answer states plainly which requested sections the packaged report lacks.
+        const sectionedRoute = routeSectionedReport({
+          requested: requestedSections,
+          asksForReport: !federalMarketProfileAsk && (isDocumentCreationRequest(customerWords) || isMarketResearchRequest(customerWords)),
+          createAvailable: !cardCtx && vaultDocEnabledFor('generate', auth.email),
+          hasPriorResearch: (Array.isArray(body.history) ? body.history : []).some((h: { role?: string; content?: unknown }) => h?.role === 'assistant' && String(h.content ?? '').trim().length > 0),
+        });
+        const sectionedDocument = sectionedRoute.route === 'document';
+        const plannerBuildsDocuments = vaultDocEnabledFor('generate', auth.email) && (isDocumentCreationRequest(customerWords) || sectionedDocument);
         let plannerDocumentText: string | null = null;
         if (isVaultChatDocumentsEnabled(auth.email) && profileEmail && body.sessionId === sessionId) {
           const loaded = await loadChatDocumentTexts(getSupabase(), { sessionId, ownerEmail: profileEmail });
@@ -796,6 +829,8 @@ export async function POST(request: NextRequest) {
         // A contract number earlier answers showed as an award is looked up by that exact id (36C24825C0020).
         const contractIdNote = contractIdentityNote(splitViewPreamble(message).rest || message, priorLedgers);
         if (contractIdNote) ledgerSystemNotes.push(contractIdNote);
+        // Strategy plan step 1: the authorized company profile (or why it is not available) opens the research.
+        if (strategyProfile) ledgerSystemNotes.push(strategyProfileNote(strategyProfile));
         for (const n of ledgerSystemNotes) messages.push({ role: 'system', content: n });
         // "Revise that document" (Agent 4 prod test 2026-11-17): with ONE tool round, the planner must write the
         // revised doc_model in the same call, so the document it refers to is loaded here — from the signed
@@ -1003,6 +1038,20 @@ export async function POST(request: NextRequest) {
         let turnMarketReport: { report_id: string | null; url: string | null; title: string; html: string } | null = null;
         // Hoisted out of the tool try so the answer call can rewrite invent-links + re-push the note.
         const fmpToolContents: Array<{ tool: string; content: string }> = [];
+        // Strategy plan (#2320): opportunity fit comes from the shared fit scorer, not the model. The first successful
+        // find_opportunities in the research rounds adds a FIT SIGNAL note (compose.ts strategy_input mode: the same
+        // picks and reasons as #2285's chat ranking) built from THIS company's saved profile. It is one input: the
+        // write-up weighs it with award history, vehicles, competition, buyers and timing, and must say why whenever its
+        // order departs from the fit order. Once per turn; no profile (refused/unavailable) means no note, never a guess.
+        let strategyFitNotePushed = false;
+        const pushStrategyFitNote = (results: ReadonlyArray<{ record: { tool: string; status: string }; content: string }>) => {
+          if (!strategyPlanAsk || strategyFitNotePushed) return;
+          const fit = strategyFitNote(results, strategyProfile);
+          if (fit.reason === 'no_find') return; // wait for the round that runs FIND
+          if (fit.note) messages.push({ role: 'system', content: fit.note });
+          turnTrace.notices.push(fit.note ? 'strategy_fit_ranking_note' : `strategy_fit_ranking_note:${fit.reason}`);
+          strategyFitNotePushed = true;
+        };
         let fmpEvidence: FmpWriteupEvidence | null = null;
         let createDocAnswerNoteContent: string | null = null;
         try {
@@ -1032,6 +1081,7 @@ export async function POST(request: NextRequest) {
               callerEmail: auth.email!,
               request,
               chatSessionId: body.sessionId === sessionId ? turnSessionId : null,
+              ...(requestedSections.length ? { requestedSections } : {}),
               // FMP step-8 validator: refuse incomplete / banned profiles before Vault save.
               ...(federalMarketProfileAsk && fmpWriteupCtx
                 ? {
@@ -1067,7 +1117,16 @@ export async function POST(request: NextRequest) {
                     return r;
                   });
                 }
-                if (genDoc && n === CREATE_DOCUMENT) return genDoc.execute(a);
+                if (genDoc && n === CREATE_DOCUMENT) {
+                  // Strategy plan: record the plan's structural check (evaluation only; never blocks the save).
+                  if (strategyPlanAsk) {
+                    try {
+                      const check = strategyPlanCheck((a as { doc_model?: unknown }).doc_model as Parameters<typeof strategyPlanCheck>[0]);
+                      turnTrace.notices.push(check.pass ? 'strategy_plan_check:pass' : `strategy_plan_check:missing=${check.missing.length}`);
+                    } catch { turnTrace.notices.push('strategy_plan_check:unreadable'); }
+                  }
+                  return genDoc.execute(a);
+                }
                 return tier0Runtime.execute(n, a);
               },
             },
@@ -1086,7 +1145,10 @@ export async function POST(request: NextRequest) {
           const priorCustomerAsk = priorCustomerRaw
             ? (splitViewPreamble(String(priorCustomerRaw)).rest || String(priorCustomerRaw))
             : null;
-          const toolOffer = filterToolsForTurn(executor.offeredToolDefs(), customerAskForContract, priorCustomerAsk);
+          const toolOffer = filterToolsForTurn(executor.offeredToolDefs(), customerAskForContract, priorCustomerAsk, { strategyPlan: strategyPlanAsk, sectionedDocument });
+          if (sectionedRoute.route !== 'none') turnTrace.notices.push(`sectioned_report:${sectionedRoute.route}${sectionedRoute.route === 'packaged_with_gap_note' ? `:${sectionedRoute.reason}` : ''}`);
+          if (sectionedRoute.route === 'packaged_with_gap_note') messages.push({ role: 'system', content: packagedReportGapNote(sectionedRoute) });
+          if (strategyPlanAsk) turnTrace.notices.push('intent:strategy_plan');
           if (toolOffer.federalMarketProfile) turnTrace.notices.push('intent:federal_market_profile');
           if (toolOffer.marketResearch) turnTrace.notices.push('intent:market_research');
           // Industry codes the CUSTOMER typed (a planner-chosen code is not passed to find_opportunities).
@@ -1106,7 +1168,7 @@ export async function POST(request: NextRequest) {
           // unlocked phases so the model cannot jump to market size / web before awards.
           const fmpCatalogDefs = ALL_TOOL_DEFS;
           let fmpState: FmpPhaseState | null = toolOffer.federalMarketProfile
-            ? initialFmpPhaseState(splitViewPreamble(message).rest || message)
+            ? initialFmpPhaseState(splitViewPreamble(message).rest || message, strategyCompany ? { companyStates: strategyCompany.states ?? [] } : {})
             : null;
           let fmpPhaseForce: string | null = null;
           if (fmpState) {
@@ -1130,6 +1192,14 @@ export async function POST(request: NextRequest) {
             const phaseNote = fmpPhaseHostNote(fmpState);
             messages.push({ role: 'system', content: phaseNote });
             toolRoundMessages.splice(1, 0, { role: 'system', content: phaseNote });
+          }
+          // Requested document sections: only when create_document is in this turn's catalog (FMP unlocks it later).
+          const requestedNote = fmpCatalogDefs.some((d) => (d.function as { name?: string })?.name === CREATE_DOCUMENT)
+            ? requestedSectionsPlannerNote(requestedSections) : null;
+          if (requestedNote) {
+            messages.push({ role: 'system', content: requestedNote });
+            toolRoundMessages.splice(1, 0, { role: 'system', content: requestedNote });
+            turnTrace.notices.push(`requested_doc_sections:${requestedSections.map((r) => r.key).join(',')}`);
           }
           turnTrace.tools_offered = ALL_TOOL_DEFS.length;
 
@@ -1176,11 +1246,12 @@ export async function POST(request: NextRequest) {
           let plannerMaxTokens = createOffered
             ? (federalMarketProfileAsk ? FMP_DOC_TOOL_ROUND_MAX_TOKENS : DOC_TOOL_ROUND_MAX_TOKENS)
             : TOOL_ROUND_MAX_TOKENS;
-          const forceCreate = !!revision && createOffered;
+          const forceCreate = (!!revision || sectionedDocument) && createOffered;
+          if (sectionedDocument && createOffered) toolRoundMessages.splice(1, 0, { role: 'system', content: sectionedReportPlannerNote(requestedSections) });
           const forceMarketReport = !forceCreate && !cardCtx && toolOffer.marketResearch && marketReportOffered;
           // FMP phase machine owns the forced tool (usually award history on round 1).
           const forceAwardHistory = !forceCreate && !forceMarketReport && !cardCtx && !!fmpPhaseForce && awardHistoryOffered && fmpPhaseForce === AWARD_HISTORY_TOOL;
-          if (forceCreate) turnTrace.notices.push('revision:create_document_forced');
+          if (forceCreate) turnTrace.notices.push(revision ? 'revision:create_document_forced' : 'sectioned_report:create_document_forced');
           if (forceMarketReport) turnTrace.notices.push('market_research:generate_market_report_forced');
           if (fmpPhaseForce) turnTrace.notices.push(`federal_market_profile:phase_forced:${fmpPhaseForce}`);
           let forcedToolName: string | null = forceCreate
@@ -1547,6 +1618,7 @@ export async function POST(request: NextRequest) {
                 for (const r of results) {
                   fmpToolContents.push({ tool: r.record.tool, content: r.content });
                 }
+                pushStrategyFitNote(results);
                 fmpState = applyFmpToolResults(
                   fmpState,
                   results.map((r) => ({ tool: r.record.tool, status: r.record.status, content: r.content })),
@@ -1561,12 +1633,20 @@ export async function POST(request: NextRequest) {
                     tool: String(tc.function?.name || ''),
                     args: String(tc.function?.arguments ?? ''),
                   }));
+                // The defense construction-oversight (PAE) section is for construction firms (the RBA benchmark). On a
+                // strategy turn it applies only when the company's own work is construction (award or profile NAICS 23x).
+                const strategyDefenseSectionApplies = (evidence: FmpWriteupEvidence): boolean => {
+                  if (!strategyPlanAsk) return true;
+                  const awardNaics = (evidence as { dominantNaics?: string | null }).dominantNaics ?? '';
+                  return String(awardNaics).startsWith('23') || String(strategyCompany?.naics ?? '').startsWith('23');
+                };
                 const ensureFmpEvidence = (customerFmp: string): FmpWriteupEvidence => {
                   fmpEvidence = accumulateFmpEvidence(fmpToolContents, customerFmp);
                   if (fmpWriteupCtx) {
                     fmpWriteupCtx.requiredSnippets = requiredSnippetsForWriteup(fmpEvidence);
                     // Name-only asks omit "defense"/"PAE"; flip on once pathway buyers show DoD.
                     if (!fmpWriteupCtx.defenseBuyersAppear
+                      && strategyDefenseSectionApplies(fmpEvidence)
                       && fmpDefenseBuyersAppearFromEvidence(fmpEvidence)) {
                       fmpWriteupCtx.defenseBuyersAppear = true;
                     }
@@ -1581,7 +1661,7 @@ export async function POST(request: NextRequest) {
                     customerText: customerFmp,
                     defenseBuyersAppear: !!(fmpWriteupCtx?.defenseBuyersAppear)
                       || fmpDefenseBuyersAppear(customerFmp)
-                      || fmpDefenseBuyersAppearFromEvidence(evidence),
+                      || (strategyDefenseSectionApplies(evidence) && fmpDefenseBuyersAppearFromEvidence(evidence)),
                     requiredSnippets: fmpWriteupCtx?.requiredSnippets,
                   });
                   turnTrace.notices.push(resolved.notice);
@@ -1731,12 +1811,13 @@ export async function POST(request: NextRequest) {
                       return JSON.stringify(buildFmpNextMarketReportArgs(
                         customerFmpText,
                         fmpState.marketReportCount,
-                        { awardNaics: awardNaicsFromTools },
+                        { awardNaics: awardNaicsFromTools, company: strategyCompany },
                       ));
                     }
                     if (toolName === 'find_opportunities') {
                       return JSON.stringify(buildFmpPathwayFindArgs(customerFmpText, {
                         awardStates: awardStatesFromTools,
+                        company: strategyCompany,
                       }));
                     }
                     return '{}';
@@ -1796,6 +1877,7 @@ export async function POST(request: NextRequest) {
                         const parsed = JSON.parse(args || '{}') as Record<string, unknown>;
                         const next = buildFmpNextMarketReportArgs(customerFmpText, fmpState.marketReportCount, {
                           awardNaics: typeof parsed.naics === 'string' ? parsed.naics : awardNaicsFromTools,
+                          company: strategyCompany,
                         });
                         args = JSON.stringify({ ...parsed, ...next });
                         turnTrace.notices.push(`fmp_market_size_args_pinned:state=${String(next.state || '')}:naics=${String(next.naics || '')}`);
@@ -1807,6 +1889,8 @@ export async function POST(request: NextRequest) {
                         const parsed = JSON.parse(args || '{}') as Record<string, unknown>;
                         const next = buildFmpPathwayFindArgs(customerFmpText, {
                           awardStates: awardStatesFromTools,
+                          company: strategyCompany,
+                          plannerQuery: typeof parsed.query === 'string' ? parsed.query : null,
                         });
                         const merged: Record<string, unknown> = { ...parsed, ...next };
                         // Keep planner advanced filters except a buildings NAICS we already strip in enforce.
@@ -1993,6 +2077,7 @@ export async function POST(request: NextRequest) {
                       } catch { /* ignore */ }
                     }
                   }
+                  pushStrategyFitNote(resultsF);
                   fmpState = applyFmpToolResults(
                     fmpState,
                     resultsF.map((r) => ({ tool: r.record.tool, status: r.record.status, content: r.content })),
@@ -2235,7 +2320,8 @@ export async function POST(request: NextRequest) {
         // Ask Mindy fit ranking note: only when the flag is on AND find_opportunities ran this turn. It orders and
         // explains the results the tool already returned (shared scorer bands, no second filter); it never blocks
         // the answer: a slow, refused or failed profile load skips the note.
-        if (fitProfileP && findResult) {
+        // A strategy turn already carries its fit note from the research rounds (pushStrategyFitNote).
+        if (fitProfileP && findResult && !strategyFitNotePushed) {
           const loaded = await withTimeout(fitProfileP, FIT_PROFILE_WAIT_MS, 'fit_profile').catch(() => null);
           if (loaded && loaded.status === 'ok') {
             const note = fitRankingNote(rankFindResult(findResult as unknown as Parameters<typeof rankFindResult>[0], loaded.profile));

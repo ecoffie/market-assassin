@@ -63,14 +63,24 @@ export function normalizeForecastRow(r: ForecastRowFields): Partial<ForecastRowF
   // digit or a shared-suffix range read wrong. Drop the floor, keep the ceiling.
   if (r.estimated_value_min != null && r.estimated_value_min < 1000) patch.estimated_value_min = null;
 
+  // The columns are BIGINT: a fractional dollar (2053499.2, or float noise like 1899999.9999999998 from "$1.9M")
+  // makes Postgres reject the whole batch. Round to whole dollars; never drop the value.
+  if (!('estimated_value_min' in patch) && r.estimated_value_min != null && !Number.isInteger(r.estimated_value_min)) {
+    patch.estimated_value_min = Math.round(r.estimated_value_min);
+  }
+  if (r.estimated_value_max != null && !Number.isInteger(r.estimated_value_max)) {
+    patch.estimated_value_max = Math.round(r.estimated_value_max);
+  }
+
   if (r.pop_state && PLACEHOLDER.test(r.pop_state)) patch.pop_state = null;
   if (r.pop_city && PLACEHOLDER.test(r.pop_city)) patch.pop_city = null;
 
   // Inverted bounds are a parse failure, not a real range. Order them rather than
   // storing a floor above the ceiling, which no downstream filter would catch.
   const min = 'estimated_value_min' in patch ? patch.estimated_value_min : r.estimated_value_min;
-  if (min != null && r.estimated_value_max != null && min > r.estimated_value_max) {
-    patch.estimated_value_min = r.estimated_value_max;
+  const max = 'estimated_value_max' in patch ? patch.estimated_value_max : r.estimated_value_max;
+  if (min != null && max != null && min > max) {
+    patch.estimated_value_min = max;
     patch.estimated_value_max = min;
   }
 

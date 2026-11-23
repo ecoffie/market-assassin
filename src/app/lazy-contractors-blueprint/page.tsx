@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { siteShareImages } from '@/lib/seo/share-image';
 import { LAZY_CONTRACTORS_BLUEPRINT as EVENT } from '@/lib/events/lazy-contractors-blueprint';
 import { countContactsByTag } from '@/lib/ghl/event-registration';
 import SeatDialog from './SeatDialog';
@@ -13,8 +14,8 @@ export const metadata: Metadata = {
   title: `${EVENT.title} — Free Live Event | Mindy`,
   description: DESCRIPTION,
   alternates: { canonical: URL },
-  openGraph: { title: EVENT.title, description: DESCRIPTION, url: URL, siteName: 'Mindy', type: 'website' },
-  twitter: { card: 'summary_large_image', title: EVENT.title, description: DESCRIPTION },
+  openGraph: { title: EVENT.title, description: DESCRIPTION, url: URL, siteName: 'Mindy', type: 'website', images: siteShareImages() },
+  twitter: { card: 'summary_large_image', title: EVENT.title, description: DESCRIPTION, images: siteShareImages() },
 };
 
 // The registrant count is re-read at most every 5 minutes.

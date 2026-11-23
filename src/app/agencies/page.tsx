@@ -12,6 +12,7 @@
  * mapping rules.
  */
 import type { Metadata } from 'next';
+import { siteShareImages } from '@/lib/seo/share-image';
 import MeetMindyStrip from '@/components/MeetMindyStrip';
 import Link from 'next/link';
 import { TRIAL_CTA_LABEL } from '@/lib/public-site/trial-cta';
@@ -31,6 +32,13 @@ export const metadata: Metadata = {
       `Browse ${listPublicAgencies().length} federal agencies by spending, pain points, and procurement portals. Find the right buyer for your NAICS.`,
     type: 'website',
     url: 'https://getmindy.ai/agencies',
+    images: siteShareImages(),
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Federal Agency Directory — Contract Opportunities by Buyer | Mindy',
+    description: `Browse ${listPublicAgencies().length} federal agencies by spending, pain points, and procurement portals. Find the right buyer for your NAICS.`,
+    images: siteShareImages(),
   },
   keywords: [
     'federal agencies',

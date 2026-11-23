@@ -29,7 +29,7 @@ export interface FederalContactsToolResult {
   _meta: {
     grounded: boolean;
     degraded: boolean;
-    anchor: 'dodaac' | 'agency-dodaac' | 'department' | 'search' | 'none';
+    anchor: 'office-code' | 'dodaac' | 'agency-dodaac' | 'department' | 'search' | 'none';
     count: number;
     emailable_count: number;
     total: number;
