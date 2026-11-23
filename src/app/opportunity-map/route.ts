@@ -11457,7 +11457,7 @@ const ASK_MINDY_JS = `<script>(function(){
   function syncRepBtn(){
     var hd=drawer.querySelector('.amk-hd'), xb=document.getElementById('amkX'); if(!hd) return;
     if(rep&&!repIsOpen()&&!oppCtx){
-      if(!repBtn){ repBtn=document.createElement('button'); repBtn.type='button'; repBtn.className='amk-repbtn'; repBtn.setAttribute('data-testid','amk-report-btn'); repBtn.textContent='Report'; repBtn.title='Open your report'; repBtn.onclick=function(){ if(rep) repOpen(rep.id); }; }
+      if(!repBtn){ repBtn=document.createElement('button'); repBtn.type='button'; repBtn.className='amk-repbtn'; repBtn.setAttribute('data-testid','amk-report-btn'); repBtn.textContent='Saved document'; repBtn.title='Open your saved document'; repBtn.onclick=function(){ if(rep) repOpen(rep.id); }; }
       if(!repBtn.parentNode) hd.insertBefore(repBtn,xb||null);
     } else if(repBtn&&repBtn.parentNode){ repBtn.parentNode.removeChild(repBtn); }
   }
@@ -11494,13 +11494,13 @@ const ASK_MINDY_JS = `<script>(function(){
       .catch(function(){ if(seq===repSeq) repMessage('The report could not be loaded. Check your connection and try again.',id); });
   }
   // The reply that created or revised a document: a card under the answer + the pane opens on the new version.
-  // The "Open report" card under an answer. Returns the primary document id ('' when the files are unusable).
+  // The "Open document" card under an answer (a saved Vault document). Returns the primary document id ('' when the files are unusable).
   function repCard(files,aEl){
     var id=primaryId(files); if(!id) return '';
     var prim=files.filter(function(f){ return f.document_id===id; })[0]||files[0];
     var ver=0; files.forEach(function(f){ if(f.version>ver) ver=f.version; });
     var w=document.createElement('div'); w.className='amk-repcard'; w.setAttribute('data-testid','amk-report-card');
-    w.innerHTML='<div class="amk-repcard-t"><b></b><span></span></div><button type="button" class="amk-repcard-open">Open report</button>';
+    w.innerHTML='<div class="amk-repcard-t"><b></b><span></span></div><button type="button" class="amk-repcard-open">Open document</button>';
     w.querySelector('b').textContent=(prim.file_name||'Your report').replace(/[.](pdf|docx|xlsx|csv)$/i,'');
     w.querySelector('span').textContent='Version '+(ver||1)+' - saved to your Vault';
     w.querySelector('.amk-repcard-open').onclick=function(){ repOpen(id); };
@@ -11536,7 +11536,7 @@ const ASK_MINDY_JS = `<script>(function(){
     syncRepBtn();
     if(!aEl) return; // re-opened from a saved card: that card already exists
     var w=document.createElement('div'); w.className='amk-repcard'; w.setAttribute('data-testid','amk-report-card');
-    w.innerHTML='<div class="amk-repcard-t"><b></b><span></span></div><button type="button" class="amk-repcard-open">Open report</button>';
+    w.innerHTML='<div class="amk-repcard-t"><b></b><span></span></div><button type="button" class="amk-repcard-open">Open market report</button>';
     w.querySelector('b').textContent=title;
     w.querySelector('span').textContent='Packaged research \\u00b7 same engine as MCP';
     w.querySelector('.amk-repcard-open').onclick=function(){
@@ -11555,7 +11555,7 @@ const ASK_MINDY_JS = `<script>(function(){
   }
   function repSavedCard(r,aEl){
     var w=document.createElement('div'); w.className='amk-repcard'; w.setAttribute('data-testid','amk-report-card');
-    w.innerHTML='<div class="amk-repcard-t"><b></b><span></span></div><button type="button" class="amk-repcard-open">Open report</button>';
+    w.innerHTML='<div class="amk-repcard-t"><b></b><span></span></div><button type="button" class="amk-repcard-open">Open market report</button>';
     w.querySelector('b').textContent=r.title;
     w.querySelector('span').textContent='Packaged research \\u00b7 same engine as MCP';
     w.querySelector('.amk-repcard-open').onclick=function(){ repOpenSaved(r); };

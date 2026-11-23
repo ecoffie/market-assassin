@@ -81,6 +81,7 @@ describe('Map Ask Mindy report pane', () => {
     const card = t.doc.querySelector('[data-testid="amk-report-card"]')!;
     expect(card).toBeTruthy();
     expect(card.textContent).toContain('Koamana-Build-report');
+    expect(card.querySelector('.amk-repcard-open')?.textContent).toBe('Open document'); // a saved Vault document (Design & Output label)
     expect(card.textContent).toContain('Version 1');
     expect(card.querySelector('.amk-repcard-exp')).toBeNull();
     expect(card.querySelector('[data-fmt="pdf"]')).toBeNull();
@@ -155,6 +156,8 @@ describe('Map Ask Mindy report pane', () => {
     expect(JSON.parse(t.store.mindy_map_report).open).toBe(false);
     const btn = t.doc.querySelector('[data-testid="amk-report-btn"]') as HTMLButtonElement;
     expect(btn).toBeTruthy();
+    expect(btn.textContent).toBe('Saved document'); // the header button opens the saved Vault document, not the market report
+    expect(btn.title).toBe('Open your saved document');
     btn.click();
     await t.settle();
     expect(pane.classList.contains('show')).toBe(true);

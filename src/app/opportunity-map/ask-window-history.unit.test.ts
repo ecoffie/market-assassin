@@ -237,6 +237,7 @@ describe('a packaged market report comes back with its conversation (Claude Loca
     await reopen(t);
     const card = t.doc.querySelector('[data-testid="amk-report-card"]');
     expect(card?.querySelector('b')?.textContent).toBe('Facilities maintenance');
+    expect(card?.querySelector('.amk-repcard-open')?.textContent).toBe('Open market report'); // same label as the live card
     expect(t.calls.some((c) => c.url.startsWith('/reports/'))).toBe(false); // card only, no auto-load
     t.click('[data-testid="amk-report-card"] .amk-repcard-open');
     await t.settle();
