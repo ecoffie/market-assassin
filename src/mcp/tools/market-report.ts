@@ -665,7 +665,12 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
       name: displayContactName(c.contact_fullname) || '',
       role: c.role_category_label || c.contact_title || c.role || '',
       email: c.contact_email || '',
-      office: c.derived_office || c.sub_agency || null,
+      // Name the contracting office AND its code ("NETWORK CONTRACT OFFICE 8 (36C248)") so a reader knows which
+      // buying office this person posts for (Claude Local, 2026-11-22). Code only when the roster derived one.
+      office: c.office_code
+        ? `${c.derived_office || 'Contracting office'} (${c.office_code})`
+        : (c.derived_office || c.sub_agency || null),
+      office_code: c.office_code ?? null,
     }))
     .filter((p) => p.name && p.email)
     .slice(0, CONTACTS_CAP);
