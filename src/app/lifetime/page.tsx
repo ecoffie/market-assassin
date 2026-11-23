@@ -6,6 +6,7 @@
  * Ultimate Giant Bundle ($1,497) is retired.
  */
 import type { Metadata } from 'next';
+import { siteShareImages } from '@/lib/seo/share-image';
 import Link from 'next/link';
 import FoundersSeats from '@/components/lifetime/FoundersSeats';
 import { PRO_TRIAL_ANNUAL, PRO_TRIAL_MONTHLY } from '@/components/public-site/pricing/app-plan-links';
@@ -37,6 +38,7 @@ export const metadata: Metadata = {
     description: `$4,997 one-time. Limited to ${FOUNDERS_LIFETIME_CAP} founding members. Full Pro access forever.`,
     type: 'website',
     url: 'https://getmindy.ai/lifetime',
+    images: siteShareImages(),
   },
 };
 

@@ -40,6 +40,7 @@ import {
 } from '@/lib/institute/acquired-pain-points';
 import { resolveOversightStatedAgency } from '@/lib/institute/oig-stated-agency';
 import { reportCronOutcome } from '@/lib/cron-self-report';
+import { decideGaoRunOutcome, GaoRunIssues } from '@/lib/institute/gao-run-outcome';
 import {
   GAO_SOURCE_KEY,
   measureGaoHeldPopulation,
@@ -241,13 +242,21 @@ export async function GET(request: NextRequest) {
   // ── 2. INSTITUTE INGEST + 3. DERIVATION ─────────────────────────────────
   let evidenceInserted = 0, alreadyHeld = 0, resolved = 0, unresolved = 0;
   let painPointsCreated = 0, evidenceOnly = 0, blocked = 0, failed = 0;
-  let processed = 0, partial = false;
+  let processed = 0, partial = false, reconcileFailed = 0;
+  // Every incomplete-run cause is recorded with its first messages — the reason
+  // lands in cron_job_runs.error and the derived_pipeline_failure alert body.
+  const issues = new GaoRunIssues();
+  for (const lane of sourceDown) issues.add('source_down', `${lane.name}: ${lane.error ?? 'down'}`);
 
   for (const doc of docs) {
-    if (Date.now() - started > budgetMs) { partial = true; break; }
+    if (Date.now() - started > budgetMs) {
+      partial = true;
+      issues.add('budget', `GAO RSS cut at ${processed}/${docs.length} after ${budgetMs}ms budget`);
+      break;
+    }
     processed++;
     const ing = await ingestInstituteDocument(db, annotateGaoRssDocument(doc), names);
-    if (ing.error) { failed++; continue; }
+    if (ing.error) { failed++; issues.add('ingest_failed', `${doc.documentNumber}: ${ing.error}`); continue; }
     if (ing.inserted) evidenceInserted++; else alreadyHeld++;
     if (ing.resolution.resolved) resolved++; else unresolved++;
 
@@ -259,14 +268,20 @@ export async function GET(request: NextRequest) {
       resolution: ing.resolution,
     });
     if (der.outcome === 'pain_point_created') painPointsCreated++;
-    else if (der.outcome === 'blocked_history_unavailable') blocked++;
+    else if (der.outcome === 'blocked_history_unavailable') {
+      blocked++;
+      issues.add('blocked', `${doc.documentNumber}: ${der.outcome}`);
+    }
     else if (der.outcome.startsWith('evidence_only')) evidenceOnly++;
   }
 
   // ── 3b. Reconcile previously-unresolved held rows (phrase-map improvements) ─
   let reconcile = null;
   try {
-    reconcile = await reconcileUnresolvedGaoAgencies(db, names);
+    // Shares the run budget: a bounded, paged pass that never starves the IG lane
+    // by rewriting unchanged rows. A budget cut is an incomplete run (partial).
+    reconcile = await reconcileUnresolvedGaoAgencies(db, names, { deadlineMs: started + budgetMs });
+    if (reconcile.budgetExhausted) partial = true;
     // Derive for newly resolved rows.
     for (const d of reconcile.details) {
       if (!d.canonicalAgency) continue;
@@ -277,6 +292,8 @@ export async function GET(request: NextRequest) {
         .maybeSingle();
       if (rowErr) {
         console.error('[institute-gao-sync] reconcile row read failed:', rowErr.message);
+        reconcileFailed++;
+        issues.add('reconcile_failed', `row read ${d.documentNumber}: ${rowErr.message}`);
         continue;
       }
       if (!row?.canonical_agency) continue;
@@ -300,8 +317,11 @@ export async function GET(request: NextRequest) {
       if (der.outcome === 'pain_point_created') painPointsCreated++;
     }
   } catch (recErr) {
+    // A reconcile exception is a FAILURE, not "blocked history" — counted and
+    // reported as itself so blockedNoHistory keeps meaning what it says.
     console.error('[institute-gao-sync] reconcile failed:', recErr);
-    blocked++;
+    reconcileFailed++;
+    issues.add('reconcile_failed', recErr instanceof Error ? recErr.message : String(recErr));
   }
 
   // ── 3c. IG open recommendations + federal reports (additive, capped) ────
@@ -315,6 +335,7 @@ export async function GET(request: NextRequest) {
     const lookup = await lookupHeldIgIds(db, federalLane.documents.map((doc) => doc.documentNumber));
     if (lookup.error) {
       failed++;
+      issues.add('held_lookup_failed', lookup.error);
       console.error('[institute-gao-sync] held IG id read failed:', lookup.error);
     } else {
       const room = ACQUISITION_NEW_ROW_CAP - igCandidates.length;
@@ -324,13 +345,19 @@ export async function GET(request: NextRequest) {
       igCandidates.push(...batch.selected);
     }
   }
+  let igProcessed = 0;
   for (const doc of igCandidates) {
-    if (Date.now() - started > budgetMs) { partial = true; break; }
+    if (Date.now() - started > budgetMs) {
+      partial = true;
+      issues.add('budget', `IG lane cut at ${igProcessed}/${igCandidates.length} after ${budgetMs}ms budget`);
+      break;
+    }
+    igProcessed++;
     const resolution = resolveOversightStatedAgency(doc.agencyAsStated);
     const ing = await ingestInstituteDocument(db, toInstituteDocument(doc), names, {
       agencyResolution: resolution,
     });
-    if (ing.error) { failed++; continue; }
+    if (ing.error) { failed++; issues.add('ingest_failed', `${doc.documentNumber}: ${ing.error}`); continue; }
     if (ing.inserted) { evidenceInserted++; igInserted++; }
     else alreadyHeld++;
     if (!doc.statesProblem || !doc.problem) continue;
@@ -343,7 +370,10 @@ export async function GET(request: NextRequest) {
       sourceKind: 'ig_report',
     });
     if (der.outcome === 'pain_point_created') painPointsCreated++;
-    else if (der.outcome === 'blocked_history_unavailable' || der.outcome === 'blocked_legacy_gao_reinjection') blocked++;
+    else if (der.outcome === 'blocked_history_unavailable' || der.outcome === 'blocked_legacy_gao_reinjection') {
+      blocked++;
+      issues.add('blocked', `${doc.documentNumber}: ${der.outcome}`);
+    }
   }
 
   // ── 4. FIVE CLOCKS on data_source_instances ─────────────────────────────
@@ -351,7 +381,24 @@ export async function GET(request: NextRequest) {
   const resolutionRate = await measureGaoResolutionRate(db);
   const dataAdvanced = evidenceInserted > 0 || painPointsCreated > 0
     || (reconcile?.newlyResolved ?? 0) > 0;
-  const verifiedComplete = !partial && failed === 0 && blocked === 0 && sourceDown.length === 0;
+  const freshness = classifyGaoFreshness({
+    clocks: {
+      lastPoll: pollAt,
+      lastSourceAdvance: sourceWatermark,
+      lastIntelligenceChange: null,
+    },
+    now: pollAt,
+  });
+  // ONE decision drives verifiedComplete, the cron outcome, `success`, `status` and
+  // the HTTP status — a budget-cut (partial) run can no longer self-report success.
+  const decision = decideGaoRunOutcome({
+    partial, failed, blocked, reconcileFailed,
+    sourceDown: sourceDown.length,
+    evidenceInserted,
+    freshnessStatus: freshness.status,
+  });
+  const { verifiedComplete } = decision;
+  const reason = issues.summary();
 
   const extraAlerts: GaoAlertCandidate[] = [];
   const withoutHeld = sourceAdvanceWithoutHeldAlert({
@@ -374,6 +421,7 @@ export async function GET(request: NextRequest) {
       heldPopulation,
       resolutionRate,
       priorResolutionRate,
+      incompleteReason: reason,
     }, extraAlerts);
     sourceState = stamped.sourceState;
     alertsFired = await dispatchAlerts(db, stamped.alerts);
@@ -403,31 +451,20 @@ export async function GET(request: NextRequest) {
     console.error('[institute-gao-sync] notes compat mirror failed:', compatErr);
   }
 
-  const freshness = classifyGaoFreshness({
-    clocks: {
-      lastPoll: pollAt,
-      lastSourceAdvance: sourceWatermark,
-      lastIntelligenceChange: null,
-    },
-    now: pollAt,
-  });
-  const status = sourceDown.length > 0 || failed > 0 || blocked > 0 ? 'degraded'
-    : evidenceInserted === 0 ? (freshness.status === 'upstream_quiet' ? 'upstream_quiet' : 'no_new_evidence')
-    : 'advanced';
-
-  const sourceDownSummary = sourceDown.map((lane) => `${lane.name}: ${lane.error}`).join('; ');
   await reportCronOutcome(
     'institute-gao-sync',
-    sourceDown.length > 0 || failed > 0 || blocked > 0 ? 'partial' : 'success',
-    sourceDownSummary || undefined,
+    decision.outcome,
+    reason ?? undefined,
   );
 
   return NextResponse.json({
-    success: failed === 0 && blocked === 0 && sourceDown.length === 0,
-    mode, pollOk: true, status, partial,
+    success: decision.success,
+    mode, pollOk: true, status: decision.status, partial,
+    verifiedComplete,
+    reason,
     documentsSeen: docs.length, documentsProcessed: processed,
     evidenceInserted, alreadyHeld, resolved, unresolved,
-    painPointsCreated, evidenceOnly, blockedNoHistory: blocked, failed,
+    painPointsCreated, evidenceOnly, blockedNoHistory: blocked, failed, reconcileFailed,
     reconcile,
     clocks: {
       last_poll: pollAt,
@@ -449,5 +486,5 @@ export async function GET(request: NextRequest) {
       igDeferred,
     },
     elapsedMs: Date.now() - started,
-  }, { status: sourceDown.length ? 502 : 200 });
+  }, { status: decision.httpStatus });
 }

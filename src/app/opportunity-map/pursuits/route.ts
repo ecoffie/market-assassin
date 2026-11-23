@@ -18,6 +18,7 @@
  * (Map · Watchlist · Saved · Pursuits, with Pursuits active) — mirroring
  * favorites/route.ts. Keep the header/rail markup + chrome CSS in sync with it.
  */
+import { STATE_BLOCK_CSS, signedOutStateHtml } from '@/lib/design/state-block';
 import { NextResponse, type NextRequest } from 'next/server';
 import { SUBPAGE_APP_SHELL_CSS, applyAppShell, isAppShellRequest } from '../app-shell';
 import { LOGIN_MODAL_CSS, LOGIN_MODAL_HTML, LOGIN_MODAL_JS } from '../login-modal';
@@ -360,7 +361,7 @@ const PAGE = `<!DOCTYPE html><html lang="en" class="mindy-map"><head>
   .na-save:hover{filter:brightness(1.06)}
   .na-save:disabled{opacity:.55;cursor:default;filter:none;box-shadow:none}
   ${ACCOUNT_MENU_CSS}
-</style><style>${LOGIN_MODAL_CSS}</style></head><body>
+</style><style>${LOGIN_MODAL_CSS}</style><style>${STATE_BLOCK_CSS}</style></head><body>
 <header class="zhead">
   <nav class="zh-left">
     <a href="/opportunity-map">Opportunities</a>
@@ -488,7 +489,7 @@ const PAGE = `<!DOCTYPE html><html lang="en" class="mindy-map"><head>
     }catch(e){}
   }
 
-  if(!t||!em){ body.innerHTML='<div class="signin">Please <a href="#" onclick="return window.__mapsSignIn()">sign in</a> to see your pursuits.</div>'; return; }
+  if(!t||!em){ body.innerHTML=${JSON.stringify(signedOutStateHtml({ title: 'Sign in to see your pursuits', body: 'Track the opportunities you are going after: what needs your attention today and what is waiting on you.' }))}; return; }
 
   // ── Derived-value helpers (grounded rules, never fabrication) ──
   var DAY=86400000;

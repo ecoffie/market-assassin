@@ -157,14 +157,29 @@ const HORIZON_WORDS: Readonly<Record<HorizonKey, string>> = { open_now: 'Open no
  * The answer-prompt note for a ranked find result, or null when there is nothing to rank. It orders and explains;
  * it never adds a fact the tool result does not hold, and it never prints a score.
  */
-export function fitRankingNote(ctx: Omit<AnswerContext, 'not_checked'>): string | null {
+export interface FitRankingNoteOpts {
+  /**
+   * 'answer' (default): the ranking IS the answer's order (the #2285 FIND answer).
+   * 'strategy_input': the fit order is ONE input to a strategy's prioritization, weighed with award history,
+   * vehicles, competition, buyer relationships, timing and the customer's objective. Same picks and reasons; it
+   * never tells the writer the order is final. It adds no score and no second scoring system.
+   */
+  mode?: 'answer' | 'strategy_input';
+}
+
+export function fitRankingNote(ctx: Omit<AnswerContext, 'not_checked'>, opts: FitRankingNoteOpts = {}): string | null {
   const unavailable = ctx.horizons.filter((h) => h.status === 'unavailable').map((h) => HORIZON_WORDS[h.horizon]);
   const notes = ctx.horizons.filter((h) => h.coverage_note).map((h) => `${HORIZON_WORDS[h.horizon]}: ${h.coverage_note}`);
   if (!ctx.top_picks.length && !ctx.related_count && !unavailable.length) return null;
+  const strategy = opts.mode === 'strategy_input';
   const lines = [
-    'FIT RANKING (computed for this company by Mindy\'s shared fit scorer from the find_opportunities result above; use it, do not re-rank):',
+    strategy
+      ? 'FIT SIGNAL (opportunity fit computed for this company by Mindy\'s shared fit scorer from the find_opportunities result above; one input to prioritization, not the final order):'
+      : 'FIT RANKING (computed for this company by Mindy\'s shared fit scorer from the find_opportunities result above; use it, do not re-rank):',
     ctx.top_picks.length
-      ? 'TOP PICKS, best first. Present these as the top picks in this order, each with its "why" in plain words. Never print a score.'
+      ? (strategy
+        ? 'STRONGEST FIT, listed by fit, each with its fit reason. Never print or cite a score.'
+        : 'TOP PICKS, best first. Present these as the top picks in this order, each with its "why" in plain words. Never print a score.')
       : 'No result cleared the fit threshold for this company. Say so plainly; do not present weaker results as top picks.',
     ...ctx.top_picks.map((p, i) => `${i + 1}. ${p.title}${p.buyer ? `, ${p.buyer}` : ''} [${HORIZON_WORDS[p.horizon]}${p.date_label ? `; ${p.date_label}` : ''}${p.value_label ? `; ${p.value_label}` : ''}]. Why: ${p.why}${p.route === 'subcontract' ? ' (Subcontract route: do not present this as work the company can bid as prime.)' : ''}${p.evidence_note ? ` Note: ${p.evidence_note}.` : ''}`),
     ...(ctx.related_count ? [`${ctx.related_count} more result(s) are related but a weaker fit: mention they exist and offer to show them; do not list them.`] : []),

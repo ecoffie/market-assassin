@@ -4,6 +4,10 @@ Rules and patterns to prevent repeated mistakes.
 
 ---
 
+## PDF claims: measure the real renderer output (Nov 22, 2026)
+
+**Always measure PDF page counts and layout on the real renderer's output (`/reports/<id>/pdf` or `renderStoredReportHtml`), not on hand-patched HTML, because a patch that missed one prose column left a table overflowing the page and produced a false "9 to 5 pages" claim for #2360 (production prints 7).**
+
 ## Saved-search alert status: report the search, then the named job (Oct 6, 2026)
 
 **Always report a customer's own search first and the job as "saved-search alerts", not a job-run status presented as "email delivery", because one failing search marks the whole run `error`.** A host told a customer "Mindy's email alerts are unreliable, last successful send Sept 29" while the same runs evaluated 118-134 searches and the provider accepted 46-48 alerts a day. Fixed in #1839 (`alert_status`, `job_status`), released with #1834/#1836/#1840.

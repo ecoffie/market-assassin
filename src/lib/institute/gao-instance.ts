@@ -53,6 +53,12 @@ export interface GaoClockStampInput {
   resolutionRate?: number | null;
   /** Prior resolution rate from the instance (for degradation detection). */
   priorResolutionRate?: number | null;
+  /**
+   * Why the run was not verified complete (counts + first errors per category,
+   * from GaoRunIssues.summary()). Added to the derived_pipeline_failure alert
+   * body only — never to its fingerprint, so dedupe stays one-per-day.
+   */
+  incompleteReason?: string | null;
 }
 
 export interface GaoClockStampResult {
@@ -148,6 +154,7 @@ export function buildGaoClockPatch(input: GaoClockStampInput): GaoClockStampResu
       bodyLines: [
         'GAO RSS was readable but the Institute reconciliation did not complete cleanly',
         '(partial budget cut, ingest failures, or blocked history).',
+        ...(input.incompleteReason ? [`Reason: ${input.incompleteReason}`] : []),
         `Runbook: ${GAO_RUNBOOK_PATH}`,
       ],
     });
