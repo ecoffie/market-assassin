@@ -15,59 +15,9 @@
  */
 
 // ── Forecast identity ────────────────────────────────────────────────────────
-
-type ForecastLike = {
-  id?: string | null;
-  external_id?: string | null;
-  agency?: string | null;
-  title?: string | null;
-  description?: string | null;
-  fiscal_year?: string | null;
-  quarter?: string | null;
-  naics_code?: string | null;
-  value_min?: number | null;
-  value_max?: number | null;
-  incumbent_name?: string | null;
-};
-
-const norm = (v: unknown): string =>
-  String(v ?? '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
-
-/**
- * The identity of ONE customer-visible forecast.
- *
- * Primary: the source listing id with the pipeline prefix stripped
- * (`GW-L:7799` and `7799` are the same Acquisition Gateway listing), scoped to the
- * agency so two agencies' numeric ids never collide.
- *
- * Fallback (no listing id): every field a reader could use to tell two rows apart —
- * title, FY, quarter, NAICS, value band, incumbent AND description. Deliberately NOT
- * title alone: Navy's three "OPF-L Delivery Order #3" rows share a title and value
- * band but name three different incumbents (AeroVironment, Anduril, Teledyne FLIR).
- * Those are three procurements, and collapsing them would delete two.
- */
-export function forecastIdentity(f: ForecastLike): string {
-  const listing = String(f.external_id ?? '').trim().replace(/^GW-L:/i, '');
-  if (listing) return `listing|${norm(f.agency)}|${listing}`;
-  return [
-    'content',
-    norm(f.agency), norm(f.title), norm(f.fiscal_year), norm(f.quarter), norm(f.naics_code),
-    f.value_min ?? '', f.value_max ?? '', norm(f.incumbent_name), norm(f.description),
-  ].join('|');
-}
-
-/** Keep the first row of each identity; report how many were cross-listed copies. */
-export function dedupeForecasts<T extends ForecastLike>(rows: T[]): { rows: T[]; removed: number } {
-  const seen = new Set<string>();
-  const out: T[] = [];
-  for (const r of rows) {
-    const k = forecastIdentity(r);
-    if (seen.has(k)) continue;
-    seen.add(k);
-    out.push(r);
-  }
-  return { rows: out, removed: rows.length - out.length };
-}
+// The shared rule lives in src/lib/forecasts/forecast-identity.ts (also used by FIND
+// coming_soon). Re-exported here so report callers keep one import.
+export { forecastIdentity, dedupeForecasts } from '@/lib/forecasts/forecast-identity';
 
 // ── Forecast set-aside ───────────────────────────────────────────────────────
 
@@ -150,4 +100,48 @@ export function dedupeRecompetes<T extends RecompeteLike>(rows: T[]): T[] {
     seen.add(k);
     return true;
   });
+}
+
+/**
+ * PROVENANCE (Design & Output's "Data and sources" section, #2396; Agent 4 approved 2026-11-23).
+ * Labels come only from evidence on the row. Never a column DEFAULT: recompete_opportunities.data_source
+ * defaults to 'usaspending' and federal_contacts.source defaults to 'sam_opportunities_poc', so neither alone
+ * is evidence. A row without evidence is null ("not stated").
+ */
+export type RecompeteSourceLabel = 'USASpending award record' | 'Legacy contracts import';
+export interface RecompeteProvenance { source_label: RecompeteSourceLabel | null; source_url: string | null; as_of: string | null; as_of_label: 'last synced' }
+
+const USASPENDING_AWARD_ID = /^CONT_(?:AWD|IDV)_/i;
+function isUsaspendingUrl(u: unknown): boolean {
+  if (typeof u !== 'string' || !u) return false;
+  try { return /(^|\.)usaspending\.gov$/i.test(new URL(u).hostname); } catch { return false; }
+}
+
+/**
+ * Row-level evidence wins: a USASpending award id (CONT_AWD_/CONT_IDV_) or a usaspending.gov URL means
+ * "USASpending award record" EVEN IF data_source says 'contracts-data-import'. Only without that evidence does
+ * data_source='contracts-data-import' label the row a legacy import. Otherwise null.
+ */
+export function recompeteProvenance(row: { contract_id?: unknown; source_url?: unknown; data_source?: unknown; last_synced_at?: unknown }): RecompeteProvenance {
+  const url = isUsaspendingUrl(row.source_url) ? String(row.source_url) : null;
+  const usa = url !== null || USASPENDING_AWARD_ID.test(String(row.contract_id ?? ''));
+  const label: RecompeteSourceLabel | null = usa
+    ? 'USASpending award record'
+    : row.data_source === 'contracts-data-import' ? 'Legacy contracts import' : null;
+  const asOf = typeof row.last_synced_at === 'string' && row.last_synced_at ? row.last_synced_at : null;
+  return { source_label: label, source_url: url, as_of: asOf, as_of_label: 'last synced' };
+}
+
+/** Section-level: each distinct label with its row count; rows without evidence counted as "not_stated". */
+export function recompeteSourceSummary(rows: Array<{ source_label: RecompeteSourceLabel | null }>): Array<{ label: RecompeteSourceLabel | 'not_stated'; count: number }> {
+  const m = new Map<RecompeteSourceLabel | 'not_stated', number>();
+  for (const r of rows) { const k = r.source_label ?? 'not_stated'; m.set(k, (m.get(k) ?? 0) + 1); }
+  return [...m.entries()].map(([label, count]) => ({ label, count }));
+}
+
+/** Contacts: the SAM notice each person was listed on; the section as-of is the newest such notice. */
+export const CONTACTS_SOURCE_LABEL = 'SAM.gov notice points of contact (government buyers)' as const;
+export function contactsAsOf(people: Array<{ source: { notice_posted: string | null } }>): string | null {
+  const dates = people.map((p) => p.source.notice_posted).filter((d): d is string => Boolean(d)).sort();
+  return dates.length ? dates[dates.length - 1] : null;
 }

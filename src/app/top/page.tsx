@@ -5,6 +5,7 @@
  * listicle automatically adds it to the hub.
  */
 import type { Metadata } from 'next';
+import { siteShareImages } from '@/lib/seo/share-image';
 import Link from 'next/link';
 import { LISTICLES } from '@/data/top-listicles';
 
@@ -22,6 +23,7 @@ export const metadata: Metadata = {
     url: `${SITE_URL}/top`,
     type: 'website',
     siteName: 'Mindy',
+    images: siteShareImages(),
   },
 };
 

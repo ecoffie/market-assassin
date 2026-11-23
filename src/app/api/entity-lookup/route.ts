@@ -17,6 +17,7 @@ import {
   findTeamingPartners
 } from '@/lib/sam/entity-api';
 import { resolveUei, ueiMessage } from '@/lib/sam/resolve-uei';
+import { registrationPurposeReadiness } from '@/lib/sam/registration-purpose';
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -134,6 +135,8 @@ export async function GET(request: NextRequest) {
           expirationDate: entity.registrationExpirationDate,
           daysUntilExpiration: entity.daysUntilExpiration,
           entityStructure: entity.entityStructure,
+          // SAM purpose of registration: Z1 (assistance only) carries a `warning`; absent → 'unknown'.
+          registrationPurpose: registrationPurposeReadiness(entity.purposeOfRegistrationCode, entity.purposeOfRegistration),
           address: {
             street: [entity.physicalAddress?.addressLine1, entity.physicalAddress?.addressLine2].filter(Boolean).join(', '),
             city: entity.physicalAddress?.city,

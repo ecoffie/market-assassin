@@ -9,7 +9,7 @@
 import type { Block, DocModel } from '@/lib/documents/model';
 import { DOC_SCHEMA } from '@/lib/documents/model';
 import { validateDocModel } from '@/lib/documents/validate';
-import { RBA_WRITEUP } from './__fixtures__/rba-federal-market-profile';
+import { WRITEUP_DOCTRINE } from './writeup-doctrine';
 import {
   fmpDefenseBuyersAppear,
   fmpDefenseBuyersAppearFromEvidence,
@@ -95,12 +95,16 @@ export interface FmpWriteupEvidence {
 
 const VEHICLE_TOKEN_RES: ReadonlyArray<{ re: RegExp; token: string }> = [
   { re: /\bMATOC\b/i, token: 'MATOC' },
-  { re: /\b693C73\w*/i, token: '693C73' },
-  { re: /\bHQ0034\w*/i, token: 'HQ0034' },
+  { re: /\bMACC\b/i, token: 'MACC' },
 ];
+/**
+ * An indefinite-delivery vehicle PIID in THIS customer's evidence: a 6-character office code, a 2-digit fiscal
+ * year and the instrument letter D (IDV), then the serial. Generic: no agency or office is named in code.
+ */
+const IDV_PIID_RE = /\b([A-Z0-9]{6})(\d{2})D[A-Z0-9]{4,8}\b/g;
 
 const DLA_HINT = /\bDLA\b|\bDefense Logistics\b/i;
-const NOTICE_OR_WHS_HINT = /\bWHS\b|\bnotice\b|\bPOC\b|\bpoint of contact\b|\bsolicitation\b/i;
+const NOTICE_HINT = /\bnotice\b|\bPOC\b|\bpoint of contact\b|\bsolicitation\b/i;
 
 /** Format a dollar obligation for the write-up (and as a required snippet when present). */
 export function formatObligationSnippet(n: number): string | null {
@@ -194,17 +198,11 @@ function extractVehicleTokens(corpus: string): string[] {
   for (const { re, token } of VEHICLE_TOKEN_RES) {
     if (re.test(corpus) && !found.includes(token)) found.push(token);
   }
-  // Prefer full PIID prefix hits when present (e.g. 693C7326D…).
-  const prefixHits = corpus.match(/\b(?:693C73|HQ0034)[A-Z0-9]{0,12}\b/gi) || [];
-  for (const hit of prefixHits) {
-    const upper = hit.toUpperCase();
-    if (!found.some((t) => upper.startsWith(t) || t.startsWith(upper.slice(0, 6)))) {
-      found.push(upper.length > 6 ? upper.slice(0, 10) : upper);
-    } else if (upper.length > 6) {
-      // Upgrade short token to a longer grounded hit when available.
-      const i = found.findIndex((t) => upper.startsWith(t));
-      if (i >= 0 && found[i].length < upper.length) found[i] = upper.slice(0, 12);
-    }
+  // IDV PIIDs that appear in this customer's own tool results (office code + FY + D + serial): the 6-character
+  // office code is the stable token (one office, many vehicle numbers).
+  for (const m of corpus.toUpperCase().matchAll(IDV_PIID_RE)) {
+    const token = m[1];
+    if (!found.includes(token)) found.push(token);
   }
   return found.slice(0, 6);
 }
@@ -251,8 +249,17 @@ const PROCUREMENT_WORDS = new Set([
   'clin', 'line', 'item', 'items', 'deliverable', 'deliverables',
 ]);
 const PROCUREMENT_PHRASES = /\bset[-\s]?aside\b|\bn\/a\b|\bfirm\s+fixed\s+price\b|\bfixed\s+price\b/i;
-/** Place / facility names that are Title Case person-shaped (forecast descriptions walk them as "contacts"). */
-const PLACE_PERSON_PHRASES = /\bClara Barton\b|\bRock Creek\b|\bAnacostia\b|\bBolling\b/i;
+/**
+ * A Title Case phrase directly followed by a place or facility noun in the SAME tool result ("<Name> Parkway",
+ * "<Name> Creek", "<Name> Air Force Base") names a place, not a person. Derived from the evidence, never a list of
+ * places.
+ */
+const PLACE_NOUN_AFTER_NAME_RE = /\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,2})\s+(?:Parkway|Creek|River|Park|Memorial|Bridge|Highway|Road|Boulevard|Avenue|Street|Trail|Lake|Island|Harbor|Station|Field|Base|Air Force Base|Center|Hall|Dam|Canal|Tunnel)\b/g;
+function placeNamesIn(content: string): Set<string> {
+  const out = new Set<string>();
+  for (const m of content.matchAll(PLACE_NOUN_AFTER_NAME_RE)) out.add(m[1].toLowerCase());
+  return out;
+}
 /** Fillers that can never be a name on their own; a string made only of these is not a person. */
 const NON_NAME_TOKENS = new Set(['no', 'yes', 'the', 'of', 'and', 'for', 'to', 'a', 'an', 'in', 'on', 'or', 'by', 'any', 'all']);
 
@@ -266,7 +273,6 @@ export function looksLikePersonContactName(s: string): boolean {
   if (IRS_LIKE.test(t)) return false;
   if (/^No\b/i.test(t)) return false;
   if (PROCUREMENT_PHRASES.test(t)) return false;
-  if (PLACE_PERSON_PHRASES.test(t)) return false;
   if (!/^[A-Z][a-z]+(?:\s+[A-Z][a-z.'-]+)+$/.test(t)) return false;
   const words = t.split(/\s+/);
   if (words.length > 4) return false;
@@ -287,7 +293,7 @@ function looksLikePersonName(s: string): boolean {
 }
 
 function collectContactNames(results: readonly FmpToolContent[]): { names: string[]; dla: Set<string> } {
-  const noticeOrWhs: string[] = [];
+  const noticeOrPoc: string[] = [];
   const other: string[] = [];
   const dla: string[] = [];
 
@@ -299,9 +305,10 @@ function collectContactNames(results: readonly FmpToolContent[]): { names: strin
     const content = String(r.content || '');
     const tool = String(r.tool || '');
     const preferNotice =
-      NOTICE_OR_WHS_HINT.test(content)
+      NOTICE_HINT.test(content)
       || /search_federal_contacts|lookup_federal_osbp|find_opportunities|search_sam|lookup_solicitation/i.test(tool);
-    const isDla = DLA_HINT.test(content) && !/\bWHS\b/i.test(content);
+    const isDla = DLA_HINT.test(content);
+    const places = placeNamesIn(content);
 
     const names: string[] = [];
     try {
@@ -309,24 +316,24 @@ function collectContactNames(results: readonly FmpToolContent[]): { names: strin
       const strings: string[] = [];
       walkStrings(p, strings);
       for (const s of strings) {
-        // "name": "Helson Roman" style already walked as value.
-        if (looksLikePersonName(s)) names.push(s.trim());
+        // A "name" value is walked as a plain string.
+        if (looksLikePersonName(s) && !places.has(s.trim().toLowerCase())) names.push(s.trim());
       }
     } catch {
       const m = content.match(/\b([A-Z][a-z]+(?:\s+[A-Z][a-z.'-]+)+)\b/g) || [];
-      for (const s of m) if (looksLikePersonName(s)) names.push(s.trim());
+      for (const s of m) if (looksLikePersonName(s) && !places.has(s.trim().toLowerCase())) names.push(s.trim());
     }
 
     for (const name of names) {
       if (isDla) pushUnique(dla, name);
-      else if (preferNotice) pushUnique(noticeOrWhs, name);
+      else if (preferNotice) pushUnique(noticeOrPoc, name);
       else pushUnique(other, name);
     }
   }
 
-  // Prefer non-DLA when notice/WHS contacts exist.
-  const preferred = noticeOrWhs.length ? [...noticeOrWhs, ...other] : [...noticeOrWhs, ...other, ...dla];
-  const nonDla = new Set([...noticeOrWhs, ...other].map((n) => n.toLowerCase()));
+  // Prefer non-DLA when notice / POC contacts exist.
+  const preferred = noticeOrPoc.length ? [...noticeOrPoc, ...other] : [...noticeOrPoc, ...other, ...dla];
+  const nonDla = new Set([...noticeOrPoc, ...other].map((n) => n.toLowerCase()));
   return {
     names: preferred.slice(0, 8),
     dla: new Set(dla.map((n) => n.toLowerCase()).filter((n) => !nonDla.has(n))),
@@ -447,7 +454,7 @@ const VEHICLE_WORD_RE = /\b(MATOC|MACC|IDIQ|BPA|IDV|multiple[- ]award|task order
 const SOURCES_SOUGHT_RE = /\b(sources? sought|RFI|request for information|special notice)\b/i;
 
 function pathwayRank(p: FmpPathway): number {
-  // Claude gold frame: vehicles → sources sought → forecasts → open RFQs → recompetes.
+  // Pathways before open bids (writeup doctrine): vehicles → sources sought → forecasts → open RFQs → recompetes.
   if (p.kind === 'recompete') return 4;
   if (p.kind === 'forecast') return 2;
   const hay = `${p.title} ${p.noticeType ?? ''}`;
@@ -456,34 +463,20 @@ function pathwayRank(p: FmpPathway): number {
   return 3;
 }
 
-/** Prefer JBAB/Andrews naming when the SAM title is a bare MACC (search_sam omits description). */
-function enrichPathwayTitle(title: string, summary?: string, noticeId?: string): string {
-  if (/JBAB|Andrews|Anacostia/i.test(title)) return title;
-  if (/Clara Barton/i.test(title)) return title;
-  const hay = `${title} ${summary || ''}`;
-  // Agency forecast codes like "MD NP GWMP 6(2)" — gold frame names the parkway, not the code.
-  if (
-    /MD\s*NP\s*GWMP|\bGWMP\b/i.test(title)
-    && /Clara Barton|retaining wall|cantilever|parkway|bridge|asphalt|overlay|pavement/i.test(hay)
-  ) {
-    return clip('Clara Barton Parkway rehabilitation', 120);
-  }
-  if (/Clara Barton/i.test(summary || '') && /parkway|retaining|cantilever|bridge/i.test(hay)) {
-    return clip('Clara Barton Parkway rehabilitation', 120);
-  }
-  const id = (noticeId || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
-  // Live Sources Sought FA706027RXXX2 — title is bare "Multiple Award Construction Contract (MACC)".
-  if (id.startsWith('FA706027RXXX2') || id === 'FA706027RXXX2') {
-    return clip('JBAB and Andrews 8(a) MACC', 120);
-  }
-  if (!/MACC|Multiple Award Construction/i.test(title)) return title;
-  if (summary && /JBAB|Anacostia Bolling|Andrews AFB|Andrews Air/i.test(summary)) {
-    return clip('JBAB and Andrews 8(a) MACC', 120);
-  }
-  return title;
+/**
+ * A bare vehicle title ("Multiple Award Construction Contract (MACC)") says nothing about where or what. When the
+ * notice's own summary is present, add its first clause so the pathway names the actual work. Generic: the words come
+ * from this notice, never from code.
+ */
+const BARE_VEHICLE_TITLE_RE = /^\s*(?:(?:multiple[- ]award|construction|contract|indefinite[- ]delivery|indefinite[- ]quantity|task[- ]order|IDIQ|MATOC|MACC|BPA|services?|and|the|for|[()/,\s-])+)\s*$/i;
+function enrichPathwayTitle(title: string, summary?: string, _noticeId?: string): string {
+  if (!BARE_VEHICLE_TITLE_RE.test(title)) return title;
+  const clause = String(summary || '').split(/[.;:\n]/)[0].replace(/\s+/g, ' ').trim();
+  if (clause.length < 8) return title;
+  return clip(`${title.trim()}: ${clause}`, 120);
 }
 
-/** Collapse Special Notice + Sources Sought twins (e.g. W912DR27H1CWY / W912DR27H1CWYPLA). */
+/** Collapse Special Notice + Sources Sought twins (a solicitation id and the same id with a PLA / amendment suffix). */
 function pathwayDedupeKey(p: FmpPathway): string {
   const titleKey = p.title.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().slice(0, 56);
   // Title first for vehicles / SS — FIND returns a notice UUID while search_sam returns the
@@ -638,29 +631,16 @@ function extractPathways(
   }
   const civilDominant = !!dominantNaics && dominantNaics.startsWith('23');
   const fitFor = (p: FmpPathway): number => (dominantNaics ? pathwayNaicsFit(p, dominantNaics) : 0);
-  /** Highway/bridge firms: inspection MATOCs are the Claude-gold #1 pathway class — boost past adjacent building MACCs. */
-  const inspectionBoost = (p: FmpPathway): number => {
-    if (!dominantNaics || !/^2373/.test(dominantNaics)) return 0;
-    const hay = `${p.title} ${p.noticeType ?? ''}`;
-    return /inspection/i.test(hay) && VEHICLE_WORD_RE.test(hay) ? 35 : 0;
-  };
-  /** Claude gold numbers Clara Barton / GWMP as a pathway, not a buried forecast table row. */
-  const claraBoost = (p: FmpPathway): number => {
-    if (p.kind !== 'forecast') return 0;
-    return /Clara Barton|GWMP/i.test(p.title) ? 40 : 0;
-  };
   // Hard drops only apply to a construction / civil firm; other profiles are ranked, never emptied.
   const candidates = civilDominant ? out.filter((p) => !isOffMarketForCivil(p)) : out;
   const indexed = candidates.map((p, i) => {
     const fit = fitFor(p);
     const buyer = pathwayBuyerAffinity(p, awardRows);
-    const boost = inspectionBoost(p) + claraBoost(p);
-    return { p, i, fit, buyer, score: fit + buyer + boost };
+    return { p, i, fit, buyer, score: fit + buyer };
   });
   indexed.sort((a, b) => {
-    // Claude gold frame: vehicles → sources sought → forecasts → open bids, THEN fit/buyer.
-    // Kind order used to put every notice before every forecast, so Clara Barton-class
-    // rows never made the six-pathway list when open RFQs filled the slots.
+    // Pathways before open bids: vehicles → sources sought → forecasts → open bids, THEN fit to this firm's
+    // award NAICS and buyers. (Ordering every notice before every forecast let open RFQs crowd out forecasts.)
     const ra = pathwayRank(a.p);
     const rb = pathwayRank(b.p);
     if (ra !== rb) return ra - rb;
@@ -674,10 +654,9 @@ function extractPathways(
     return a.i - b.i;
   });
   if (civilDominant) {
-    // Sibling 23x NAICS alone is not enough (dredging beat bridges for RBA). Prefer
-    // exact/prefix fit, 5413 inspection lanes, award-buyer hits, OR vehicle / sources-sought
-    // notices in the construction sector (JBAB 236210 MACC, Capitol Perimeter 236220 SS —
-    // Claude gold pathways that sector-fit alone used to drop).
+    // A sibling 23x NAICS alone is not enough (an adjacent trade can outrank the firm's own). Prefer exact/prefix
+    // fit to the firm's award NAICS, engineering-services lanes, the firm's own award buyers, OR vehicle /
+    // sources-sought notices in the construction sector, which sector fit alone used to drop.
     const fits = indexed.filter((x) => {
       const hay = `${x.p.title} ${x.p.summary ?? ''} ${x.p.noticeType ?? ''}`;
       const inspection = (x.p.naics ?? '').startsWith('5413') && x.fit >= 40;
@@ -686,18 +665,18 @@ function extractPathways(
       // Forecasts need civil wording — sector-fit alone lets gymnasium / building forecasts in.
       // Bare "deck" used to admit pier/boat-forces forecasts (deck replacement on a pier).
       const forecastCivil = !WATERFRONT_OFF_RE.test(hay)
-        && (CIVIL_LEXICAL_RE.test(hay) || /GWMP|Clara Barton|parkway|bridge|highway|roadway|pavement|culvert/i.test(hay));
+        && (CIVIL_LEXICAL_RE.test(hay) || /parkway|bridge|highway|roadway|pavement|culvert/i.test(hay));
       if (x.p.kind === 'forecast') return forecastCivil;
       return x.fit >= 80 || x.buyer >= 30 || inspection || adjacentVehicle || (x.fit >= 40 && x.buyer > 0);
     });
     // Fewer than two on-market pathways: show none so the vehicle-token frame renders instead of junk.
     if (fits.length < 2) return [];
-    // Cap open RFQs so HUMBOLT-class exact-NAICS bids cannot fill all six slots.
+    // Cap open RFQs so exact-NAICS one-off bids cannot fill all six slots.
     const frame = fits.filter((x) => pathwayRank(x.p) <= 2);
     const open = fits.filter((x) => pathwayRank(x.p) === 3);
     const recompete = fits.filter((x) => pathwayRank(x.p) === 4);
-    // With three+ vehicle/SS/forecast rows, drop open RFQs so Clara Barton-class
-    // forecasts keep a numbered slot (HUMBOLT / Sacramento open bids used to fill #4–5).
+    // Pathways before open bids: with three+ vehicle / sources-sought / forecast rows, open RFQs give up their
+    // slots so the pathway rows stay numbered.
     const openCap = frame.length >= 3 ? 0 : frame.length >= 2 ? 1 : 2;
     const merged = [...frame, ...open.slice(0, openCap), ...recompete];
     // Drop Special Notice / Sources Sought twins of the same solicitation.
@@ -954,12 +933,12 @@ function extractRanksByState(results: readonly FmpToolContent[], corpus: string)
 
 function extractMarketTerritoryDollars(corpus: string): string | null {
   const m =
-    corpus.match(/(?:territory|buyer[- ]class|FHWA\s*(?:\+|and|&)\s*NPS)[^.\n$]{0,60}(\$\s?\d[\d,.]*\s?[MB])\b/i)
+    corpus.match(/(?:territory|buyer[- ]class)[^.\n$]{0,60}(\$\s?\d[\d,.]*\s?[MB])\b/i)
     || corpus.match(/"(?:market_territory_dollars|territory_total|buyer_class_total)"\s*:\s*"(\$[^"]+)"/i);
   return m ? m[1].replace(/\s+/g, '') : null;
 }
 
-const PRESSURE_RE = /\b(deferred maintenance|backlog|funding|reauthori[sz]ation|extension|lapse|shortfall|GAO|CRS|Legacy Restoration|appropriations?)\b/i;
+const PRESSURE_RE = /\b(deferred maintenance|backlog|funding|reauthori[sz]ation|extension|lapse|shortfall|GAO|CRS|appropriations?)\b/i;
 
 /** Search-result chrome: FAQ boilerplate, nav labels and cut-off snippets are not buyer pressure. */
 const SERP_CHROME_RE = /find answers to commonly asked|frequently asked questions|^\s*(?:home|search results?|skip to (?:main )?content)\b/i;
@@ -1003,9 +982,9 @@ function extractWebSnippets(results: readonly FmpToolContent[]): Array<{ title?:
     .map(({ c: { strong: _strong, ...rest } }) => rest);
 }
 
-const CIVIL_SIGNAL_RE = /\b(FHWA|Federal Highway|Eastern Federal Lands|EFL|National Park Service|NPS|heavy civil|bridges?|highways?|roadways?|paving|USACE|Army Corps)\b/i;
-/** Agencies whose notice POCs a civil / bridge / highway firm should be talking to. */
-const CIVIL_AGENCY_RE = /\b(FHWA|Federal Highway|Eastern Federal Lands|EFL|National Park|NPS|USACE|Army Corps|Corps of Engineers|WHS|Washington Headquarters|Air Force|JBAB|Transportation|Interior)\b|@[\w.-]*(?:dot|nps|usace|whs)\.(?:gov|mil)\b/i;
+const CIVIL_SIGNAL_RE = /\b(FHWA|Federal Highway|Federal Lands|National Park Service|NPS|heavy civil|bridges?|highways?|roadways?|paving|USACE|Army Corps)\b/i;
+/** Civil-works buyer families (generic). The firm's OWN award buyers are matched separately, from its evidence. */
+const CIVIL_AGENCY_RE = /\b(FHWA|Federal Highway|Federal Lands|National Park|NPS|USACE|Army Corps|Corps of Engineers|Transportation|Interior)\b|@[\w.-]*(?:dot|nps|usace)\.(?:gov|mil)\b/i;
 const DLA_EMAIL_RE = /@[\w.-]*dla\.mil\b/i;
 
 function agencyWords(s: string): string[] {
@@ -1141,14 +1120,9 @@ export function requiredSnippetsForWriteup(evidence: FmpWriteupEvidence): string
   if (evidence.totalObligations) out.push(evidence.totalObligations);
   if (evidence.eightAExitYear) out.push(evidence.eightAExitYear);
   if (evidence.vehicleTokens.length) {
-    // Prefer stable PIID prefixes over bare MATOC (validator + host text share these literals).
-    const joined = evidence.vehicleTokens.join(' ');
-    if (/\b693C73/i.test(joined)) out.push('693C73');
-    else if (/\bHQ0034/i.test(joined)) out.push('HQ0034');
-    else {
-      const piidLike = evidence.vehicleTokens.find((t) => /\d/.test(t));
-      out.push(piidLike || evidence.vehicleTokens[0]);
-    }
+    // Prefer a PIID-like token from this firm's evidence over a bare vehicle word (validator + host text share it).
+    const piidLike = evidence.vehicleTokens.find((t) => /\d/.test(t));
+    out.push(piidLike || evidence.vehicleTokens[0]);
   }
   // Dedupe while preserving order.
   const seen = new Set<string>();
@@ -1327,10 +1301,10 @@ export type BuildFmpHostDocModelOpts = {
   today?: () => string;
   /**
    * Ask Mindy strategy plan (ASK_MINDY_STRATEGY_PLAN): the company this plan is for, from its saved profile. When set,
-   * the host model is that company's plan, not the RBA benchmark shape: no civil or highway wording unless the
+   * the host model is that company's plan, not the generic Federal Market Profile shape: no civil or highway wording unless the
    * company does construction, 8(a) wording only for an 8(a) firm, the defense construction-oversight section only
    * for construction, plus an "About the company" standing section and a "Next 90 days" moves table built from the
-   * pathways this turn returned. Absent: the benchmark Federal Market Profile model, unchanged.
+   * pathways this turn returned. Absent: the Federal Market Profile model, unchanged.
    */
   strategy?: FmpHostStrategy | null;
 };
@@ -1426,9 +1400,9 @@ export function buildFmpHostDocModel(
   const identity = extractProfileCompanyIdentity(customerText);
   const company = identity.legalName || strategy?.companyName || (strategy ? 'Your company' : 'Federal market profile');
   const firm = identity.legalName || strategy?.companyName || 'The firm';
-  // Strategy plans for non-construction firms never get the civil/benchmark wording below.
+  // Strategy plans for non-construction firms never get the civil / construction-oversight wording below.
   const civilFrame = !strategy || strategy.construction;
-  // Name-only asks omit "defense"/"PAE" in the prompt, but JBAB / Capitol / Army pathways
+  // Name-only asks omit "defense"/"PAE" in the prompt, but defense-buyer pathways in the evidence
   // still need the PAE section. OR evidence so a false prompt flag cannot suppress DoD buyers.
   const defense = (!!opts.defenseBuyersAppear || fmpDefenseBuyersAppearFromEvidence(evidence)) && civilFrame;
   const date = (opts.today ?? (() => new Date().toISOString().slice(0, 10)))();
@@ -1438,9 +1412,6 @@ export function buildFmpHostDocModel(
   const exitY = evidence.eightAExitYear;
   const vehicleSnippet = (() => {
     if (!evidence.vehicleTokens.length) return null;
-    const joined = evidence.vehicleTokens.join(' ');
-    if (/\b693C73/i.test(joined)) return '693C73';
-    if (/\bHQ0034/i.test(joined)) return 'HQ0034';
     return evidence.vehicleTokens.find((t) => /\d/.test(t)) || evidence.vehicleTokens[0];
   })();
   const vehicleList = evidence.vehicleTokens.length
@@ -1550,8 +1521,8 @@ export function buildFmpHostDocModel(
   const directBuyers = [...new Set(awardRows.map((r) => r.buyer).filter((b) => b && b !== 'Not stated'))].slice(0, 3);
   const directPathway = directBuyers.length > 0 || buyerSpend.length > 0;
   const forecastPathways = allPathways.filter((p) => p.kind === 'forecast');
-  // Include forecasts in the numbered pathway list (Claude gold puts Clara Barton / GWMP
-  // as pathway #6). Keep a separate forecast table when extras remain.
+  // Include forecasts in the numbered pathway list (a forecast is a pathway, not a footnote). Keep a separate
+  // forecast table when extras remain.
   const noticeCap = directPathway ? 5 : 6;
   const shown = allPathways.slice(0, noticeCap);
   const totalPathways = shown.length + (directPathway ? 1 : 0);
@@ -1747,7 +1718,7 @@ export function buildFmpHostDocModel(
     });
   }
 
-  // ── Where the money is moving (Claude gold §8) — only when vehicle evidence exists ──
+  // ── Where the money is moving: only when vehicle evidence exists ──
   if (evidence.vehicleTokens.length || shown.some((p) => VEHICLE_WORD_RE.test(`${p.title} ${p.noticeType ?? ''}`))) {
     const firmLabel = firm;
     sections.push({
@@ -2044,7 +2015,7 @@ export interface FmpDocModelRichness {
 
 const LEADING_TITLE_RE = /^(?:Mr|Ms|Mrs|Dr|Col|Maj|Capt|Lt|Gen|CAPT|COL|LTC|CDR)\.?\s+/;
 
-/** The person-like head of a who-to-talk cell ("Helson Roman, FHWA EFL, h@x.gov" -> "Helson Roman"). */
+/** The person-like head of a who-to-talk cell ("Jane Doe, Federal Highway, j@x.gov" -> "Jane Doe"). */
 function personHeadOfCell(cell: unknown): string {
   const t = String(cell ?? '').replace(/\*\*|_/g, '').replace(/\S+@\S+/g, ' ').trim();
   return (t.split(/[,;(|\n]|\s-\s|\sat\s/)[0] ?? '').trim().replace(LEADING_TITLE_RE, '');
@@ -2053,11 +2024,11 @@ function personHeadOfCell(cell: unknown): string {
 function whoToTalkTables(model: DocModel): Array<Extract<Block, { type: 'table' }>> {
   const out: Array<Extract<Block, { type: 'table' }>> = [];
   for (const s of model.sections ?? []) {
-    const headingHit = RBA_WRITEUP.whoToTalkHeadingSynonyms.some((re) => re.test(s.heading));
+    const headingHit = WRITEUP_DOCTRINE.whoToTalkHeadingSynonyms.some((re) => re.test(s.heading));
     for (const b of s.blocks ?? []) {
       if (b.type !== 'table') continue;
       const hits = b.columns.filter((c) =>
-        RBA_WRITEUP.whoToTalkTableColumnHints.some((re) => re.test(c.label))).length;
+        WRITEUP_DOCTRINE.whoToTalkTableColumnHints.some((re) => re.test(c.label))).length;
       if (headingHit || hits >= 2) out.push(b);
     }
   }
@@ -2114,7 +2085,7 @@ export function fmpDocModelRichness(model: DocModel): FmpDocModelRichness {
     chars: flattenDocModelText(model).length,
     whoToTalkPersonRows: people,
     hasPathways: (model.sections ?? []).some((s) =>
-      RBA_WRITEUP.pathwayHeadingSynonyms.some((re) => re.test(s.heading))),
+      WRITEUP_DOCTRINE.pathwayHeadingSynonyms.some((re) => re.test(s.heading))),
   };
 }
 

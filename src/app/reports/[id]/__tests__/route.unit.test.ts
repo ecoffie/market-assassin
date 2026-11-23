@@ -53,7 +53,7 @@ describe('GET /reports/[id]', () => {
     expect(res.headers.get('Content-Type')).toContain('text/html');
     const html = await res.text();
     expect(html.startsWith('<!doctype html>')).toBe(true);
-    expect(html).toContain('drones');
+    expect(html).toContain('Drones'); // display title (displayTitle); the stored subject is unchanged
     expect(html).toContain('Powered by'); // Mindy footer = the distribution play
     // A real PDF download (./pdf), not the browser's print dialog.
     expect(html).toContain(`href="/reports/${REPORT.id}/pdf" download>Download PDF</a>`);

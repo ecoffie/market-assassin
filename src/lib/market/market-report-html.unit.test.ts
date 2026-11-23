@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { renderMarketReportHtml } from './market-report-html';
+import { renderMarketReportHtml, provenanceRows } from './market-report-html';
 
 /**
  * The measurement bridge must actually reach the page.
@@ -70,6 +70,19 @@ describe('market report — the measurement bridge', () => {
     expect(html).not.toContain('How this market was measured');
   });
 
+  it('with ONE tier, still says what the agency and contractor tables are ranked on (its note, verbatim)', () => {
+    const note = 'This literal-phrase reading is what the agency and contractor tables below are ranked on (FY23-25).';
+    const html = renderMarketReportHtml({ ...base, summary: summary({ size_tiers: [{ ...TIERS[0], role: 'sections_basis', note }] }) } as never);
+    expect(html).not.toContain('How this market was measured');
+    expect(html).toContain(note);
+  });
+
+  it('does not repeat the note when the measurement table already shows it', () => {
+    const note = 'Ranked on the synonym reading.';
+    const html = renderMarketReportHtml({ ...base, summary: summary({ size_tiers: [TIERS[0], { ...TIERS[1], note }] }) } as never);
+    expect(html.split(note).length - 1).toBe(1);
+  });
+
   it('renders the undercount note as an honest floor warning', () => {
     const html = renderMarketReportHtml({
       ...base,
@@ -101,7 +114,9 @@ describe('RC-5: no internal implementation detail in rendered HTML', () => {
   ];
 
   it('the rendered report contains no internal-comment signature', () => {
-    const html = renderMarketReportHtml({ ...base, summary: summary({ size_tiers: TIERS }) } as never);
+    // The embedded report font is base64 data, not text anyone reads; its alphabet can spell "XXX" by chance.
+    const html = renderMarketReportHtml({ ...base, summary: summary({ size_tiers: TIERS }) } as never)
+      .replace(/url\(data:font\/woff2;base64,[A-Za-z0-9+/=]+\)/g, 'url(data:font/woff2)');
     for (const sig of INTERNAL_SIGNATURES) {
       expect(html, `rendered HTML leaked internal signature "${sig}"`).not.toContain(sig);
     }
@@ -110,6 +125,76 @@ describe('RC-5: no internal implementation detail in rendered HTML', () => {
   it('the rendered report contains no HTML comments at all', () => {
     const html = renderMarketReportHtml({ ...base, summary: summary({ size_tiers: TIERS }) } as never);
     expect(html.match(/<!--[\s\S]*?-->/g) ?? []).toHaveLength(0);
+  });
+});
+
+
+/**
+ * Track C3 (Design & Output, 2026-11-23): "Data and sources" is built ONLY from metadata the stored report carries.
+ * A missing source or date is left out (or reads "Not stated"), never filled in.
+ */
+describe('market report — data and sources', () => {
+  const withProvenance = {
+    ...base,
+    summary: summary({ size_tiers: [{ ...TIERS[1], method: 'Award text contains the terms (FY23-25, contract awards).' }] }),
+    sections: {
+      ...base.sections,
+      market_size: { source: 'bigquery_usaspending_awards', windowLabel: 'FY2026 (1 complete fiscal year · description match)', sourceMaxActionDate: '2026-09-30' },
+      recompetes: { contracts: [{ incumbent_name: 'A', last_synced_at: '2026-11-22T16:25:30Z' }, { incumbent_name: 'B', last_synced_at: '2026-11-20T01:00:00Z' }] },
+      forecasts: { forecasts: [{ title: 'X', as_of: '2026-08-01T20:06:17Z', source_url: 'https://www.acquisitiongateway.gov/forecast' }, { title: 'Y', as_of: '2026-07-15T00:00:00Z', source_url: 'https://osdbu.hhs.gov/x' }] },
+    },
+  } as never;
+
+  it('lists each section with the source and window its own data states', () => {
+    expect(provenanceRows(withProvenance)).toEqual([
+      { section: 'Total market and market composition', source: 'USASpending.gov award records', window: 'FY2026 (1 complete fiscal year · description match); awards through September 30, 2026' },
+      { section: 'Who is buying · Competitive landscape', source: '', window: 'Award text contains the terms (FY23-25, contract awards).' },
+      { section: 'Recompetes on the horizon', source: '', window: 'records last synced November 20, 2026 to November 22, 2026' },
+      { section: 'Upcoming forecasts', source: 'acquisitiongateway.gov, osdbu.hhs.gov', window: 'records as of July 15, 2026 to August 1, 2026' },
+    ]);
+    const html = renderMarketReportHtml(withProvenance);
+    expect(html).toContain('Data and sources');
+    expect(html).toContain('Award data through September 30, 2026');
+    expect(html).not.toMatch(/<td class="txt">USASpending\.gov award records<\/td><td class="txt">Award text/); // a source the row's data does not name is left blank, not guessed
+  });
+
+  it('invents nothing: no metadata, no section and no header date', () => {
+    expect(provenanceRows({ ...base, summary: summary() } as never)).toEqual([]);
+    const html = renderMarketReportHtml({ ...base, summary: summary() } as never);
+    expect(html).not.toContain('Data and sources');
+    expect(html).not.toContain('Award data through');
+  });
+
+  it('hides an unknown source key and ignores dates that are not dates', () => {
+    const odd = { ...base, summary: summary(), sections: { ...base.sections, market_size: { source: 'some_internal_table', windowLabel: '', sourceMaxActionDate: 'n/a' } } } as never;
+    expect(provenanceRows(odd)).toEqual([]);
+    expect(renderMarketReportHtml(odd)).not.toContain('some_internal_table');
+  });
+});
+
+describe('market report — data and sources: contacts and recompetes (Data Core #2399 fields)', () => {
+  const withRows = (contacts: unknown, recompetes: unknown) => ({ ...base, summary: summary(), sections: { ...base.sections, contacts, recompetes } }) as never;
+
+  it('lists Who to call from the contacts source_label and as_of, and recompetes from their row provenance', () => {
+    const rows = provenanceRows(withRows(
+      { agency: 'Dept', office: null, total: 3, people: [{ name: 'A', role: 'CO', email: 'a@x.gov', office: null, source: { kind: 'sam_notice_poc', solicitation_number: 'S1', notice_posted: '2026-11-18' } }],
+        source_label: 'SAM.gov notice points of contact (government buyers)', as_of: '2026-11-18', as_of_label: 'most recent notice listing these contacts' },
+      { contracts: [{ incumbent_name: 'A', provenance: { source_label: 'USASpending award record', source_url: null, as_of: '2026-11-22T00:00:00Z', as_of_label: 'last synced' } }, { incumbent_name: 'B', provenance: { source_label: null, source_url: null, as_of: null, as_of_label: 'last synced' } }],
+        sources: [{ label: 'USASpending award record', count: 1 }, { label: 'not_stated', count: 1 }] },
+    ));
+    expect(rows).toEqual([
+      { section: 'Who to call', source: 'SAM.gov notice points of contact (government buyers)', window: 'most recent notice listing these contacts: November 18, 2026' },
+      { section: 'Recompetes on the horizon', source: 'USASpending award record (1), not stated (1)', window: 'records last synced November 22, 2026' },
+    ]);
+  });
+
+  it('never defaults: null provenance gives no row, and a report stored before #2399 keeps its last_synced_at', () => {
+    expect(provenanceRows(withRows(
+      { agency: 'Dept', office: null, total: 1, people: [{ name: 'A', role: 'CO', email: 'a@x.gov', office: null }], source_label: undefined, as_of: null },
+      { contracts: [{ incumbent_name: 'A', provenance: { source_label: null, source_url: null, as_of: null, as_of_label: 'last synced' } }] },
+    ))).toEqual([]);
+    expect(provenanceRows(withRows(null, { contracts: [{ incumbent_name: 'A', last_synced_at: '2026-11-20T00:00:00Z' }] })))
+      .toEqual([{ section: 'Recompetes on the horizon', source: '', window: 'records last synced November 20, 2026' }]);
   });
 });
 

@@ -345,6 +345,17 @@ export interface ReconcileAgencyResult {
   stillUnresolved: number;
   multiAgency: number;
   noAgency: number;
+  /** NO_AGENCY rows whose stored classification already matched — NOT rewritten. */
+  unchangedSkipped: number;
+  /** NO_AGENCY provenance writes that failed (row left as it was). */
+  writeFailed: number;
+  /** Keyset pages read (each < PostgREST's 1,000-row response cap). */
+  pagesRead: number;
+  /** True when every candidate row was visited. False = budget cut — NOT a full pass. */
+  complete: boolean;
+  /** True when the shared run deadline stopped the pass. */
+  budgetExhausted: boolean;
+  /** Only rows this pass WROTE (newly resolved or newly classified NO_AGENCY). */
   details: Array<{
     documentNumber: string;
     classification: string;
@@ -353,83 +364,142 @@ export interface ReconcileAgencyResult {
   }>;
 }
 
+export interface ReconcileAgencyOptions {
+  /** Epoch ms of the SHARED run deadline (route: started + budgetMs). Omit = unbounded. */
+  deadlineMs?: number;
+  /** Keyset page size. Clamped to 1..RECONCILE_MAX_PAGE_SIZE. */
+  pageSize?: number;
+  /** Clock (tests). */
+  now?: () => number;
+}
+
+/** PostgREST silently caps a response at 1,000 rows — every page stays below it. */
+export const RECONCILE_MAX_PAGE_SIZE = 999;
+export const RECONCILE_DEFAULT_PAGE_SIZE = 500;
+
+function sameStringArray(a: unknown, b: string[]): boolean {
+  return Array.isArray(a) && a.length === b.length && a.every((v, i) => v === b[i]);
+}
+
 /**
  * Re-run agency resolution on held unresolved GAO rows. Only WRITES when evidence
  * newly supports a single canonical agency — never force-maps MULTI/NO/UNKNOWN.
  *
  * Existing rows were frozen at insert-time resolution; improving the phrase map
  * would otherwise leave them stuck. Idempotent.
+ *
+ * BOUNDED (2026-11-23): the read was one unranged select, which PostgREST silently
+ * truncates at 1,000 rows, and every NO_AGENCY row's `raw` was rewritten on every run
+ * with no budget check — spending the shared run budget before the IG lane.
+ *   - Reads page by keyset on `id` (pages < 1,000). Keyset, not offset: rows this
+ *     pass resolves leave the filter, which would make an offset skip rows.
+ *   - Checks the shared deadline before each page and each row; a cut sets
+ *     `complete=false, budgetExhausted=true` (the caller must treat it as partial).
+ *   - A NO_AGENCY row whose stored classification/candidates/note already equal the
+ *     fresh audit is NOT rewritten. The audit is pure and cheap; it still runs, so a
+ *     phrase-map improvement that now resolves the row is never skipped.
  */
 export async function reconcileUnresolvedGaoAgencies(
   db: SupabaseClient,
   canonicalNames: string[],
+  opts: ReconcileAgencyOptions = {},
 ): Promise<ReconcileAgencyResult> {
-  const { data: rows, error } = await db
-    .from('institute_sources')
-    .select('id,document_number,title,abstract,source_url,publication_date,raw,resolution_method')
-    .eq('source_type', 'gao_report')
-    .or('canonical_agency.is.null,resolution_method.eq.unresolved');
-  if (error) throw new Error(`reconcileUnresolvedGaoAgencies: ${error.message}`);
+  const now = opts.now ?? Date.now;
+  const pageSize = Math.max(1, Math.min(RECONCILE_MAX_PAGE_SIZE, Math.floor(opts.pageSize ?? RECONCILE_DEFAULT_PAGE_SIZE)));
+  const overBudget = () => opts.deadlineMs !== undefined && now() > opts.deadlineMs;
 
   const result: ReconcileAgencyResult = {
-    scanned: rows?.length ?? 0,
+    scanned: 0,
     newlyResolved: 0,
     stillUnresolved: 0,
     multiAgency: 0,
     noAgency: 0,
+    unchangedSkipped: 0,
+    writeFailed: 0,
+    pagesRead: 0,
+    complete: false,
+    budgetExhausted: false,
     details: [],
   };
 
-  for (const row of rows ?? []) {
-    const doc: InstituteDocument = {
-      sourceOrg: 'GAO',
-      sourceType: 'gao_report',
-      documentNumber: row.document_number as string,
-      title: row.title as string,
-      url: (row.source_url as string) || '',
-      publicationDate: (row.publication_date as string) || null,
-      abstract: (row.abstract as string) || null,
-    };
-    const audit = auditDocumentAgency(doc, canonicalNames);
-    result.details.push({
-      documentNumber: doc.documentNumber,
-      classification: audit.classification,
-      canonicalAgency: audit.resolution.canonicalAgency,
-      candidates: audit.candidates,
-    });
+  let lastId: string | null = null;
+  for (;;) {
+    if (overBudget()) { result.budgetExhausted = true; return result; }
+    let q = db
+      .from('institute_sources')
+      .select('id,document_number,title,abstract,source_url,publication_date,raw,resolution_method')
+      .eq('source_type', 'gao_report')
+      .or('canonical_agency.is.null,resolution_method.eq.unresolved');
+    if (lastId !== null) q = q.gt('id', lastId);
+    const { data: rows, error } = await q.order('id', { ascending: true }).limit(pageSize);
+    if (error) throw new Error(`reconcileUnresolvedGaoAgencies: ${error.message}`);
+    result.pagesRead++;
+    const page = rows ?? [];
 
-    if (audit.classification === 'MULTI_AGENCY') { result.multiAgency++; result.stillUnresolved++; continue; }
-    if (audit.classification === 'NO_AGENCY') { result.noAgency++; result.stillUnresolved++; 
-      // Persist classification provenance without inventing an agency.
+    for (const row of page) {
+      if (overBudget()) { result.budgetExhausted = true; return result; }
+      lastId = row.id as string;
+      result.scanned++;
+      const doc: InstituteDocument = {
+        sourceOrg: 'GAO',
+        sourceType: 'gao_report',
+        documentNumber: row.document_number as string,
+        title: row.title as string,
+        url: (row.source_url as string) || '',
+        publicationDate: (row.publication_date as string) || null,
+        abstract: (row.abstract as string) || null,
+      };
+      const audit = auditDocumentAgency(doc, canonicalNames);
+      const detail = {
+        documentNumber: doc.documentNumber,
+        classification: audit.classification,
+        canonicalAgency: audit.resolution.canonicalAgency,
+        candidates: audit.candidates,
+      };
       const priorRaw = (row.raw && typeof row.raw === 'object') ? row.raw as Record<string, unknown> : {};
-      await db.from('institute_sources').update({
-        raw: { ...priorRaw, agencyClassification: audit.classification, agencyCandidates: audit.candidates, agencyNote: audit.note },
+
+      if (audit.classification === 'MULTI_AGENCY') { result.multiAgency++; result.stillUnresolved++; continue; }
+      if (audit.classification === 'NO_AGENCY') {
+        result.noAgency++; result.stillUnresolved++;
+        const unchanged = priorRaw.agencyClassification === audit.classification
+          && sameStringArray(priorRaw.agencyCandidates, audit.candidates)
+          && (priorRaw.agencyNote ?? null) === (audit.note ?? null);
+        if (unchanged) { result.unchangedSkipped++; continue; }
+        // Persist classification provenance without inventing an agency.
+        const { error: noErr } = await db.from('institute_sources').update({
+          raw: { ...priorRaw, agencyClassification: audit.classification, agencyCandidates: audit.candidates, agencyNote: audit.note },
+          updated_at: new Date().toISOString(),
+        }).eq('id', row.id);
+        if (noErr) { result.writeFailed++; continue; }
+        result.details.push(detail);
+        continue;
+      }
+      if (!audit.resolution.resolved || !audit.resolution.canonicalAgency) {
+        result.stillUnresolved++;
+        continue;
+      }
+
+      const { error: upErr } = await db.from('institute_sources').update({
+        canonical_agency: audit.resolution.canonicalAgency,
+        toptier_code: audit.resolution.toptierCode,
+        resolution_method: audit.resolution.method,
+        resolution_confidence: audit.resolution.confidence,
+        raw: {
+          ...priorRaw,
+          agencyClassification: audit.classification,
+          agencyCandidates: audit.candidates,
+          agencyNote: audit.note,
+        },
         updated_at: new Date().toISOString(),
       }).eq('id', row.id);
-      continue;
-    }
-    if (!audit.resolution.resolved || !audit.resolution.canonicalAgency) {
-      result.stillUnresolved++;
-      continue;
+      if (upErr) throw new Error(`reconcile update ${doc.documentNumber}: ${upErr.message}`);
+      result.newlyResolved++;
+      result.details.push(detail);
     }
 
-    const priorRaw = (row.raw && typeof row.raw === 'object') ? row.raw as Record<string, unknown> : {};
-    const { error: upErr } = await db.from('institute_sources').update({
-      canonical_agency: audit.resolution.canonicalAgency,
-      toptier_code: audit.resolution.toptierCode,
-      resolution_method: audit.resolution.method,
-      resolution_confidence: audit.resolution.confidence,
-      raw: {
-        ...priorRaw,
-        agencyClassification: audit.classification,
-        agencyCandidates: audit.candidates,
-        agencyNote: audit.note,
-      },
-      updated_at: new Date().toISOString(),
-    }).eq('id', row.id);
-    if (upErr) throw new Error(`reconcile update ${doc.documentNumber}: ${upErr.message}`);
-    result.newlyResolved++;
+    if (page.length < pageSize) break;
   }
 
+  result.complete = true;
   return result;
 }

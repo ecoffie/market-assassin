@@ -8,6 +8,8 @@
  * /reports/[id] page (follow-on PR) can reuse the exact same renderer.
  */
 
+import { INTER_LATIN_FONT_FACE } from '@/lib/fonts/inter-latin-embedded';
+
 type Row = Record<string, unknown>;
 const s = (v: unknown): string => (v == null ? '' : String(v));
 function esc(v: unknown): string {
@@ -38,6 +40,22 @@ function percentShare(pct: unknown, amount: unknown): string {
   if (!Number.isFinite(p)) return 'unavailable';
   if (p > 0 && p < 0.1) return '<0.1%';
   return `${p.toFixed(1)}%`;
+}
+/** A short value that must never split across lines (a code, amount, date, label). Already-escaped HTML in. */
+function nw(html: string): string {
+  return `<span class="nw">${html}</span>`;
+}
+/**
+ * Display casing for the report title only: capitalise words typed all in lower case ("janitorial services"
+ * → "Janitorial Services"), keep anything the user cased themselves ("VA IT", "eDiscovery") and keep short
+ * joining words lower case after the first word. The stored subject, file name and quoted search phrase are
+ * unchanged.
+ */
+export function displayTitle(subject: unknown): string {
+  const SMALL = new Set(['a', 'an', 'and', 'as', 'at', 'by', 'for', 'in', 'of', 'on', 'or', 'the', 'to', 'vs', 'with']);
+  return s(subject).split(/(\s+)/).map((w, i) =>
+    /^[a-z][a-z'-]*$/.test(w) && !(i > 0 && SMALL.has(w)) ? w[0].toUpperCase() + w.slice(1) : w,
+  ).join('');
 }
 function num(v: unknown): string {
   const n = typeof v === 'number' ? v : Number(v);
@@ -126,6 +144,8 @@ interface ReportLike {
       office: string | null;
       people: Array<{ name: string; role: string; email: string; office: string | null }>;
       total: number;
+      basis?: 'market_awarding_offices' | 'department_roster';
+      office_codes?: string[];
     } | null;
     agency_detail: unknown;
     set_aside_gap: unknown;
@@ -153,7 +173,7 @@ function countValue(shown: number, total: number | null | undefined): { value: s
 // whole grid row uneven). The sub line is clamped to 2 lines in CSS.
 function statCard(label: string, value: string, sub?: string): string {
   return `<div class="stat"><div class="stat-v">${esc(value)}</div>`
-    + (sub ? `<div class="stat-sub">${esc(sub)}</div>` : '')
+    + (sub ? `<div class="stat-sub" title="${esc(sub)}">${esc(sub)}</div>` : '')
     + `<div class="stat-l">${esc(label)}</div></div>`;
 }
 
@@ -176,11 +196,102 @@ function kpi(status: string | undefined, n: unknown): string {
   return num(n);
 }
 
-function table(headers: string[], rows: string[][], whenEmpty?: string): string {
+/**
+ * DATA AND SOURCES — when and where each section's figures come from, built ONLY from metadata the stored report
+ * already carries (Design & Output, Track C3). Nothing is inferred: a section with no stated source or date is left
+ * out of the table, never filled in. Known source keys get their public name; an unknown key is not shown.
+ */
+const SOURCE_NAMES: Record<string, string> = {
+  bigquery_usaspending_awards: 'USASpending.gov award records',
+};
+/** "September 30, 2026" from an ISO date or timestamp; '' when it is not a real date. */
+function longDate(v: unknown): string {
+  if (typeof v !== 'string' || !/^\d{4}-\d{2}-\d{2}/.test(v)) return '';
+  const d = new Date(`${v.slice(0, 10)}T00:00:00Z`);
+  return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
+}
+function hostOf(v: unknown): string {
+  try { return typeof v === 'string' && /^https?:\/\//.test(v) ? new URL(v).hostname.replace(/^www\./, '') : ''; } catch { return ''; }
+}
+/** Earliest and latest of a set of ISO dates, as "A" or "A to B"; '' when there are none. */
+function dateSpan(values: unknown[]): string {
+  const days = [...new Set(values.map((v) => (typeof v === 'string' ? v.slice(0, 10) : '')).filter((d) => longDate(d)))].sort();
+  if (!days.length) return '';
+  return days.length === 1 || days[0] === days[days.length - 1] ? longDate(days[0]) : `${longDate(days[0])} to ${longDate(days[days.length - 1])}`;
+}
+
+export interface ProvenanceRow { section: string; source: string; window: string }
+
+export function provenanceRows(report: Pick<ReportLike, 'summary' | 'sections'>): ProvenanceRow[] {
+  const rows: ProvenanceRow[] = [];
+  const ms = (report.sections.market_size ?? null) as { source?: unknown; windowLabel?: unknown; sourceMaxActionDate?: unknown } | null;
+  if (ms) {
+    const source = typeof ms.source === 'string' ? SOURCE_NAMES[ms.source] ?? '' : '';
+    const through = longDate(ms.sourceMaxActionDate);
+    const window = [typeof ms.windowLabel === 'string' ? ms.windowLabel : '', through ? `awards through ${through}` : ''].filter(Boolean).join('; ');
+    if (source || window) rows.push({ section: 'Total market and market composition', source, window });
+  }
+  const basisTier = (report.summary.size_tiers ?? []).find((t) => t.role === 'sections_basis');
+  if (basisTier?.method) rows.push({ section: 'Who is buying · Competitive landscape', source: '', window: basisTier.method });
+  const contacts = report.sections.contacts as { source_label?: unknown; as_of?: unknown; as_of_label?: unknown; people?: unknown[] } | null | undefined;
+  if (contacts && contacts.people?.length) {
+    const asOf = longDate(contacts.as_of);
+    const source = typeof contacts.source_label === 'string' ? contacts.source_label : '';
+    const label = typeof contacts.as_of_label === 'string' ? contacts.as_of_label : 'as of';
+    if (source || asOf) rows.push({ section: 'Who to call', source, window: asOf ? `${label}: ${asOf}` : '' });
+  }
+  // Recompetes: each row's own provenance (Data Core #2399); a stored report from before it has only last_synced_at.
+  const recompetes = report.sections.recompetes as { contracts: unknown[]; sources?: Array<{ label?: unknown; count?: unknown }> };
+  const recRows = recompetes.contracts as Row[];
+  const recSources = (recompetes.sources ?? [])
+    .filter((x) => typeof x.label === 'string' && typeof x.count === 'number' && x.count > 0)
+    .map((x) => (x.label === 'not_stated' ? `not stated (${x.count})` : `${String(x.label)} (${x.count})`));
+  const recompeteSync = dateSpan(recRows.map((c) => (c.provenance as { as_of?: unknown } | undefined)?.as_of ?? c.last_synced_at));
+  if (recSources.length || recompeteSync) {
+    rows.push({ section: 'Recompetes on the horizon', source: recSources.join(', '), window: recompeteSync ? `records last synced ${recompeteSync}` : '' });
+  }
+  const forecasts = report.sections.forecasts.forecasts as Row[];
+  const hosts = [...new Set(forecasts.map((f) => hostOf(f.source_url)).filter(Boolean))];
+  const asOf = dateSpan(forecasts.map((f) => f.as_of));
+  if (hosts.length || asOf) rows.push({ section: 'Upcoming forecasts', source: hosts.join(', '), window: asOf ? `records as of ${asOf}` : '' });
+  return rows;
+}
+
+const FOOTER_HTML = 'Powered by <b>Mindy</b> · getmindy.ai — federal contracting intelligence.<br>\n  '
+  + 'Figures are federal contract obligations over the reporting window (USASpending/SAM), not budget authority.';
+
+/**
+ * In the PDF the page footer is printed INSIDE the last section, so it travels with that section's final
+ * rows; as a separate block after the section it could land alone on an extra page (Claude Local,
+ * 2026-11-22: page 9 held only the footer). The screen keeps the page-level footer.
+ */
+function withPrintFooter(body: string): string {
+  const at = body.lastIndexOf('</section>');
+  if (at < 0) return body;
+  return `${body.slice(0, at)}<div class="rp rp-print">${FOOTER_HTML}</div>${body.slice(at)}`;
+}
+
+/**
+ * Wraps code-like tokens in already-escaped text (letters/digits joined by hyphens with at least one digit,
+ * such as a project number "561A4-26-510") so the PDF never splits them at a hyphen. Ordinary hyphenated
+ * words ("Service-Disabled") are left to wrap like prose.
+ */
+function keepCodesWhole(escaped: string): string {
+  return escaped.replace(/(^|[\s(])((?=[A-Za-z0-9-]*\d)[A-Za-z0-9]+(?:-[A-Za-z0-9]+)+)(?=$|[\s),.;:])/g, '$1<span class="code">$2</span>');
+}
+
+/**
+ * `textCols`: columns (besides the first, which is always the lead) that hold long prose, such as an agency name
+ * or a set-aside. In the PDF only those and the lead wrap, and only between words; every other cell (money,
+ * codes, dates, short labels) and every header stays whole (Claude Local, 2026-11-22: "$1.6B" printed as
+ * "$1." / "6B" and "AMOUNT" as AM/OU/NT).
+ */
+function table(headers: string[], rows: string[][], whenEmpty?: string, textCols: number[] = []): string {
   if (!rows.length) return `<p class="empty">${esc(whenEmpty || emptyText(undefined))}</p>`;
   const head = headers.map((h) => `<th>${esc(h)}</th>`).join('');
+  const cls = (i: number) => (i === 0 ? ' class="lead"' : textCols.includes(i) ? ' class="txt"' : '');
   const body = rows
-    .map((r) => `<tr>${r.map((c, i) => `<td${i === 0 ? ' class="lead"' : ''}>${c}</td>`).join('')}</tr>`)
+    .map((r) => `<tr>${r.map((c, i) => `<td${cls(i)}>${c}</td>`).join('')}</tr>`)
     .join('');
   return `<div class="tw"><table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div>`;
 }
@@ -265,14 +376,14 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
   // same incumbent apart (Heritage-M2C1 holds FA500425F0093 AND FA500425F0094 — two
   // contracts, not one row printed twice).
   const recompeteRows = (sections.recompetes.contracts as Row[]).map((c) => [
-    `${esc(c.incumbent_name || '—')}<div class="rowsub">${esc(c.piid || '')}${
-      c.description ? ` · ${esc(s(c.description).slice(0, 90))}${s(c.description).length > 90 ? '…' : ''}` : ''
+    `${esc(c.incumbent_name || '—')}<div class="rowsub">${c.piid ? `<span class="code">${esc(c.piid)}</span>` : ''}${
+      c.description ? ` · ${keepCodesWhole(esc(s(c.description).slice(0, 90)))}${s(c.description).length > 90 ? '…' : ''}` : ''
     }</div>`,
     esc(c.awarding_sub_agency || c.awarding_agency || '—'),
-    esc(c.naics_code || '—'),
-    money(c.potential_total_value ?? c.total_obligation),
-    esc(s(c.period_of_performance_current_end).slice(0, 10) || '—'),
-    esc(c.recompete_likelihood || '—'),
+    nw(esc(c.naics_code || '—')),
+    nw(money(c.potential_total_value ?? c.total_obligation)),
+    nw(esc(s(c.period_of_performance_current_end).slice(0, 10) || '—')),
+    esc(c.recompete_likelihood || '—'), // words: may wrap between words (break-word never splits one)
   ]);
 
   // ---- Forecasts ----
@@ -281,7 +392,7 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
   const forecastRows = (sections.forecasts.forecasts as Row[]).map((f) => [
     esc(f.title) + (f.incumbent_name ? `<div class="rowsub">Incumbent: ${esc(f.incumbent_name)}</div>` : ''),
     esc(f.agency || f.department || '—'),
-    esc(f.naics_code || '—'),
+    nw(esc(f.naics_code || '—')),
     esc(prettyRange(f.value_range, f.value_max, f.value_min)),
     esc([f.fiscal_year, f.quarter].filter(Boolean).join(' ') || '—'),
     // Normalized upstream; null = the source did not state a category.
@@ -292,7 +403,7 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
   // agency_detail comes from getAgencySpendingDetail (USASpending spending_by_category): the WHOLE agency,
   // all NAICS, one fiscal year, contract obligations net of de-obligations. Its pct_of_total and
   // small_business_share are already PERCENT units (9.4 = 9.4%) — multiplying by 100 printed 940%.
-  const ad = sections.agency_detail as { total_obligated?: number; small_business_share?: number | null; fiscal_year?: number; agency?: string; sub_agencies?: Row[]; set_aside_breakdown?: Row[] } | null;
+  const ad = sections.agency_detail as { total_obligated?: number; small_business_share?: number | null; fiscal_year?: number; agency?: string; sub_agencies?: Row[] | null; sub_agency_structure?: string; sub_agency_note?: string; set_aside_breakdown?: Row[]; set_aside_note?: string } | null;
   let agencyDetailHtml = '';
   if (ad && ad.total_obligated) {
     const share = (r: Row) => percentShare(r.pct_of_total, r.amount);
@@ -305,8 +416,17 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
       `${esc(ad.agency || 'Agency')}-wide, all NAICS, ${fy} — not limited to this market. `
         + `Total contract obligations ${money(ad.total_obligated)} (net of de-obligations) · set-aside-code share ${sb} `
         + `(dollars awarded under small-business set-aside codes; not the SBA goaling figure — small firms also win full-and-open work)`,
-      `<div class="two"><div><h3>Top sub-agencies</h3>${table(['Sub-agency', 'Obligated', 'Share of agency total'], subRows)}</div>` +
-        `<div><h3>Set-aside breakdown</h3>${table(['Set-aside', 'Obligated (net)', 'Share of agency total'], saRows)}</div></div>`
+      `<div class="two"><div><h3>Top sub-agencies</h3>${
+          // A department that files every award under one self-named sub-agency (VA) or a failed lookup gets a
+          // plain sentence (sub_agency_note), never an unexplained "No rows" next to a $90B total.
+          subRows.length || !ad.sub_agency_note
+            ? table(['Sub-agency', 'Obligated', 'Share of agency total'], subRows)
+            : `<p class="empty">${esc(ad.sub_agency_note)}</p>`
+        }</div>` +
+        // VA's distinct VOSB (VA only) row is explained in one factual sentence from the tool (set_aside_note).
+        `<div><h3>Set-aside breakdown</h3>${table(['Set-aside', 'Obligated (net)', 'Share of agency total'], saRows)}${
+          ad.set_aside_note ? `<p class="empty">${esc(ad.set_aside_note)}</p>` : ''
+        }</div></div>`
     );
   }
 
@@ -317,18 +437,26 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
   const contactsHtml = contacts && contacts.people.length
     ? section(
         'Who to call',
-        `Real points of contact at ${esc(contacts.agency)}${contacts.office ? ` · ${esc(contacts.office)}` : ''} — the buyer's small-business and contracting people${
-          contacts.total > contacts.people.length ? `. Showing ${contacts.people.length} of ${num(contacts.total)}.` : '.'
-        }`,
-        table(
-          ['Name', 'Role', 'Office', 'Email'],
-          contacts.people.map((p) => [
-            esc(p.name),
-            esc(p.role || '—'),
-            esc(p.office || '—'),
-            p.email ? `<a href="mailto:${esc(p.email)}">${esc(p.email)}</a>` : '—',
-          ])
-        )
+        (contacts.basis === 'market_awarding_offices'
+          ? `Contracting staff at the offices that awarded this market's expiring contracts (office ${esc((contacts.office_codes || []).join(', '))}) — the people who post those offices' solicitations`
+          : contacts.basis === 'department_roster'
+            ? `General contacts at ${esc(contacts.agency)} — <strong>not specific to this market or location</strong>: no in-scope contract identified a contracting office to anchor on`
+            : `Real points of contact at ${esc(contacts.agency)}${contacts.office ? ` · ${esc(contacts.office)}` : ''} — the buyer's small-business and contracting people`)
+          + (contacts.total > contacts.people.length ? `. Showing ${contacts.people.length} of ${num(contacts.total)}.` : '.'),
+        // The Office column is shown only when at least one person has an office: a column of dashes
+        // tells the reader nothing (the section subtitle already names the offices).
+        (() => {
+          const withOffice = contacts.people.some((p) => p.office);
+          return table(
+            withOffice ? ['Name', 'Role', 'Office', 'Email'] : ['Name', 'Role', 'Email'],
+            contacts.people.map((p) => [
+              esc(p.name),
+              esc(p.role || '—'),
+              ...(withOffice ? [esc(p.office || '—')] : []),
+              p.email ? `<a href="mailto:${esc(p.email)}">${esc(p.email)}</a>` : '—',
+            ]),
+          );
+        })()
       )
     : '';
 
@@ -393,12 +521,18 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
                 + (t.inputs.length > 1 ? `<div class="tier-terms">Terms: ${esc(t.inputs.join(', '))}</div>` : ''),
             ]),
           ],
+          undefined,
+          [2],
         ),
       )
     : '';
 
   /** An empty ranked table explains itself when the phrase it ranked on measured $0. */
   const sectionsBasisTier = tiers.find((t) => t.role === 'sections_basis');
+  // The agency and contractor tables are ranked on a different reading (and window) than the headline. With
+  // several readings "How this market was measured" explains it; with ONE that table is not rendered, and the
+  // reader saw $1.6B for the Army under a $426.3M headline with nothing saying why. Show the tier's own note.
+  const sectionsBasisNote = !measurementHtml && sectionsBasisTier?.note ? `<p class="note">${esc(sectionsBasisTier.note)}</p>` : '';
   const phraseEmptyNote = sectionsBasisTier && sectionsBasisTier.amount === 0
     ? `<p class="note">No contract award text contains the exact phrase this table is ranked on, so it is empty for that phrase. That is not a statement that no one buys this work — the market total above was measured ${
         tb?.identity_resolved_via?.length ? `through: ${esc(tb.identity_resolved_via.join(', '))}` : 'differently (see How this market was measured)'
@@ -430,6 +564,7 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
       ${summary.contacts ? statCard('Contacts to call', num(summary.contacts)) : ''}
     </section>`,
     scopeNote,
+    sectionsBasisNote,
     // THE BRIDGE — how the headline was derived, shown so a client can audit it.
     // A single unlabeled number is what made a $46.3B hypersonics headline
     // indefensible: nobody could see which awards it was built from.
@@ -468,7 +603,7 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
           ? ` Showing ${num(recompeteRows.length)} of ${num(summary.recompetes_total)} found.`
           : ''
       }`,
-      table(['Incumbent / contract', 'Agency', 'NAICS', 'Value', 'Ends', 'Likelihood'], recompeteRows, emptyText(st('recompetes')))),
+      table(['Incumbent / contract', 'Agency', 'NAICS', 'Value', 'Ends', 'Likelihood'], recompeteRows, emptyText(st('recompetes')), [1, 5])),
     section('Upcoming forecasts',
       `Planned procurements agencies have published.${
         summary.forecasts_total != null && summary.forecasts_total > forecastRows.length
@@ -479,30 +614,50 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
           ? ` ${num(summary.forecasts_duplicates_removed)} duplicate listing${summary.forecasts_duplicates_removed === 1 ? '' : 's'} (the same listing received from two sources) removed.`
           : ''
       }`,
-      table(['Title', 'Agency', 'NAICS', 'Value', 'FY', 'Set-aside'], forecastRows, emptyText(st('forecasts')))),
+      table(['Title', 'Agency', 'NAICS', 'Value', 'FY', 'Set-aside'], forecastRows, emptyText(st('forecasts')), [1, 5])),
     agencyDetailHtml,
+    (() => {
+      const prov = provenanceRows(report);
+      return prov.length
+        ? section('Data and sources', 'Where each section\u2019s figures come from and how current they are, as recorded in this report\u2019s data. Sections without a stated source or date are not listed.',
+            `<div class="prov">${table(['Section', 'Source', 'Window / as of'], prov.map((r) => [esc(r.section), esc(r.source || '—'), esc(r.window || '—')]), undefined, [1, 2])}</div>`)
+        : '';
+    })(),
   ].join('\n');
 
   const degradedNote = report._meta.degraded
     ? `<p class="note">Some sections could not be loaded at generation time and may be incomplete.</p>`
     : '';
 
+  // The second @media print block is PDF-only: a page is a fixed width, so nothing may rely on horizontal
+  // scrolling or truncation (screen layout unchanged). Before it, the recompetes / forecasts tables were
+  // ~1,150-1,290px wide in a 626px column and the PDF cut their right side off (Claude Local, 2026-11-22).
+  // The NAICS / PSC columns (.two > div) may continue on the next page: kept whole, a tall pair jumped to a
+  // new page and left the page before it with one line (full report fixture: page 2 = 58 characters). Rows,
+  // KPI tiles, subtitles and notes still never split.
+  // In print the page wrapper keeps no bottom padding: 56px of trailing padding after the closing note started a
+  // blank last page (only the running footer on it) whenever the report ended near the foot of a page.
+  // The report embeds its own font (Inter latin subset, data: URI): the PDF renders with JavaScript and network
+  // off, so without it the page used whatever the machine had (Open Sans on production, DejaVu/Liberation on CI).
+  // No comments inside the emitted HTML/CSS: client HTML carries no engineering notes (tested).
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Market Report — ${esc(subject)}</title>
+<title>Market Report — ${esc(displayTitle(subject))}</title>
 <style>
+  ${INTER_LATIN_FONT_FACE}
   :root { --navy:#1e3a8a; --purple:#7c3aed; --ink:#1e2230; --muted:#6b7280; --line:#e5e7eb; --bg:#f7f7fb; --card:#fff; }
   * { box-sizing:border-box; }
-  body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.55 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.55 'Mindy Report Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; }
   .wrap { max-width:1000px; margin:0 auto; padding:32px 24px 56px; }
   header.rp { background:linear-gradient(135deg,var(--navy),var(--purple)); color:#fff; border-radius:16px; padding:28px 30px; }
   header.rp .kick { font-size:12px; letter-spacing:.12em; text-transform:uppercase; opacity:.85; font-weight:700; }
   header.rp h1 { margin:6px 0 2px; font-size:30px; line-height:1.15; }
   header.rp .meta { font-size:13px; opacity:.9; margin-top:6px; }
   .summary { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin:22px 0 8px; align-items:start; }
+  .nw { white-space:nowrap; }
   .stat { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px 16px; min-width:0; }
   .stat-v { font-size:20px; font-weight:800; color:var(--navy); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .stat-sub { font-size:11.5px; font-weight:600; color:var(--ink,#334155); line-height:1.35; margin-top:3px;
-    display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+    display:-webkit-box; -webkit-line-clamp:4; -webkit-box-orient:vertical; overflow:hidden; }
   .stat-l { font-size:11.5px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); margin-top:6px; }
   .sec { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:20px 22px; margin-top:18px; }
   .sec h2 { margin:0 0 2px; font-size:18px; color:var(--navy); }
@@ -521,30 +676,53 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
   .tier-tag { font-weight:400; color:var(--muted); font-size:.85em; }
   .tier-terms { color:var(--muted); margin-top:4px; font-size:.9em; }
   .tier-note { margin-top:4px; font-size:.92em; }
+  .prov td { white-space:normal; }
   .rowsub { color:var(--muted); font-weight:400; font-size:.88em; margin-top:2px; white-space:normal; }
   .note { color:#b45309; font-size:12.5px; }
   .rec { border-color:#c7b7f5; background:linear-gradient(180deg,#faf8ff,#fff); }
   .rec h2 { color:var(--purple); }
   footer.rp { margin-top:28px; text-align:center; color:var(--muted); font-size:12px; }
   footer.rp b { color:var(--purple); }
+  .rp-print { display:none; }
   .pdfbtn { position:absolute; top:22px; right:22px; background:rgba(255,255,255,.16); color:#fff; border:1px solid rgba(255,255,255,.5);
             border-radius:8px; padding:7px 13px; font:600 12.5px/1 inherit; cursor:pointer; text-decoration:none; }
   .pdfbtn:hover { background:rgba(255,255,255,.28); }
   @media (max-width:560px){ button.pdfbtn { display:none; } a.pdfbtn { position:static; display:inline-block; margin-top:12px; } }
   @media print { body { background:#fff; } .sec,.stat { break-inside:avoid; } .pdfbtn { display:none; } }
+  @media print {
+    .tw { overflow: visible; }
+    table { width: 100%; table-layout: auto; }
+    th, td:not(.lead):not(.txt) { white-space: nowrap; }
+    td.lead, td.txt { white-space: normal; overflow-wrap: break-word; word-break: normal; }
+    .code { white-space: nowrap; }
+    thead { display: table-header-group; }
+    tr { break-inside: avoid; }
+    .sec { break-inside: auto; }
+    .sec h2, .sec h3, .sec .sub { break-after: avoid; }
+    .stat, .sub, .note { break-inside: avoid; }
+    .two > div { break-inside: auto; }
+    .wrap { padding-bottom: 0; }
+    footer.rp { display: none; }
+    .rp-print { display: block; margin-top: 14px; text-align: center; color: var(--muted); font-size: 12px; break-before: avoid; break-inside: avoid; }
+    .rp-print b { color: var(--purple); }
+    .stat-v { white-space: normal; overflow: visible; text-overflow: clip; }
+    .stat-sub { display: block; -webkit-line-clamp: unset; overflow: visible; }
+  }
 </style></head>
 <body><div class="wrap">
   <header class="rp" style="position:relative">
     <div class="kick">Federal Market Report</div>
-    <h1>${esc(subject)}</h1>
-    <div class="meta">${generated_for ? `Prepared for ${esc(generated_for)} · ` : ''}${esc(date)}</div>
+    <h1>${esc(displayTitle(subject))}</h1>
+    <div class="meta">${generated_for ? `Prepared for ${esc(generated_for)} · ` : ''}${esc(date)}${(() => {
+      const through = longDate((sections.market_size as { sourceMaxActionDate?: unknown } | null)?.sourceMaxActionDate);
+      return through ? ` · Award data through ${esc(through)}` : '';
+    })()}</div>
     ${opts.pdfUrl
       ? `<a class="pdfbtn" href="${esc(opts.pdfUrl)}" download>Download PDF</a>`
       : '<button class="pdfbtn" onclick="window.print()">Save as PDF</button>'}
   </header>
   ${degradedNote}
-  ${body}
-  <footer class="rp">Powered by <b>Mindy</b> · getmindy.ai — federal contracting intelligence.<br>
-  Figures are federal contract obligations over the reporting window (USASpending/SAM), not budget authority.</footer>
+  ${withPrintFooter(body)}
+  <footer class="rp">${FOOTER_HTML}</footer>
 </div></body></html>`;
 }

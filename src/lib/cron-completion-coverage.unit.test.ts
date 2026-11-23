@@ -30,6 +30,7 @@ const ROUTES: Array<[string, string]> = [
   ['src/app/api/cron/snapshot-multisite/route.ts', 'snapshot-multisite-nih'],
   ['src/app/api/cron/sync-sam-opportunities/route.ts', 'sync-sam-opportunities-full'],
   ['src/app/api/cron/sync-recompete-contracts/route.ts', 'sync-recompete-contracts'],
+  ['src/app/api/cron/fco-roster-watch/route.ts', 'fco-roster-watch'],
 ];
 
 describe('every newly wired long route reports its own outcome', () => {

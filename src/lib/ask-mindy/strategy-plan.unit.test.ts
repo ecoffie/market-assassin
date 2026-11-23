@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import {
-  askMindyStrategyPlanEnabledFor, isStrategyPlanRequest, STRATEGY_PLAN_CHAT_CONTRACT, strategyPlanCheck, strategyProfileNote, strategyCompanyContext,
+  askMindyStrategyPlanEnabledFor, isStrategyPlanRequest, STRATEGY_PLAN_CHAT_CONTRACT, strategyPlanCheck, strategyProfileNote, strategyCompanyContext, strategyFitNote,
   STRATEGY_PLAN_ENV, STRATEGY_PLAN_ALLOWLIST_ENV,
 } from './strategy-plan';
+import { fitRankingNote, rankFindResult } from './compose';
 import { GENERIC_MARKET_REPORT, LIST_AND_GENERIC_PLAN, STRONG_PLAN } from './__fixtures__/strategy-plan/docs';
 import { buildFmpNextMarketReportArgs, buildFmpPathwayFindArgs, filterToolsForTurn } from '@/lib/chat/tool-selection';
 import { initialFmpPhaseState } from '@/lib/chat/fmp-phase-machine';
@@ -135,9 +136,13 @@ describe('company context: the RBA civil defaults never reach another company', 
     expect(buildFmpPathwayFindArgs('Write a federal strategy plan for us', { company, plannerQuery: 'custodial services federal buildings' })).toMatchObject({ query: 'custodial services federal buildings' });
     expect(JSON.stringify(buildFmpPathwayFindArgs('plan for us', { company }))).not.toMatch(/highway|bridge|heavy civil/);
   });
-  it('without company context the benchmark FMP behavior is unchanged', () => {
-    expect(buildFmpPathwayFindArgs('Build a federal market profile for RBA')).toMatchObject({ query: 'highway bridge heavy civil' });
-    expect(buildFmpNextMarketReportArgs('Build a federal market profile for RBA', 0)).toMatchObject({ naics: '237310' });
+  it('without company context there is no default trade, code or region either', () => {
+    const find = buildFmpPathwayFindArgs('Build a federal market profile for RBA');
+    expect(find.query).toBe('Build a federal market profile for RBA');
+    expect(JSON.stringify(find)).not.toMatch(/highway|bridge|heavy civil/);
+    const report = buildFmpNextMarketReportArgs('Build a federal market profile for RBA', 0);
+    expect(report.naics).toBeUndefined();
+    expect(JSON.stringify(report)).not.toMatch(/237310/);
   });
   it('market report: award NAICS first, then the company code, never 237310; states rotate over the company states', () => {
     expect(buildFmpNextMarketReportArgs('plan for us', 0, { company })).toEqual({ state: 'GA', naics: '561720', client_name: 'Ridgeline Test Facilities LLC' });
@@ -147,7 +152,7 @@ describe('company context: the RBA civil defaults never reach another company', 
   it('phase state: one market report per company state (max 3), one national report with none', () => {
     expect(initialFmpPhaseState('plan for us', { companyStates: ['GA', 'SC'] }).marketReportTarget).toBe(2);
     expect(initialFmpPhaseState('plan for us', { companyStates: [] }).marketReportTarget).toBe(1);
-    expect(initialFmpPhaseState('Build a federal market profile for RBA').marketReportTarget).toBe(3);
+    expect(initialFmpPhaseState('Build a federal market profile for RBA').marketReportTarget).toBe(1);
   });
 });
 
@@ -191,5 +196,81 @@ describe('the synthetic Ridgeline plan (built through the workflow, 2026-11-22) 
     expect(text).toContain('Why these and not others');
     expect(text).toContain('DSBS');
     expect(text).not.toMatch(/\$\d+\s*\/\s*mo|subscription|upgrade|Mindy Pro/i);
+  });
+});
+
+describe('PR 2: "where to focus" is ranked by the shared fit scorer', () => {
+  const NOW = Date.parse('2026-11-22T12:00:00Z');
+  const profile = {
+    companyName: 'Ridgeline Test Facilities LLC', naicsCodes: ['561720'], states: ['SC', 'GA'], certifications: [],
+    keywords: ['janitorial'], unknown: [],
+  };
+  const FIND = {
+    horizons: {
+      open_now: { status: 'grounded', matched_count: 2, items: [
+        { horizon: 'open_now', title: 'Francis Marion Ranger District Office Janitorial Services', buyer: 'AGRICULTURE, DEPARTMENT OF', naics_code: '561720', place_of_performance_state: 'SC', set_aside_description: 'Small Business Set Aside - Total', response_deadline: '2026-12-17T22:00:00+00:00', relevant_date: '2026-12-17', relevant_date_label: 'response_deadline' },
+        { horizon: 'open_now', title: 'Tractor Purchase', buyer: 'DEPT OF DEFENSE', naics_code: '336120', place_of_performance_state: 'GA', set_aside_description: 'No Set aside used', response_deadline: '2026-11-23T21:00:00+00:00' },
+      ] },
+      coming_back: { status: 'grounded', matched_count: 0, items: [] },
+      coming_soon: { status: 'unavailable', items: [] },
+    },
+  };
+  const r = (tool: string, value: unknown, status = 'success') => ({ record: { tool, status }, content: JSON.stringify(value) });
+
+  it('ranks the FIND result for this company: the matching janitorial notice, not the tractor', () => {
+    const fit = strategyFitNote([r('find_opportunities', FIND)], { status: 'ok', profile }, NOW);
+    expect(fit.reason).toBe('ok');
+    expect(fit.note).toMatch(/^FIT SIGNAL/);
+    expect(fit.note).toContain('Francis Marion Ranger District Office Janitorial Services');
+    expect(fit.note).not.toContain('Tractor Purchase');
+    expect(fit.note).toMatch(/Never print or cite a score/);
+  });
+
+  it('the strategy note is one input to prioritization, never the final order (no "do not re-rank", no "in this order")', () => {
+    const note = strategyFitNote([r('find_opportunities', FIND)], { status: 'ok', profile }, NOW).note!;
+    expect(note).toContain('one input to prioritization, not the final order');
+    expect(note).not.toMatch(/do not re-rank/i);
+    expect(note).not.toMatch(/in this order/i);
+    expect(note).not.toMatch(/TOP PICKS/);
+    // same picks and fit reasons as the answer-mode note: one scorer, not a second scoring system
+    const answer = fitRankingNote(rankFindResult(FIND as Parameters<typeof rankFindResult>[0], profile, { nowMs: NOW }))!;
+    const picks = (s: string) => s.split('\n').filter((l) => /^\d+\. /.test(l));
+    expect(picks(note)).toEqual(picks(answer));
+    expect(picks(note).length).toBeGreaterThan(0);
+  });
+
+  it('default (answer) mode is byte-identical to the live #2285 note', () => {
+    const ctx = rankFindResult(FIND as Parameters<typeof rankFindResult>[0], profile, { nowMs: NOW });
+    const live = fitRankingNote(ctx)!;
+    expect(fitRankingNote(ctx, {})).toBe(live);
+    expect(fitRankingNote(ctx, { mode: 'answer' })).toBe(live);
+    const lines = live.split('\n');
+    expect(lines[0]).toBe("FIT RANKING (computed for this company by Mindy's shared fit scorer from the find_opportunities result above; use it, do not re-rank):");
+    expect(lines[1]).toBe('TOP PICKS, best first. Present these as the top picks in this order, each with its "why" in plain words. Never print a score.');
+    expect(lines.slice(2)).toEqual(fitRankingNote(ctx, { mode: 'strategy_input' })!.split('\n').slice(2));
+  });
+
+  it('no note without a profile, without a successful FIND, or with an unreadable result', () => {
+    expect(strategyFitNote([r('find_opportunities', FIND)], { status: 'unavailable' }, NOW)).toEqual({ note: null, reason: 'no_profile' });
+    expect(strategyFitNote([r('find_opportunities', FIND)], null, NOW).reason).toBe('no_profile');
+    expect(strategyFitNote([r('get_contractor_award_history', {})], { status: 'ok', profile }, NOW)).toEqual({ note: null, reason: 'no_find' });
+    expect(strategyFitNote([r('find_opportunities', FIND, 'failed')], { status: 'ok', profile }, NOW).reason).toBe('no_find');
+    expect(strategyFitNote([{ record: { tool: 'find_opportunities', status: 'success' }, content: 'not json' }], { status: 'ok', profile }, NOW)).toEqual({ note: null, reason: 'unreadable' });
+  });
+
+  it('the contract treats fit as one input and REQUIRES an evidence-named why whenever the order departs from it', () => {
+    const line = STRATEGY_PLAN_CHAT_CONTRACT.split('\n').find((l) => l.startsWith('- Prioritization:'))!;
+    expect(line).toContain('when a FIT SIGNAL note is present');
+    expect(line).toContain('one input to prioritization, not the final order');
+    // the evidence it must weigh alongside fit
+    for (const w of ['award history', 'vehicles held', 'competitive position', 'incumbents', 'buyer relationships', 'timing', 'objective', 'trade-offs']) expect(line).toContain(w);
+    // a departure is not merely permitted: the explanation is required
+    expect(line).toContain('Every pathway states why it is recommended');
+    expect(line).toMatch(/When your order differs from the FIT SIGNAL order, that pathway's why MUST name the evidence that moved it/);
+    expect(line).toContain('never depart from the fit order without saying why');
+    expect(line).toContain('Never print or cite a fit score');
+    // the old "follow its order" instruction is gone
+    expect(line).not.toMatch(/follows its order/);
+    expect(STRATEGY_PLAN_CHAT_CONTRACT).not.toContain('do not re-rank');
   });
 });

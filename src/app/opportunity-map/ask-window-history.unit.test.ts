@@ -25,11 +25,13 @@ const SID = '11111111-1111-4111-8111-111111111111';
 const SID2 = '22222222-2222-4222-8222-222222222222';
 const DOC = '33333333-3333-4333-8333-333333333333';
 const LEDGER = { v: 1, entries: [{ id: 'src:x' }], sig: 's' };
+const REPORT_ID = 'Ej6xTestReportId0000a';
+const HOSTED_HTML = '<!doctype html><html><head><title>R</title></head><body><button class="pdfbtn">Save as PDF</button><p>HOSTED REPORT BODY</p></body></html>';
 
 type Store = Record<string, string>;
 type Sessions = { list?: { status: number; json?: unknown }; one?: { status: number; json?: unknown }; del?: { status: number } };
 
-function boot(opts: { session?: Store; local?: Store; chat?: Array<Array<Record<string, unknown>>>; sessions?: Sessions } = {}) {
+function boot(opts: { session?: Store; local?: Store; chat?: Array<Array<Record<string, unknown>>>; sessions?: Sessions; hosted?: { status: number; html?: string } | 'network-error' } = {}) {
   const dom = new JSDOM(
     '<!doctype html><html><body><div id="amkOv"></div><aside id="amk" aria-hidden="true"><div class="amk-hd"><div id="amkCtx"></div><button id="amkX"></button></div>'
     + '<div id="amkBody"></div><div class="amk-foot"><div class="amk-in"><textarea id="amkIn"></textarea><button id="amkSend"></button></div></div></aside></body></html>',
@@ -53,6 +55,10 @@ function boot(opts: { session?: Store; local?: Store; chat?: Array<Array<Record<
     const js = (status: number, json: unknown = {}) => Promise.resolve({ ok: status < 300, status, json: async () => json });
     if (url.startsWith('/api/app/vault/')) p = js(200, { uploads: false, generate: true, success: true, title: 'R', version: 1, html: '<p>R</p>', files: [] });
     else if (url.startsWith('/api/app/chat/suggestions')) p = js(200, { suggestions: [] });
+    else if (url.startsWith('/reports/')) {
+      const h = opts.hosted ?? { status: 200, html: HOSTED_HTML };
+      p = h === 'network-error' ? Promise.reject(new Error('offline')) : Promise.resolve({ ok: h.status < 300, status: h.status, text: async () => h.html ?? '' });
+    }
     else if (url.startsWith('/api/app/chat-sessions')) {
       const s = opts.sessions ?? {};
       if (init.method === 'DELETE') p = js(s.del?.status ?? 200, { success: true });
@@ -205,5 +211,89 @@ describe('History (GET /api/app/chat-sessions)', () => {
 describe('opportunity (card) chat', () => {
   it('History and New chat are map-view tools, hidden in card chat', () => {
     expect(MAP).toContain('.amk-card .amk-hd-tools{display:none}');
+  });
+});
+
+describe('a packaged market report comes back with its conversation (Claude Local, 2026-11-22)', () => {
+  // Before: reopening a saved conversation (History) or reloading showed the answer text only. The market
+  // report's card, preview and Export menu were gone, so the PDF download could not be reached.
+  const pane = (doc: Document) => doc.querySelector('[data-testid="amk-report-pane"]') as HTMLElement | null;
+  const pdfItem = (doc: Document) => doc.querySelector('.amk-exp-panel button[data-fmt="pdf"]') as HTMLButtonElement | null;
+  const ONE = { success: true, session: { id: SID2, title: 'Facilities' }, messages: [
+    { id: 'm1', role: 'user', content: 'Market report for facilities maintenance' },
+    { id: 'm2', role: 'assistant', content: 'Here is your report.', market_report: { report_id: REPORT_ID, title: 'Facilities maintenance' } },
+  ] };
+  const reopen = async (t: ReturnType<typeof boot>) => {
+    t.open();
+    t.click('[data-testid="amk-history-btn"]');
+    await t.settle();
+    t.click('.amk-hist-item');
+    await t.settle();
+  };
+  const LIST = { success: true, sessions: [{ id: SID2, title: 'Facilities', message_count: 2, updated_at: '2026-11-22T10:00:00Z' }] };
+
+  it('History: the report card is back; Open loads the hosted report into the pane with Export → Download PDF', async () => {
+    const t = boot({ sessions: { list: { status: 200, json: LIST }, one: { status: 200, json: ONE } } });
+    await reopen(t);
+    const card = t.doc.querySelector('[data-testid="amk-report-card"]');
+    expect(card?.querySelector('b')?.textContent).toBe('Facilities maintenance');
+    expect(t.calls.some((c) => c.url.startsWith('/reports/'))).toBe(false); // card only, no auto-load
+    t.click('[data-testid="amk-report-card"] .amk-repcard-open');
+    await t.settle();
+    expect(t.calls.filter((c) => c.url.startsWith('/reports/')).map((c) => c.url)).toEqual([`/reports/${REPORT_ID}`]);
+    expect(pane(t.doc)?.classList.contains('show')).toBe(true);
+    const f = t.doc.querySelector('.amk-rep-f') as HTMLIFrameElement;
+    expect(f.srcdoc).toContain('HOSTED REPORT BODY');
+    expect(f.srcdoc).toContain('.pdfbtn{display:none!important}');
+    expect(pdfItem(t.doc)?.textContent).toBe('Download PDF');
+    expect([...t.doc.querySelectorAll('.amk-rep-exp a')].map((a) => (a as HTMLAnchorElement).getAttribute('href'))).toEqual([`https://getmindy.ai/reports/${REPORT_ID}`]);
+    expect(t.doc.querySelectorAll('[data-testid="amk-report-card"]').length).toBe(1); // opening adds no second card
+    // Download PDF is the #2354 hidden-frame navigation.
+    pdfItem(t.doc)!.click();
+    expect((t.doc.querySelector('[data-testid="amk-report-pdf-frame"]') as HTMLIFrameElement).getAttribute('src')).toBe(`/reports/${REPORT_ID}/pdf`);
+  });
+
+  it('a reload in the same tab keeps the card (the live turn records the report id and title)', async () => {
+    const a = boot({ chat: [[{ type: 'session', sessionId: SID }, { type: 'token', content: 'Here is your report.' },
+      { type: 'market_report', report_id: REPORT_ID, url: `https://getmindy.ai/reports/${REPORT_ID}`, title: 'Facilities maintenance', html: '<p>LIVE</p>' }, { type: 'done' }]] });
+    a.open();
+    await a.send('Market report for facilities maintenance');
+    const b = boot({ session: a.session, local: a.local });
+    b.open();
+    expect(b.doc.querySelector('[data-testid="amk-report-card"] b')?.textContent).toBe('Facilities maintenance');
+    expect(a.session[Object.keys(a.session)[0]]).not.toContain('LIVE'); // the html is never stored
+    await b.send('Next');
+    expect((b.chatBodies[0].history as Array<Record<string, unknown>>).every((h) => !('report' in h))).toBe(true); // display-only, never sent
+    expect(JSON.stringify(b.chatBodies[0].history)).not.toContain(REPORT_ID);
+  });
+
+  it('a removed or expired report says so (no retry); other failures offer Try again', async () => {
+    for (const status of [404, 410]) {
+      const t = boot({ sessions: { list: { status: 200, json: LIST }, one: { status: 200, json: ONE } }, hosted: { status } });
+      await reopen(t);
+      t.click('[data-testid="amk-report-card"] .amk-repcard-open');
+      await t.settle();
+      const msg = t.doc.querySelector('.amk-rep-msg') as HTMLElement;
+      expect(msg.textContent).toContain('This report is no longer available. Ask Mindy to create it again.');
+      expect(msg.querySelector('button')).toBeNull();
+      expect(pdfItem(t.doc)).toBeNull(); // no Export for a report that is gone
+    }
+    for (const hosted of [{ status: 503 }, 'network-error' as const]) {
+      const t = boot({ sessions: { list: { status: 200, json: LIST }, one: { status: 200, json: ONE } }, hosted });
+      await reopen(t);
+      t.click('[data-testid="amk-report-card"] .amk-repcard-open');
+      await t.settle();
+      const msg = t.doc.querySelector('.amk-rep-msg') as HTMLElement;
+      expect(msg.textContent).toMatch(/could not be loaded/);
+      expect(msg.querySelector('button')?.textContent).toBe('Try again');
+    }
+  });
+
+  it('a malformed report id from the server is ignored (no card, no request)', async () => {
+    const bad = { ...ONE, messages: [ONE.messages[0], { ...ONE.messages[1], market_report: { report_id: '../admin', title: 'x' } }] };
+    const t = boot({ sessions: { list: { status: 200, json: LIST }, one: { status: 200, json: bad } } });
+    await reopen(t);
+    expect(t.doc.querySelector('[data-testid="amk-report-card"]')).toBeNull();
+    expect(t.calls.some((c) => c.url.startsWith('/reports/'))).toBe(false);
   });
 });

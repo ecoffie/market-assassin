@@ -20,7 +20,6 @@ import {
   derivePathwaySearchQuery,
   buildFmpPathwayFindArgs,
   buildFmpPathwaySupplementalCalls,
-  FMP_CIVIL_PATHWAY_SUPPLEMENT_KEYWORDS,
   federalMarketProfileSelfReportNote,
   federalMarketProfilePathwayNote,
   federalMarketProfileVehicleNote,
@@ -108,7 +107,7 @@ describe('isFederalMarketProfileRequest (RBA pathway profile — awards before N
   });
   it('host contract requires awards before NAICS and forbids construction→236220 assumption', () => {
     expect(FEDERAL_MARKET_PROFILE_CHAT_CONTRACT).toMatch(/get_contractor_award_history/);
-    expect(FEDERAL_MARKET_PROFILE_CHAT_CONTRACT).toMatch(/236220/);
+    expect(FEDERAL_MARKET_PROFILE_CHAT_CONTRACT).toMatch(/Never map a generic word like "construction" to a code/);
     expect(FEDERAL_MARKET_PROFILE_CHAT_CONTRACT).toMatch(/pathways first/i);
     expect(FEDERAL_MARKET_PROFILE_CHAT_CONTRACT).toMatch(/No em dashes/);
   });
@@ -223,39 +222,24 @@ describe('Federal Market Profile pathways (step 3 — civil + Mid-Atlantic)', ()
     const args = buildFmpPathwayFindArgs(RBA_NAME_ONLY_PROMPT, {
       awardStates: extractAwardGeographyStates([awardJson]),
     });
-    expect(args.query).toMatch(/highway|bridge|heavy civil/i);
+    // No default trade: a name-only ask with no work words searches the customer's own words.
+    expect(args.query).not.toMatch(/highway|bridge|heavy civil/i);
+    expect(args.query).toBe(RBA_NAME_ONLY_PROMPT.trim().slice(0, 200));
     expect(String(args.location).split(',').sort()).toEqual(['DC', 'MD', 'VA']);
-    // Award NAICS must NOT be pinned — JBAB/inspection/Capitol live on adjacent codes.
+    // Award NAICS must NOT be pinned — adjacent-code vehicles and sources sought would drop out.
     expect(args.advanced).toBeUndefined();
   });
 
-  it('host pathway supplements name inspection MATOC, Capitol, JBAB, and GWMP forecasts', () => {
-    const calls = buildFmpPathwaySupplementalCalls(RBA_NAME_ONLY_PROMPT, {
-      awardStates: ['VA', 'MD', 'DC'],
-    });
-    expect(calls.filter((c) => c.name === 'search_sam_opportunities')).toHaveLength(3);
-    expect(calls.filter((c) => c.name === 'get_agency_forecasts').map((c) => String(c.args.keyword))).toEqual(
-      expect.arrayContaining(['Clara Barton', 'GWMP', 'MD NP GWMP']),
-    );
-    expect(calls.filter((c) => c.name === 'lookup_solicitation').map((c) => String(c.args.query))).toEqual(
-      expect.arrayContaining(['693C73-27-R-000006', 'FA706027RXXX2', 'W912DR27H1CWY']),
-    );
-    expect(calls.some((c) => c.name === 'search_past_contracts')).toBe(true);
-    const keywords = calls
-      .filter((c) => c.name === 'search_sam_opportunities')
-      .map((c) => String(c.args.keyword));
-    expect(keywords).toEqual([...FMP_CIVIL_PATHWAY_SUPPLEMENT_KEYWORDS]);
-    expect(String(calls[0].args.state).split(',').sort()).toEqual(['DC', 'MD', 'VA']);
-    // Distinctive keywords must survive pathway enforce (not rewritten to civil default).
-    for (const kw of keywords) {
-      const r = enforceFederalMarketProfilePathwayArgs(
-        'search_sam_opportunities',
-        JSON.stringify({ keyword: kw, state: 'VA,MD,DC' }),
-        RBA_NAME_ONLY_PROMPT,
-        { awardStates: ['VA', 'MD', 'DC'] },
-      );
-      expect(JSON.parse(r.args).keyword).toBe(kw);
-    }
+  it('host pathway supplements come only from the customer\'s own work words (none for a name-only ask)', () => {
+    // Name-only: no work words, so no follow-up and nothing from any benchmark answer.
+    expect(buildFmpPathwaySupplementalCalls(RBA_NAME_ONLY_PROMPT, { awardStates: ['VA', 'MD', 'DC'] })).toEqual([]);
+    // Work words in the ask: one sam search + one forecast search on those words, in the award states.
+    const calls = buildFmpPathwaySupplementalCalls('Build a federal market profile for a firm that does bridge and highway work', { awardStates: ['GA'] });
+    expect(calls).toEqual([
+      { name: 'search_sam_opportunities', args: { keyword: 'bridge highway', limit: 8, state: 'GA' } },
+      { name: 'get_agency_forecasts', args: { keyword: 'bridge highway', limit: 8 } },
+    ]);
+    expect(JSON.stringify(calls)).not.toMatch(/lookup_solicitation|search_past_contracts|MATOC|MACC/);
   });
 
   it('pathway enforce fills states from award geography when the prompt has none', () => {
@@ -265,13 +249,11 @@ describe('Federal Market Profile pathways (step 3 — civil + Mid-Atlantic)', ()
       RBA_NAME_ONLY_PROMPT,
       { awardStates: ['VA', 'MD', 'DC'] },
     );
-    expect(r.changes).toEqual(expect.arrayContaining([
-      'pathway_states_enforced',
-      'pathway_civil_query_enforced',
-    ]));
+    // States come from the award geography; with no work words in the ask there is no query to force.
+    expect(r.changes).toEqual(['pathway_states_enforced']);
     const a = JSON.parse(r.args) as { location: string; query: string; advanced?: { naics?: string } };
     expect(a.location.split(',').sort()).toEqual(['DC', 'MD', 'VA']);
-    expect(a.query).toMatch(/highway|bridge|heavy civil/i);
+    expect(a.query).toBeUndefined();
     expect(a.advanced?.naics).toBeUndefined();
   });
 
@@ -329,12 +311,13 @@ describe('Federal Market Profile pathways (step 3 — civil + Mid-Atlantic)', ()
     expect(a.state).toBeUndefined();
     expect(a.keyword.toLowerCase()).not.toBe('construction');
   });
-  it('pathway note names Mid-Atlantic states and civil keywords', () => {
+  it('pathway note names the customer\'s states and work keywords, and no project or solicitation', () => {
     const note = federalMarketProfilePathwayNote(RBA_FEDERAL_MARKET_PROFILE_PROMPT) || '';
     expect(note).toMatch(/VA/);
     expect(note).toMatch(/find_opportunities/);
     expect(note).toMatch(/get_agency_forecasts/);
-    expect(note).toMatch(/Clara Barton|civil\/bridge/i);
+    expect(note).toMatch(/Work keywords from the customer's words/);
+    expect(note).not.toMatch(/Clara Barton|GWMP|JBAB|Capitol Perimeter/i);
   });
 });
 
@@ -483,14 +466,14 @@ describe('Federal Market Profile contacts + policy (step 6)', () => {
     expect(JSON.parse(bare.args).query).toBe('FY2027 NDAA');
     expect(bare.changes).toContain('contacts_legislation_query_fy27');
   });
-  it('rewrites Pentagon/DoD OSBP agency to WHS', () => {
+  it('passes the planner\'s OSBP agency through (no office is substituted from code)', () => {
     const r = enforceFederalMarketProfileContactsArgs(
       'lookup_federal_osbp',
       JSON.stringify({ agency: 'Pentagon' }),
       RBA_FEDERAL_MARKET_PROFILE_PROMPT,
     );
-    expect(JSON.parse(r.args).agency).toBe('WHS');
-    expect(r.changes).toContain('contacts_osbp_whs');
+    expect(JSON.parse(r.args).agency).toBe('Pentagon');
+    expect(r.changes).toEqual([]);
   });
   it('clears bare VA/MD/DC agency on OSBP and contacts (state≠agency)', () => {
     for (const tool of ['lookup_federal_osbp', 'search_federal_contacts'] as const) {
@@ -510,10 +493,11 @@ describe('Federal Market Profile contacts + policy (step 6)', () => {
     expect(JSON.parse(keep.args).agency).toBe('WHS');
     expect(keep.changes).toEqual([]);
   });
-  it('contacts note requires notice POCs, WHS OSBP, FY27 NDAA status-only, and questions', () => {
+  it('contacts note requires notice POCs, OSBP for the buyers that appeared, FY27 NDAA status-only, and questions', () => {
     const note = federalMarketProfileContactsNote(RBA_FEDERAL_MARKET_PROFILE_PROMPT) || '';
-    expect(note).toMatch(/Helson Roman/);
-    expect(note).toMatch(/WHS/);
+    expect(note).toMatch(/notice POCs/);
+    expect(note).toMatch(/lookup_federal_osbp for the defense buyers that appeared/);
+    expect(note).not.toMatch(/Helson Roman|David Bogner|Terry Agena|WHS/);
     expect(note).toMatch(/FY2027 NDAA/);
     expect(note).toMatch(/STATUS only/i);
     expect(note).toMatch(/question to ask/i);
@@ -553,9 +537,8 @@ describe('Federal Market Profile outside web + write-up (steps 7–8)', () => {
   it('outside-web note requires search_web and forbids fabrication', () => {
     const note = federalMarketProfileOutsideWebNote(RBA_FEDERAL_MARKET_PROFILE_PROMPT) || '';
     expect(note).toMatch(/search_web/);
-    expect(note).toMatch(/CRS/);
-    expect(note).toMatch(/Legacy Restoration Fund/);
-    expect(note).toMatch(/Dec 11/);
+    expect(note).toMatch(/buyer pressures behind THIS firm's pathways/);
+    expect(note).not.toMatch(/Legacy Restoration Fund|Dec 11|NPS deferred/);
     expect(note).toMatch(/GAO/);
     expect(note).toMatch(/PAE/);
     expect(note).toMatch(/8\(a\)/);
@@ -572,8 +555,8 @@ describe('Federal Market Profile outside web + write-up (steps 7–8)', () => {
     expect(note).toMatch(/DSBS/);
     expect(note).toMatch(/No em dashes/i);
     expect(note).toMatch(/Do not grade/i);
-    expect(note).toMatch(/Do NOT include a Mid plan/i);
-    expect(FEDERAL_MARKET_PROFILE_CHAT_CONTRACT).toMatch(/Do NOT include a Mid plan/);
+    expect(note).toMatch(/Do NOT include any pricing CTA/i);
+    expect(FEDERAL_MARKET_PROFILE_CHAT_CONTRACT).toMatch(/Do NOT include a pricing CTA/);
   });
   it('host contract names steps 6–8', () => {
     expect(FEDERAL_MARKET_PROFILE_CHAT_CONTRACT).toMatch(/Contacts \+ policy \(step 6\)/);

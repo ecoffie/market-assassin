@@ -25,6 +25,11 @@
  *      they have failed FAILING_STREAK_THRESHOLD times in a row. Read from
  *      cron_job_runs, not the sticky cron_jobs.last_status, so a transient blip
  *      that self-heals on the next run does not alert every 3h until the next day.
+ *   5. UNCLOSED  — cron_job_runs rows still `running` / `dispatched` past the job's timeout_ms
+ *      plus a margin: a run the platform killed never closes its row, and FAILING reads only
+ *      error/timeout. Read-only detection — the rows are reported, never mutated. `dispatched`
+ *      is judged only for jobs proven to self-report (src/lib/cron/unclosed-runs.ts); a read
+ *      failure reports the check as UNKNOWN (null), never as "nothing unclosed".
  *
  * NOTIFICATIONS ARE INCIDENT-BASED (src/lib/cron/watchdog-incidents.ts, 2026-10-05). This
  * route used to post to Slack on EVERY 3-hourly pass while a problem existed — replaying it
@@ -49,6 +54,17 @@ import { isMissed } from '@/lib/cron/cron-expr';
 import { classifyObservation, runWatchdogIncidents, type WatchdogObservation } from '@/lib/cron/watchdog-incidents';
 import { createSupabaseIncidentStore } from '@/lib/cron/watchdog-incident-store';
 import { hasValidCronSecret } from '@/lib/cron/cron-request-auth';
+import {
+  findUnclosedRuns,
+  describeUnclosed,
+  isLongJob,
+  LONG_JOB_ACK_MS,
+  SELF_REPORT_STATUSES,
+  SELF_REPORT_EVIDENCE_LOOKBACK_DAYS,
+  UNCLOSED_LOOKBACK_HOURS,
+  type OpenRunRow,
+  type UnclosedJobFinding,
+} from '@/lib/cron/unclosed-runs';
 
 const INCIDENT_SOURCE = 'dispatcher-watchdog';
 
@@ -254,6 +270,66 @@ export async function GET(request: NextRequest) {
     if (newestErr || !newest || newest.started_at !== r.started_at) attributedRuns.delete(jobName);
   }
 
+  // 5) UNCLOSED — runs that never reached a terminal status (read-only).
+  // Unknown is never zero: any read failure makes the whole check `null` + an error, so the
+  // response can never claim "nothing unclosed" when it could not look.
+  let unclosed: UnclosedJobFinding[] | null = null;
+  const unclosedErrors: string[] = [];
+  {
+    const openFrom = new Date(now.getTime() - UNCLOSED_LOOKBACK_HOURS * 3600_000).toISOString();
+    const evidenceFrom = new Date(now.getTime() - SELF_REPORT_EVIDENCE_LOOKBACK_DAYS * 86400_000).toISOString();
+    const longJobs = enabledJobs.filter((j) => isLongJob(j.timeout_ms));
+
+    // Self-report evidence per long job: the oldest run in the window that a route closed after
+    // the dispatcher's ack window. One indexed (job_name, started_at) lookup per long job.
+    const selfReportEvidence = new Map<string, string>();
+    await Promise.all(longJobs.map(async (j) => {
+      const { data, error } = await supabase
+        .from('cron_job_runs')
+        .select('started_at')
+        .eq('job_name', j.job_name)
+        .in('status', [...SELF_REPORT_STATUSES])
+        .gte('duration_ms', LONG_JOB_ACK_MS)
+        .gte('started_at', evidenceFrom)
+        .order('started_at', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      if (error) unclosedErrors.push(`self-report evidence (${j.job_name}): ${error.message}`);
+      else if (data?.started_at) selfReportEvidence.set(j.job_name, data.started_at as string);
+    }));
+
+    const openRuns: OpenRunRow[] = [];
+    // `running` for every job (always anomalous once past its deadline) …
+    const { data: running, error: runningErr } = await supabase
+      .from('cron_job_runs')
+      .select('id, job_name, started_at, status')
+      .eq('status', 'running')
+      .gte('started_at', openFrom)
+      .order('started_at', { ascending: false })
+      .limit(1000);
+    if (runningErr) unclosedErrors.push(`running rows: ${runningErr.message}`);
+    else openRuns.push(...((running || []) as OpenRunRow[]));
+    // … `dispatched` only for jobs proven to self-report (for the rest it is the healthy record).
+    if (selfReportEvidence.size > 0) {
+      const { data: dispatched, error: dispatchedErr } = await supabase
+        .from('cron_job_runs')
+        .select('id, job_name, started_at, status')
+        .eq('status', 'dispatched')
+        .in('job_name', [...selfReportEvidence.keys()])
+        .gte('started_at', openFrom)
+        .order('started_at', { ascending: false })
+        .limit(1000);
+      if (dispatchedErr) unclosedErrors.push(`dispatched rows: ${dispatchedErr.message}`);
+      else openRuns.push(...((dispatched || []) as OpenRunRow[]));
+    }
+
+    if (unclosedErrors.length === 0) {
+      unclosed = findUnclosedRuns({ openRuns, jobs: enabledJobs, selfReportEvidence, now });
+    } else {
+      console.error('[dispatcher-watchdog] unclosed-run check UNKNOWN:', unclosedErrors.join('; '));
+    }
+  }
+
   const lastRunAt = lastRun?.started_at ? new Date(lastRun.started_at) : null;
   const minutesSinceLastRun = lastRunAt
     ? Math.round((now.getTime() - lastRunAt.getTime()) / 60000)
@@ -294,7 +370,8 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  const problems = dispatcherLikelyDown || overdue.length > 0 || stuck.length > 0 || failing.length > 0;
+  const problems = dispatcherLikelyDown || overdue.length > 0 || stuck.length > 0 || failing.length > 0
+    || (unclosed?.length ?? 0) > 0;
 
   // Incident observations — one per problem. An empty list still runs, so open incidents
   // that are no longer observed get their single recovery post.
@@ -320,6 +397,9 @@ export async function GET(request: NextRequest) {
   }
   for (const j of stuck) observations.push({ key: `stuck:${j}`, kind: 'stuck', jobName: j });
   for (const j of overdue) observations.push({ key: `overdue:${j}`, kind: 'overdue', jobName: j });
+  for (const u of unclosed ?? []) {
+    observations.push({ key: `unclosed:${u.job_name}:${u.status}`, kind: 'unclosed', jobName: u.job_name, detail: describeUnclosed(u) });
+  }
 
   const incidents = await runWatchdogIncidents({
     store: createSupabaseIncidentStore(supabase),
@@ -346,6 +426,7 @@ export async function GET(request: NextRequest) {
     if (failing.length) lines.push(`<p><strong>❌ Failing (last run errored):</strong> ${failing.join(', ')}</p>`);
     if (stuck.length) lines.push(`<p><strong>🔒 Stuck (lock never released):</strong> ${stuck.join(', ')}</p>`);
     if (overdue.length) lines.push(`<p><strong>⏰ Overdue (daily job past due, not run today):</strong> ${overdue.join(', ')}</p>`);
+    if (unclosed?.length) lines.push(`<p><strong>🧟 Unclosed runs (still running/dispatched past timeout):</strong> ${unclosed.map((u) => `${u.job_name} (${u.status} ×${u.runs})`).join(', ')}</p>`);
 
     await sendOpsAlert({
       to: ALERT_TO,
@@ -353,7 +434,7 @@ export async function GET(request: NextRequest) {
       emailType: 'dispatcher_watchdog',
       subject: `⚠️ Cron dispatcher health alert${dispatcherLikelyDown ? ' — DISPATCHER DOWN' : ''} (incident dedupe unavailable)`,
       html: `<h2>Cron dispatcher watchdog</h2>${lines.join('')}<p style="color:#888">Enabled jobs: ${enabledJobs.length}. Checked ${now.toISOString()}.</p>`,
-      text: `Cron dispatcher health alert. down=${dispatcherLikelyDown} failing=[${failing.join(',')}] stuck=[${stuck.join(',')}] overdue=[${overdue.join(',')}]`,
+      text: `Cron dispatcher health alert. down=${dispatcherLikelyDown} failing=[${failing.join(',')}] stuck=[${stuck.join(',')}] overdue=[${overdue.join(',')}] unclosed=[${(unclosed ?? []).map((u) => `${u.job_name}:${u.status}`).join(',')}]`,
     });
   }
 
@@ -368,6 +449,9 @@ export async function GET(request: NextRequest) {
     attributedRuns: [...attributedRuns.keys()],
     stuck,
     overdue,
+    // null = the check could not run (see unclosedError); [] = checked, nothing unclosed.
+    unclosed,
+    unclosedError: unclosedErrors.length ? unclosedErrors.join('; ') : null,
     incidents: {
       storeAvailable: incidents.storeAvailable,
       claimed: incidents.claimed,

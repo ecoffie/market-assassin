@@ -121,11 +121,12 @@ export function isMarketResearchRequest(customerText: string): boolean {
   return MARKET_RESEARCH_SIGNAL.test(String(customerText || ''));
 }
 
-// ── FEDERAL_MARKET_PROFILE: company-first pathway profile (RBA benchmark, 2026-11-19) ─────────
+// ── FEDERAL_MARKET_PROFILE: company-first pathway profile ─────────
 // Distinct from packaged keyword generate_market_report. Awards establish what the firm actually
 // wins (primary NAICS from award codes) BEFORE any market-size NAICS. Pathways = vehicles,
-// sources sought, direct 8(a) — not a FIND-first open-bid list. Fixture:
-// src/lib/chat/__fixtures__/rba-federal-market-profile.ts
+// sources sought, direct 8(a) — not a FIND-first open-bid list. Every query, code, state, buyer and contact
+// comes from THIS customer's words and tool results; nothing from any benchmark company is in code
+// (guarded by no-benchmark-answers.unit.test.ts).
 export const AWARD_HISTORY_TOOL = 'get_contractor_award_history';
 
 export const FEDERAL_MARKET_PROFILE_SIGNAL =
@@ -136,25 +137,25 @@ export function isFederalMarketProfileRequest(customerText: string): boolean {
 }
 
 /**
- * Ask host contract for a Federal Market Profile (parity with the Claude+MCP chain that
- * produced the RBA benchmark). Injected when isFederalMarketProfileRequest is true — replaces
- * the CURRENT_FIND contract for that turn so "sources sought" in the ask does not flip into
- * FIND-first open-opportunity framing.
+ * Ask host contract for a Federal Market Profile. Injected when isFederalMarketProfileRequest is true — replaces
+ * the CURRENT_FIND contract for that turn so "sources sought" in the ask does not flip into FIND-first
+ * open-opportunity framing. Generic: it names steps and tools, never a company, project, person, solicitation,
+ * region or code.
  */
 export const FEDERAL_MARKET_PROFILE_CHAT_CONTRACT = [
   'FEDERAL MARKET PROFILE (company-first pathway report — not a keyword market-size report):',
   '- PHASE PLAN (server-enforced): identity → awards → pathways → vehicles → market_size → contacts → web → writeup. The server only offers tools for unlocked phases and forces the next required call. Do not skip ahead. A PHASE PLAN note names the current required phase.',
-  '- Identity first. Resolve the legal name and UEI with search_contractors and/or lookup_sam_entity. The server rewrites identity-tool company args to the LEGAL name from the customer message when one was given — a trade nickname alone (e.g. "RBA Construction") can hit the wrong firm (VRBA). Prefer UEI when you have it.',
-  '- Awards establish the market. Call get_contractor_award_history (and get_contractor_profile / get_recipient_annual_obligations as needed) BEFORE any NAICS assumption or generate_market_report. Primary NAICS = dominant codes on THEIR awards. Never map the word "construction" or "8(a) construction" to 236220 when award history shows another code (e.g. 237310 bridges and roads).',
-  '- Self-reported facts (bonding, equipment, PE/CCM, JV, self-perform scopes) come ONLY from what the customer typed. The server surfaces any it can parse into a SELF-REPORTED note — use those as customer-stated, never as federal-tool facts. If the note says none were provided (name-only ask), do not invent bonding, equipment counts, credentials, or joint ventures.',
+  '- Identity first. Resolve the legal name and UEI with search_contractors and/or lookup_sam_entity. The server rewrites identity-tool company args to the LEGAL name from the customer message when one was given — a trade nickname alone can hit a different firm with a similar name. Prefer UEI when you have it.',
+  '- Awards establish the market. Call get_contractor_award_history (and get_contractor_profile / get_recipient_annual_obligations as needed) BEFORE any NAICS assumption or generate_market_report. Primary NAICS = dominant codes on THEIR awards. Never map a generic word like "construction" to a code when the award history shows another code.',
+  '- Self-reported facts (bonding, equipment, credentials, JV, self-perform scopes) come ONLY from what the customer typed. The server surfaces any it can parse into a SELF-REPORTED note — use those as customer-stated, never as federal-tool facts. If the note says none were provided (name-only ask), do not invent bonding, equipment counts, credentials, or joint ventures.',
   '- Pathways first, in priority order: vehicles (MATOC/IDIQ/MACC), sources sought / market research, and direct 8(a) routes. Do NOT frame the deliverable as a list of single open bids.',
-  '- Pathways (after award NAICS): call find_opportunities AND search_sam_opportunities with CIVIL keywords (bridge / highway / heavy civil / marine — never bare "construction" → buildings) and the customer\'s states as a comma list (e.g. VA,MD,DC). Then lookup_solicitation + get_solicitation_documents for named vehicles/MATOCs/MACCs (inspection, Northeast, JBAB, Capitol Perimeter, etc.). Call get_agency_forecasts with civil/bridge keywords for upcoming parkway/bridge work. Frame results as vehicles, sources sought, and direct 8(a) — not a list of single open bids.',
+  '- Pathways (after award NAICS): call find_opportunities AND search_sam_opportunities with keywords for the work THIS firm performs (from its awards and the customer\'s words; never a bare generic word that pulls in a different trade) and the states the customer named or the firm\'s awards show, as a comma list. Then lookup_solicitation + get_solicitation_documents for the vehicles / MATOCs / MACCs those results name. Call get_agency_forecasts with the same work keywords for upcoming work. Frame results as vehicles, sources sought, and direct 8(a) — not a list of single open bids.',
   '- Vehicles (step 4): for each MATOC/IDIQ/MACC from pathway results, call search_past_contracts with piid_prefix (contract-number stem), search_idv_contracts with search_type:"task" and parent_id, then get_award_detail on the vehicle. Holders and order sizes come from past/IDV; ceilings, end dates, and set-aside (including women-owned small business) often ONLY appear on get_award_detail — never skip it.',
-  '- Market size (step 5): AFTER award history, call generate_market_report once PER named state (e.g. VA, then MD, then DC) with the award-derived NAICS (never 236220 from the word construction). Do NOT pass set_aside — it rewrites agency dollar tables even though it is documented as forecast-only. Sum top-buyer lists across those runs by hand for FHWA+NPS-class totals; read the firm\'s rank off each state\'s competitor list. One multi-state call is wrong.',
-  '- Contacts + policy (step 6): notice POCs first (from solicitation/docs already pulled — e.g. Helson Roman / David Bogner / Terry Agena class names). Then lookup_federal_osbp for defense buyers that appeared (WHS / Pentagon small-business office) and search_federal_contacts for the rest — never invent names or emails. Every named contact needs the question to ask them. Call get_legislation_status with "FY2027 NDAA" (or "FY27 NDAA") when defense buyers appear — STATUS only, never bill text; do not invent what a bill requires.',
+  '- Market size (step 5): AFTER award history, call generate_market_report once PER state in scope with the award-derived NAICS. Do NOT pass set_aside — it rewrites agency dollar tables even though it is documented as forecast-only. Combine top-buyer lists across those runs by hand; read the firm\'s rank off each state\'s competitor list only when the tool states it. One multi-state call is wrong.',
+  '- Contacts + policy (step 6): notice POCs first (from the solicitations and documents already pulled). Then lookup_federal_osbp for defense buyers that appeared and search_federal_contacts for the rest — never invent names or emails. Every named contact needs the question to ask them. When defense buyers appear, call get_legislation_status for the current NDAA — STATUS only, never bill text; do not invent what a bill requires.',
   '- When defense buyers appear, include how PAE (or the current Navy construction oversight model in the data) affects those buyers. Include 8(a) timing for THIS firm when SAM/profile evidence supports it. Readiness checklist includes DSBS keywords.',
-  '- Outside Mindy (step 7): call search_web for NPS deferred maintenance (CRS), Legacy Restoration Fund bills, the Dec 11 highway extension, GAO reports, PAE sources, and 8(a) rule-change detail — one focused query per topic. Quote only returned snippets + URLs. If search_web returns available=false or grounded=false after trying, disclose that as a known gap (not a failure) — never fabricate CRS figures, bill text, GAO findings, or PAE press from memory.',
-  '- Write-up (step 8): pathways FIRST in priority order. Frame = vehicles, sources sought, and direct awards ONLY — never a list of single open bids. Include a PAE section (when defense buyers appear), buyer pain points, a "Who to talk to and what to say" table (named contact + the question), and DSBS keywords in the readiness checklist. No em dashes. Do not grade or score the company. Do NOT include a Mid plan / pricing CTA (that line in the Claude benchmark was accidental).',
+  '- Outside Mindy (step 7): call search_web for the buyer pressures behind THIS firm\'s pathways (budget, backlog, funding and policy changes for those buyers, GAO/IG findings, 8(a) rule changes) — one focused query per topic. Quote only returned snippets + URLs. If search_web returns available=false or grounded=false after trying, disclose that as a known gap (not a failure) — never fabricate figures, bill text or findings from memory.',
+  '- Write-up (step 8): pathways FIRST in priority order. Frame = vehicles, sources sought, and direct awards ONLY — never a list of single open bids. Include a PAE section (when defense buyers appear), buyer pain points, a "Who to talk to and what to say" table (named contact + the question), and DSBS keywords in the readiness checklist. No em dashes. Do not grade or score the company. Do NOT include a pricing CTA.',
   '- match_company_to_pathways is not required for this profile; skip it if it errors.',
 ].join('\n');
 
@@ -163,7 +164,13 @@ export function filterToolsForTurn<T extends { function?: Record<string, unknown
   customerText: string,
   priorCustomerText?: string | null,
   /** strategyPlan: an Ask Mindy strategy-plan turn (flag-gated by the caller): runs the FMP research pipeline. */
-  opts: { strategyPlan?: boolean } = {},
+  /**
+   * sectionedDocument: the customer asked for a report with named sections the packaged market report does not
+   * carry, and create_document can build it from research already in this chat (requested-doc-sections.ts). The
+   * packaged report is not offered (its fixed template is never presented as fulfilling the request) and
+   * create_document stays offered.
+   */
+  opts: { strategyPlan?: boolean; sectionedDocument?: boolean } = {},
 ): {
   defs: T[];
   removed: string[];
@@ -182,7 +189,7 @@ export function filterToolsForTurn<T extends { function?: Record<string, unknown
     : filterToolsForQuestion(defs, customerText);
   const intent = federalMarketProfile ? 'OTHER' : inheritFindIntent(customerText, priorCustomerText);
   const openOnly = isOpenOnlyRequest(customerText);
-  const marketResearch = !federalMarketProfile && !opts.strategyPlan && isMarketResearchRequest(customerText);
+  const marketResearch = !federalMarketProfile && !opts.strategyPlan && !opts.sectionedDocument && isMarketResearchRequest(customerText);
   const findOffered = base.defs.some((d) => String(d.function?.name ?? '') === FIND_TOOL);
   const removed = [...base.removed];
   let kept = base.defs;
@@ -209,6 +216,16 @@ export function filterToolsForTurn<T extends { function?: Record<string, unknown
       return true;
     });
   }
+  if (opts.sectionedDocument && !federalMarketProfile) {
+    kept = kept.filter((d) => {
+      const name = String(d.function?.name ?? '');
+      if (name === MARKET_REPORT_TOOL || name === 'capability_market_match') {
+        if (!removed.includes(name)) removed.push(name);
+        return false;
+      }
+      return true;
+    });
+  }
   return { defs: kept, removed, intent, openOnly, marketResearch, federalMarketProfile };
 }
 
@@ -223,7 +240,7 @@ export const FEDERAL_MARKET_PROFILE_IDENTITY_TOOLS: ReadonlySet<string> = new Se
 
 export type ProfileCompanyIdentity = {
   legalName: string | null;
-  /** Parenthetical trade names / DBAs from the prompt (e.g. "RBA Construction & Engineering"). */
+  /** Parenthetical trade names / DBAs from the prompt (e.g. "Acme Construction & Engineering"). */
   aliases: string[];
   /** 12-char UEI when the customer typed one. */
   uei: string | null;
@@ -234,7 +251,7 @@ const LEGAL_ENTITY_SUFFIX =
 
 /**
  * Cut a legal name at the entity suffix so `8(a)` paren-capture cannot leave
- * "RBA Engineering International PLLC. 8" (withAlias treats `8(a)` as `(…)`).
+ * "Acme Engineering International PLLC. 8" (withAlias treats `8(a)` as `(…)`).
  */
 export function cleanLegalCompanyName(raw: string): string {
   const t = String(raw || '').replace(/\s+/g, ' ').trim();
@@ -256,8 +273,8 @@ function normCompany(s: string): string {
 
 /**
  * Pull the profiled firm's legal name (and optional alias / UEI) from the customer message.
- * "for RBA Engineering International PLLC (RBA Construction & Engineering, Springfield VA)"
- * → legalName PLLC, alias "RBA Construction & Engineering".
+ * "for Acme Engineering International PLLC (Acme Construction & Engineering, Springfield VA)"
+ * → legalName PLLC, alias "Acme Construction & Engineering".
  */
 export function extractProfileCompanyIdentity(customerText: string): ProfileCompanyIdentity {
   const t = String(customerText || '');
@@ -304,7 +321,7 @@ export function extractProfileCompanyIdentity(customerText: string): ProfileComp
   return { legalName, aliases, uei };
 }
 
-/** True when `company` is empty or matches a known trade alias (VRBA trap class). */
+/** True when `company` is empty or matches a known trade alias (similar-name trap class). */
 export function isTradeAliasCompany(
   company: string,
   identity: ProfileCompanyIdentity,
@@ -316,7 +333,7 @@ export function isTradeAliasCompany(
     const an = normCompany(a);
     if (!an) continue;
     if (c === an) return true;
-    // "RBA Construction" ⊂ "RBA Construction & Engineering"
+    // "Acme Construction" ⊂ "Acme Construction & Engineering"
     if (an.startsWith(c) || c.startsWith(an)) return true;
   }
   return false;
@@ -325,7 +342,7 @@ export function isTradeAliasCompany(
 /**
  * Close the identity gate on Federal Market Profile turns: identity/award tools must look up
  * the LEGAL name (and UEI when present), never a trade nickname alone. Measured failure mode:
- * "RBA Construction" → VRBA (Nebraska) instead of RBA Engineering International PLLC / C9K6EE9JVDK7.
+ * a trade nickname matched a different, similarly named firm in another state instead of the customer's legal entity.
  */
 export type SelfReportedProfileFacts = {
   bonding: string | null;
@@ -339,7 +356,7 @@ export type SelfReportedProfileFacts = {
 
 /**
  * Parse customer-stated facts that are NOT in federal award/SAM data.
- * Cold RBA prompt carries bonding / equipment / PE·CCM / self-perform; name-only carries none.
+ * A full prompt carries bonding / equipment / PE·CCM / self-perform; name-only carries none.
  * Pedro / JV only appear when the customer typed them — never inferred.
  */
 export function extractSelfReportedProfileFacts(customerText: string): SelfReportedProfileFacts {
@@ -421,7 +438,8 @@ const BUILDINGS_CONSTRUCTION_QUERY =
 const BUILDINGS_NAICS = new Set(['236220', '236210', '236200', '236']);
 
 /**
- * Civil pathway keywords from self-report / prompt — never bare "construction" (236220 trap).
+ * Pathway keywords from the customer's self-report / prompt — never bare "construction" (it pulls in buildings).
+ * Empty when the customer's words name no work: no default trade is ever substituted.
  */
 export function derivePathwaySearchQuery(customerText: string): string {
   const facts = extractSelfReportedProfileFacts(customerText);
@@ -438,7 +456,9 @@ export function derivePathwaySearchQuery(customerText: string): string {
   if (/\bhighway|parkway/.test(customerText)) bits.push('highway');
   const uniq = [...new Set(bits.map((b) => b.trim()).filter(Boolean))];
   if (uniq.length) return uniq.join(' ');
-  return 'highway bridge heavy civil';
+  // No civil work words: use what the customer said they do. Unknown stays empty (callers keep the planner's own
+  // query); there is no default trade.
+  return '';
 }
 
 /**
@@ -485,12 +505,12 @@ export function enforceFederalMarketProfilePathwayArgs(
       }
     }
     const q = typeof a.query === 'string' ? a.query.trim() : '';
-    if (!q || BUILDINGS_CONSTRUCTION_QUERY.test(q)) {
+    if (civilQuery && (!q || BUILDINGS_CONSTRUCTION_QUERY.test(q))) {
       a.query = civilQuery;
       changes.push('pathway_civil_query_enforced');
     }
     // Strip a buildings-only NAICS pin the planner may have invented from "construction".
-    // Do not replace it with award NAICS — that hides inspection / JBAB / Capitol pathways.
+    // Do not replace it with award NAICS — adjacent-code vehicles and sources sought would drop out.
     const adv = (a.advanced && typeof a.advanced === 'object' && !Array.isArray(a.advanced))
       ? { ...(a.advanced as Record<string, unknown>) }
       : null;
@@ -517,17 +537,17 @@ export function enforceFederalMarketProfilePathwayArgs(
       }
     }
     const kw = typeof a.keyword === 'string' ? a.keyword.trim() : '';
-    if (!kw || BUILDINGS_CONSTRUCTION_QUERY.test(kw)) {
+    if (civilQuery && (!kw || BUILDINGS_CONSTRUCTION_QUERY.test(kw))) {
       a.keyword = civilQuery;
       changes.push('pathway_civil_query_enforced');
     }
   }
 
   if (toolName === 'get_agency_forecasts') {
-    // Do not force state on forecasts (37% lack PoP — a state filter hides parkway work).
-    // Do force civil/bridge keyword when empty or buildings-construction.
+    // Do not force state on forecasts (37% lack a place of performance — a state filter hides them).
+    // Do force the customer's work keywords when empty or buildings-construction.
     const kw = typeof a.keyword === 'string' ? a.keyword.trim() : '';
-    if (!kw || BUILDINGS_CONSTRUCTION_QUERY.test(kw)) {
+    if (civilQuery && (!kw || BUILDINGS_CONSTRUCTION_QUERY.test(kw))) {
       a.keyword = civilQuery;
       changes.push('pathway_civil_query_enforced');
     }
@@ -542,12 +562,12 @@ export function federalMarketProfilePathwayNote(customerText: string): string | 
   const q = derivePathwaySearchQuery(customerText);
   const stateLine = states.length
     ? `Search geography: ${states.join(', ')} (pass as a comma list on find_opportunities location and search_sam_opportunities state).`
-    : 'Search geography: use the states the customer named; do not substitute another state (e.g. Hawaii).';
+    : 'Search geography: the states the customer named, else the states in this firm\'s award history; do not substitute another state.';
   return [
     'PATHWAY SEARCH (step 3 — vehicles, sources sought, forecasts; not a single-open-bid list):',
     stateLine,
-    `Civil keywords (not bare "construction"): ${q}.`,
-    'Call find_opportunities and search_sam_opportunities with those states + keywords. Then lookup_solicitation / get_solicitation_documents for named MATOCs/MACCs (inspection, Northeast, JBAB, Capitol Perimeter, NIH when they appear). Call get_agency_forecasts with civil/bridge keywords (Clara Barton / Rock Creek / parkway-class forecasts when present).',
+    q ? `Work keywords from the customer's words (not bare "construction"): ${q}.` : 'Work keywords: the work THIS firm performs, from its award history (not a bare generic word).',
+    'Call find_opportunities and search_sam_opportunities with those states + keywords. Then lookup_solicitation / get_solicitation_documents for the MATOCs / MACCs / IDIQs those results name. Call get_agency_forecasts with the same work keywords.',
   ].join('\n');
 }
 
@@ -558,7 +578,7 @@ export const FEDERAL_MARKET_PROFILE_VEHICLE_TOOLS: ReadonlySet<string> = new Set
   'get_award_detail',
 ]);
 
-/** PIID / vehicle stems that look like contract-number prefixes (e.g. 693C7326D, HQ003422D002). */
+/** PIID / vehicle stems that look like contract-number prefixes (a 6-character office code + FY + instrument letter). */
 const PIID_PREFIX_SHAPE = /^[A-Z0-9]{6,20}$/i;
 
 /**
@@ -570,7 +590,7 @@ export function extractVehiclePiidPrefixes(customerText: string): string[] {
     const t = tok.replace(/[.?!:]+$/, '').toUpperCase();
     if (!PIID_PREFIX_SHAPE.test(t)) continue;
     // Prefer stems that look like federal PIIDs (digit + letter mix), not pure words.
-    // Do NOT skip length-12 tokens: HQ003422D002 is a real vehicle stem (and a UEI is
+    // Do NOT skip length-12 tokens: a 12-character vehicle stem is common (and a UEI is
     // handled separately via extractProfileCompanyIdentity).
     if (!/\d/.test(t) || !/[A-Z]/.test(t)) continue;
     if (!found.includes(t)) found.push(t);
@@ -650,7 +670,7 @@ export function federalMarketProfileVehicleNote(customerText: string): string | 
   return [
     'VEHICLE HOLDERS (step 4 — who owns the MATOC/IDIQ and what orders look like):',
     typedLine,
-    'For each vehicle: (1) search_past_contracts with piid_prefix = the contract-number stem (e.g. 693C7326D, HQ003422D002) to see holders;',
+    'For each vehicle: (1) search_past_contracts with piid_prefix = the contract-number stem from the results (office code + fiscal year + instrument letter) to see holders;',
     '(2) search_idv_contracts with search_type:"task" and parent_id for active task-order sizes;',
     '(3) get_award_detail on the vehicle for ceiling, end date, and set-aside.',
     'CRITICAL: set-aside (including women-owned small business) often appears ONLY on get_award_detail — if you skip it, you will miss that catch.',
@@ -743,13 +763,13 @@ export function federalMarketProfileMarketSizeNote(customerText: string): string
   const states = extractProfileStates(customerText);
   const stateLine = states.length
     ? `Call generate_market_report ONCE PER state with state=${states.join(' | ')} (three separate calls for ${states.join(', ')}). Never one call with a comma-joined state list.`
-    : 'Call generate_market_report once per state the customer named (separate calls).';
+    : 'Call generate_market_report once per state in scope: the states the customer named, else the states in this firm\'s award history; with none, one national report (separate calls).';
   return [
     'MARKET SIZE (step 5 — after award history established primary NAICS):',
     stateLine,
-    'Pass naics = the dominant code from get_contractor_award_history (e.g. 237310 bridges/roads). Never 236220 from the word "construction".',
+    'Pass naics = the dominant code from get_contractor_award_history. Never a code guessed from a generic word like "construction".',
     'Do NOT pass set_aside — it rewrites agency dollar tables (documented forecast-only filter; known trap).',
-    'After the per-state reports: sum the top-buyer lists by hand for FHWA + NPS (and peers) totals; read the firm\'s rank off each competitor list (#4 / #5 / #9 class). Do not invent a combined market figure the tool did not return.',
+    'After the per-state reports: combine the top-buyer lists by hand for this firm\'s buyers; read the firm\'s rank off each competitor list only when the tool states it. Do not invent a combined market figure the tool did not return.',
   ].join('\n');
 }
 
@@ -760,8 +780,8 @@ export function federalMarketProfileMarketSizeNote(customerText: string): string
  */
 /**
  * The company a strategy-plan turn is about (Ask Mindy, ASK_MINDY_STRATEGY_PLAN), from the saved company profile.
- * When present, the FMP host builders use THIS company's work, codes and states and never the RBA civil defaults
- * (237310, "highway bridge heavy civil"), which exist only for the Federal Market Profile benchmark ask.
+ * When present, the FMP host builders use THIS company's work, codes and states. Without it they use the customer's
+ * words and award history; there is no default trade, code or region.
  */
 export interface FmpCompanyContext {
   legalName?: string;
@@ -794,8 +814,11 @@ export function buildFmpNextMarketReportArgs(
     const own = (company.naics || '').replace(/\D/g, '').slice(0, 6);
     if (own.length >= 3) args.naics = own;
   } else {
-    // Cold RBA / heavy civil default when awards named bridges/roads but planner omitted NAICS.
-    args.naics = '237310';
+    // No award NAICS and no profile: measure by the work the customer named. A company name is not a market, so with
+    // no recognised work word the measurement axis stays unknown (no default code); the tool then reports it.
+    const withoutName = identity.legalName ? customerText.split(identity.legalName).join(' ') : customerText;
+    const kw = industryWordIn(withoutName);
+    if (kw) args.keyword = kw;
   }
   const clientName = identity.legalName || company?.legalName;
   if (clientName) args.client_name = clientName;
@@ -830,13 +853,12 @@ export function extractAwardGeographyStates(toolContents: readonly string[]): st
 
 /**
  * Host-built args for FMP `find_opportunities` (pathways phase).
- * Short "Build a federal market profile for RBA…" has no states in the prompt — without
- * this pin, force-inject `{}` searches nationally and the write-up collapses to a generic
- * MATOC frame after the civil pathway filter empties dredging/harbor noise.
+ * A short name-only ask has no states in the prompt — without this pin, force-inject `{}` searches nationally.
+ * States come from the customer's words, else the saved profile, else this firm's award history.
  *
- * Do NOT pin award NAICS on FIND. Claude gold pathways include adjacent codes
- * (inspection 541330, JBAB 236210, Capitol 236220); a 237310-only FIND never sees them.
- * Geography + civil keywords are the pin; write-up ranking filters the noise.
+ * Do NOT pin award NAICS on FIND: vehicles and sources sought in adjacent codes are real pathways and a
+ * single-code FIND never sees them. Geography + the firm's work keywords are the pin; write-up ranking filters
+ * the noise.
  */
 export function buildFmpPathwayFindArgs(
   customerText: string,
@@ -848,11 +870,11 @@ export function buildFmpPathwayFindArgs(
     .map((s) => normalizeStateCode(String(s).trim()) || '')
     .filter(Boolean);
   const states = textStates.length ? textStates : company?.states?.length ? company.states : [...new Set(awardStates)];
-  // Strategy plan: the planner's query (it read the company's work), else the company's own work phrase, else the
-  // customer's words. The civil query is for the Federal Market Profile benchmark only.
+  // The planner's query (it read the firm's awards), else the company's own work phrase, else the work words in the
+  // customer's message, else the customer's words. Never a default trade.
   const query = company
     ? (opts?.plannerQuery?.trim() || company.workPhrase?.trim() || customerText.trim().slice(0, 200))
-    : derivePathwaySearchQuery(customerText);
+    : (derivePathwaySearchQuery(customerText) || opts?.plannerQuery?.trim() || customerText.trim().slice(0, 200));
   const args: Record<string, unknown> = {
     query,
     limit_per_horizon: 15,
@@ -864,76 +886,28 @@ export function buildFmpPathwayFindArgs(
 export type FmpPathwayToolCall = { name: string; args: Record<string, unknown> };
 
 /**
- * Host-forced pathway follow-ups for civil FMP (Claude gold frame).
- * One FIND with "highway bridge heavy civil" returns open RFQs and sometimes the
- * inspection MATOC — it does not reliably surface JBAB MACC, Capitol Perimeter SS,
- * or GWMP/parkway forecasts. Claude's MCP chain looked those up by name; Ask must
- * too, or the write-up stays an open-bid list with a MATOC footnote.
- *
- * Keywords are distinctive (not bare "construction") so pathway enforce will not
- * rewrite them into the civil default.
+ * Host-forced pathway follow-ups on a Federal Market Profile turn, built ONLY from this customer's words: one
+ * search_sam_opportunities and one get_agency_forecasts on the work keywords the customer named, in the states they
+ * named (else the states in their award history). No keyword means no follow-up. Nothing here names a project,
+ * buyer, solicitation or region: the follow-ups find what THIS firm's market holds, not what a benchmark answer held.
  */
-export const FMP_CIVIL_PATHWAY_SUPPLEMENT_KEYWORDS = [
-  'Construction Inspection MATOC',
-  'Capitol Perimeter',
-  'JBAB Multiple Award Construction',
-] as const;
-
-/** Live gold-frame solicitations — lookup returns notice POCs FIND/search_sam omit. */
-export const FMP_CIVIL_GOLD_SOLICITATION_QUERIES = [
-  '693C73-27-R-000006',
-  'FA706027RXXX2',
-  'W912DR27H1CWY',
-] as const;
-
-/** Single-token forecast keywords — multi-word ILIKE misses "MD NP GWMP 6(2)". */
-export const FMP_CIVIL_FORECAST_KEYWORDS = [
-  'Clara Barton',
-  'GWMP',
-  'MD NP GWMP',
-] as const;
-
 export function buildFmpPathwaySupplementalCalls(
   customerText: string,
   opts?: { awardStates?: readonly string[] },
 ): FmpPathwayToolCall[] {
   if (!isFederalMarketProfileRequest(customerText)) return [];
+  const keyword = derivePathwaySearchQuery(customerText);
+  if (!keyword) return [];
   const textStates = extractProfileStates(customerText);
   const awardStates = (opts?.awardStates || [])
     .map((s) => normalizeStateCode(String(s).trim()) || '')
     .filter(Boolean);
   const states = textStates.length ? textStates : [...new Set(awardStates)];
   const stateList = states.length ? states.join(',') : '';
-  const calls: FmpPathwayToolCall[] = FMP_CIVIL_PATHWAY_SUPPLEMENT_KEYWORDS.map((keyword) => ({
-    name: 'search_sam_opportunities',
-    args: {
-      keyword,
-      limit: 8,
-      ...(stateList ? { state: stateList } : {}),
-    },
-  }));
-  for (const keyword of FMP_CIVIL_FORECAST_KEYWORDS) {
-    calls.push({
-      name: 'get_agency_forecasts',
-      args: { keyword, limit: 8 },
-    });
-  }
-  for (const query of FMP_CIVIL_GOLD_SOLICITATION_QUERIES) {
-    calls.push({
-      name: 'lookup_solicitation',
-      args: { query },
-    });
-  }
-  // Pentagon / WHS paving vehicle successors — gold frame pathway when past contracts land.
-  calls.push({
-    name: 'search_past_contracts',
-    args: {
-      keyword: 'Pentagon paving',
-      ...(stateList ? { state: stateList } : { state: 'VA,MD,DC' }),
-      limit: 8,
-    },
-  });
-  return calls;
+  return [
+    { name: 'search_sam_opportunities', args: { keyword, limit: 8, ...(stateList ? { state: stateList } : {}) } },
+    { name: 'get_agency_forecasts', args: { keyword, limit: 8 } },
+  ];
 }
 
 /** Pull a dominant 6-digit NAICS from award-history tool JSON when present. */
@@ -966,8 +940,8 @@ export function extractDominantAwardNaics(toolContent: string): string | null {
       return best;
     }
   } catch { /* ignore */ }
-  // Loose text fallback (answers sometimes echo "Primary NAICS Codes: 237310").
-  const m = toolContent.match(/\b(237310|237990|236220)\b/);
+  // Loose text fallback: a 6-digit code the text itself labels as NAICS ("Primary NAICS Codes: 123456").
+  const m = toolContent.match(/\bnaics[\w\s"':=-]{0,24}?(\d{6})\b/i);
   return m ? m[1] : null;
 }
 
@@ -986,9 +960,8 @@ export const FMP_LEGISLATION_QUERY_DEFAULT = 'FY2027 NDAA';
 
 /**
  * Step 6 gate: legislation needs a real query (default FY2027 NDAA); contacts/OSBP must not treat
- * profile state codes as agency names (VA → Veterans Affairs trap). Bare "Pentagon"/"defense"
- * OSBP lookups rewrite to WHS (Washington Headquarters Services) — the office that answered
- * in the benchmark chain.
+ * profile state codes as agency names (VA → Veterans Affairs trap). The agency the planner names is otherwise
+ * passed through: no office is substituted from code.
  */
 export function enforceFederalMarketProfileContactsArgs(
   toolName: string,
@@ -1014,14 +987,6 @@ export function enforceFederalMarketProfileContactsArgs(
     }
   }
 
-  if (toolName === 'lookup_federal_osbp') {
-    const agency = typeof a.agency === 'string' ? a.agency.trim() : '';
-    if (agency && /^(pentagon|dod|department of defense|defense|whs pentagon)$/i.test(agency)) {
-      a.agency = 'WHS';
-      changes.push('contacts_osbp_whs');
-    }
-  }
-
   if (toolName === 'lookup_federal_osbp' || toolName === 'search_federal_contacts') {
     const agency = typeof a.agency === 'string' ? a.agency.trim() : '';
     if (agency && STATE_AGENCY_COLLISION.has(agency.toUpperCase()) && agency.length <= 2) {
@@ -1038,8 +1003,8 @@ export function federalMarketProfileContactsNote(customerText: string): string |
   if (!isFederalMarketProfileRequest(customerText)) return null;
   return [
     'CONTACTS + POLICY (step 6):',
-    '1) Prefer notice POCs already on solicitations/documents pulled in pathways (names like Helson Roman, David Bogner, Terry Agena) — do not invent names or emails.',
-    '2) lookup_federal_osbp for defense buyers that appeared — use WHS (Washington Headquarters Services) for Pentagon / DoD HQ small-business office. Never pass a bare state code as agency (VA ≠ Virginia here; it resolves to Veterans Affairs).',
+    '1) Prefer notice POCs already on the solicitations/documents pulled in pathways — do not invent names or emails.',
+    '2) lookup_federal_osbp for the defense buyers that appeared in this firm\'s results, using the buyer named there. Never pass a bare state code as agency (VA ≠ Virginia here; it resolves to Veterans Affairs).',
     '3) search_federal_contacts with agency or dodaac from those buyers for the rest of the roster; grounded=false means no match — leave the slot empty.',
     '4) get_legislation_status with query "FY2027 NDAA" (or "FY27 NDAA") when defense buyers appear — STATUS only (stage / public law). It cannot say what a bill requires; do not invent bill text or PAE press from this tool.',
     '5) In the write-up: every named contact gets the specific question to ask them.',
@@ -1050,8 +1015,8 @@ export function federalMarketProfileOutsideWebNote(customerText: string): string
   if (!isFederalMarketProfileRequest(customerText)) return null;
   return [
     'OUTSIDE MINDY (step 7 — use search_web):',
-    'Call search_web once per topic with a focused query: NPS deferred maintenance CRS; Legacy Restoration Fund bills; Dec 11 highway extension; GAO reports on parks/highways/construction; PAE / Navy construction oversight; 8(a) rule changes.',
-    'Quote only returned snippets and cite the URL. If available=false (web not configured) or grounded=false after searching: disclose the gap — do NOT fabricate CRS figures, bill text, GAO findings, or PAE press. Missing web ≠ fail the profile.',
+    'Call search_web once per topic with a focused query on the buyer pressures behind THIS firm\'s pathways: budget or backlog reports for those buyers, funding and policy changes that affect them, GAO / IG findings, PAE / Navy construction oversight when defense buyers appear, and 8(a) rule changes.',
+    'Quote only returned snippets and cite the URL. If available=false (web not configured) or grounded=false after searching: disclose the gap — do NOT fabricate figures, bill text, GAO findings, or press. Missing web ≠ fail the profile.',
   ].join(' ');
 }
 
@@ -1066,7 +1031,7 @@ export function federalMarketProfileWriteupNote(customerText: string): string | 
     '5) Readiness checklist includes DSBS keywords.',
     '6) No em dashes (use commas, periods, or hyphens).',
     '7) Do not grade, score, or rank the company — facts and questions only.',
-    '8) Do NOT include a Mid plan price, $5K–$10K CTA, or any pricing upsell in this profile (accidental in the Claude benchmark; not part of the deliverable).',
+    '8) Do NOT include any pricing CTA or upsell in this profile (no Mindy pricing in research deliverables).',
   ].join('\n');
 }
 
@@ -1252,10 +1217,18 @@ function extractStateFromCustomerText(text: string): string | null {
   return null;
 }
 
+const INDUSTRY_NOUN_RE = /^(construction|janitorial|custodial|roofing|hvac|staffing|cybersecurity|cyber|guard|security|catering|plumbing|electrical|landscaping|demolition|facilities|logistics|trucking|cleaning)$/i;
+
+/** The first recognised industry word in the customer's own text ("a janitorial and custodial firm" → janitorial). */
+function industryWordIn(text: string): string | null {
+  for (const w of String(text || '').toLowerCase().split(/[^a-z]+/)) if (INDUSTRY_NOUN_RE.test(w)) return w;
+  return null;
+}
+
 /** Industry / activity keyword when the planner forgot the measurement axis. */
 function deriveMarketReportKeyword(text: string): string | null {
   const t = String(text || '');
-  // "for RBA Construction in Hawaii" → company phrase before "in <state>"
+  // "for Acme Construction in Hawaii" → company phrase before "in <state>"
   const forMatch = t.match(/\bfor\s+(.+?)(?:\s+in\s+[A-Za-z][A-Za-z.\s]{1,30})?\s*[.?!]?\s*$/i);
   const phrase = (forMatch?.[1] || t)
     .replace(/\b(my|our|the|a|an)\s+(company|firm|business)\b/gi, ' ')
@@ -1263,13 +1236,13 @@ function deriveMarketReportKeyword(text: string): string | null {
     .replace(/\s+/g, ' ')
     .trim();
   if (!phrase) return null;
-  // Prefer a distinctive industry noun at the end of a company name ("RBA Construction" → construction)
+  // Prefer a distinctive industry noun at the end of a company name ("Acme Construction" → construction)
   const words = phrase.split(/\s+/).filter(Boolean);
   const last = words[words.length - 1] || '';
-  if (/^(construction|janitorial|roofing|hvac|staffing|cybersecurity|cyber|guard|security|catering|plumbing|electrical|landscaping|demolition|facilities|logistics|trucking|cleaning)$/i.test(last)) {
+  if (INDUSTRY_NOUN_RE.test(last)) {
     return last.toLowerCase();
   }
-  // Drop all-caps acronyms (RBA) and keep the rest as a keyword phrase
+  // Drop all-caps acronyms (e.g. a 3-letter company initialism) and keep the rest as a keyword phrase
   const meaningful = words.filter((w) => !/^[A-Z]{2,5}$/.test(w) && w.length > 2);
   if (meaningful.length) return meaningful.join(' ').toLowerCase().slice(0, 80);
   return phrase.toLowerCase().slice(0, 80);

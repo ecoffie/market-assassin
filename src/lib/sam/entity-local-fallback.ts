@@ -126,7 +126,8 @@ function toSamEntity(r: Record<string, unknown>): SAMEntity {
     return certFlag(certificationStatus, label as CertProgram);
   };
 
-  const naics = arr(r.naics_codes);
+  // Never emit a blank NAICS row (naicsCode "") — same rule as the live transformer.
+  const naics = arr(r.naics_codes).map((c) => c.trim()).filter(Boolean);
   const primary = str(r.primary_naics);
 
   // Registered SAM POCs (R8, 2026-11-13): the mirror stores the same {name,title,phone,email,type}
