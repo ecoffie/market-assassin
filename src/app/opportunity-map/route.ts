@@ -16,7 +16,7 @@ import { INDUSTRY_PRESETS } from '@/lib/industry-presets';
 import { decodeFSC } from '@/lib/codes/fsc';
 import { DIBBS_MAP_ENABLED } from '@/lib/dibbs/availability';
 import { OPPORTUNITY_MAP_TEMPLATE } from './template-html';
-import { buildOppShareMeta, fetchOppShareRow, isNoticeId, renderOppShareHead } from '@/lib/opportunities/share-metadata';
+import { applyMapHead, buildOppShareMeta, fetchOppShareRow, isNoticeId, renderOppShareHead } from '@/lib/opportunities/share-metadata';
 import { ACCOUNT_MENU_CSS, ACCOUNT_MENU_JS } from './account-menu';
 import { siteTopHtml, SITE_NAV_CSS } from '@/lib/public-site/site-nav';
 import { MP_ACCOUNT_OVERRIDES_CSS, mpTokenDeclarations } from '@/lib/public-site/css';
@@ -10941,6 +10941,16 @@ const ASK_MINDY_CSS =
   + '.amk-in textarea:focus{border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.12)}'
   + '.amk-send{flex:none;width:40px;height:40px;border:0;border-radius:11px;background:#2563eb;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center}'
   + '.amk-send:disabled{opacity:.45;cursor:default}.amk-send svg{width:18px;height:18px}'
+  + '.amk-notices{margin-top:8px;display:flex;flex-direction:column;gap:4px}.amk-notice{font:500 12px Inter,system-ui,sans-serif;color:#92400e;background:#fffbeb;border:1px solid #fde68a;border-radius:7px;padding:4px 8px}'
+  + '@media(prefers-color-scheme:dark){.amk-notice{color:#fcd34d;background:rgba(245,158,11,.1);border-color:rgba(245,158,11,.25)}}'
+  + '.amk-hd-tools{display:flex;gap:6px;flex:none}.amk-card .amk-hd-tools{display:none}.amk-tool{border:1px solid #dde3ec;background:#fff;color:#334155;font:600 11.5px Inter,system-ui,sans-serif;border-radius:7px;padding:4px 9px;cursor:pointer}.amk-tool:hover{background:#f1f5f9}'
+  + '.amk-hist{flex:1;min-height:0;overflow-y:auto;padding:10px 14px 16px}.amk-hist[hidden]{display:none}.amk-hist-open #amkBody,.amk-hist-open .amk-foot{display:none}'
+  + '.amk-hist-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;font:700 13px Inter,system-ui,sans-serif;color:#111c26}.amk-hist-x{border:0;background:none;color:#8595a6;font:400 22px/1 Inter,system-ui,sans-serif;cursor:pointer}'
+  + '.amk-hist-row{display:flex;align-items:center;gap:4px;border-radius:8px}.amk-hist-row:hover{background:#f1f5f9}.amk-hist-row.cur{background:#eaf1fe}'
+  + '.amk-hist-item{flex:1;min-width:0;display:flex;flex-direction:column;align-items:flex-start;border:0;background:none;text-align:left;padding:8px 10px;cursor:pointer}.amk-hist-item b{font:600 13px Inter,system-ui,sans-serif;color:#111c26;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.amk-hist-item span{font:500 11px Inter,system-ui,sans-serif;color:#64748b}'
+  + '.amk-hist-del{flex:none;border:0;background:none;color:#94a3b8;font:400 18px/1 Inter,system-ui,sans-serif;padding:4px 8px;cursor:pointer}.amk-hist-del:hover{color:#b91c1c}.amk-hist-err{font:500 11px Inter,system-ui,sans-serif;color:#b91c1c;padding-right:6px}'
+  + '.amk-hist-msg{font:500 12.5px Inter,system-ui,sans-serif;color:#475569;padding:10px 4px}.amk-hist-retry{border:1px solid #bcd3fb;background:#eaf1fe;color:#1d4ed8;font:600 12px Inter,system-ui,sans-serif;border-radius:8px;padding:6px 10px;cursor:pointer}'
+  + '@media(prefers-color-scheme:dark){.amk-tool{background:#0d141d;color:#cbd5e1;border-color:#202b39}.amk-hist-hd,.amk-hist-item b{color:#eaf1f8}.amk-hist-row:hover{background:#111a26}.amk-hist-row.cur{background:#0f1f3a}}'
   + '.amk-stop{display:inline-block;margin-top:6px;border:1px solid #dde3ec;background:#fff;color:#334155;font:600 11.5px Inter,system-ui,sans-serif;border-radius:7px;padding:4px 10px;cursor:pointer}.amk-stop:hover{background:#f1f5f9}'
   // ── In-chat REPORT PANE (create_document → read it here, no download). Sits beside the chat drawer on wide
   // screens and over it on narrow ones. The report itself is the shared document engine's HTML in a
@@ -11168,9 +11178,97 @@ const ASK_MINDY_JS = `<script>(function(){
     if(pendingTurn){ var pd=pendingTurn; ask(pd.q,{turnId:pd.turnId,replay:true}); }
   };
   function greet(){
+    // The map conversation comes back: after a page reload (this tab's saved copy), after an opportunity chat,
+    // or after the drawer was closed. Only a conversation with no turns starts blank.
+    if(!history.length){ var v=readView(); if(v){ sessionId=v.sessionId||''; history=v.history; } }
+    if(history.length){ renderConversation(history); return; }
     // Blank start (2026-11-20): no starter prompt ideas. The input is the product.
     // Opportunity-card opens still use greetCard() (scoped shortcuts for that notice).
     body.innerHTML='<div class="amk-empty" data-testid="amk-blank" aria-hidden="true"></div>';
+  }
+  // ── CONVERSATION CONTINUITY (map view). This tab keeps the conversation in sessionStorage, so a reload
+  // continues it, scoped to the signed-in email and workspace. History (GET /api/app/chat-sessions, the same
+  // route the /app panel uses) reopens older ones. The server does not rebuild context from sessionId, so the
+  // client re-sends history (contract confirmed with Ask Mindy). A reopened conversation has no source ledger,
+  // so its history is sent without sources.
+  var VIEW_KEY='mindy_map_chat';
+  function saveView(){ if(oppCtx) return; try{ if(history.length) sessionStorage.setItem(VIEW_KEY,JSON.stringify({email:email(),ws:wsKey(),sessionId:sessionId,history:history.slice(-16)})); else sessionStorage.removeItem(VIEW_KEY); }catch(e){} }
+  function readView(){ try{ var o=JSON.parse(sessionStorage.getItem(VIEW_KEY)||'null'); return (o&&o.email&&o.email===email()&&(o.ws||'')===wsKey()&&Array.isArray(o.history))?o:null; }catch(e){ return null; } }
+  function renderConversation(msgs){
+    body.innerHTML='';
+    msgs.forEach(function(m){ if(!m||typeof m.content!=='string') return; var d=addMsg(m.role==='user'?'user':'assistant', m.content); if(m.role!=='user'&&m.files&&m.files.length) repCard(cleanFiles(m.files),d); if(m.role!=='user'){ var r=savedReport(m.report); if(r) repSavedCard(r,d); } });
+  }
+  function newChat(){
+    if(busy||oppCtx) return;
+    sessionId=''; history=[]; viewState={sessionId:'',history:[]}; saveView(); clearFollowups(); greet(); hideHistory();
+    if(input){ input.value=''; input.focus(); }
+    try{ if(window.__track) window.__track('tool_use','map_chat_new',{}); }catch(e){}
+  }
+  var histEl=null;
+  function hideHistory(){ if(histEl){ histEl.hidden=true; drawer.classList.remove('amk-hist-open'); } }
+  function showHistory(){
+    if(busy||oppCtx) return;
+    if(!histEl){
+      histEl=document.createElement('div'); histEl.className='amk-hist'; histEl.setAttribute('data-testid','amk-history');
+      histEl.innerHTML='<div class="amk-hist-hd"><b>Your conversations</b><button type="button" class="amk-hist-x" aria-label="Close conversations">&times;</button></div><div class="amk-hist-list" role="list"></div>';
+      histEl.querySelector('.amk-hist-x').onclick=hideHistory;
+      var hd=drawer.querySelector('.amk-hd'); if(hd&&hd.nextSibling) drawer.insertBefore(histEl,hd.nextSibling); else drawer.appendChild(histEl);
+    }
+    histEl.hidden=false; drawer.classList.add('amk-hist-open'); loadHistory();
+  }
+  function histMsg(list,text,retry){ list.innerHTML=''; var p=document.createElement('div'); p.className='amk-hist-msg'; p.textContent=text; list.appendChild(p);
+    if(retry){ var b=document.createElement('button'); b.type='button'; b.className='amk-hist-retry'; b.textContent='Try again'; b.onclick=loadHistory; list.appendChild(b); } }
+  function loadHistory(){
+    var list=histEl.querySelector('.amk-hist-list'), em=email(); if(!tok()||!em){ histMsg(list,'Sign in to see your conversations.'); return; }
+    histMsg(list,'Loading your conversations...');
+    fetch('/api/app/chat-sessions?email='+encodeURIComponent(em),{headers:authHdrs()})
+      .then(function(r){ if(r.status===403) return {pro:true}; if(r.status===401) return {auth:true}; if(!r.ok) throw new Error('sessions '+r.status); return r.json(); })
+      .then(function(d){
+        if(d&&d.pro){ histMsg(list,'Saved conversations are part of Mindy Pro.'); return; }
+        if(d&&d.auth){ histMsg(list,'Please sign in again to see your conversations.'); return; }
+        if(!d||!Array.isArray(d.sessions)) throw new Error('shape');
+        if(!d.sessions.length){ histMsg(list,'No saved conversations yet.'); return; }
+        list.innerHTML='';
+        d.sessions.forEach(function(s){
+          if(!s||!UUID_RX.test(String(s.id||''))) return;
+          var row=document.createElement('div'); row.className='amk-hist-row'+(s.id===sessionId?' cur':''); row.setAttribute('role','listitem');
+          var open=document.createElement('button'); open.type='button'; open.className='amk-hist-item';
+          var t=document.createElement('b'); t.textContent=String(s.title||'Untitled').slice(0,120);
+          var m=document.createElement('span'); var dt=s.updated_at?new Date(s.updated_at):null; m.textContent=(dt&&!isNaN(dt.getTime()))?dt.toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'}):'';
+          open.appendChild(t); open.appendChild(m); open.onclick=function(){ openConversation(s.id); };
+          var del=document.createElement('button'); del.type='button'; del.className='amk-hist-del'; del.setAttribute('aria-label','Delete conversation'); del.title='Delete conversation'; del.textContent='\u00d7';
+          del.onclick=function(){ deleteConversation(s.id,row); };
+          row.appendChild(open); row.appendChild(del); list.appendChild(row);
+        });
+      })
+      .catch(function(){ histMsg(list,"Couldn't load your conversations. Check your connection and try again.",true); });
+  }
+  function openConversation(sid){
+    if(busy) return;
+    var list=histEl.querySelector('.amk-hist-list'), em=email();
+    fetch('/api/app/chat-sessions?email='+encodeURIComponent(em)+'&sessionId='+encodeURIComponent(sid),{headers:authHdrs()})
+      .then(function(r){ if(!r.ok) throw new Error('session '+r.status); return r.json(); })
+      .then(function(d){
+        if(!d||!d.success||!Array.isArray(d.messages)) throw new Error('shape');
+        sessionId=sid;
+        history=d.messages.filter(function(m){ return m&&(m.role==='user'||m.role==='assistant')&&typeof m.content==='string'; }).map(function(m){
+          var h={role:m.role,content:m.content}; var f=m.deliverables&&Array.isArray(m.deliverables.files)?m.deliverables.files:null; if(f&&f.length) h.files=f;
+          var r=m.market_report?savedReport({id:m.market_report.report_id,title:m.market_report.title}):null; if(r) h.report=r; return h; });
+        clearFollowups(); hideHistory(); renderConversation(history); saveView();
+        try{ if(window.__track) window.__track('tool_use','map_chat_reopen',{messages:history.length}); }catch(e){}
+      })
+      .catch(function(){ histMsg(list,"Couldn't open that conversation. Try again.",true); });
+  }
+  function deleteConversation(sid,row){
+    var em=email();
+    fetch('/api/app/chat-sessions',{method:'DELETE',headers:Object.assign({'Content-Type':'application/json'},authHdrs()),body:JSON.stringify({email:em,sessionId:sid})})
+      .then(function(r){
+        if(!r.ok) throw new Error('delete '+r.status);
+        if(row.parentNode) row.parentNode.removeChild(row);
+        if(sid===sessionId){ sessionId=''; history=[]; saveView(); greet(); }
+        var list=histEl.querySelector('.amk-hist-list'); if(list&&!list.querySelector('.amk-hist-row')) histMsg(list,'No saved conversations yet.');
+      })
+      .catch(function(){ var e=row.querySelector('.amk-hist-err'); if(!e){ e=document.createElement('span'); e.className='amk-hist-err'; e.setAttribute('role','alert'); row.appendChild(e); } e.textContent="Couldn't delete. Try again."; });
   }
   // Public opener (does NOT auto-send). An explicit question (typed in the search bar, then "Ask") goes into the
   // box as the customer's own words. What is sent = what is in the box (map filters are not injected).
@@ -11191,6 +11289,14 @@ const ASK_MINDY_JS = `<script>(function(){
     setOpen(true);
   };
   var x=document.getElementById('amkX'); if(x)x.onclick=function(){ setOpen(false); };
+  (function(){
+    var hd=drawer.querySelector('.amk-hd'); if(!hd) return;
+    var tools=document.createElement('div'); tools.className='amk-hd-tools';
+    tools.innerHTML='<button type="button" class="amk-tool" data-testid="amk-history-btn">History</button><button type="button" class="amk-tool" data-testid="amk-new-chat">New chat</button>';
+    tools.children[0].onclick=function(){ if(histEl&&!histEl.hidden) hideHistory(); else showHistory(); };
+    tools.children[1].onclick=newChat;
+    hd.insertBefore(tools,x||null);
+  })();
   ov.onclick=function(){ setOpen(false); };
   document.addEventListener('keydown',function(e){ if(e.key==='Escape'&&drawer.classList.contains('show')){ if(repIsOpen()){ repHide(true); return; } setOpen(false); } });
   // Auto-grow the textarea + Enter-to-send (Shift+Enter = newline).
@@ -11277,29 +11383,40 @@ const ASK_MINDY_JS = `<script>(function(){
       .then(function(d){ if(d&&d.url){ try{ if(window.__track) window.__track('tool_use','map_report_export',{format:file.format}); }catch(e){} location.href=d.url; } else { btn.textContent='Try again'; repError('The '+FMT_LABEL[file.format]+' file could not be prepared. Try again, or reopen the report from your Vault.'); } },function(){ btn.textContent='Try again'; repError('The file could not be prepared. Check your connection and try again.'); })
       .then(function(){ btn.disabled=false; if(btn.textContent==='Preparing...') btn.textContent=label; });
   }
-  // Packaged market report: a real PDF from /reports/<id>/pdf (same renderer as the hosted page). Fetched
-  // here, OUTSIDE the script-less preview frame, and saved as a file; a failure shows the server's message.
+  // Packaged market report: a real PDF from /reports/<id>/pdf (same renderer as the hosted page). The browser
+  // downloads it by NAVIGATING a hidden frame to that URL (the response is Content-Disposition: attachment),
+  // never through a blob: a blob plus a synthetic link click after a long wait was blocked in production and
+  // saved nothing. A failure answers with the route's own HTML error page, which DOES load in the frame, so
+  // its message is read back and shown in the pane.
   var REPORT_ID_RX=/^[A-Za-z0-9_-]{16,64}$/;
+  var PDF_SETTLE_MS=10000, PDF_FRAME_TTL_MS=120000, pdfFrame=null;
   function downloadReportPdf(reportId,btn){
-    var label=btn.textContent; btn.disabled=true; btn.textContent='Preparing PDF...'; repError('');
-    var fail=function(msg){ btn.textContent='Try again'; repError(msg||'The PDF could not be created. Try again in a minute.'); };
-    fetch('/reports/'+encodeURIComponent(reportId)+'/pdf',{headers:{Accept:'application/pdf, application/json'}})
-      .then(function(r){
-        var ct=r.headers.get('content-type')||'';
-        if(r.ok&&ct.indexOf('application/pdf')===0){
-          var m=/filename="([^"]+)"/.exec(r.headers.get('content-disposition')||'');
-          return r.blob().then(function(b){
-            if(!b||!b.size){ fail(); return; }
-            var u=URL.createObjectURL(b), a=document.createElement('a'); a.href=u; a.download=(m&&m[1])||'market-report.pdf';
-            a.setAttribute('data-testid','amk-report-pdf-link'); document.body.appendChild(a); a.click();
-            setTimeout(function(){ URL.revokeObjectURL(u); if(a.parentNode) a.parentNode.removeChild(a); },1000);
-            btn.textContent=label;
-            try{ if(window.__track) window.__track('tool_use','map_report_export',{format:'pdf',source:'market_report'}); }catch(e){}
-          });
-        }
-        return r.json().then(function(j){ fail(j&&typeof j.message==='string'?j.message:''); },function(){ fail(); });
-      },function(){ fail('The PDF could not be downloaded. Check your connection and try again.'); })
-      .then(function(){ btn.disabled=false; if(btn.textContent==='Preparing PDF...') btn.textContent=label; });
+    var label='Download PDF'; btn.disabled=true; btn.textContent='Preparing PDF...'; repError('');
+    // The button settles after PDF_SETTLE_MS (no event tells us a download began); an error page that
+    // arrives later still shows, so a slow failure is never silent.
+    var errored=false;
+    var settle=function(){ if(errored||pdfFrame!==f) return; btn.disabled=false; btn.textContent=label; };
+    var failWith=function(msg){
+      if(errored||pdfFrame!==f) return; errored=true; btn.disabled=false; btn.textContent='Try again';
+      repError(msg||'The PDF could not be created. Try again in a minute.');
+    };
+    if(pdfFrame&&pdfFrame.parentNode) pdfFrame.parentNode.removeChild(pdfFrame);
+    var f=document.createElement('iframe'); pdfFrame=f;
+    f.setAttribute('data-testid','amk-report-pdf-frame'); f.setAttribute('aria-hidden','true'); f.setAttribute('tabindex','-1'); f.title='PDF download';
+    f.style.cssText='position:absolute;width:0;height:0;border:0;visibility:hidden;left:-9999px;top:0';
+    f.addEventListener('load',function(){
+      var d=null; try{ d=f.contentDocument; }catch(e){ d=null; }
+      if(!d){ failWith(''); return; }
+      var body=d.body?(d.body.textContent||'').replace(/\\s+/g,' ').trim():'';
+      if(d.title!=='PDF not available'&&!body) return;
+      var p=d.querySelector('.c p'); var msg=p?(p.textContent||'').trim():'';
+      failWith(msg);
+    });
+    document.body.appendChild(f);
+    f.src='/reports/'+encodeURIComponent(reportId)+'/pdf';
+    try{ if(window.__track) window.__track('tool_use','map_report_export',{format:'pdf',source:'market_report'}); }catch(e){}
+    setTimeout(settle,PDF_SETTLE_MS);
+    setTimeout(function(){ if(f.parentNode) f.parentNode.removeChild(f); if(pdfFrame===f) pdfFrame=null; },PDF_FRAME_TTL_MS);
   }
   // items: [{label, fmt, run(btn)}]
   function exportMenu(items,host){
@@ -11377,17 +11494,24 @@ const ASK_MINDY_JS = `<script>(function(){
       .catch(function(){ if(seq===repSeq) repMessage('The report could not be loaded. Check your connection and try again.',id); });
   }
   // The reply that created or revised a document: a card under the answer + the pane opens on the new version.
-  function repOnDeliverables(list,aEl){
-    var files=cleanFiles(list); var id=primaryId(files); if(!id) return;
+  // The "Open report" card under an answer. Returns the primary document id ('' when the files are unusable).
+  function repCard(files,aEl){
+    var id=primaryId(files); if(!id) return '';
     var prim=files.filter(function(f){ return f.document_id===id; })[0]||files[0];
     var ver=0; files.forEach(function(f){ if(f.version>ver) ver=f.version; });
-    rep={email:email(),ws:wsKey(),id:id,title:'',version:ver||1,files:files,ledger:(rep&&rep.ledger)||null,open:true}; repWrite();
     var w=document.createElement('div'); w.className='amk-repcard'; w.setAttribute('data-testid','amk-report-card');
     w.innerHTML='<div class="amk-repcard-t"><b></b><span></span></div><button type="button" class="amk-repcard-open">Open report</button>';
     w.querySelector('b').textContent=(prim.file_name||'Your report').replace(/[.](pdf|docx|xlsx|csv)$/i,'');
     w.querySelector('span').textContent='Version '+(ver||1)+' - saved to your Vault';
     w.querySelector('.amk-repcard-open').onclick=function(){ repOpen(id); };
     aEl.appendChild(w); body.scrollTop=body.scrollHeight;
+    return id;
+  }
+  function repOnDeliverables(list,aEl){
+    var files=cleanFiles(list); var id=primaryId(files); if(!id) return;
+    var ver=0; files.forEach(function(f){ if(f.version>ver) ver=f.version; });
+    rep={email:email(),ws:wsKey(),id:id,title:'',version:ver||1,files:files,ledger:(rep&&rep.ledger)||null,open:true}; repWrite();
+    repCard(files,aEl);
     repOpen(id);
   }
   // Packaged generate_market_report deliverable (Mindy IP — same engine as MCP). Opens the Ask
@@ -11410,6 +11534,7 @@ const ASK_MINDY_JS = `<script>(function(){
     }
     mrExport();
     syncRepBtn();
+    if(!aEl) return; // re-opened from a saved card: that card already exists
     var w=document.createElement('div'); w.className='amk-repcard'; w.setAttribute('data-testid','amk-report-card');
     w.innerHTML='<div class="amk-repcard-t"><b></b><span></span></div><button type="button" class="amk-repcard-open">Open report</button>';
     w.querySelector('b').textContent=title;
@@ -11420,6 +11545,40 @@ const ASK_MINDY_JS = `<script>(function(){
     };
     aEl.appendChild(w); body.scrollTop=body.scrollHeight;
     try{ if(window.__track) window.__track('tool_use','map_market_report_open',{}); }catch(e){}
+  }
+  // A packaged report in a reopened or reloaded conversation: the conversation keeps only its id and title
+  // (chat-sessions never returns the html), so the card re-opens it from the hosted page /reports/<id>
+  // (same renderer as the PDF), with the same Export menu. A removed or expired report says so.
+  function savedReport(r){
+    if(!r||typeof r.id!=='string'||!REPORT_ID_RX.test(r.id)) return null;
+    return {id:r.id,title:String(typeof r.title==='string'&&r.title?r.title:'Market report').slice(0,160)};
+  }
+  function repSavedCard(r,aEl){
+    var w=document.createElement('div'); w.className='amk-repcard'; w.setAttribute('data-testid','amk-report-card');
+    w.innerHTML='<div class="amk-repcard-t"><b></b><span></span></div><button type="button" class="amk-repcard-open">Open report</button>';
+    w.querySelector('b').textContent=r.title;
+    w.querySelector('span').textContent='Packaged research \\u00b7 same engine as MCP';
+    w.querySelector('.amk-repcard-open').onclick=function(){ repOpenSaved(r); };
+    aEl.appendChild(w);
+  }
+  function repOpenSaved(r){
+    var E=ensurePane(), seq=++repSeq, path='/reports/'+encodeURIComponent(r.id);
+    E.el.classList.add('show'); E.el.setAttribute('aria-hidden','false');
+    E.t.textContent=r.title; E.v.textContent='Packaged market report'; E.exp.innerHTML='';
+    syncRepBtn(); repMessage('Loading your report...');
+    var fail=function(text,retry){ if(seq!==repSeq) return; repMessage(text); if(retry){ var b=document.createElement('button'); b.type='button'; b.textContent='Try again'; b.onclick=function(){ repOpenSaved(r); }; E.msg.appendChild(b); } };
+    fetch(path,{headers:{Accept:'text/html'}})
+      .then(function(res){
+        if(res.status===404||res.status===410){ fail('This report is no longer available. Ask Mindy to create it again.',false); return null; }
+        if(!res.ok){ fail('Your report could not be loaded. Try again.',true); return null; }
+        return res.text();
+      })
+      .then(function(html){
+        if(html==null||seq!==repSeq) return;
+        if(!html){ fail('Your report could not be loaded. Try again.',true); return; }
+        repOnMarketReport({html:html,title:r.title,url:location.origin+path,report_id:r.id},null);
+      },function(){ fail('Your report could not be loaded. Check your connection and try again.',true); });
+    try{ if(window.__track) window.__track('tool_use','map_market_report_reopen',{}); }catch(e){}
   }
   function addMsg(role, text){ var d=document.createElement('div'); d.className='amk-msg '+(role==='user'?'u':'a'); d.innerHTML=(role==='user')?esc(text):('<div class="bub"></div>'); if(role!=='user'){ var bb=d.querySelector('.bub'); if(text) paint(bb,text); else bb.textContent=''; } body.appendChild(d); body.scrollTop=body.scrollHeight; return d; }
   function upsell(){ body.innerHTML='<div class="amk-up"><h4>\\ud83d\\udd12 Ask Mindy is a Pro feature</h4><p>Get grounded, real-data answers on set-asides, agencies, opportunities, teaming and proposals \\u2014 with sources.</p><a href="/market-intelligence">Upgrade to Pro</a></div>'; }
@@ -11440,7 +11599,7 @@ const ASK_MINDY_JS = `<script>(function(){
     addMsg('user', q);
     var aEl=addMsg('assistant',''); var bub=aEl.querySelector('.bub');
     bub.innerHTML='<span class="amk-typing"><i></i><i></i><i></i></span>';
-    busy=true; if(send)send.disabled=true; clearFollowups();
+    busy=true; if(send)send.disabled=true; clearFollowups(); hideHistory();
     // Stop (view mode): abort the stream, keep what already arrived. Card chat keeps its once-per-question retry flow.
     var ctrl=(!oppCtx&&typeof AbortController==='function')?new AbortController():null, stopped=false, stopBtn=null;
     if(ctrl){ stopBtn=document.createElement('button'); stopBtn.type='button'; stopBtn.className='amk-stop'; stopBtn.setAttribute('data-testid','amk-stop'); stopBtn.textContent='Stop';
@@ -11449,9 +11608,9 @@ const ASK_MINDY_JS = `<script>(function(){
       if(acc){ paint(bub,acc); history.push({role:'user',content:q}); history.push(ledger?{role:'assistant',content:acc,sources:ledger}:{role:'assistant',content:acc}); }
       else bub.textContent='';
       var sn=document.createElement('div'); sn.className='amk-credits'; sn.setAttribute('data-testid','amk-stopped'); sn.textContent=acc?'You stopped this answer, so it may be incomplete.':'You stopped this answer.'; aEl.appendChild(sn);
-      release(); body.scrollTop=body.scrollHeight;
+      saveView(); release(); body.scrollTop=body.scrollHeight;
     }
-    var acc='', started=false, gotDone=false, gotError=false, ledger=null, turnDoc=false;
+    var acc='', started=false, gotDone=false, gotError=false, ledger=null, turnDoc=false, turnFiles=null, turnReport=null;
     // Product decision 2026-11-19: Map and Ask Mindy are separate tools. Send the customer's words
     // only — never inject map viewport filters/geography into Ask. Card chat still sends notice
     // context (below); that is an opportunity record, not the map view.
@@ -11461,7 +11620,7 @@ const ASK_MINDY_JS = `<script>(function(){
     // source ledger saved with the report is what lets "revise it" resolve to THAT document. It rides along as
     // the oldest assistant turn (the server verifies the signature and the owner; a forged one is ignored).
     if(!oppCtx&&!history.length&&rep&&rep.ledger&&rep.email===em){ history.push({role:'assistant',content:'I saved your report'+(rep.title?' "'+rep.title+'"':'')+' to your Vault.',sources:rep.ledger}); }
-    var payload={email:em,message:sendMsg,sessionId:sessionId||undefined,history:history.slice(-8),display:'narrow_panel'};
+    var payload={email:em,message:sendMsg,sessionId:sessionId||undefined,history:history.slice(-8).map(function(h){ return h.sources?{role:h.role,content:h.content,sources:h.sources}:{role:h.role,content:h.content}; }),display:'narrow_panel'};
     if(attAtSend){ payload.context={kind:'opportunity',notice_id:attAtSend.id}; try{ if(window.__track) window.__track('tool_use','ask_mindy_with_notice',{}); }catch(e){} }
     if(oppCtx){ payload.context={kind:'opportunity',notice_id:oppCtx.id}; payload.turn_id=turnId; if(opts.replay)payload.replay_only=true;
       if(!opts.turnId){ try{ if(window.__track) window.__track('tool_use','card_chat_ask',{turn:Math.floor(history.length/2)+1}); }catch(e){} } }
@@ -11501,11 +11660,14 @@ const ASK_MINDY_JS = `<script>(function(){
             if(ev.type==='session'){ sessionId=ev.sessionId||sessionId; }
             else if(ev.type==='sources'){ ledger=(ev.ledger&&typeof ev.ledger==='object')?ev.ledger:null; if(turnDoc&&rep&&ledger){ rep.ledger=ledger; repWrite(); } }
             // create_document saved a document: a card under the answer and the report opens in the pane (view mode only).
-            else if(ev.type==='deliverables'&&Array.isArray(ev.files)&&!oppCtx){ turnDoc=true; try{ repOnDeliverables(ev.files,aEl); }catch(e){} }
-            else if(ev.type==='market_report'&&ev.html&&!oppCtx){ turnDoc=true; try{ repOnMarketReport(ev,aEl); }catch(e){} }
+            else if(ev.type==='deliverables'&&Array.isArray(ev.files)&&!oppCtx){ turnDoc=true; turnFiles=ev.files; try{ repOnDeliverables(ev.files,aEl); }catch(e){} }
+            else if(ev.type==='market_report'&&ev.html&&!oppCtx){ turnDoc=true; turnReport=savedReport({id:ev.report_id,title:ev.title}); try{ repOnMarketReport(ev,aEl); }catch(e){} }
             else if(ev.type==='token'){ if(!started){ bub.textContent=''; started=true; } acc+=(ev.content||''); paint(bub,acc); body.scrollTop=body.scrollHeight; }
             // citations event is now always empty (RAG corpus removed 2026-08-02) \\u2014 ignored.
             else if(ev.type==='error'){ gotError=true; if(!started)bub.textContent=safeErr(ev.message); }
+            // Server status lines (a data source unavailable, a lookup failed, a long step under way): shown under
+            // the answer, as the old chat does, instead of only typing dots.
+            else if((ev.type==='notice'||ev.type==='progress')&&typeof ev.message==='string'&&ev.message.trim()){ addNotice(aEl,ev.message); }
             else if(ev.type==='done'){ gotDone=true; }
             else if(ev.type==='replayed'){ var rd=document.createElement('div'); rd.className='amk-credits'; rd.textContent='Saved answer \\u00b7 no extra credits'; aEl.appendChild(rd); }
             else if(ev.type==='citations'&&oppCtx&&Array.isArray(ev.sources)&&ev.sources.length){ var sd=document.createElement('div'); sd.className='amk-src'; var s0=ev.sources[0]; sd.innerHTML='Source: '+(s0.url?'<a href="'+esc(s0.url)+'" target="_blank" rel="noopener">'+esc(s0.title||'SAM.gov notice')+'</a>':esc(s0.title||'SAM.gov notice')); aEl.appendChild(sd); }
@@ -11521,7 +11683,9 @@ const ASK_MINDY_JS = `<script>(function(){
           if(turnId&&oppCtx===cardAtSend){ pendingTurn=null; }
           if(!started&&!acc&&!gotError)bub.textContent='Mindy had no answer for that \\u2014 try rephrasing.';
           if(!(turnId&&gotError&&!acc)){ history.push({role:'user',content:q}); history.push(ledger?{role:'assistant',content:acc,sources:ledger}:{role:'assistant',content:acc}); }
-          saveCard(); if(acc)paint(bub,acc);
+          if(turnFiles&&history.length&&history[history.length-1].role==='assistant') history[history.length-1].files=turnFiles;
+          if(turnReport&&history.length&&history[history.length-1].role==='assistant') history[history.length-1].report=turnReport;
+          saveCard(); saveView(); if(acc)paint(bub,acc);
           // Follow-ups only after a real outcome (report/files) or a finished Q&A answer — never mid-gather.
           if(acc&&!oppCtx&&(turnDoc||String(acc).trim().length>=80))followups(aEl,q,acc);
           release(); body.scrollTop=body.scrollHeight; }
@@ -11532,6 +11696,13 @@ const ASK_MINDY_JS = `<script>(function(){
   // Customer-safe failure text (B2): only these exact strings are shown verbatim; anything else becomes the
   // generic one. Kept identical to src/lib/chat/customer-errors.ts (ask-window-stop-errors.unit.test.ts).
   var SAFE_ERR=["Mindy couldn't answer right now. Nothing was wrong with your question. Please try again in a moment.","Something went wrong while Mindy was answering, so this answer is incomplete. Please try again.","Couldn't reach Mindy. Check your connection and try again.","Mindy is temporarily unavailable. Please try again in a moment.","That question pulled in more data than Mindy can read at once. Try narrowing it, for example to one agency, state or contract type.","Mindy took too long to answer, so this answer is incomplete. Please try again, or narrow the question."];
+  function addNotice(aEl,text){
+    var box=aEl.querySelector('.amk-notices');
+    if(!box){ box=document.createElement('div'); box.className='amk-notices'; box.setAttribute('role','status'); box.setAttribute('data-testid','amk-notices'); aEl.appendChild(box); }
+    if(box.children.length>=6) return; // a runaway stream cannot bury the answer
+    var n=document.createElement('div'); n.className='amk-notice'; n.textContent=String(text).slice(0,300); box.appendChild(n);
+    body.scrollTop=body.scrollHeight;
+  }
   function safeErr(m){ return (typeof m==='string'&&SAFE_ERR.indexOf(m)>=0)?m:SAFE_ERR[0]; }
   // Card chat out of credits: say what an answer costs and what they hold; Pro is the next step. No new grant.
   function creditsWall(bub,d){
@@ -11544,11 +11715,18 @@ const ASK_MINDY_JS = `<script>(function(){
   // endpoint the /app panel uses (POST /api/app/chat/suggestions). The old version appended the same four
   // fixed chips under every answer (2026-11-15). No chips when the endpoint returns none or fails.
   function clearFollowups(){ var old=body.querySelectorAll('.amk-act.amk-fu'); for(var i=0;i<old.length;i++){ if(old[i].parentNode)old[i].parentNode.removeChild(old[i]); } }
+  // The customer's earlier questions (last 6, not the current one), so a suggested next step never asks for
+  // something they already said. Same contract as the /app panel (the "earlier" field of POST /api/app/chat/suggestions).
+  function earlierAsks(q){
+    var u=history.filter(function(h){ return h&&h.role==='user'&&typeof h.content==='string'; }).map(function(h){ return h.content; });
+    if(u.length&&u[u.length-1]===q) u.pop();
+    return u.slice(-6);
+  }
   function followups(aEl,q,answer){
     clearFollowups();
     var t=tok(), em=email(); if(!t||!em)return;
     var mine=aEl;
-    fetch('/api/app/chat/suggestions',{method:'POST',headers:{'Content-Type':'application/json','x-mi-auth-token':t,'x-user-email':em},body:JSON.stringify({email:em,message:q,answer:String(answer||'').slice(0,6000)})})
+    fetch('/api/app/chat/suggestions',{method:'POST',headers:{'Content-Type':'application/json','x-mi-auth-token':t,'x-user-email':em},body:JSON.stringify({email:em,message:q,answer:String(answer||'').slice(0,6000),earlier:earlierAsks(q)})})
       .then(function(r){ return r.ok?r.json():null; })
       .then(function(d){
         var list=(d&&Array.isArray(d.suggestions))?d.suggestions.filter(function(x){ return typeof x==='string'&&x.trim(); }).slice(0,3):[];
@@ -11953,10 +12131,10 @@ export async function GET(request: NextRequest) {
     html = html.replace('__AGENCY_PRESETS__', () => JSON.stringify(AGENCY_PRESETS));
     html = html.replace('__FSC_PRESETS__', () => JSON.stringify(FSC_PRESETS));
   }
-  // Object-specific social metadata for a shared opportunity. Unknown/missing notice → the page stays
-  // exactly as before (generic title); the authenticated Maps experience is untouched either way.
+  // Object-specific social metadata for a shared opportunity. Unknown/missing notice → the default
+  // map head (title, description, canonical, og/twitter); the authenticated Maps experience is untouched.
   const shareHead = await shareHeadP;
-  if (shareHead) html = repl(html, '<title>Mindy Map</title>', shareHead);
+  html = applyMapHead(html, shareHead, reqUrl.origin);
   // ?shell=app — this map inside the signed-in app's shell (/app?panel=map). Hides ONLY .zhead/.zrail
   // and adds the parent bridge; data, boot and fetch behaviour are untouched (see app-shell.ts).
   // Never for ?embed= (a different, static mode with its own boot rules).

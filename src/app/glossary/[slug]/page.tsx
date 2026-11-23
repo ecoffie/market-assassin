@@ -15,6 +15,7 @@
  * Breadcrumbs sit above the H1 for both SEO and human navigation.
  */
 import type { Metadata } from 'next';
+import { siteShareImages } from '@/lib/seo/share-image';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import {
@@ -67,6 +68,13 @@ export async function generateMetadata({
       description: trimmedDef,
       type: 'article',
       url: `https://getmindy.ai/glossary/${term.slug}`,
+      images: siteShareImages(),
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: `${term.term} — Federal Contracting Glossary | Mindy`,
+      description: trimmedDef,
+      images: siteShareImages(),
     },
     keywords: [
       term.term.toLowerCase(),
@@ -232,7 +240,7 @@ export default async function GlossaryTermPage({
                 href="/pricing"
                 className="inline-block px-6 py-3 bg-(--mp-navy) hover:bg-(--mp-navy-hover) text-white rounded-lg font-semibold transition"
               >
-                Start for free
+                Start 14-day free trial
               </Link>
             </div>
           </article>
@@ -292,7 +300,7 @@ export default async function GlossaryTermPage({
             href="/pricing"
             className="inline-block px-8 py-4 bg-(--mp-navy) hover:bg-(--mp-navy-hover) text-white rounded-lg font-bold text-lg transition-colors"
           >
-            Meet Mindy — Start for free
+            Meet Mindy — Start 14-day free trial
           </Link>
           <p className="text-(--mp-muted) text-sm mt-4">
             14-day free trial. Cancel anytime. First briefing lands tomorrow morning.

@@ -16,6 +16,7 @@
  *   government is actively trying to drive more work to HUBZones
  */
 import type { Metadata } from 'next';
+import { siteShareImages } from '@/lib/seo/share-image';
 import Link from 'next/link';
 
 export const metadata: Metadata = {
@@ -40,6 +41,7 @@ export const metadata: Metadata = {
       'Mindy filters SAM.gov, agency forecasts, and recompetes for HUBZone set-asides and flags the 10% price preference on full-and-open bids.',
     type: 'website',
     url: 'https://getmindy.ai/set-asides/hubzone',
+    images: siteShareImages(),
   },
 };
 

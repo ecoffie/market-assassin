@@ -3,6 +3,7 @@ import { fetchAllPaged } from '@/lib/supabase/paged-read';
 import { createClient } from '@supabase/supabase-js';
 import { kv } from '@vercel/kv';
 import { sendEmail } from '@/lib/send-email';
+import { treatmentUpgradeDashboardUrl } from '@/lib/email/admin-outreach-destinations';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
@@ -1512,7 +1513,7 @@ function generateUpgradeNotificationEmail(
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
                 <tr>
                   <td align="center" style="padding: 20px 0;">
-                    <a href="https://getmindy.ai/briefings"
+                    <a href="${treatmentUpgradeDashboardUrl(email)}"
                        style="display: inline-block; background: linear-gradient(135deg, #059669 0%, #10b981 100%); color: #ffffff; padding: 16px 40px; font-size: 18px; font-weight: 600; text-decoration: none; border-radius: 8px; box-shadow: 0 4px 14px rgba(16, 185, 129, 0.4);">
                       View Your Dashboard →
                     </a>

@@ -17,6 +17,7 @@
  * results live on each /glossary/[slug] page.
  */
 import type { Metadata } from 'next';
+import { siteShareImages } from '@/lib/seo/share-image';
 import Link from 'next/link';
 import { glossaryTerms } from '@/data/glossary';
 
@@ -43,6 +44,14 @@ export const metadata: Metadata = {
       '45+ federal contracting acronyms and terms defined in plain English. From CAGE codes to IDIQs, the vocabulary you need to win federal work.',
     type: 'website',
     url: 'https://getmindy.ai/glossary',
+    images: siteShareImages(),
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'GovCon Glossary — Federal Contracting Terms Explained | Mindy',
+    description:
+      '45+ federal contracting acronyms and terms defined in plain English. From CAGE codes to IDIQs, the vocabulary you need to win federal work.',
+    images: siteShareImages(),
   },
 };
 
@@ -156,7 +165,7 @@ export default function GlossaryIndexPage() {
             href="/pricing"
             className="inline-block px-8 py-4 bg-(--mp-navy) hover:bg-(--mp-navy-hover) text-white rounded-lg font-bold text-lg transition-colors"
           >
-            Start for free
+            Start 14-day free trial
           </Link>
           <p className="text-(--mp-muted) text-sm mt-4">
             14-day free trial. Cancel anytime. First briefing lands tomorrow morning.
@@ -238,7 +247,7 @@ export default function GlossaryIndexPage() {
             href="/pricing"
             className="inline-block px-8 py-4 bg-(--mp-navy) hover:bg-(--mp-navy-hover) text-white rounded-lg font-bold text-lg transition-colors"
           >
-            Meet Mindy — Start for free
+            Meet Mindy — Start 14-day free trial
           </Link>
           <p className="text-(--mp-muted) text-sm mt-4">
             500+ small businesses already wake up to a Mindy briefing.

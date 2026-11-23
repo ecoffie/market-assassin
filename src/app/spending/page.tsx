@@ -4,6 +4,7 @@
  * Supabase (built weekly by /api/cron/build-recent-spending). Grounded, never faked.
  */
 import type { Metadata } from 'next';
+import { siteShareImages } from '@/lib/seo/share-image';
 import Link from 'next/link';
 import ShareButton from '@/components/ShareButton';
 import { getRecentBigAwards } from '@/lib/discover/recent-spending';
@@ -25,11 +26,13 @@ export const metadata: Metadata = {
     url: `${SITE_URL}/spending`,
     type: 'website',
     siteName: 'Mindy',
+    images: siteShareImages(),
   },
   twitter: {
     card: 'summary_large_image',
     title: 'The Latest Big Federal Contracts',
     description: 'The biggest federal contracts the government has awarded recently. Real and verifiable.',
+    images: siteShareImages(),
   },
 };
 

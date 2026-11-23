@@ -17,6 +17,7 @@
  * SERP), and FAQPage (mirrors the visible FAQ for rich results).
  */
 import type { Metadata } from 'next';
+import { siteShareImages } from '@/lib/seo/share-image';
 import Link from 'next/link';
 
 export const metadata: Metadata = {
@@ -40,6 +41,7 @@ export const metadata: Metadata = {
       'Same federal market intelligence as GovWin (opportunities, recompetes, forecasts) at 1% of the price. No sales call, no annual contract.',
     type: 'website',
     url: 'https://getmindy.ai/compare/govwin',
+    images: siteShareImages(),
   },
 };
 
@@ -273,7 +275,7 @@ export default function GovWinComparePage() {
             href="/pricing"
             className="inline-block px-8 py-4 bg-(--mp-navy) hover:bg-(--mp-navy-hover) text-white rounded-lg font-bold text-lg transition-colors"
           >
-            Start for free
+            Start 14-day free trial
           </Link>
           <p className="text-(--mp-muted) text-sm mt-4">First briefing lands tomorrow morning.</p>
         </div>
@@ -573,7 +575,7 @@ export default function GovWinComparePage() {
             href="/pricing"
             className="inline-block px-10 py-4 bg-white hover:bg-(--mp-wash) text-(--mp-navy) rounded-lg font-bold text-lg transition-colors"
           >
-            Start for free
+            Start 14-day free trial
           </Link>
           <p className="text-(--mp-muted) text-sm mt-4">
             14-day free trial. No sales call. Cancel anytime.

@@ -81,7 +81,7 @@ export interface AnswerContext {
   not_checked: Array<{ step: string; state: string; reason: string }>;
 }
 
-type HorizonLike = { status?: string; items?: Array<Record<string, unknown>>; matched_count?: number | null };
+export type HorizonLike = { status?: string; items?: Array<Record<string, unknown>>; matched_count?: number | null };
 
 /** The find_opportunities result from a Where to start run, if that step ran. */
 function findResult(run: RecipeRun): { horizons?: Partial<Record<HorizonKey, HorizonLike>> } | null {
@@ -96,11 +96,26 @@ function profileIsEmpty(p: CompanyProfile): boolean {
 
 /** Where to start: rank every horizon's results for this company and keep the best, explained. */
 export function composeWhereToStart(run: RecipeRun, profile: CompanyProfile, opts: { queryConcepts?: string[]; nowMs?: number } = {}): AnswerContext {
+  const ranked = rankFindResult(findResult(run), profile, opts);
+  const not_checked = run.status === 'ran'
+    ? run.steps.filter((s) => s.outcome.state !== 'ok').map((s) => ({ step: s.id, state: s.outcome.state, reason: (s.outcome as { reason: string }).reason }))
+    : [{ step: 'recipe', state: 'not_implemented', reason: 'recipe not built' }];
+  return { ...ranked, not_checked };
+}
+
+/**
+ * Ranks a find_opportunities result (as the chat route already holds it) for this company. The chat wiring
+ * calls this directly; composeWhereToStart calls it for a recipe run.
+ */
+export function rankFindResult(
+  result: { horizons?: Partial<Record<HorizonKey, HorizonLike>> } | null,
+  profile: CompanyProfile,
+  opts: { queryConcepts?: string[]; nowMs?: number } = {},
+): Omit<AnswerContext, 'not_checked'> {
   const fitProfile = toFitProfile(profile, opts.queryConcepts);
   const candidates: TopPick[] = [];
   let related = 0;
   const horizons: AnswerContext['horizons'] = [];
-  const result = findResult(run);
 
   for (const key of HORIZON_KEYS) {
     const h = result?.horizons?.[key];
@@ -127,18 +142,52 @@ export function composeWhereToStart(run: RecipeRun, profile: CompanyProfile, opt
     }
   }
 
-  const not_checked = run.status === 'ran'
-    ? run.steps.filter((s) => s.outcome.state !== 'ok').map((s) => ({ step: s.id, state: s.outcome.state, reason: (s.outcome as { reason: string }).reason }))
-    : [{ step: 'recipe', state: 'not_implemented', reason: 'recipe not built' }];
-
   return {
     top_picks: candidates.sort((a, b) => b.score - a.score).slice(0, MAX_TOP_PICKS),
     related_count: related,
     horizons,
     profile_gaps: { unknown: profile.unknown, unavailable: profile.unavailable ?? [] },
     next_steps: profileIsEmpty(profile) ? [PROFILE_COMPLETION_STEP] : [],
-    not_checked,
   };
+}
+
+const HORIZON_WORDS: Readonly<Record<HorizonKey, string>> = { open_now: 'Open now', coming_back: 'Coming back', coming_soon: 'Coming soon (forecast)' };
+
+/**
+ * The answer-prompt note for a ranked find result, or null when there is nothing to rank. It orders and explains;
+ * it never adds a fact the tool result does not hold, and it never prints a score.
+ */
+export interface FitRankingNoteOpts {
+  /**
+   * 'answer' (default): the ranking IS the answer's order (the #2285 FIND answer).
+   * 'strategy_input': the fit order is ONE input to a strategy's prioritization, weighed with award history,
+   * vehicles, competition, buyer relationships, timing and the customer's objective. Same picks and reasons; it
+   * never tells the writer the order is final. It adds no score and no second scoring system.
+   */
+  mode?: 'answer' | 'strategy_input';
+}
+
+export function fitRankingNote(ctx: Omit<AnswerContext, 'not_checked'>, opts: FitRankingNoteOpts = {}): string | null {
+  const unavailable = ctx.horizons.filter((h) => h.status === 'unavailable').map((h) => HORIZON_WORDS[h.horizon]);
+  const notes = ctx.horizons.filter((h) => h.coverage_note).map((h) => `${HORIZON_WORDS[h.horizon]}: ${h.coverage_note}`);
+  if (!ctx.top_picks.length && !ctx.related_count && !unavailable.length) return null;
+  const strategy = opts.mode === 'strategy_input';
+  const lines = [
+    strategy
+      ? 'FIT SIGNAL (opportunity fit computed for this company by Mindy\'s shared fit scorer from the find_opportunities result above; one input to prioritization, not the final order):'
+      : 'FIT RANKING (computed for this company by Mindy\'s shared fit scorer from the find_opportunities result above; use it, do not re-rank):',
+    ctx.top_picks.length
+      ? (strategy
+        ? 'STRONGEST FIT, listed by fit, each with its fit reason. Never print or cite a score.'
+        : 'TOP PICKS, best first. Present these as the top picks in this order, each with its "why" in plain words. Never print a score.')
+      : 'No result cleared the fit threshold for this company. Say so plainly; do not present weaker results as top picks.',
+    ...ctx.top_picks.map((p, i) => `${i + 1}. ${p.title}${p.buyer ? `, ${p.buyer}` : ''} [${HORIZON_WORDS[p.horizon]}${p.date_label ? `; ${p.date_label}` : ''}${p.value_label ? `; ${p.value_label}` : ''}]. Why: ${p.why}${p.route === 'subcontract' ? ' (Subcontract route: do not present this as work the company can bid as prime.)' : ''}${p.evidence_note ? ` Note: ${p.evidence_note}.` : ''}`),
+    ...(ctx.related_count ? [`${ctx.related_count} more result(s) are related but a weaker fit: mention they exist and offer to show them; do not list them.`] : []),
+    ...(unavailable.length ? [`Could not be checked this turn (unavailable, not zero): ${unavailable.join(', ')}.`] : []),
+    ...notes,
+    ...(ctx.next_steps.length ? [`Optional next step to offer at the end (never before the answer): ${ctx.next_steps.join('; ')}.`] : []),
+  ];
+  return lines.join('\n');
 }
 
 // ---------------------------------------------------------------------------------------------------------------

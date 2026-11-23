@@ -18,6 +18,7 @@
  * visible FAQ for rich results.
  */
 import type { Metadata } from 'next';
+import { siteShareImages } from '@/lib/seo/share-image';
 import Link from 'next/link';
 
 export const metadata: Metadata = {
@@ -41,6 +42,7 @@ export const metadata: Metadata = {
       'Stop scrolling SAM.gov. Get personalized daily briefings with incumbent data, recompete alerts, and AI fit scoring SAM.gov cannot deliver.',
     type: 'website',
     url: 'https://getmindy.ai/compare/sam-gov',
+    images: siteShareImages(),
   },
 };
 
@@ -251,7 +253,7 @@ export default function SamGovComparePage() {
             href="/pricing"
             className="inline-block px-8 py-4 bg-(--mp-navy) hover:bg-(--mp-navy-hover) text-white rounded-lg font-bold text-lg transition-colors"
           >
-            Start for free
+            Start 14-day free trial
           </Link>
           <p className="text-(--mp-muted) text-sm mt-4">First briefing lands tomorrow morning.</p>
         </div>
@@ -523,7 +525,7 @@ export default function SamGovComparePage() {
             href="/pricing"
             className="inline-block px-10 py-4 bg-white hover:bg-(--mp-wash) text-(--mp-navy) rounded-lg font-bold text-lg transition-colors"
           >
-            Start for free
+            Start 14-day free trial
           </Link>
           <p className="text-(--mp-muted) text-sm mt-4">
             You&apos;ll still use SAM.gov. You just won&apos;t live there anymore.

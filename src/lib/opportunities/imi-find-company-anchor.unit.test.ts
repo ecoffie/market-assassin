@@ -405,6 +405,9 @@ describe('findOpportunities end-to-end (fake client, frozen rows)', () => {
     // The frozen fixtures carry real Sources Sought / Presolicitation notices → the respond-early rule is present.
     expect(res.summary.respond_early.returned_count).toBeGreaterThan(0);
     expect(res.presentation.host_rules).toEqual([...HOST_RULES_FIND_FIRST_VALUE, ...HOST_RULES_RESPOND_EARLY, ...HOST_RULES_COMPANY_ANCHORED]);
+    // IMI's fixture registration is Z2 "All Awards": the company block reports it, with no warning.
+    expect(res.company?.registration_readiness).toMatchObject({ purpose_code: 'Z2', contract_awards: 'registered' });
+    expect(res.company?.registration_readiness?.warning).toBeUndefined();
   });
 
   it('no uei → beginner flow unchanged: no company block, no eligibility, P2 host_rules only', async () => {

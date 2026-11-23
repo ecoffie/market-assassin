@@ -130,11 +130,16 @@ function fakeClient() {
 }
 
 const SENT: Array<{ to: string; subject: string; html: string }> = [];
+let BLOCK_REASON: string | null = null;
 
 vi.mock('@supabase/supabase-js', () => ({ createClient: () => fakeClient() }));
 vi.mock('@/lib/supabase/server-clients', () => ({ getReadClient: () => fakeClient() }));
 vi.mock('@/lib/send-email', () => ({
-  sendEmail: async (m: { to: string; subject: string; html: string }) => { SENT.push(m); return true; },
+  // BLOCK_REASON simulates sendEmail()'s guard: it reports the reason via onBlocked and returns false.
+  sendEmail: async (m: { to: string; subject: string; html: string; onBlocked?: (r: string) => void }) => {
+    if (BLOCK_REASON) { m.onBlocked?.(BLOCK_REASON); return false; }
+    SENT.push(m); return true;
+  },
 }));
 vi.mock('@/lib/intelligence', () => {
   class IntelligenceMetrics { constructor() { return new Proxy(this, { get: (_t, p) => (p === 'getSnapshot' ? () => ({}) : () => undefined) }); } }
@@ -187,7 +192,7 @@ beforeAll(async () => {
   ({ POST } = await import('./route'));
 });
 
-beforeEach(() => { SENT.length = 0; ALERT_LOG.clear(); SAM_MODE = 'error'; SAM_READS = 0; GRANTS = []; COMING_BACK = { kind: 'omit', reason: 'no_naics_market' }; USER_OVERRIDES = {}; });
+beforeEach(() => { BLOCK_REASON = null; SENT.length = 0; ALERT_LOG.clear(); SAM_MODE = 'error'; SAM_READS = 0; GRANTS = []; COMING_BACK = { kind: 'omit', reason: 'no_naics_market' }; USER_OVERRIDES = {}; });
 
 /** A scheduled-style run scoped to the one user. NOT forceResend: the same-day guard must be exercised. */
 async function run() {
@@ -445,5 +450,22 @@ describe('partial-send dedupe across days — the real job, three phases', () =>
     // Day 2: the Open item was recorded Day 1, so it is deduped out of the new list (it may only
     // reappear through the existing "resurface active deadlines" fallback); Coming Back + grant repeat.
     expect(has(SENT[1].html)).toMatchObject({ comingBack: true, grant: true });
+  });
+});
+
+describe('daily-alerts cron — a guard-blocked send records WHY, without changing error_message', () => {
+  it.each([
+    ['suppressed:hard_bounce'],
+    ['suppression_check_failed'],
+    ['synthetic_client_address'],
+  ])('guard reason %s → skipped/send_guard_blocked with guard_reason in the context', async (reason) => {
+    SAM_MODE = 'rows';
+    BLOCK_REASON = reason;
+    await run();
+    const row = todayRow()!;
+    expect(row.delivery_status).toBe('skipped');
+    expect(row.error_message).toBe('send_guard_blocked'); // exact string other monitors match on
+    expect((row.opportunities_data as Row[])[0]).toMatchObject({ guard_reason: reason });
+    expect(SENT).toHaveLength(0);
   });
 });

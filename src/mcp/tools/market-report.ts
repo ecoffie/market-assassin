@@ -27,6 +27,7 @@ import { detectUndercount } from '@/lib/market/undercount-signal';
 import { resolveMarketScope, filtersForScope, fetchSpendingCategory, buildSpendingFilters } from '@/lib/market/spend-query';
 import { expiringContracts } from '@/mcp/tools/expiring-contracts';
 import { queryFederalContacts } from '@/lib/gov-contacts/contact-roster';
+import { isValidOfficeCode } from '@/lib/gov-contacts/dodaac-prefix';
 import { displayContactName } from '@/lib/gov-contacts/contact-quality';
 import { agencyForecasts } from '@/mcp/tools/forecasts';
 import { getAgencySpendingDetailTool } from '@/mcp/tools/agency-spending-detail';
@@ -46,6 +47,12 @@ import {
   dedupeRecompetes,
   normalizeForecastSetAside,
   presentRecompete,
+  recompeteProvenance,
+  recompeteSourceSummary,
+  contactsAsOf,
+  CONTACTS_SOURCE_LABEL,
+  type RecompeteProvenance,
+  type RecompeteSourceLabel,
 } from '@/lib/market/report-presentation';
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://getmindy.ai';
@@ -184,6 +191,9 @@ export interface MarketReportSummary {
     window: string | null;
     state_scoped: boolean;
     requested_state: string | null;
+    /** The headline is never agency-scoped: false + requested_agency discloses that it covers ALL buyers. */
+    agency_scoped: boolean;
+    requested_agency: string | null;
     /** Measurement terms that recovered the market — evidence, not a rename. */
     identity_resolved_via: string[] | null;
   } | null;
@@ -224,9 +234,25 @@ export interface MarketReportContacts {
   /** The buying office the roster is anchored on, when one is identifiable. */
   office: string | null;
   /** A few real, emailable POCs (CO / small-business / specialists). */
-  people: Array<{ name: string; role: string; email: string; office: string | null }>;
+  people: Array<{
+    name: string; role: string; email: string; office: string | null;
+    /** Row provenance: the SAM notice this person was listed on as POC. null fields = not stated (never a default). */
+    source: { kind: 'sam_notice_poc'; solicitation_number: string | null; notice_posted: string | null };
+  }>;
+  /** Where these people come from (federal_contacts, government buyers only). */
+  source_label?: typeof CONTACTS_SOURCE_LABEL;
+  /** Newest notice_posted among the shown people; null when none states one. */
+  as_of?: string | null;
+  as_of_label?: 'most recent notice listing these contacts';
   /** Total matched (before the display cap) so truncation is explicit. */
   total: number;
+  /**
+   * WHY these people. 'market_awarding_offices' = staff who post solicitations for the contracting
+   * offices that awarded this market's in-scope expiring contracts (office_codes = PIID prefixes).
+   * 'department_roster' = the agency's general roster — NOT specific to this market or state.
+   */
+  basis?: 'market_awarding_offices' | 'department_roster';
+  office_codes?: string[];
 }
 
 /**
@@ -283,7 +309,11 @@ export interface MarketReportResult {
      *  when nothing was cut. */
     top_agencies_total: number;
     competition: { contractors: unknown[]; count: number };
-    recompetes: { contracts: unknown[]; count: number };
+    recompetes: {
+      contracts: unknown[]; count: number;
+      /** Distinct row source labels with counts (contracts[i].provenance); "not_stated" = no evidence on the row. */
+      sources?: Array<{ label: RecompeteSourceLabel | 'not_stated'; count: number }>;
+    };
     forecasts: { forecasts: unknown[]; count: number };
     /** Who to call — the market's #1 buyer's office + a few real contacts. */
     contacts: MarketReportContacts | null;
@@ -398,6 +428,22 @@ async function unionSpendingCategory(
   return [...merged.values()]
     .sort((a, b) => b.amount - a.amount)
     .slice(0, limit);
+}
+
+
+/**
+ * The contracting offices behind a market: the 6-char office prefix of each in-scope contract's PIID
+ * (DoD DoDAAC or civilian code, e.g. 36C248), most frequent first, at most 3. Orders contribute their
+ * own PIID prefix (the ordering office). Codes that are not office-shaped are skipped.
+ */
+export function marketOfficeCodes(contracts: Array<Record<string, unknown>>, max = 3): string[] {
+  const counts = new Map<string, number>();
+  for (const c of contracts) {
+    const code = String(c.piid ?? '').toUpperCase().trim().slice(0, 6);
+    if (!isValidOfficeCode(code)) continue;
+    counts.set(code, (counts.get(code) ?? 0) + 1);
+  }
+  return [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, max).map(([c]) => c);
 }
 
 export async function generateMarketReport(input: MarketReportInput): Promise<MarketReportResult> {
@@ -600,7 +646,9 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
 
   const contractors = competitionR.value?.contractors ?? [];
   // LIST — one row per customer-visible record, labelled for what it is.
-  const contracts = dedupeRecompetes((recompetesR.value?.contracts ?? []) as Array<Record<string, unknown>>).map((c) => presentRecompete(c));
+  // Each row carries its own provenance, from evidence on the row (report-presentation.recompeteProvenance).
+  const contracts = dedupeRecompetes((recompetesR.value?.contracts ?? []) as Array<Record<string, unknown>>)
+    .map((c) => ({ ...presentRecompete(c), provenance: recompeteProvenance(c) }));
   const forecastDedupe = dedupeForecasts(forecastsR.value?.forecasts ?? []);
   const forecasts = forecastDedupe.rows.map((f) => ({
     ...f,
@@ -628,28 +676,59 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
   const contactAgency = agency || topAgencies[0]?.name || '';
   const CONTACTS_CAP = 6;
   let contactsSection: MarketReportContacts | null = null;
-  if (contactAgency) {
+  const toPeople = (rows: Awaited<ReturnType<typeof queryFederalContacts>>['contacts']) => rows
+    .filter((c) => (c.contact_email || '').includes('@'))
+    .map((c) => ({
+      // The roster appends phone/DSN junk to the name on 12.8% of rows ("Stephen
+      // Weaver6142923131", "Natalya RadykDSN312-850-4033"). This cleaner used to live ONLY
+      // here, so the report showed clean names while every other surface showed the raw
+      // pollution. It is now the shared contract.
+      name: displayContactName(c.contact_fullname) || '',
+      role: c.role_category_label || c.contact_title || c.role || '',
+      email: c.contact_email || '',
+      // Name the contracting office AND its code ("NETWORK CONTRACT OFFICE 8 (36C248)") so a reader knows which
+      // buying office this person posts for (Claude Local, 2026-11-22). Code only when the roster derived one.
+      office: c.office_code
+        ? `${c.derived_office || 'Contracting office'} (${c.office_code})`
+        : (c.derived_office || c.sub_agency || null),
+      office_code: c.office_code ?? null,
+      source: {
+        kind: 'sam_notice_poc' as const,
+        solicitation_number: c.notice_solicitation_number ?? null,
+        notice_posted: c.notice_posted_date ?? null,
+      },
+    }))
+    .filter((p) => p.name && p.email)
+    .slice(0, CONTACTS_CAP);
+  // 1) The offices that actually award THIS market: the contracting-office prefix of the in-scope
+  //    expiring contracts' PIIDs (already scoped by NAICS/keyword, agency and state). The department
+  //    roster ranked by recency returned Army Corps staff in Mobile/Pittsburgh for a GA janitorial
+  //    report and generic VA staff for a VA construction report (2026-11-22).
+  const officeCodes = marketOfficeCodes((recompetesR.value?.contracts ?? []) as Array<Record<string, unknown>>);
+  if (officeCodes.length) {
+    const roster = (await guard(queryFederalContacts({ officeCodes, limit: CONTACTS_CAP * 3 }))).value;
+    const people = toPeople(roster?.contacts ?? []);
+    if (people.length) {
+      contactsSection = {
+        agency: contactAgency || String((recompetesR.value?.contracts?.[0] as { awarding_agency?: string } | undefined)?.awarding_agency || ''),
+        office: people[0].office, people, total: roster?.total ?? people.length,
+        basis: 'market_awarding_offices', office_codes: officeCodes,
+        source_label: CONTACTS_SOURCE_LABEL, as_of: contactsAsOf(people), as_of_label: 'most recent notice listing these contacts',
+      };
+    }
+  }
+  // 2) Fallback: the agency's general roster, labelled as such (not market- or state-specific).
+  if (!contactsSection && contactAgency) {
     const roster = (await guard(queryFederalContacts({ agency: contactAgency, limit: CONTACTS_CAP * 3 }))).value;
-    const people = (roster?.contacts ?? [])
-      .filter((c) => (c.contact_email || '').includes('@'))
-      .map((c) => ({
-        // The roster appends phone/DSN junk to the name on 12.8% of rows ("Stephen
-        // Weaver6142923131", "Natalya RadykDSN312-850-4033"). This cleaner used to live ONLY
-        // here, so the report showed clean names while every other surface showed the raw
-        // pollution. It is now the shared contract.
-        name: displayContactName(c.contact_fullname) || '',
-        role: c.role_category_label || c.contact_title || c.role || '',
-        email: c.contact_email || '',
-        office: c.derived_office || c.sub_agency || null,
-      }))
-      .filter((p) => p.name && p.email)
-      .slice(0, CONTACTS_CAP);
+    const people = toPeople(roster?.contacts ?? []);
     if (people.length) {
       contactsSection = {
         agency: contactAgency,
         office: people[0].office,
         people,
         total: roster?.total ?? people.length,
+        basis: 'department_roster',
+        source_label: CONTACTS_SOURCE_LABEL, as_of: contactsAsOf(people), as_of_label: 'most recent notice listing these contacts',
       };
     }
   }
@@ -779,6 +858,9 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
        */
       state_scoped: false,
       requested_state: state ?? null,
+      // Nor is it agency-scoped: keywordCoverage / codeMarketSize ignore the agency (VA report 2026-11-22).
+      agency_scoped: false,
+      requested_agency: agency || null,
       /** What resolved identity when the literal phrase measured nothing (RC-1). */
       identity_resolved_via: coverage?.identityResolvedVia ?? null,
     };
@@ -846,7 +928,7 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
     top_agencies: topAgencies,
     top_agencies_total: agenciesWithSpend.length,
     competition: { contractors, count: contractors.length },
-    recompetes: { contracts, count: contracts.length },
+    recompetes: { contracts, count: contracts.length, sources: recompeteSourceSummary(contracts.map((c) => c.provenance as RecompeteProvenance)) },
     forecasts: { forecasts, count: forecasts.length },
     contacts: contactsSection,
     agency_detail: agencyDetailR.value ?? null,

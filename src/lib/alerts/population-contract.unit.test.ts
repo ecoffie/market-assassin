@@ -93,7 +93,10 @@ describe('the shipped surfaces satisfy the contract', () => {
     const SRC = read('src/app/api/cron/daily-alerts/route.ts');
     // totalCount = contracts + grants; moreCount and the panel are contracts-only.
     expect(SRC).not.toMatch(/View all \$\{totalCount\} new matches/);
-    expect(SRC).toMatch(/ctaLabel = isUsingFallback/);
+    // The view-all CTA names the email remainder and the Map destination separately — no count
+    // or "new" claim on the link (daily-alert-view-all.ts).
+    expect(SRC).toMatch(/viewAllCta = dailyAlertViewAllCta\(/);
+    expect(SRC).not.toMatch(/View all \$\{opportunities\.length\}/);
   });
 
   it('daily-alerts drops the "new" claim on the fallback path — subject and header', () => {

@@ -1674,8 +1674,9 @@ server.registerTool(
     annotations: { readOnlyHint: true, openWorldHint: true },
     description:
       'The statutory government-wide small-business goals (SB 23% · WOSB 5% · SDB/8(a) 5% · SDVOSB 3% · HUBZone 3%) set ' +
-      "against an agency's ACTUAL set-aside obligations from USASpending, per category, with the gap and a meets/below " +
-      'flag. Actuals measure set-aside CODE dollars — a floor on, not identical to, the official SBA Scorecard number.',
+      "against an agency's ACTUAL set-aside obligations from USASpending, per category, with the gap and an above/below " +
+      'flag. A SET-ASIDE-BASED INDICATOR, not an official SBA goaling scorecard: actuals measure set-aside CODE dollars — ' +
+      'a floor on, not identical to, the official SBA Scorecard number.',
     inputSchema: {
       agency: z.string().describe('Agency name or abbreviation, e.g. "Department of Defense", "VA", "NASA".'),
       fiscal_year: z.number().optional().describe('Fiscal year (defaults to the latest complete FY).'),

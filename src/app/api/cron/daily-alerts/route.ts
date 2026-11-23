@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { dailyAlertViewAllCta } from '@/lib/alerts/daily-alert-view-all';
 import { MINDY_DAY } from '@/lib/mindy/mindy-day';
 import { createClient } from '@supabase/supabase-js';
 import {
@@ -1097,6 +1098,9 @@ async function runDailyAlertJob(options?: {
         // Send email - now includes all active opportunities for deadline tracking and action tips
         try {
           metrics.recordEmailAttempted();
+          // The guard's exact reason (suppressed:<r> / suppression_check_failed /
+          // synthetic_client_address). Kept in the row's context, not error_message.
+          let guardReason: string | null = null;
           const emailDelivered = await sendDailyAlertEmail(
             user.user_email,
             scoredOpps,
@@ -1110,6 +1114,7 @@ async function runDailyAlertJob(options?: {
               openKeywordNote: openUnavailable ? undefined : (openMarketNote(openKeywordOutcome ?? 'no_keywords_configured', keywordScan) ?? undefined),
               comingBack,
               openUnavailable: !!openUnavailable,
+              onBlocked: (reason) => { guardReason = reason; },
             },
             todaysLens,
             isUsingFallback,
@@ -1122,10 +1127,13 @@ async function runDailyAlertJob(options?: {
           // NO email actually left — making a real non-delivery invisible to every
           // "who didn't get an alert" query. Record it as a visible skip instead.
           if (emailDelivered === false) {
+            // error_message stays exactly 'send_guard_blocked' (watch-key-accounts and
+            // throughput-digest match on it); the reason rides in the context object.
             await saveSkippedAlert(user.user_email, 'send_guard_blocked', {
               opportunitiesCount: scoredOpps.length + scoredGrants.length,
+              guard_reason: guardReason,
             });
-            console.warn(`[Daily Alerts] ⚠️ Send guard blocked ${user.user_email} (suppression or daily cap) — recorded as skipped, NOT sent`);
+            console.warn(`[Daily Alerts] ⚠️ Send guard blocked ${user.user_email} (${guardReason ?? 'reason not reported'}) — recorded as skipped, NOT sent`);
             results.skipped++;
             continue;
           }
@@ -1617,6 +1625,8 @@ async function sendDailyAlertEmail(
     comingBack?: ComingBackDecision;
     /** Open search failed on every same-day attempt: render OPEN_UNAVAILABLE_LINE, claim no count and no zero. */
     openUnavailable?: boolean;
+    /** Passed through to sendEmail(): receives the send guard's reason when it blocks. */
+    onBlocked?: (reason: string) => void;
   },
   todaysLens?: TodaysLens | null,
   /**
@@ -1716,7 +1726,7 @@ async function sendDailyAlertEmail(
   // style. One system now: warm white, dark ink, thin rules, restrained accents.
   //
   // SHOW THE BEST 5, NOT ALL OF THEM. The email answers "what changed that I need to
-  // know?", not "here is the database" — the rest live behind an honest "View all N".
+  // know?", not "here is the database" — the rest live behind an honest link to the Map.
   const EMAIL_ROW_LIMIT = 5;
   const shownOpps = opportunities.slice(0, EMAIL_ROW_LIMIT);
 
@@ -1815,22 +1825,20 @@ function mindyDayBannerHtml(): string {
   // market", which is a different action and is labelled separately at the foot.
   const moreCount = Math.max(0, opportunities.length - EMAIL_ROW_LIMIT);
 
-  // THE CTA MUST NAME THE POPULATION IT LANDS ON. Two things were wrong here:
-  //
-  //  1. It printed totalCount (contracts + grants) while moreCount is contracts-only, and
-  //     /app?panel=alerts renders NO grants at all. "View all 10" with 6 contracts + 4 grants
-  //     sent the user to a panel holding 6.
-  //
-  //  2. It said "new matches", but the panel filters on response_deadline (still open) and
-  //     never on posted_date — so the destination is every open opportunity regardless of age.
-  //     The count was a 24-hour population; the landing is not time-bounded at all.
-  //
-  // Both fixed by describing the destination honestly rather than restating the headline:
-  // contracts only, and "matches" without the time claim the landing cannot honour. When the
-  // rows are fallback rows, "new" would be false anyway.
-  const ctaLabel = isUsingFallback
-    ? `View all ${opportunities.length} matches`
-    : `View all ${opportunities.length} matching contracts`;
+  // THE CTA MUST NAME THE POPULATION IT LANDS ON (population-contract.ts). History:
+  //  · It once printed totalCount (contracts + grants) on a contracts-only panel, and said
+  //    "new matches" about a destination with no time window.
+  //  · Then it said "View all N matching contracts" -> the legacy /app alerts panel, a retired surface the
+  //    email legacy-destination guard flagged on every such send (prod 2026-11-22, 305 in 12h).
+  // Now: the Map's Open horizon scoped to this alert's NAICS (a market link — never the reader's
+  // state). That shows every open contract in those codes, not the N rows ranked here, so the
+  // copy states the two facts separately: how many didn't fit, and what the Map shows. No
+  // "all N", no "new". See src/lib/alerts/daily-alert-view-all.ts.
+  const viewAllCta = dailyAlertViewAllCta({
+    siteUrl: MINDY_SITE_URL,
+    naicsCodes: user.naics_codes,
+    moreCount,
+  });
 
   // REMOVED (Eric 2026-08-06): the green market-breadth banner + its upsell CTA. It pushed
   // the /market-intelligence subscription page — buyer framing. We seek CASUAL BROWSERS:
@@ -1950,7 +1958,8 @@ function mindyDayBannerHtml(): string {
   </table>
   ${moreCount > 0 ? `
   <p style="margin:18px 0 0 0;">
-    <a href="${trackedUrl(`${MINDY_SITE_URL}/app?panel=alerts`, 'view_all_new', 'view_all_new')}" style="color:#4f46e5;font-size:14px;font-weight:700;text-decoration:none;">${ctaLabel} &rarr;</a>
+    <span style="color:#475569;font-size:14px;">${viewAllCta.remainder}</span>
+    <a href="${trackedUrl(viewAllCta.href, 'view_all_new', 'view_all_new')}" style="color:#4f46e5;font-size:14px;font-weight:700;text-decoration:none;">${viewAllCta.label} &rarr;</a>
   </p>` : ''}
   ` : `
   <!-- Quiet day — honest, no fabricated rows, no emoji. -->
@@ -2070,6 +2079,7 @@ function mindyDayBannerHtml(): string {
     emailType: 'daily_alert',
     eventSource: 'daily_alert',
     transactional: sendOptions?.transactional,
+    onBlocked: sendOptions?.onBlocked,
     tags: {
       email_type: 'daily_alert',
       alert_type: 'daily',

@@ -22,6 +22,7 @@
  * Keep them in sync. All data via /api/app/watchlist-brief + /api/app/saved-searches
  * (MI-token authed, read client-side from localStorage — same as the map).
  */
+import { STATE_BLOCK_CSS, signedOutStateHtml } from '@/lib/design/state-block';
 import { NextResponse } from 'next/server';
 import { SUBPAGE_APP_SHELL_CSS, applyAppShell, isAppShellRequest } from '../app-shell';
 import { LOGIN_MODAL_CSS, LOGIN_MODAL_HTML, LOGIN_MODAL_JS } from '../login-modal';
@@ -193,7 +194,7 @@ const PAGE = `<!DOCTYPE html><html lang="en" class="mindy-map"><head>
   .errline{text-align:center;padding:60px 20px;color:var(--sub)}
   .errline h3{font-size:18px;color:var(--ink);margin-bottom:6px}
   ${ACCOUNT_MENU_CSS}
-</style><style>${LOGIN_MODAL_CSS}</style></head><body>
+</style><style>${LOGIN_MODAL_CSS}</style><style>${STATE_BLOCK_CSS}</style></head><body>
 <header class="zhead">
   <nav class="zh-left">
     <a href="/opportunity-map">Opportunities</a>
@@ -237,7 +238,7 @@ const PAGE = `<!DOCTYPE html><html lang="en" class="mindy-map"><head>
   function h(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
   function esc(s){ return h(s); }
 
-  if(!t||!em){ bodyEl.innerHTML='<div class="signin" style="text-align:center;padding:70px 20px">Please <a href="#" onclick="return window.__mapsSignIn()">sign in</a> to see your Morning Brief.</div>'; return; }
+  if(!t||!em){ bodyEl.innerHTML=${JSON.stringify(signedOutStateHtml({ title: 'Sign in to see your Morning Brief', body: 'See what is new in the markets you watch, and manage the searches that feed it.' }))}; return; }
   function hdrs(){ return {'Content-Type':'application/json','x-mi-auth-token':t,'x-user-email':em}; }
 
   // Friendly first-name greeting derived SAFELY from the email local-part (never a hardcoded name).

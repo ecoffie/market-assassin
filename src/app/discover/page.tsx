@@ -4,6 +4,7 @@
  * Data-as-content (operating thesis). Pulls cheap live previews from Supabase; SEO + shareable.
  */
 import type { Metadata } from 'next';
+import { siteShareImages } from '@/lib/seo/share-image';
 import Link from 'next/link';
 import ShareButton from '@/components/ShareButton';
 import { getRecentBigAwards } from '@/lib/discover/recent-spending';
@@ -38,8 +39,9 @@ export const metadata: Metadata = {
     url: `${SITE_URL}/discover`,
     type: 'website',
     siteName: 'Mindy',
+    images: siteShareImages(),
   },
-  twitter: { card: 'summary_large_image', title: 'Discover — The Federal Market, Decoded', description: 'Where the government spends its money. Free, verifiable, shareable.' },
+  twitter: { card: 'summary_large_image', title: 'Discover — The Federal Market, Decoded', description: 'Where the government spends its money. Free, verifiable, shareable.', images: siteShareImages() },
 };
 
 export default async function DiscoverHub() {
@@ -167,7 +169,7 @@ export default async function DiscoverHub() {
             worth bidding. Try it free for 14 days.
           </p>
           <Link href="/pricing" className="inline-flex rounded-lg bg-(--mp-navy) px-6 py-3 font-semibold text-white hover:bg-(--mp-navy-hover)">
-            Start for free →
+            Start 14-day free trial →
           </Link>
         </div>
       </section>

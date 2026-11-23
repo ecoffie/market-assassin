@@ -170,7 +170,7 @@ export default function BlogIndexPage() {
             href="/pricing"
             className="inline-block px-8 py-3 bg-white hover:bg-(--mp-wash) text-(--mp-navy) font-bold rounded-lg transition-colors"
           >
-            Start for free
+            Start 14-day free trial
           </Link>
         </div>
       </section>

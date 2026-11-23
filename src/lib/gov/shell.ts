@@ -13,6 +13,7 @@
  * figures.
  */
 import { mpRawBodyClose, mpRawBodyOpen, mpRawHeadHtml } from '@/lib/public-site/html';
+import { shareImageMetaTags } from '@/lib/seo/share-image';
 
 /**
  * Gov-family rules, written ONLY in the public-site roles (`--mp-*`, src/lib/public-site/tokens.ts).
@@ -133,6 +134,7 @@ export function govPage(opts: {
 ${opts.canonical ? `<link rel="canonical" href="${opts.canonical}">` : ''}
 <meta property="og:title" content="${opts.title}">
 <meta property="og:description" content="${opts.description}">
+${shareImageMetaTags()}
 ${mpRawHeadHtml()}
 <style>${GOV_CSS}</style>
 </head><body>

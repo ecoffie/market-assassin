@@ -28,7 +28,7 @@ import {
   getRelatedNaics,
 } from '@/data/naics-top100';
 import {
-  getNaicsProfile,
+  lookupNaicsProfile,
   getTopRecipientsForNaics,
   getTopAgenciesForNaics,
   getNaicsSetAsideAndPsc,
@@ -37,6 +37,8 @@ import {
 } from '@/lib/bigquery/naics';
 import { recipientSlug } from '@/lib/bigquery/recipients';
 import { AGENCIES_SEO } from '@/data/agencies-seo';
+import { SeoTemporarilyUnavailableError } from '@/lib/seo/seo-unavailable';
+import { buildNaicsTitles } from '@/lib/seo/seo-title-clip';
 
 // Prerender every top-100 NAICS at build. 100 entries is cheap and
 // keeps the pages on the edge cache — no serverless invocation per
@@ -137,13 +139,18 @@ export async function generateMetadata({
   let resolvedCode = code;
   let resolvedTitle: string | null = entry?.title ?? null;
   if (!entry) {
-    const profile = await getNaicsProfile(code);
-    if (!profile) {
+    const lookup = await lookupNaicsProfile(code);
+    if (lookup.kind === 'unavailable') {
+      // Unknown, not absent: the page body throws the 5xx. Never claim "not found" here.
+      return { title: `NAICS ${code} | Mindy`, robots: { index: false, follow: true } };
+    }
+    if (lookup.kind === 'absent') {
       return {
         title: 'NAICS code not found | Mindy',
         description: 'The NAICS code you requested has no federal contract activity on record.',
       };
     }
+    const profile = lookup.profile;
     resolvedCode = profile.naics_code;
     resolvedTitle = profile.naics_description || `NAICS ${profile.naics_code}`;
   }
@@ -155,15 +162,16 @@ export async function generateMetadata({
     description.length > 158
       ? `${description.slice(0, 155).trimEnd()}...`
       : description;
+  const { title, ogTitle } = buildNaicsTitles(resolvedCode, titleStr);
 
   return {
-    title: `NAICS ${resolvedCode}: ${titleStr} — Federal Contracts | Mindy`,
+    title,
     description: trimmed,
     alternates: {
       canonical: `https://getmindy.ai/naics/${resolvedCode}`,
     },
     openGraph: {
-      title: `NAICS ${resolvedCode}: ${titleStr} — Federal Contracts | Mindy`,
+      title: ogTitle,
       description: trimmed,
       type: 'article',
       url: `https://getmindy.ai/naics/${resolvedCode}`,
@@ -195,14 +203,22 @@ export default async function NaicsCodePage({
   // If the code is in top-100 these enrich the page; if not, the
   // profile becomes the source of truth and the static sections are
   // skipped.
-  const [bqProfile, bqRecipients, bqAgencies, bqSetAsidePsc] = await Promise.all([
-    getNaicsProfile(code),
+  const [profileLookup, bqRecipients, bqAgencies, bqSetAsidePsc] = await Promise.all([
+    lookupNaicsProfile(code),
     getTopRecipientsForNaics(code, 25),
     getTopAgenciesForNaics(code, 10),
     getNaicsSetAsideAndPsc(code),
   ]);
 
-  if (!topEntry && !bqProfile) notFound();
+  const bqProfile = profileLookup.kind === 'found' ? profileLookup.profile : null;
+  if (!topEntry && !bqProfile) {
+    // Only a measured "no row" is a 404. An unknown read is a 5xx: not cached by ISR,
+    // retried on the next request (src/lib/seo/seo-unavailable.ts).
+    if (profileLookup.kind === 'unavailable') {
+      throw new SeoTemporarilyUnavailableError(`naics ${code}: profile ${profileLookup.reason}`);
+    }
+    notFound();
+  }
 
   // Synthesize an entry-shaped object when not in top-100, so the
   // existing JSX (which renders code/title/parent everywhere) stays
