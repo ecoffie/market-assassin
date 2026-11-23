@@ -512,16 +512,18 @@ describe('create_document: the sections the customer asked for are in the saved 
     const saved = s.docs()[0].doc_model;
     const headings = saved.sections.map((x: R) => x.heading);
     expect(headings[0]).toBe('Executive summary');
+    // level 1: the renderer's contents page counts level-1 sections
+    for (const h of ['Executive summary', 'Risks', 'Recommended actions']) expect(saved.sections.find((x: R) => x.heading === h).level).toBe(1);
     expect(headings).toContain('Risks');
-    expect(headings).toContain('Actions');
+    expect(headings).toContain('Recommended actions');
     // every format renders the completed model
     for (const x of s.renders) expect(x.model.sections.map((y: R) => y.heading)).toEqual(headings);
     const items = (h: string) => saved.sections.find((x: R) => x.heading === h).blocks[0].items as R[];
     // built from the document's own statements, labels and cites copied: no new fact, no new source
     const bodyTexts = new Set(bodyOnly().sections.flatMap((x: R) => x.blocks.map((b: R) => b.text)));
-    for (const h of ['Executive summary', 'Risks', 'Actions']) for (const it of items(h)) expect(bodyTexts.has(it.text)).toBe(true);
+    for (const h of ['Executive summary', 'Risks', 'Recommended actions']) for (const it of items(h)) expect(bodyTexts.has(it.text)).toBe(true);
     expect(items('Executive summary')[0]).toMatchObject({ text: 'VA obligated $412.5M for janitorial services in FY2025.', claim: 'fact', cites: ['s1'] });
-    expect(items('Actions')).toEqual([{ text: 'Request a capability briefing with the Augusta VA contracting office this month.', claim: 'recommendation', cites: ['s2'] }]);
+    expect(items('Recommended actions')).toEqual([{ text: 'Request a capability briefing with the Augusta VA contracting office this month.', claim: 'recommendation', cites: ['s2'] }]);
     expect(items('Risks')[0]).toMatchObject({ claim: 'assumption', origin: expect.stringContaining('not confirmed') });
     expect(saved.sources.map((x: R) => x.id)).toEqual(['s1', 's2']);
     // Sources: every declared source is cited, so the rendered Sources list carries both
@@ -548,7 +550,7 @@ describe('create_document: the sections the customer asked for are in the saved 
     const s = setup({ requestedSections: requestedDocSections('Make a Word doc with risks, action items and citations') });
     const r = await s.tool.execute({ doc_model: model({ sources: [], sections: [{ id: 'a', heading: 'Overview', blocks: [{ type: 'paragraph', id: 'p', text: 'The firm cleans federal offices.', claim: 'recommendation' }] }] }) });
     expect(r).toMatchObject({ ok: true, requested_sections: { added: ['actions'], missing: ['risks', 'sources'] } });
-    expect(s.docs()[0].doc_model.sections.map((x: R) => x.heading)).toEqual(['Overview', 'Actions']);
+    expect(s.docs()[0].doc_model.sections.map((x: R) => x.heading)).toEqual(['Overview', 'Recommended actions']);
     expect(String(r.note)).toMatch(/asked for Risks, Sources in the document, but they are NOT in the saved file/);
   });
 

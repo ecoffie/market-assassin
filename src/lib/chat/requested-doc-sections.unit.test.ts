@@ -27,7 +27,7 @@ describe('requestedDocSections: only what the customer named', () => {
 
   it('the planner note names each section and says the file (not the chat) must carry it', () => {
     const note = requestedSectionsPlannerNote(requestedDocSections('executive summary, risks, actions and sources'))!;
-    expect(note).toContain('Executive summary, Risks, Actions, Sources');
+    expect(note).toContain('Executive summary, Risks, Recommended actions, Sources');
     expect(note).toMatch(/doc_model MUST carry each one as its own section/);
     expect(note).toMatch(/The chat answer does not count/);
     expect(note).toMatch(/Never fill it with a guess/);
@@ -45,7 +45,7 @@ describe('ensureRequestedSections', () => {
     ]);
     const r = ensureRequestedSections(m, requestedDocSections('executive summary and actions'));
     expect(r.added).toEqual(['executive_summary', 'actions']);
-    expect(r.model.sections.map((s) => s.heading)).toEqual(['Executive summary', 'Market', 'Actions', 'How to read this']);
+    expect(r.model.sections.map((s) => s.heading)).toEqual(['Executive summary', 'Market', 'Recommended actions', 'How to read this']);
     // input is not mutated
     expect(m.sections.map((s) => s.heading)).toEqual(['Market', 'How to read this']);
   });
@@ -56,7 +56,7 @@ describe('ensureRequestedSections', () => {
       { id: 'b', heading: 'Body', blocks: [{ type: 'paragraph', id: 'p', text: 'Call the office.', claim: 'recommendation' }] },
     ]);
     const r = ensureRequestedSections(m, requestedDocSections('actions'));
-    const added = r.model.sections.find((s) => s.heading === 'Actions')!;
+    const added = r.model.sections.find((s) => s.heading === 'Recommended actions')!;
     expect(added.id).toBe('sec-actions-2');
     expect(added.blocks[0].id).toBe('blk-actions-2');
     expect(JSON.stringify(added)).not.toContain('read this first');
@@ -88,7 +88,7 @@ describe('the Claude Local repro prompt', () => {
     expect(requestedDocSections(REPRO)).toEqual([
       { key: 'executive_summary', label: 'Executive summary' },
       { key: 'risks', label: 'Risks' },
-      { key: 'actions', label: 'Actions' },
+      { key: 'actions', label: 'Recommended actions' },
       { key: 'sources', label: 'Sources' },
       { key: 'named', label: 'Agency analysis' },
       { key: 'named', label: 'Opportunity pipeline' },
@@ -97,7 +97,7 @@ describe('the Claude Local repro prompt', () => {
   });
 
   it('the packaged template lacks all but the agency analysis (its Agency deep-dive covers that)', () => {
-    expect(sectionsPackagedReportLacks(requestedDocSections(REPRO)).map((r) => r.label)).toEqual(['Executive summary', 'Risks', 'Actions', 'Sources', 'Opportunity pipeline', 'Incumbent research']);
+    expect(sectionsPackagedReportLacks(requestedDocSections(REPRO)).map((r) => r.label)).toEqual(['Executive summary', 'Risks', 'Recommended actions', 'Sources', 'Opportunity pipeline', 'Incumbent research']);
   });
 });
 
@@ -111,7 +111,7 @@ describe('routeSectionedReport', () => {
     expect(first).toMatchObject({ route: 'packaged_with_gap_note', reason: 'no_prior_research' });
     const none = routeSectionedReport({ requested, asksForReport: true, createAvailable: false, hasPriorResearch: true });
     expect(none).toMatchObject({ route: 'packaged_with_gap_note', reason: 'no_document_tool' });
-    if (first.route === 'packaged_with_gap_note') expect(packagedReportGapNote(first)).toMatch(/do not include Executive summary, Risks, Actions, Sources, Opportunity pipeline, Incumbent research; never present it as the report they asked for/);
+    if (first.route === 'packaged_with_gap_note') expect(packagedReportGapNote(first)).toMatch(/do not include Executive summary, Risks, Recommended actions, Sources, Opportunity pipeline, Incumbent research; never present it as the report they asked for/);
   });
   it('no report asked, no sections named, or only sections the template carries → unchanged', () => {
     expect(routeSectionedReport({ requested, asksForReport: false, createAvailable: true, hasPriorResearch: true }).route).toBe('none');

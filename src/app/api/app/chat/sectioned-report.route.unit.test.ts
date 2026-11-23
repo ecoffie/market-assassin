@@ -118,7 +118,7 @@ describe('sectioned report request (Claude Local repro)', () => {
     expect(r.tools).toContain('create_document');
     expect(r.toolChoice).toContain('create_document');
     const sys = plannerSystems.join('\n');
-    expect(sys).toContain('SECTIONED REPORT: the customer asked for a report with these sections: Executive summary, Risks, Actions, Sources, Agency analysis, Opportunity pipeline, Incumbent research.');
+    expect(sys).toContain('SECTIONED REPORT: the customer asked for a report with these sections: Executive summary, Risks, Recommended actions, Sources, Agency analysis, Opportunity pipeline, Incumbent research.');
     // the planner sees the research it must build from (the latest answer)
     const msgs = (plannerBody!.messages as Array<{ role: string; content: string }>);
     expect(msgs.some((m) => m.role === 'assistant' && m.content.includes('Acme Builders'))).toBe(true);
@@ -153,7 +153,7 @@ describe('sectioned report request (Claude Local repro)', () => {
     expect(r.tools).toContain('generate_market_report');
     expect(r.toolChoice).not.toContain('create_document');
     const note = answerSystems.find((s) => s.startsWith('REQUESTED SECTIONS NOT IN THE PACKAGED REPORT'))!;
-    expect(note).toContain('Executive summary, Risks, Actions, Sources, Opportunity pipeline, Incumbent research');
+    expect(note).toContain('Executive summary, Risks, Recommended actions, Sources, Opportunity pipeline, Incumbent research');
     expect(note).toMatch(/never present it as the report they asked for/);
     expect(note).toMatch(/Offer, as the next step, to turn this research into a document/);
     expect(h.saved).toEqual([]);

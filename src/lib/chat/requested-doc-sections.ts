@@ -42,7 +42,7 @@ const SPECS: readonly SectionSpec[] = [
     heading: /\brisks?\b/i,
   },
   {
-    key: 'actions', label: 'Actions',
+    key: 'actions', label: 'Recommended actions',
     // "actions" alone, "action items/plan", "next steps", "to-dos". Not award jargon ("contract actions",
     // "procurement actions", "number of actions" — a USAspending count), not "corrective/disciplinary actions".
     asked: /\b(?:action\s+(?:items?|plan|steps?)|next\s+steps?|to-?\s?dos?|(?<!(?:contract|contracting|procurement|award|obligation|modification|corrective|disciplinary|enforcement|legal|personnel|of)\s)actions\b)/i,
@@ -177,9 +177,11 @@ export function ensureRequestedSections(model: DocModel, requested: readonly Req
   const usedIds = new Set<string>();
   for (const s of model.sections) { usedIds.add(s.id); for (const b of s.blocks ?? []) usedIds.add(b.id); }
   const uid = (base: string) => { let id = base; let n = 2; while (usedIds.has(id)) id = `${base}-${n++}`; usedIds.add(id); return id; };
+  // Level 1: the renderer's contents page counts level-1 sections (Design & Output, 2026-11-23).
   const section = (heading: string, base: string, items: BulletItem[]): DocSection => ({
     id: uid(`sec-${base}`),
     heading,
+    level: 1,
     blocks: [{ type: 'bullets', id: uid(`blk-${base}`), items } as Block],
   });
 

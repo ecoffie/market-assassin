@@ -130,9 +130,9 @@ describe('create_document through the real chat route', () => {
       ] }],
     } };
     await ask('Create a PDF report with an executive summary, risks, actions and sources');
-    expect(plannerSystems.join('\n')).toContain('REQUESTED DOCUMENT SECTIONS: the customer asked the document itself to include: Executive summary, Risks, Actions, Sources.');
+    expect(plannerSystems.join('\n')).toContain('REQUESTED DOCUMENT SECTIONS: the customer asked the document itself to include: Executive summary, Risks, Recommended actions, Sources.');
     const model = h.saved[0].docModel as { sections: Array<{ heading: string }> };
-    expect(model.sections.map((x) => x.heading)).toEqual(['Executive summary', 'Where demand is', 'Risks', 'Actions']);
+    expect(model.sections.map((x) => x.heading)).toEqual(['Executive summary', 'Where demand is', 'Risks', 'Recommended actions']);
     expect(toolResultsSeen.join(' ')).toMatch(/"requested_sections":\{"requested":\["executive_summary","risks","actions","sources"\],"added":\["executive_summary","risks","actions"\],"missing":\[\]\}/);
   });
 
