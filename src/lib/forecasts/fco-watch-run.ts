@@ -9,14 +9,23 @@
  * for 3.5 weeks, because the only enumerator stopped at 8,000 rows of a 9,225-row source.
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { runFcoCensus, type FcoCensus } from './fco-census';
+import { runFcoCensus, parseCensusProgress, type FcoCensus, type FcoCensusProgress } from './fco-census';
 import { gatewayWatchState } from './gateway-watch-state';
 import { evaluateFcoWatch, type FcoEvent, type FcoWatchState } from './fco-roster-watch';
 
 export const FCO_SOURCE_KEY = 'forecast_gsa_gateway';
 
 export interface FcoWatchRun {
-  census: Pick<FcoCensus, 'reportedTotal' | 'uniqueRows' | 'uniqueListingIds' | 'maxChanged' | 'fingerprint' | 'complete' | 'pagesFetched' | 'pagesFailed'> & { departments: number };
+  census: Pick<FcoCensus, 'reportedTotal' | 'uniqueRows' | 'uniqueListingIds' | 'maxChanged' | 'fingerprint' | 'complete' | 'pagesFetched' | 'pagesFailed'> & {
+    departments: number;
+    /** Runs this census spans; > 1 means it resumed from stored progress. */
+    runsSpanned: number;
+    censusStartedAt: string | null;
+    /** Page the next run resumes at; null when complete or a new census starts at page 0. */
+    nextPage: number | null;
+    restartReason: string | null;
+    incompleteReason: string | null;
+  };
   events: FcoEvent[];
   heldCanonical: number;
   /** What we actually wrote to the instance row — for an explainable run. */
@@ -57,10 +66,16 @@ function parsePrevious(row: Record<string, unknown> | null): FcoWatchState | nul
   return parsed as unknown as FcoWatchState;
 }
 
-function parseResumePage(row: Record<string, unknown> | null): number | undefined {
-  const parsed = parseFingerprint(row?.upstream_fingerprint);
-  const n = parsed?.resumePage;
-  return typeof n === 'number' && Number.isFinite(n) && n > 0 ? n : undefined;
+/**
+ * Cross-run census progress stored beside the last good roster.
+ *
+ * ⚠️ The legacy shape `{ resumePage, partial: true }` carried a cursor WITHOUT the rows seen
+ * before it, so a run resuming from it could never reach the reported total — and because it was
+ * only rewritten when a new cursor existed, it was never cleared. It is deliberately IGNORED here
+ * (a new census starts at page 0) and dropped on the next write.
+ */
+function parseCarry(row: Record<string, unknown> | null): FcoCensusProgress | null {
+  return parseCensusProgress(parseFingerprint(row?.upstream_fingerprint)?.census_progress);
 }
 
 export async function runFcoWatch(
@@ -79,7 +94,7 @@ export async function runFcoWatch(
   const census = await runFcoCensus({
     concurrency: opts.concurrency ?? 1,
     budgetMs: opts.budgetMs,
-    startPage: parseResumePage(inst as Record<string, unknown> | null),
+    progress: parseCarry(inst as Record<string, unknown> | null),
     retryBaseMs: 1_000,
   });
   const heldCanonical = await countCanonicalGatewayHeld(sb);
@@ -119,12 +134,18 @@ export async function runFcoWatch(
   if (watched === 'content_stale' && !result.clocks.lastSuccessfulCheck && census.reportedTotal > 0) {
     clocks.upstream_population = census.reportedTotal;
   }
-  // Resume cursor lives beside the last good roster. A partial run must not erase departments.
-  if (!census.complete && census.resumePage != null) {
-    const prior = parseFingerprint(inst?.upstream_fingerprint) ?? {};
-    const { resumePage: _drop, partial: _partial, ...rest } = prior;
-    void _drop; void _partial;
-    clocks.upstream_fingerprint = JSON.stringify({ ...rest, resumePage: census.resumePage, partial: true });
+  // Census progress lives beside the last good roster. A partial run must not erase departments,
+  // and EVERY incomplete run rewrites the progress: a stale cursor (legacy `resumePage`/`partial`,
+  // or progress for a census that has since ended or restarted) never survives a run.
+  if (!census.complete) {
+    const prior = parseFingerprint(inst?.upstream_fingerprint);
+    if (prior || census.progress) {
+      const { resumePage: _drop, partial: _partial, census_progress: _progress, ...roster } = prior ?? {};
+      void _drop; void _partial; void _progress;
+      clocks.upstream_fingerprint = JSON.stringify(
+        census.progress ? { ...roster, census_progress: census.progress } : roster,
+      );
+    }
   }
 
   if (!dry) {
@@ -139,6 +160,11 @@ export async function runFcoWatch(
       fingerprint: census.fingerprint, complete: census.complete,
       pagesFetched: census.pagesFetched, pagesFailed: census.pagesFailed,
       departments: census.departments.length,
+      runsSpanned: census.runsSpanned ?? 1,
+      censusStartedAt: census.censusStartedAt ?? null,
+      nextPage: census.progress?.next_page ?? null,
+      restartReason: census.restartReason ?? null,
+      incompleteReason: census.incompleteReason ?? null,
     },
     events: result.events,
     heldCanonical,
