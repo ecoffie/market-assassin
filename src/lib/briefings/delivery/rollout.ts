@@ -1,4 +1,5 @@
 import { kv } from '@vercel/kv';
+import { createHash } from 'crypto';
 import { SupabaseClient } from '@supabase/supabase-js';
 
 const DEFAULT_PAGE_SIZE = 1000;
@@ -138,6 +139,8 @@ export interface BriefingAudienceResolution {
     selectedUsers: number;
     selectedProfileReady: number;
     selectedFallback: number;
+    /** Briefings-enabled users the classification gate dropped (reporting only). */
+    droppedByClassification?: number;
   };
 }
 
@@ -196,6 +199,105 @@ export function isBriefingEntitled(
   if (!BRIEFING_ENTITLED_ACCESS.has(row.briefings_access || '')) return false;
   if (row.briefings_expiry && new Date(row.briefings_expiry).getTime() <= now) return false;
   return true;
+}
+
+/** Synthetic Coach-Mode workspace addresses ({workspaceId}@clients.getmindy.ai, see
+ *  mindy/coach-provision.ts). They key workspace rows; they are never a customer inbox. */
+const COACH_WORKSPACE_EMAIL_SUFFIX = '@clients.getmindy.ai';
+
+export function isCoachWorkspaceEmail(email: string): boolean {
+  return email.toLowerCase().trim().endsWith(COACH_WORKSPACE_EMAIL_SUFFIX);
+}
+
+/** Non-reversible short tag for logs: never put a raw customer email in a log line. */
+export function redactEmailForLog(email: string): string {
+  // No domain either: a small company's domain alone identifies the customer.
+  const normalized = email.toLowerCase().trim();
+  return `sha256:${createHash('sha256').update(normalized).digest('hex').slice(0, 10)}`;
+}
+
+/**
+ * Why a briefings-enabled user was dropped by the classification gate.
+ * REPORTING ONLY: this never decides who is sent to. The decision is
+ * isBriefingEntitled(); this function calls the same predicate and only
+ * explains the "false" answers.
+ */
+export interface ClassificationDropReport {
+  /** Every enabled email the gate dropped, coach workspaces included. */
+  droppedByClassification: number;
+  /** No customer_classifications row at all. */
+  noRow: number;
+  /** A row exists but its briefings_access does not entitle delivery, keyed by access value. */
+  notEntitling: Record<string, number>;
+  /** An entitling briefings_access whose briefings_expiry has passed. */
+  expired: number;
+  /** Dropped synthetic Coach-Mode workspace addresses, counted apart from the three buckets above. */
+  coachWorkspace: number;
+  /** Up to `sampleSize` redacted examples per reason (never raw emails). */
+  samples: Record<string, string[]>;
+}
+
+export function classifyBriefingClassificationDrops(
+  enabledEmails: Iterable<string>,
+  classificationRows: ReadonlyArray<{ email?: string | null; briefings_access?: string | null; briefings_expiry?: string | null }>,
+  now: number = Date.now(),
+  sampleSize = 3,
+): ClassificationDropReport {
+  const rowsByEmail = new Map<string, Array<(typeof classificationRows)[number]>>();
+  for (const row of classificationRows) {
+    const email = row.email?.toLowerCase().trim();
+    if (!email) continue;
+    const list = rowsByEmail.get(email) || [];
+    list.push(row);
+    rowsByEmail.set(email, list);
+  }
+
+  const report: ClassificationDropReport = {
+    droppedByClassification: 0,
+    noRow: 0,
+    notEntitling: {},
+    expired: 0,
+    coachWorkspace: 0,
+    samples: {},
+  };
+  const addSample = (reason: string, email: string) => {
+    const list = report.samples[reason] || (report.samples[reason] = []);
+    if (list.length < sampleSize) list.push(redactEmailForLog(email));
+  };
+
+  const seen = new Set<string>();
+  for (const raw of enabledEmails) {
+    const email = raw?.toLowerCase().trim();
+    if (!email || seen.has(email)) continue;
+    seen.add(email);
+
+    const rows = rowsByEmail.get(email) || [];
+    // Same predicate, same "any row entitles" rule as fetchBriefingEntitlements.
+    if (rows.some(row => isBriefingEntitled(row, now))) continue;
+
+    report.droppedByClassification += 1;
+    if (isCoachWorkspaceEmail(email)) {
+      report.coachWorkspace += 1;
+      addSample('coach_workspace', email);
+      continue;
+    }
+    if (rows.length === 0) {
+      report.noRow += 1;
+      addSample('no_row', email);
+      continue;
+    }
+    // An entitling access that failed the predicate can only have failed on expiry.
+    if (rows.some(row => BRIEFING_ENTITLED_ACCESS.has(row.briefings_access || ''))) {
+      report.expired += 1;
+      addSample('expired', email);
+      continue;
+    }
+    const access = rows[0].briefings_access || 'null';
+    report.notEntitling[access] = (report.notEntitling[access] || 0) + 1;
+    addSample(`not_entitling:${access}`, email);
+  }
+
+  return report;
 }
 
 function isInternalBriefingRecipient(email: string): boolean {
@@ -264,7 +366,9 @@ async function fetchSmartProfiles(_supabase: SupabaseClient): Promise<SmartProfi
   return [];
 }
 
-async function fetchBriefingEntitlements(supabase: SupabaseClient): Promise<Set<string>> {
+async function fetchBriefingEntitlements(
+  supabase: SupabaseClient
+): Promise<{ entitled: Set<string>; rows: BriefingEntitlementRow[]; now: number }> {
   const rows = await fetchAllRows(async (from, to) => {
     const { data, error } = await supabase
       .from('customer_classifications')
@@ -294,7 +398,7 @@ async function fetchBriefingEntitlements(supabase: SupabaseClient): Promise<Set<
     if (isBriefingEntitled(row, now)) entitled.add(email);
   }
 
-  return entitled;
+  return { entitled, rows, now };
 }
 
 function buildCandidate(
@@ -343,9 +447,22 @@ export async function fetchBriefingAudienceCandidates(
   supabase: SupabaseClient,
   options?: { includeSmartProfiles?: boolean }
 ): Promise<BriefingAudienceUser[]> {
+  return (await fetchBriefingAudienceCandidatesWithDrops(supabase, options)).candidates;
+}
+
+/**
+ * Same audience as fetchBriefingAudienceCandidates, plus an account of who the
+ * classification gate dropped. Before this the drop was a bare .filter() with no
+ * counter and no log, so "enabled but never sent" was invisible from the sender.
+ * The report is computed alongside the filter and never feeds back into it.
+ */
+export async function fetchBriefingAudienceCandidatesWithDrops(
+  supabase: SupabaseClient,
+  options?: { includeSmartProfiles?: boolean }
+): Promise<{ candidates: BriefingAudienceUser[]; drops: ClassificationDropReport }> {
   const includeSmartProfiles = options?.includeSmartProfiles ?? true;
   const usersByEmail = new Map<string, BriefingAudienceUser>();
-  const entitledEmails = await fetchBriefingEntitlements(supabase);
+  const { entitled: entitledEmails, rows: classificationRows, now } = await fetchBriefingEntitlements(supabase);
 
   const notificationSettings = await fetchNotificationSettings(supabase);
   for (const row of notificationSettings) {
@@ -393,13 +510,24 @@ export async function fetchBriefingAudienceCandidates(
     }
   }
 
-  return Array.from(usersByEmail.values())
+  const candidates = Array.from(usersByEmail.values())
     .filter(user => entitledEmails.has(user.email))
     .map(user => ({
       ...user,
       hasPaidBriefingAccess: true,
     }))
     .sort((a, b) => a.email.localeCompare(b.email));
+
+  const drops = classifyBriefingClassificationDrops(usersByEmail.keys(), classificationRows, now);
+  if (drops.droppedByClassification > 0) {
+    console.warn(
+      `[rollout] droppedByClassification=${drops.droppedByClassification} of ${usersByEmail.size} briefings-enabled ` +
+      `(no_row=${drops.noRow}, expired=${drops.expired}, not_entitling=${JSON.stringify(drops.notEntitling)}, ` +
+      `coach_workspace=${drops.coachWorkspace}) samples=${JSON.stringify(drops.samples)}`
+    );
+  }
+
+  return { candidates, drops };
 }
 
 export async function getBriefingRolloutConfig(): Promise<BriefingRolloutConfig> {
@@ -633,7 +761,7 @@ export async function resolveBriefingAudience(
   supabase: SupabaseClient
 ): Promise<BriefingAudienceResolution> {
   const config = await getBriefingRolloutConfig();
-  const candidates = await fetchBriefingAudienceCandidates(supabase, {
+  const { candidates, drops } = await fetchBriefingAudienceCandidatesWithDrops(supabase, {
     includeSmartProfiles: config.includeSmartProfiles,
   });
 
@@ -653,6 +781,7 @@ export async function resolveBriefingAudience(
         selectedUsers: candidates.length,
         selectedProfileReady: profileReadyCandidates,
         selectedFallback: fallbackCandidates,
+        droppedByClassification: drops.droppedByClassification,
       },
     };
   }
@@ -684,6 +813,7 @@ export async function resolveBriefingAudience(
       selectedUsers: finalUsers.length,
       selectedProfileReady: finalUsers.filter(candidate => candidate.hasProfileData).length,
       selectedFallback: finalUsers.filter(candidate => candidate.usesFallback).length,
+      droppedByClassification: drops.droppedByClassification,
     },
   };
 }
