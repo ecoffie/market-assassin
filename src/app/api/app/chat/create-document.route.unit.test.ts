@@ -56,6 +56,7 @@ const LIVE_LIKE_ARGS = {
 
 let plannerArgs: unknown = LIVE_LIKE_ARGS;
 const toolResultsSeen: string[] = [];
+const plannerSystems: string[] = [];
 
 beforeEach(() => {
   process.env.OPENAI_API_KEY = 'sk-test';
@@ -63,10 +64,14 @@ beforeEach(() => {
   vi.stubEnv('VAULT_DOC_ALLOWLIST', 'erika@example.com');
   h.saved.length = 0;
   toolResultsSeen.length = 0;
+  plannerSystems.length = 0;
   plannerArgs = LIVE_LIKE_ARGS;
   vi.stubGlobal('fetch', vi.fn(async (_url: string, init: RequestInit) => {
     const body = JSON.parse(String(init.body || '{}')) as { messages?: Array<{ role: string; content?: string }> };
-    if (isPlannerCall(body as Record<string, unknown>)) return plannerResponse([{ name: 'create_document', args: plannerArgs }]);
+    if (isPlannerCall(body as Record<string, unknown>)) {
+      for (const m of body.messages ?? []) if (m.role === 'system' && m.content) plannerSystems.push(m.content);
+      return plannerResponse([{ name: 'create_document', args: plannerArgs }]);
+    }
     for (const m of body.messages ?? []) if (m.role === 'tool' && m.content) toolResultsSeen.push(m.content);
     return answerStream(['Your capability statement is saved to your Vault.']);
   }));
@@ -112,5 +117,28 @@ describe('create_document through the real chat route', () => {
     vi.stubEnv('VAULT_DOC_ALLOWLIST', 'someone-else@example.com');
     await ask('Create my capability statement as a document');
     expect(h.saved).toEqual([]);
+  });
+
+  it('requested sections (Claude Local 2026-11-22): the planner is told, and the saved DocModel carries them, with sources', async () => {
+    plannerArgs = { doc_model: {
+      title: 'VA Janitorial Brief',
+      sources: [{ id: 's1', kind: 'usaspending', label: 'USAspending award', url: 'https://www.usaspending.gov/award/CONT_AWD_X' }],
+      sections: [{ id: 'core', heading: 'Where demand is', blocks: [
+        { type: 'paragraph', id: 'p1', text: 'VA obligated $412.5M for janitorial services.', claim: 'fact', cites: ['s1'] },
+        { type: 'paragraph', id: 'p2', text: 'Staffing costs could rise faster than planned.', claim: 'assumption', origin: 'Planning premise; not verified.' },
+        { type: 'paragraph', id: 'p3', text: 'Call the VA contracting office this month.', claim: 'recommendation' },
+      ] }],
+    } };
+    await ask('Create a PDF report with an executive summary, risks, actions and sources');
+    expect(plannerSystems.join('\n')).toContain('REQUESTED DOCUMENT SECTIONS: the customer asked the document itself to include: Executive summary, Risks, Recommended actions, Sources.');
+    const model = h.saved[0].docModel as { sections: Array<{ heading: string }> };
+    expect(model.sections.map((x) => x.heading)).toEqual(['Executive summary', 'Where demand is', 'Risks', 'Recommended actions']);
+    expect(toolResultsSeen.join(' ')).toMatch(/"requested_sections":\{"requested":\["executive_summary","risks","actions","sources"\],"added":\["executive_summary","risks","actions"\],"missing":\[\]\}/);
+  });
+
+  it('no sections named: no requested-sections note and the model is saved as sent', async () => {
+    await ask('Create my improved capability statement as a document');
+    expect(plannerSystems.join('\n')).not.toContain('REQUESTED DOCUMENT SECTIONS');
+    expect((h.saved[0].docModel as { sections: Array<{ heading: string }> }).sections.map((x) => x.heading)).toEqual(['Core competencies']);
   });
 });

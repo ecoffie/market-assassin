@@ -15,59 +15,9 @@
  */
 
 // ── Forecast identity ────────────────────────────────────────────────────────
-
-type ForecastLike = {
-  id?: string | null;
-  external_id?: string | null;
-  agency?: string | null;
-  title?: string | null;
-  description?: string | null;
-  fiscal_year?: string | null;
-  quarter?: string | null;
-  naics_code?: string | null;
-  value_min?: number | null;
-  value_max?: number | null;
-  incumbent_name?: string | null;
-};
-
-const norm = (v: unknown): string =>
-  String(v ?? '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
-
-/**
- * The identity of ONE customer-visible forecast.
- *
- * Primary: the source listing id with the pipeline prefix stripped
- * (`GW-L:7799` and `7799` are the same Acquisition Gateway listing), scoped to the
- * agency so two agencies' numeric ids never collide.
- *
- * Fallback (no listing id): every field a reader could use to tell two rows apart —
- * title, FY, quarter, NAICS, value band, incumbent AND description. Deliberately NOT
- * title alone: Navy's three "OPF-L Delivery Order #3" rows share a title and value
- * band but name three different incumbents (AeroVironment, Anduril, Teledyne FLIR).
- * Those are three procurements, and collapsing them would delete two.
- */
-export function forecastIdentity(f: ForecastLike): string {
-  const listing = String(f.external_id ?? '').trim().replace(/^GW-L:/i, '');
-  if (listing) return `listing|${norm(f.agency)}|${listing}`;
-  return [
-    'content',
-    norm(f.agency), norm(f.title), norm(f.fiscal_year), norm(f.quarter), norm(f.naics_code),
-    f.value_min ?? '', f.value_max ?? '', norm(f.incumbent_name), norm(f.description),
-  ].join('|');
-}
-
-/** Keep the first row of each identity; report how many were cross-listed copies. */
-export function dedupeForecasts<T extends ForecastLike>(rows: T[]): { rows: T[]; removed: number } {
-  const seen = new Set<string>();
-  const out: T[] = [];
-  for (const r of rows) {
-    const k = forecastIdentity(r);
-    if (seen.has(k)) continue;
-    seen.add(k);
-    out.push(r);
-  }
-  return { rows: out, removed: rows.length - out.length };
-}
+// The shared rule lives in src/lib/forecasts/forecast-identity.ts (also used by FIND
+// coming_soon). Re-exported here so report callers keep one import.
+export { forecastIdentity, dedupeForecasts } from '@/lib/forecasts/forecast-identity';
 
 // ── Forecast set-aside ───────────────────────────────────────────────────────
 

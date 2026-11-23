@@ -49,3 +49,16 @@ describe('presentRecompete', () => {
     expect(presentRecompete({ estimated_recompete_date: null }).capture_start_passed).toBeNull();
   });
 });
+
+describe('dedupeForecasts (report) — gateway listing vs legacy separator twins', () => {
+  it('counts GW-L:FHWA-2026-167 / FHWA_2026_167 and GW-L:FY26-010880 / FY26_010880 as removed duplicates', () => {
+    const { rows, removed } = dedupeForecasts([
+      { agency: 'DOT', external_id: 'FHWA_2026_167', title: 'VA ST FB KNGMN-WLKR GTS' },
+      { agency: 'DOT', external_id: 'GW-L:FHWA-2026-167', title: 'VA ST FB KNGMN-WLKR GTS' },
+      { agency: 'USDA', external_id: 'GW-L:FY26-010880', title: 'George Washington and Jefferson National Forests Road Maintenance IDIQ Forest-Wide' },
+      { agency: 'USDA', external_id: 'FY26_010880', title: 'George Washington and Jefferson National Forests Road Maintenance IDIQ Forest-Wide' },
+    ]);
+    expect(removed).toBe(2);
+    expect(rows.map((r) => r.external_id)).toEqual(['GW-L:FHWA-2026-167', 'GW-L:FY26-010880']);
+  });
+});

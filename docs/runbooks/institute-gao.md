@@ -31,6 +31,15 @@ with an `intelligence_changes` history row. Customer surfaces read via
 - Verified ingest incomplete / pipeline failure
 - Agency resolution rate degraded (>15pp drop)
 
+## Cron outcome (`cron_job_runs`)
+
+One decision (`src/lib/institute/gao-run-outcome.ts`) drives `last_verified_ingest`, the
+self-reported outcome, the response `success`/`status` and the HTTP status. Any incomplete
+run (budget cut, ingest failure, held-id lookup failure, reconcile failure, blocked
+derivation, oversight.gov lane down) is `partial` / HTTP 503, never `success`, and
+`cron_job_runs.error` carries the reason: `category=N [first message | second message]; ...`.
+The same reason is appended to the "Verified ingest incomplete" alert body.
+
 ## Agency resolution
 
 Unresolved stays unresolved. MULTI_AGENCY candidates are preserved in `raw` — never

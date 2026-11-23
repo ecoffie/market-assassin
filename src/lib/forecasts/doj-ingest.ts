@@ -7,7 +7,7 @@
 import { applyInsertGuard } from './writer';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import * as XLSX from 'xlsx';
-import { mapDojRow } from './doj-parse';
+import { mapDojRow, resolveDojColumns, type DojColumnMap } from './doj-parse';
 import {
   auditDojIdentity, planDojReconciliation, dojPlanReconciles, dojPlanIsSemanticallySane,
   dojWorkbookFingerprint, dojDataAdvanced, DOJ_SOURCE_OWNED_FIELDS, type DojRow,
@@ -48,10 +48,28 @@ export interface DojIngestResult {
   nullProtectedRows: number;
   nullProtectedFields: Record<string, number>;
   suspects: Array<{ atn: string; heldTitle: string; upstreamTitle: string }>;
+  /**
+   * NEW rows (inside newProven) DOJ published with no usable title — blank or a
+   * placeholder like 'TBD'. agency_forecasts.title is NOT NULL, and Mindy never
+   * invents a title, so they are held back from the insert and counted here
+   * instead of failing the whole insert batch.
+   */
+  newWithoutTitle: number;
+  newWithoutTitleSample: string[];
   // receipts
   insertAttempted: number; inserted: number; insertFailed: number;
   updateAttempted: number; updated: number; updateFailed: number;
+  /** The database's own error text for each failed write (capped) — never discarded. */
+  writeErrors: Array<{ op: 'insert' | 'update'; externalIds: string[]; message: string }>;
   dataAdvanced: boolean;
+}
+
+const WRITE_ERRORS_KEPT = 10;
+const SAMPLE_SIZE = 10;
+
+/** A title Mindy can store. dojCell already turned blanks/'TBD'/'N/A' into null. */
+export function dojHasUsableTitle(row: { title?: unknown }): boolean {
+  return row.title != null && String(row.title).trim() !== '';
 }
 
 const EMPTY = (): DojIngestResult => ({
@@ -62,8 +80,9 @@ const EMPTY = (): DojIngestResult => ({
   matchedSafe: 0, changedSafe: 0, unchangedSafe: 0, newProven: 0,
   absentRetained: 0, heldAmbiguous: 0, corruptLegacyIdentity: 0,
   nullProtectedRows: 0, nullProtectedFields: {}, suspects: [],
+  newWithoutTitle: 0, newWithoutTitleSample: [],
   insertAttempted: 0, inserted: 0, insertFailed: 0,
-  updateAttempted: 0, updated: 0, updateFailed: 0, dataAdvanced: false,
+  updateAttempted: 0, updated: 0, updateFailed: 0, writeErrors: [], dataAdvanced: false,
 });
 
 export async function runDojIngest(
@@ -97,20 +116,32 @@ export async function runDojIngest(
   if (!fingerprint) return { ...base, failure: 'not_xlsx' };
 
   let rows: unknown[][];
+  let columns: DojColumnMap;
   try {
     const wb = XLSX.read(bytes, { type: 'array' });
     const ws = wb.Sheets[DOJ_SHEET];
     if (!ws) return { ...base, fingerprint, sourceLastModified: lastModified, failure: `sheet_missing:${DOJ_SHEET}` };
     const aoa = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, defval: null });
+    // Columns are located by HEADER NAME. A missing required header fails closed —
+    // never a silent shift of some other column onto a source-owned field.
+    const resolved = resolveDojColumns(aoa[0] ?? []);
+    if (!resolved.ok) {
+      const parts = [
+        ...(resolved.missing.length ? [`missing ${resolved.missing.join(', ')}`] : []),
+        ...(resolved.duplicated.length ? [`duplicated ${resolved.duplicated.join(', ')}`] : []),
+      ];
+      return { ...base, fingerprint, sourceLastModified: lastModified, failure: `header_drift: ${parts.join('; ')}` };
+    }
+    columns = resolved.columns;
     rows = aoa.slice(1).filter((r) => Array.isArray(r) && r.some((c) => c != null && String(c).trim() !== ''));
   } catch (e) {
     return { ...base, fingerprint, sourceLastModified: lastModified, failure: `parse: ${(e as Error).message}` };
   }
   if (rows.length === 0) return { ...base, fingerprint, sourceLastModified: lastModified, failure: 'no_data_rows' };
 
-  const audit = auditDojIdentity(rows.map((r) => String(r[1] ?? '')));
+  const audit = auditDojIdentity(rows.map((r) => String(r[columns.atn] ?? '')));
   const rejectedAtns = new Set(audit.duplicateAtnGroups);
-  const parsed = rows.map(mapDojRow).filter((x): x is NonNullable<typeof x> => !!x)
+  const parsed = rows.map((row) => mapDojRow(row, columns)).filter((x): x is NonNullable<typeof x> => !!x)
     .filter((p) => !rejectedAtns.has(p.atn));
 
   // ── HELD. Paged; an unranged read caps at 1,000 and would fabricate the plan. ──
@@ -132,6 +163,11 @@ export async function runDojIngest(
   if (!sane.ok) return { ...base, fingerprint, sourceLastModified: lastModified, failure: `semantic: ${sane.problems.join('; ')}` };
 
   const derivedById = new Map(parsed.map((p) => [p.atn, p.derived]));
+  // ⚠️ ONE untitled new row used to fail its whole 500-row insert batch (title is
+  // NOT NULL) and turn the run into a daily 500. Hold it back, count it, never
+  // fabricate a title for it.
+  const insertable = plan.toInsert.filter(dojHasUsableTitle);
+  const untitled = plan.toInsert.filter((row) => !dojHasUsableTitle(row));
   const r: DojIngestResult = {
     ...base, ok: true, fingerprint, sourceLastModified: lastModified,
     rawUpstream: plan.rawUpstream,
@@ -152,6 +188,8 @@ export async function runDojIngest(
     nullProtectedRows: plan.nullProtectedRows,
     nullProtectedFields: plan.nullProtected,
     suspects: plan.crossEditionSuspect,
+    newWithoutTitle: untitled.length,
+    newWithoutTitleSample: untitled.slice(0, SAMPLE_SIZE).map((row) => row.external_id),
   };
   if (!apply) return r;
 
@@ -161,7 +199,7 @@ export async function runDojIngest(
   // publisher's alert floor is active — those would all read as "new" Forecasts. Updates still apply.
   // ALL-OR-NOTHING: the guard runs BEFORE the first batch, over the whole run's new rows. A refused
   // run inserts ZERO rows (never a partial prefix) and quarantines the full payload for replay.
-  const insertGuard = await applyInsertGuard(sb, 'DOJ', plan.toInsert);
+  const insertGuard = await applyInsertGuard(sb, 'DOJ', insertable);
   if (insertGuard.refused) {
     r.insertRefused = insertGuard.refused.reason;
     r.insertQuarantined = insertGuard.refused.quarantined;
@@ -177,7 +215,11 @@ export async function runDojIngest(
       last_synced_at: new Date().toISOString(),
     }));
     const { count, error } = await sb.from('agency_forecasts').insert(batch, { count: 'exact' });
-    if (error) { r.insertFailed += batch.length; continue; }
+    if (error) {
+      r.insertFailed += batch.length;
+      recordWriteError(r, 'insert', batch.map((row) => row.external_id), error.message);
+      continue;
+    }
     r.inserted += count ?? batch.length;
   }
   r.updateAttempted = plan.toUpdate.length;
@@ -185,7 +227,11 @@ export async function runDojIngest(
     const { count, error } = await sb.from('agency_forecasts')
       .update({ ...u.patch, last_synced_at: new Date().toISOString() }, { count: 'exact' })
       .eq('source_agency', 'DOJ').eq('external_id', u.externalId);
-    if (error) { r.updateFailed++; continue; }
+    if (error) {
+      r.updateFailed++;
+      recordWriteError(r, 'update', [u.externalId], error.message);
+      continue;
+    }
     r.updated += count ?? 0;
   }
   r.dataAdvanced = dojDataAdvanced(r.inserted, r.updated);
@@ -195,4 +241,11 @@ export async function runDojIngest(
   r.ok = r.insertFailed === 0 && r.updateFailed === 0 && balanced;
   if (!r.ok) r.failure = balanced ? 'partial_mutation' : 'receipt_mismatch';
   return r;
+}
+
+function recordWriteError(r: DojIngestResult, op: 'insert' | 'update', ids: string[], message: string) {
+  console.error(`[doj-forecast] ${op} failed (${ids.length} row(s), first ${ids[0] ?? '-'}): ${message}`);
+  if (r.writeErrors.length < WRITE_ERRORS_KEPT) {
+    r.writeErrors.push({ op, externalIds: ids.slice(0, SAMPLE_SIZE), message });
+  }
 }

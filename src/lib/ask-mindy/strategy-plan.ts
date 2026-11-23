@@ -25,6 +25,7 @@
 import { flagMode } from '@/lib/vault/flags';
 import type { FmpCompanyContext } from '@/lib/chat/tool-selection';
 import type { CompanyProfile } from './company-profile';
+import { fitRankingNote, rankFindResult } from './compose';
 
 export const STRATEGY_PLAN_ENV = 'ASK_MINDY_STRATEGY_PLAN';
 export const STRATEGY_PLAN_ALLOWLIST_ENV = 'ASK_MINDY_STRATEGY_PLAN_ALLOWLIST';
@@ -74,6 +75,7 @@ export const STRATEGY_PLAN_CHAT_CONTRACT = [
   '- Pathways before open bids: contract vehicles (IDIQ, MATOC, GSA Schedule, BPA), sources sought and market research notices, forecasts, recompetes, and direct awards where the company is eligible. find_opportunities and search_sam_opportunities with the company\'s own work words and states; lookup_solicitation / get_solicitation_documents for named vehicles; get_agency_forecasts.',
   '- Vehicles: for each vehicle that matters, search_past_contracts / search_idv_contracts (task orders) and get_award_detail for holders, ceilings, end dates and set-asides.',
   '- Market size supports the choice; it is never the deliverable. generate_market_report runs per state with the award NAICS.',
+  '- Prioritization: when a FIT SIGNAL note is present, it is opportunity fit computed for THIS company by Mindy\'s shared fit scorer: one input to prioritization, not the final order. Rank "Pathways in priority order" by weighing it with the evidence: the company\'s award history (what it already wins and for whom), vehicles held and how it gains access, competitive position and incumbents, buyer relationships and timing, and the customer\'s objective and trade-offs. Every pathway states why it is recommended. When your order differs from the FIT SIGNAL order, that pathway\'s why MUST name the evidence that moved it (e.g. "ranked above the open janitorial notice because the company already holds the vehicle this buy runs through"); never depart from the fit order without saying why. A subcontract-route pick is labeled as a teaming or subcontract pathway. Never print or cite a fit score.',
   '- Contacts and policy: notice contacts first, then lookup_federal_osbp / search_federal_contacts; get_legislation_status for legislation that affects these buyers (status only). Never invent a name, email or phone.',
   '- Outside Mindy: search_web for the agency problems, policy and budget context that change a choice. Quote returned snippets with URLs; if search is unavailable, say so as a known gap.',
   '',
@@ -132,6 +134,30 @@ export function strategyCompanyContext(input: StrategyProfileInput): FmpCompanyC
     ...(p?.naicsCodes?.length ? { naics: p.naicsCodes[0] } : {}),
     ...(p?.states?.length ? { states: p.states.slice(0, 3) } : {}),
   };
+}
+
+/**
+ * The FIT SIGNAL note for a strategy turn: the first successful find_opportunities result in the research rounds,
+ * ranked for THIS company by the shared fit scorer (compose.ts, the same picks and reasons as #2285's chat ranking, in strategy_input mode: one input to the
+ * plan's prioritization, never the final order). Returns
+ * null when there is no profile, no successful FIND, nothing rankable, or the result cannot be read: no guessed
+ * ranking, ever.
+ */
+export function strategyFitNote(
+  results: ReadonlyArray<{ record: { tool: string; status: string }; content: string }>,
+  input: StrategyProfileInput | null,
+  nowMs?: number,
+): { note: string | null; reason: 'ok' | 'no_profile' | 'no_find' | 'nothing_ranked' | 'unreadable' } {
+  if (!input || input.status !== 'ok' || !input.profile) return { note: null, reason: 'no_profile' };
+  const find = results.find((r) => r.record.tool === 'find_opportunities' && r.record.status === 'success');
+  if (!find) return { note: null, reason: 'no_find' };
+  try {
+    const parsed = JSON.parse(find.content) as Parameters<typeof rankFindResult>[0];
+    const note = fitRankingNote(rankFindResult(parsed, input.profile, nowMs !== undefined ? { nowMs } : {}), { mode: 'strategy_input' });
+    return note ? { note, reason: 'ok' } : { note: null, reason: 'nothing_ranked' };
+  } catch {
+    return { note: null, reason: 'unreadable' };
+  }
 }
 
 // ── Structural check (evaluation) ───────────────────────────────────────────────────────────────────────────────

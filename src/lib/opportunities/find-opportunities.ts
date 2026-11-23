@@ -8,6 +8,14 @@
 import { forecastLinkFields } from '@/lib/forecasts/forecast-link';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { forecastSyncClock } from '@/lib/forecasts/query';
+import {
+  ALREADY_AWARDED_RULE,
+  alreadyAwardedFlag,
+  warmCompanyAwardsLookup,
+  type CompanyAwardsLookup,
+  type CompanyAwardsResult,
+} from './forecast-awarded-to-company';
+import { dedupeForecasts, type ForecastIdentityLike } from '@/lib/forecasts/forecast-identity';
 import { classifySearchFailure } from './search-failure';
 import { recompeteRowAnnotations } from '@/lib/recompete/annotate';
 import { parseAwardLineage, NOT_ORDER_UNDER_VEHICLE_OR } from '@/lib/recompete/award-lineage';
@@ -148,6 +156,8 @@ export interface FindOpportunitiesDeps {
   entityLookup?: EntityLookup;
   /** How each returned Coming back award was competed (USASpending). null = skip (tests). */
   competitionLookup?: CompetitionLookup | null;
+  /** Company-anchored FIND: the company's own awards, for the "already awarded to you" flag. */
+  companyAwardsLookup?: CompanyAwardsLookup;
 }
 
 export interface FindNextAction {
@@ -201,6 +211,8 @@ export interface HorizonResult {
   evidence_counts?: EvidenceCounts | null;
   /** Coming Soon only: forecast publisher coverage when it is not complete (canonical plan). */
   coverage?: { state: 'partial' | 'unestablished'; gaps: ForecastCoverageGap[] };
+  /** Coming Soon only: cross-listed copies of the same forecast listing removed from the window (forecast-identity.ts). */
+  duplicates_removed?: number;
   /** Coming Back only: task/delivery orders the plan matched and excluded (null = count unavailable). Internal. */
   orders_excluded?: number | null;
   /** Coming back only: how the returned awards were competed (USASpending award record). */
@@ -209,6 +221,11 @@ export interface HorizonResult {
   eligibility_counts?: Record<EligibilityStatus, number> | null;
   /** Stage-filtered FIND only (input.stage). Open now carries the counts; other horizons say "not applied". */
   stage?: HorizonStage | null;
+  /**
+   * Coming soon, company-anchored FIND only: whether forecasts were checked against the company's
+   * own awards (forecast-awarded-to-company.ts). Flagged rows carry `already_awarded_to_company`.
+   */
+  company_award_check?: { status: 'checked' | 'unavailable'; flagged: number; rule: string; note: string } | null;
 }
 
 export interface HorizonStage {
@@ -255,6 +272,11 @@ export interface FindCompanySummary {
   /** Per-NAICS SAM size representation, verbatim tri-state. */
   size_by_naics: CompanyAnchor['size_by_naics'] | null;
   location: CompanyAnchor['location'] | null;
+  /**
+   * SAM registration purpose and whether it covers contract awards. `warning` is present only
+   * when SAM lists an assistance-only purpose (Z1) — the host must repeat it. Null when unresolved.
+   */
+  registration_readiness: CompanyAnchor['registration_purpose'] | null;
 }
 
 export interface FindOpportunitiesResult {
@@ -333,8 +355,10 @@ export const HOST_RULES_FIND_FIRST_VALUE = [
 /** Added to host_rules ONLY for a company-anchored call (input.uei). The beginner first turn is unchanged. */
 export const HOST_RULES_COMPANY_ANCHORED = [
   'COMPANY-ANCHORED: this FIND used the company\'s own SAM registration (see `company`). Items with match_basis company_registered_psc / company_registered_naics were recalled by a code the company REGISTERED — say so; they are not a match on the words typed and never a DIRECT_MATCH.',
+  'REGISTRATION: if company.registration_readiness.warning is present, say it plainly before the items (SAM lists the registration as assistance-only, so the company is not currently registered for contract awards). If contract_awards is "unknown", do not claim either way.',
   'ELIGIBILITY is separate from relevance. Report each item\'s eligibility.status with its reason: ELIGIBLE, NOT_ELIGIBLE (say why — e.g. not small under the notice NAICS), or UNKNOWN. Never turn UNKNOWN into eligible or not eligible. A missing set-aside is UNKNOWN, not unrestricted. Size is per NAICS — never call the company "small" in general.',
   'Coming back eligibility is always UNKNOWN: a recompete is not a live solicitation and its set-aside is not stated yet. Coming soon eligibility reflects the agency\'s ANTICIPATED set-aside only.',
+  'ALREADY AWARDED: a coming_soon item with already_awarded_to_company matches an award already made to this company (exact rule in company_award_check.rule). Show it with its label (e.g. "already awarded to you (PIID, date)") — never present it as a new lead, never drop it. No flag means no match among the awards checked, not "not awarded to you".',
 ] as const;
 
 export const FIND_FIRST_VALUE_SECTIONS = {
@@ -1215,6 +1239,30 @@ async function queryComingBack(
   }
 }
 
+/**
+ * FLAG — never hide — Coming soon forecasts an award already made to this company exactly matches.
+ * Rule + scope: forecast-awarded-to-company.ts. Rows keep their place and count.
+ */
+function flagAlreadyAwarded(h: HorizonResult, awards: CompanyAwardsResult): HorizonResult {
+  let flagged = 0;
+  const items = awards.status === 'checked'
+    ? h.items.map((i) => {
+      const flag = alreadyAwardedFlag(
+        { title: i.title, source_agency: (i.forecast_source_agency as string) || null, department: i.buyer },
+        awards.awards,
+      );
+      if (!flag) return i;
+      flagged++;
+      return { ...i, already_awarded_to_company: flag };
+    })
+    : h.items;
+  return {
+    ...h,
+    items,
+    company_award_check: { status: awards.status, flagged, rule: ALREADY_AWARDED_RULE, note: awards.note },
+  };
+}
+
 async function queryComingSoon(
   client: SupabaseClient,
   p: InterpretedQuery,
@@ -1278,7 +1326,12 @@ async function queryComingSoon(
       const base = await applyForecastPlan(client.from(source).select(COLS), p.basePlan).limit(Math.max(limit, 200));
       if (!base.error) baseRows = (base.data || []) as Row[];
     }
-    const all = inRegion(unionRows(baseRows, (data || []) as Row[], 'id') as Row[], 'pop_state', p);
+    // The same listing ingested twice (`GW-L:FHWA-2026-167` + legacy `FHWA_2026_167`) is ONE forecast —
+    // shared identity rule with generate_market_report (forecast-identity.ts). Exact listing id only.
+    const { rows: all, removed: forecastDuplicatesRemoved } = dedupeForecasts(
+      inRegion(unionRows(baseRows, (data || []) as Row[], 'id') as Row[], 'pop_state', p) as Array<Row & ForecastIdentityLike>,
+      { listingOnly: true },
+    );
     const scores = new Map(rankRecords(p.plan, all, ['title', 'description', 'naics_description', 'department']).map((s) => [s.row, s]));
     const rows = [...all].sort((a, b) => {
       const bd = (scores.get(b)?.breadth ?? 0) - (scores.get(a)?.breadth ?? 0);
@@ -1371,9 +1424,11 @@ async function queryComingSoon(
 
     return {
       status: partial ? 'partial' : 'grounded',
-      matched_count: count ?? null,
+      // Cross-listed twins removed from the window are not separate forecasts (same as Coming back's lineage dedupe).
+      matched_count: count == null ? null : Math.max(count - forecastDuplicatesRemoved, items.length),
       returned_count: items.length,
       window_size: forecastWindow,
+      duplicates_removed: forecastDuplicatesRemoved,
       items,
       source,
       as_of: asOf,
@@ -1541,6 +1596,7 @@ function companySummary(c: CompanyAnchorResolution, plan: DiscoveryPlan): FindCo
     recall_codes: plan.company ?? null,
     size_by_naics: a ? a.size_by_naics : null,
     location: a?.location ?? null,
+    registration_readiness: a ? a.registration_purpose : null,
   };
 }
 
@@ -1643,11 +1699,18 @@ export async function findOpportunities(
     return annotateHorizon(key, h, interpreted);
   };
 
-  const [open_now, coming_back, coming_soon] = await Promise.all([
+  // "Already awarded to you" needs the company's own awards — fetched beside the horizons, only when
+  // the UEI resolved and Coming soon was asked for.
+  const companyAwardsP = company?.status === 'resolved' && requested.includes('coming_soon')
+    ? (deps.companyAwardsLookup ?? warmCompanyAwardsLookup)(company.uei)
+    : null;
+  const [open_now, coming_back, coming_soonRaw, companyAwards] = await Promise.all([
     run('open_now'),
     run('coming_back'),
     run('coming_soon'),
+    companyAwardsP,
   ]);
+  const coming_soon = companyAwards ? flagAlreadyAwarded(coming_soonRaw, companyAwards) : coming_soonRaw;
 
   const horizons = { open_now, coming_back, coming_soon };
   const shape = classifyFindShape(horizons);

@@ -159,7 +159,7 @@ describe('get_federal_event_series', () => {
     // 2026-11-09: every entry re-checked against its organizer (catalog-integrity.unit.test.ts).
     // A file-level review date says nothing about whether an entry is current — catalog_verification does.
     const { _meta } = getFederalEventSeries({});
-    expect(_meta.catalog_updated).toBe('2026-11-09');
+    expect(_meta.catalog_updated).toBe('2026-11-23'); // held one-off events removed; not a full review
     expect(_meta.catalog_last_full_review).toBe('2026-11-09');
     expect(_meta.catalog_verification.verified_upcoming).toBeLessThan(_meta.total_in_catalog);
   });

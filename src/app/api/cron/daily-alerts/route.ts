@@ -1098,6 +1098,9 @@ async function runDailyAlertJob(options?: {
         // Send email - now includes all active opportunities for deadline tracking and action tips
         try {
           metrics.recordEmailAttempted();
+          // The guard's exact reason (suppressed:<r> / suppression_check_failed /
+          // synthetic_client_address). Kept in the row's context, not error_message.
+          let guardReason: string | null = null;
           const emailDelivered = await sendDailyAlertEmail(
             user.user_email,
             scoredOpps,
@@ -1111,6 +1114,7 @@ async function runDailyAlertJob(options?: {
               openKeywordNote: openUnavailable ? undefined : (openMarketNote(openKeywordOutcome ?? 'no_keywords_configured', keywordScan) ?? undefined),
               comingBack,
               openUnavailable: !!openUnavailable,
+              onBlocked: (reason) => { guardReason = reason; },
             },
             todaysLens,
             isUsingFallback,
@@ -1123,10 +1127,13 @@ async function runDailyAlertJob(options?: {
           // NO email actually left — making a real non-delivery invisible to every
           // "who didn't get an alert" query. Record it as a visible skip instead.
           if (emailDelivered === false) {
+            // error_message stays exactly 'send_guard_blocked' (watch-key-accounts and
+            // throughput-digest match on it); the reason rides in the context object.
             await saveSkippedAlert(user.user_email, 'send_guard_blocked', {
               opportunitiesCount: scoredOpps.length + scoredGrants.length,
+              guard_reason: guardReason,
             });
-            console.warn(`[Daily Alerts] ⚠️ Send guard blocked ${user.user_email} (suppression or daily cap) — recorded as skipped, NOT sent`);
+            console.warn(`[Daily Alerts] ⚠️ Send guard blocked ${user.user_email} (${guardReason ?? 'reason not reported'}) — recorded as skipped, NOT sent`);
             results.skipped++;
             continue;
           }
@@ -1618,6 +1625,8 @@ async function sendDailyAlertEmail(
     comingBack?: ComingBackDecision;
     /** Open search failed on every same-day attempt: render OPEN_UNAVAILABLE_LINE, claim no count and no zero. */
     openUnavailable?: boolean;
+    /** Passed through to sendEmail(): receives the send guard's reason when it blocks. */
+    onBlocked?: (reason: string) => void;
   },
   todaysLens?: TodaysLens | null,
   /**
@@ -2070,6 +2079,7 @@ function mindyDayBannerHtml(): string {
     emailType: 'daily_alert',
     eventSource: 'daily_alert',
     transactional: sendOptions?.transactional,
+    onBlocked: sendOptions?.onBlocked,
     tags: {
       email_type: 'daily_alert',
       alert_type: 'daily',
