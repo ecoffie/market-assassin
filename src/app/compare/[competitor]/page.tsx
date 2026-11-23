@@ -11,6 +11,7 @@
  * govwin/sam-gov entry, so a stray hit would 404 (correct).
  */
 import type { Metadata } from 'next';
+import { siteShareImages } from '@/lib/seo/share-image';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getCompetitor, COMPETITORS } from '@/data/competitors';
@@ -31,7 +32,7 @@ export async function generateMetadata({ params }: { params: Promise<{ competito
     title: c.metaTitle,
     description: c.metaDescription,
     alternates: { canonical: url },
-    openGraph: { title: c.metaTitle, description: c.metaDescription, type: 'website', url },
+    openGraph: { title: c.metaTitle, description: c.metaDescription, type: 'website', url, images: siteShareImages() },
     keywords: c.keywords,
   };
 }
