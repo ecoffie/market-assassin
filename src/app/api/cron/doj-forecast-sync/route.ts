@@ -10,10 +10,15 @@ import { forecastWriterClient } from '@/lib/forecasts/writer';
 import { sendOpsAlert } from '@/lib/ops-alert';
 import { runDojIngest } from '@/lib/forecasts/doj-ingest';
 import { hasValidCronSecret } from '@/lib/cron/cron-request-auth';
+import { dojFailureSourceState } from '@/lib/forecasts/doj-instance-state';
+import { reportCronOutcome } from '@/lib/cron-self-report';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
+
+/** cron_jobs.job_name — the dispatcher fire-and-forgets this job, so the route reports its own outcome. */
+const JOB_NAME = 'doj-forecast-sync';
 
 export async function GET(request: NextRequest) {
   const auth = request.headers.get('authorization');
@@ -38,17 +43,20 @@ export async function GET(request: NextRequest) {
         subject: 'Forecast sync — DOJ bulk of NEW rows refused (publisher floor active)',
         html: `<p>${r.insertRefused}</p><p>${r.insertQuarantined ? 'Rows quarantined in forecast_refused_loads — replay with scripts/forecast-refused-load.ts.' : 'QUARANTINE FAILED — the rows must be re-fetched from the source during the backfill.'}</p>`,
       }).catch(() => {});
+      if (apply) await reportCronOutcome(JOB_NAME, 'error', `insert_refused: ${r.insertRefused}`);
       return NextResponse.json({ success: false, failure: `insert_refused: ${r.insertRefused}`, detail: r }, { status: 500 });
     }
 
     if (!r.ok) {
       // ⚠️ DRY observes and reports; it never records a verdict about the source.
+      // A workbook that was READ but not taken in is content_stale, never unreachable.
       if (apply) {
         await sb.from('data_source_instances').update({
           last_poll: nowIso,
-          source_state: r.fingerprint ? 'unreachable' : 'unmeasured',
+          source_state: dojFailureSourceState(r),
           updated_at: nowIso,
         }).eq('source_key', 'forecast_doj_live');
+        await reportCronOutcome(JOB_NAME, 'error', r.failure ?? 'failed');
       }
       return NextResponse.json({ success: false, dry: !apply, failure: r.failure, detail: r }, { status: 500 });
     }
@@ -78,7 +86,11 @@ export async function GET(request: NextRequest) {
     if (apply) {
       const { error: upErr } = await sb.from('data_source_instances')
         .update(patch).eq('source_key', 'forecast_doj_live');
-      if (upErr) return NextResponse.json({ success: false, failure: `instance_update: ${upErr.message}`, detail: r }, { status: 500 });
+      if (upErr) {
+        await reportCronOutcome(JOB_NAME, 'error', `instance_update: ${upErr.message}`);
+        return NextResponse.json({ success: false, failure: `instance_update: ${upErr.message}`, detail: r }, { status: 500 });
+      }
+      await reportCronOutcome(JOB_NAME, 'success');
     }
 
     return NextResponse.json({
@@ -121,6 +133,7 @@ export async function GET(request: NextRequest) {
       interventionState: 'none_required',
     });
   } catch (e) {
+    if (apply) await reportCronOutcome(JOB_NAME, 'error', (e as Error).message);
     return NextResponse.json({ success: false, failure: (e as Error).message }, { status: 500 });
   }
 }
