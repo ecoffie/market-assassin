@@ -170,6 +170,6 @@ describe('route wiring (static)', () => {
     const route = readFileSync(join(__dirname, 'route.ts'), 'utf8');
     expect(route).toMatch(/const fitRankingOn = !cardCtx && askMindyRecipesEnabledFor\(auth\.email\);/);
     expect(route).toMatch(/const fitProfileP = fitRankingOn \? loadCompanyProfile\(actingScope\)\.catch\(\(\) => null\) : null;/);
-    expect(route).toMatch(/if \(fitProfileP && findResult\) \{/);
+    expect(route).toMatch(/if \(fitProfileP && findResult(?: && !strategyFitNotePushed)?\) \{/);
   });
 });

@@ -37,7 +37,7 @@ import { hasProAccess } from '@/lib/access/resolve-access';
 // podcast retrieval (retrieveRagContext / retrievePodcastEpisodes) is gone entirely.
 import { loadBidderProfileResult, formatProfileForPrompt } from '@/lib/proposal/loaders';
 import { contractIdentityNote, contractEvidence, contractEvidenceNote, priorAwardIds } from '@/lib/chat/contract-evidence';
-import { askMindyStrategyPlanEnabledFor, isStrategyPlanRequest, STRATEGY_PLAN_CHAT_CONTRACT, strategyPlanCheck, strategyProfileNote, strategyCompanyContext, type StrategyProfileInput } from '@/lib/ask-mindy/strategy-plan';
+import { askMindyStrategyPlanEnabledFor, isStrategyPlanRequest, STRATEGY_PLAN_CHAT_CONTRACT, strategyPlanCheck, strategyProfileNote, strategyCompanyContext, strategyFitNote, type StrategyProfileInput } from '@/lib/ask-mindy/strategy-plan';
 import { isUserOverBudget, recordLlmUsage } from '@/lib/llm/usage-cost';
 import { makeTier0Tools, TIER0_TOOL_DEFS, TIER0_TOOL_NAMES } from '@/lib/chat/tier0-tools';
 import { makeMyDocumentsTool, MY_DOCUMENTS_TOOL_DEF, FIND_MY_DOCUMENTS } from '@/lib/chat/my-documents-tool';
@@ -1038,6 +1038,20 @@ export async function POST(request: NextRequest) {
         let turnMarketReport: { report_id: string | null; url: string | null; title: string; html: string } | null = null;
         // Hoisted out of the tool try so the answer call can rewrite invent-links + re-push the note.
         const fmpToolContents: Array<{ tool: string; content: string }> = [];
+        // Strategy plan (#2320): opportunity fit comes from the shared fit scorer, not the model. The first successful
+        // find_opportunities in the research rounds adds a FIT SIGNAL note (compose.ts strategy_input mode: the same
+        // picks and reasons as #2285's chat ranking) built from THIS company's saved profile. It is one input: the
+        // write-up weighs it with award history, vehicles, competition, buyers and timing, and must say why whenever its
+        // order departs from the fit order. Once per turn; no profile (refused/unavailable) means no note, never a guess.
+        let strategyFitNotePushed = false;
+        const pushStrategyFitNote = (results: ReadonlyArray<{ record: { tool: string; status: string }; content: string }>) => {
+          if (!strategyPlanAsk || strategyFitNotePushed) return;
+          const fit = strategyFitNote(results, strategyProfile);
+          if (fit.reason === 'no_find') return; // wait for the round that runs FIND
+          if (fit.note) messages.push({ role: 'system', content: fit.note });
+          turnTrace.notices.push(fit.note ? 'strategy_fit_ranking_note' : `strategy_fit_ranking_note:${fit.reason}`);
+          strategyFitNotePushed = true;
+        };
         let fmpEvidence: FmpWriteupEvidence | null = null;
         let createDocAnswerNoteContent: string | null = null;
         try {
@@ -1604,6 +1618,7 @@ export async function POST(request: NextRequest) {
                 for (const r of results) {
                   fmpToolContents.push({ tool: r.record.tool, content: r.content });
                 }
+                pushStrategyFitNote(results);
                 fmpState = applyFmpToolResults(
                   fmpState,
                   results.map((r) => ({ tool: r.record.tool, status: r.record.status, content: r.content })),
@@ -2062,6 +2077,7 @@ export async function POST(request: NextRequest) {
                       } catch { /* ignore */ }
                     }
                   }
+                  pushStrategyFitNote(resultsF);
                   fmpState = applyFmpToolResults(
                     fmpState,
                     resultsF.map((r) => ({ tool: r.record.tool, status: r.record.status, content: r.content })),
@@ -2304,7 +2320,8 @@ export async function POST(request: NextRequest) {
         // Ask Mindy fit ranking note: only when the flag is on AND find_opportunities ran this turn. It orders and
         // explains the results the tool already returned (shared scorer bands, no second filter); it never blocks
         // the answer: a slow, refused or failed profile load skips the note.
-        if (fitProfileP && findResult) {
+        // A strategy turn already carries its fit note from the research rounds (pushStrategyFitNote).
+        if (fitProfileP && findResult && !strategyFitNotePushed) {
           const loaded = await withTimeout(fitProfileP, FIT_PROFILE_WAIT_MS, 'fit_profile').catch(() => null);
           if (loaded && loaded.status === 'ok') {
             const note = fitRankingNote(rankFindResult(findResult as unknown as Parameters<typeof rankFindResult>[0], loaded.profile));
