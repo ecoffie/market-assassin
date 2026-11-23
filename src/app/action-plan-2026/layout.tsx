@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import PublicShell from '@/components/public-site/PublicShell';
 
 export const metadata: Metadata = {
+  alternates: { canonical: '/action-plan-2026' },
   title: '2026 GovCon Action Plan | Mindy',
   description: 'Your step-by-step roadmap to winning federal contracts in 2026.',
 };

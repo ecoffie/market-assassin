@@ -33,6 +33,7 @@ import {
   type FamilyNoticeRow,
 } from '@/lib/sam/solicitation-family';
 import { authorizeCronRequest } from '@/lib/cron/cron-request-auth';
+import { PURSUIT_CHANGES_EMAIL_CTA_URL, PURSUIT_CHANGES_SMS_LINK } from '@/lib/pipeline/pursuit-change-links';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -403,7 +404,7 @@ export async function GET(request: NextRequest) {
         <h2 style="color:#1e293b">⚠️ Changes to your tracked pursuits</h2>
         <p style="color:#64748b;font-size:14px">Mindy detected updates on ${items.length} pursuit${items.length === 1 ? '' : 's'} you're tracking. Review before your bid.</p>
         ${rows}
-        <p style="margin-top:18px"><a href="https://getmindy.ai/app" style="background:#7c3aed;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:600">Open My Pursuits →</a></p>
+        <p style="margin-top:18px"><a href="${PURSUIT_CHANGES_EMAIL_CTA_URL}" style="background:#7c3aed;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:600">Open My Pursuits →</a></p>
       </div>`;
     // sendEmail THROWS on a Resend failure (no fallback provider since 2026-10-27). Catch per
     // recipient so one rejected address cannot stop the digest for everyone after it. Nothing is
@@ -438,7 +439,7 @@ export async function GET(request: NextRequest) {
       const total = flat.length;
       const head = flat.slice(0, 2).join(' | ');
       const more = total > 2 ? ` (+${total - 2} more)` : '';
-      const smsBody = `Mindy: ${total} update${total === 1 ? '' : 's'} on your tracked pursuit${total === 1 ? '' : 's'}. ${head}${more}. getmindy.ai/app`;
+      const smsBody = `Mindy: ${total} update${total === 1 ? '' : 's'} on your tracked pursuit${total === 1 ? '' : 's'}. ${head}${more}. ${PURSUIT_CHANGES_SMS_LINK}`;
       const res = await sendViaGHL(phone, smsBody);
       if (res.success) {
         smsSent++;

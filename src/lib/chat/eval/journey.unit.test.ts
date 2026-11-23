@@ -109,8 +109,20 @@ describe('observed flags and the run label', () => {
     const t = captureFromEvents(1, 'p', [{ type: 'trace_usage', notices: ['requested_doc_sections:risks', 'fmp_phase:writeup_skipped_no_create_document'] }], 1, 200);
     expect(observeFlags([t]).vault_generate.state).toBe('unobserved');
     const on = captureFromEvents(1, 'p', [{ type: 'trace_usage', notices: ['fit_ranking_note'] }], 1, 200);
-    expect(labelRun('before', [], observeFlags([on]))).toEqual({ label: 'UNCONFIRMED', reasons: ['recipes observed on in a BEFORE run'] });
+    expect(labelRun('before', [], observeFlags([on]))).toEqual({ label: 'UNCONFIRMED', reasons: ['recipes observed on in a BEFORE run that did not expect it'] });
     expect(labelRun('before', [], observeFlags([captureFromEvents(1, 'p', [], 1, 200)])).label).toBe('BEFORE');
+  });
+
+  it('option (A): a BEFORE run with the same expected flags as AFTER is BEFORE only when exactly those are on', () => {
+    const all = captureFromEvents(1, 'p', [{ type: 'trace_usage', notices: ['intent:strategy_plan', 'fit_ranking_note', 'requested_doc_sections:risks'] }], 1, 200);
+    const flags = observeFlags([all]);
+    expect(labelRun('before', ['strategy_plan', 'recipes', 'vault_generate'], flags)).toEqual({ label: 'BEFORE', reasons: [] });
+    // an expected flag missing
+    const two = observeFlags([captureFromEvents(1, 'p', [{ type: 'trace_usage', notices: ['intent:strategy_plan', 'fit_ranking_note'] }], 1, 200)]);
+    expect(labelRun('before', ['strategy_plan', 'recipes', 'vault_generate'], two)).toEqual({ label: 'UNCONFIRMED', reasons: ['vault_generate expected on, observed unobserved'] });
+    // an extra flag on that was not expected (both intents)
+    expect(labelRun('before', ['strategy_plan', 'recipes'], flags).reasons).toEqual(['vault_generate observed on in a BEFORE run that did not expect it']);
+    expect(labelRun('after', ['strategy_plan', 'recipes'], flags)).toEqual({ label: 'UNCONFIRMED', reasons: ['vault_generate observed on in an AFTER run that did not expect it'] });
   });
 
   it('no trace events at all is a warning (the target was not started with trace on)', () => {

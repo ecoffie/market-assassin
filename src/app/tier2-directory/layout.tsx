@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import PublicShell from '@/components/public-site/PublicShell';
 
 export const metadata: Metadata = {
+  alternates: { canonical: '/tier2-directory' },
   title: 'Tier-2 Supplier Directory | Mindy',
   description: '50+ prime contractor supplier contacts with vendor registration portal links.',
 };

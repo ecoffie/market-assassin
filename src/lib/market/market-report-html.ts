@@ -8,6 +8,8 @@
  * /reports/[id] page (follow-on PR) can reuse the exact same renderer.
  */
 
+import { INTER_LATIN_FONT_FACE } from '@/lib/fonts/inter-latin-embedded';
+
 type Row = Record<string, unknown>;
 const s = (v: unknown): string => (v == null ? '' : String(v));
 function esc(v: unknown): string {
@@ -618,13 +620,18 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
   // The NAICS / PSC columns (.two > div) may continue on the next page: kept whole, a tall pair jumped to a
   // new page and left the page before it with one line (full report fixture: page 2 = 58 characters). Rows,
   // KPI tiles, subtitles and notes still never split.
+  // In print the page wrapper keeps no bottom padding: 56px of trailing padding after the closing note started a
+  // blank last page (only the running footer on it) whenever the report ended near the foot of a page.
+  // The report embeds its own font (Inter latin subset, data: URI): the PDF renders with JavaScript and network
+  // off, so without it the page used whatever the machine had (Open Sans on production, DejaVu/Liberation on CI).
   // No comments inside the emitted HTML/CSS: client HTML carries no engineering notes (tested).
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Market Report — ${esc(displayTitle(subject))}</title>
 <style>
+  ${INTER_LATIN_FONT_FACE}
   :root { --navy:#1e3a8a; --purple:#7c3aed; --ink:#1e2230; --muted:#6b7280; --line:#e5e7eb; --bg:#f7f7fb; --card:#fff; }
   * { box-sizing:border-box; }
-  body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.55 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.55 'Mindy Report Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; }
   .wrap { max-width:1000px; margin:0 auto; padding:32px 24px 56px; }
   header.rp { background:linear-gradient(135deg,var(--navy),var(--purple)); color:#fff; border-radius:16px; padding:28px 30px; }
   header.rp .kick { font-size:12px; letter-spacing:.12em; text-transform:uppercase; opacity:.85; font-weight:700; }
@@ -679,6 +686,7 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
     .sec h2, .sec h3, .sec .sub { break-after: avoid; }
     .stat, .sub, .note { break-inside: avoid; }
     .two > div { break-inside: auto; }
+    .wrap { padding-bottom: 0; }
     footer.rp { display: none; }
     .rp-print { display: block; margin-top: 14px; text-align: center; color: var(--muted); font-size: 12px; break-before: avoid; break-inside: avoid; }
     .rp-print b { color: var(--purple); }

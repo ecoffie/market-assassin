@@ -191,18 +191,23 @@ export function observeFlags(turns: readonly TurnCapture[]): Record<FlagKey, { s
 export type RunLabel = 'BEFORE' | 'AFTER' | 'UNCONFIRMED';
 
 /**
- * BEFORE needs no flag on (an expected-off flag observed on makes it UNCONFIRMED). AFTER needs EVERY expected
- * flag observed on; anything else is UNCONFIRMED, never silently AFTER.
+ * The run's flag state must be EXACTLY what the operator expected: every `expected` flag observed on, and no other
+ * flag observed on. Anything else is UNCONFIRMED, never silently BEFORE or AFTER.
+ *
+ *   - AFTER always needs at least one expected flag.
+ *   - BEFORE with no expected flags is the product as customers had it (every flag off). BEFORE with expected flags
+ *     is option (A) of the benchmark plan: the same flags as AFTER, so the comparison isolates the code change.
  */
 export function labelRun(intent: 'before' | 'after', expected: readonly FlagKey[], observed: ReturnType<typeof observeFlags>): { label: RunLabel; reasons: string[] } {
   const reasons: string[] = [];
-  if (intent === 'after') {
-    for (const k of expected) if (observed[k].state !== 'on') reasons.push(`${k} expected on, observed ${observed[k].state}`);
-    if (!expected.length) reasons.push('no expected flags were given for an AFTER run');
-    return { label: reasons.length ? 'UNCONFIRMED' : 'AFTER', reasons };
+  const want = new Set(expected);
+  if (intent === 'after' && !want.size) reasons.push('no expected flags were given for an AFTER run');
+  for (const k of want) if (observed[k].state !== 'on') reasons.push(`${k} expected on, observed ${observed[k].state}`);
+  const runName = intent === 'after' ? 'an AFTER' : 'a BEFORE';
+  for (const k of Object.keys(observed) as FlagKey[]) {
+    if (!want.has(k) && observed[k].state === 'on') reasons.push(`${k} observed on in ${runName} run that did not expect it`);
   }
-  for (const k of Object.keys(observed) as FlagKey[]) if (observed[k].state === 'on') reasons.push(`${k} observed on in a BEFORE run`);
-  return { label: reasons.length ? 'UNCONFIRMED' : 'BEFORE', reasons };
+  return { label: reasons.length ? 'UNCONFIRMED' : intent === 'after' ? 'AFTER' : 'BEFORE', reasons };
 }
 
 /** Missing evidence the operator should know about (no trace means the preview was not started with trace on). */
