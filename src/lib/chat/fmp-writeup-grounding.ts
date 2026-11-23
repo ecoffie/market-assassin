@@ -1299,7 +1299,25 @@ export type BuildFmpHostDocModelOpts = {
   customerText?: string;
   defenseBuyersAppear?: boolean;
   today?: () => string;
+  /**
+   * Ask Mindy strategy plan (ASK_MINDY_STRATEGY_PLAN): the company this plan is for, from its saved profile. When set,
+   * the host model is that company's plan, not the generic Federal Market Profile shape: no civil or highway wording unless the
+   * company does construction, 8(a) wording only for an 8(a) firm, the defense construction-oversight section only
+   * for construction, plus an "About the company" standing section and a "Next 90 days" moves table built from the
+   * pathways this turn returned. Absent: the Federal Market Profile model, unchanged.
+   */
+  strategy?: FmpHostStrategy | null;
 };
+
+export interface FmpHostStrategy {
+  companyName?: string;
+  /** The company's own work is construction (award or profile NAICS 23x). */
+  construction: boolean;
+  /** The company holds 8(a) (self-reported in its profile, or stated by the customer). */
+  is8a: boolean;
+  /** The company's own work words (profile keywords), for DSBS advice. */
+  workTerms: string[];
+}
 
 /** Civil-work terms DSBS keywords can lean on; only terms the customer or tool rows actually used are kept. */
 const CIVIL_TERMS = [
@@ -1378,12 +1396,15 @@ export function buildFmpHostDocModel(
   opts: BuildFmpHostDocModelOpts = {},
 ): DocModel {
   const customerText = opts.customerText || '';
+  const strategy = opts.strategy ?? null;
   const identity = extractProfileCompanyIdentity(customerText);
-  const company = identity.legalName || 'Federal market profile';
-  const firm = identity.legalName || 'The firm';
+  const company = identity.legalName || strategy?.companyName || (strategy ? 'Your company' : 'Federal market profile');
+  const firm = identity.legalName || strategy?.companyName || 'The firm';
+  // Strategy plans for non-construction firms never get the civil / construction-oversight wording below.
+  const civilFrame = !strategy || strategy.construction;
   // Name-only asks omit "defense"/"PAE" in the prompt, but defense-buyer pathways in the evidence
   // still need the PAE section. OR evidence so a false prompt flag cannot suppress DoD buyers.
-  const defense = !!opts.defenseBuyersAppear || fmpDefenseBuyersAppearFromEvidence(evidence);
+  const defense = (!!opts.defenseBuyersAppear || fmpDefenseBuyersAppearFromEvidence(evidence)) && civilFrame;
   const date = (opts.today ?? (() => new Date().toISOString().slice(0, 10)))();
   const snippets = requiredSnippetsForWriteup(evidence);
   const naics = evidence.dominantNaics || snippets.find((s) => /^\d{6}$/.test(s)) || null;
@@ -1404,7 +1425,8 @@ export function buildFmpHostDocModel(
 
   // ── Subtitle: only what the customer text / evidence states ──
   const geo = geoFromCustomerText(customerText);
-  const is8a = /8\s*\(\s*a\s*\)/i.test(customerText);
+  const is8a = strategy ? strategy.is8a || /8\s*\(\s*a\s*\)/i.test(customerText) : /8\s*\(\s*a\s*\)/i.test(customerText);
+  const directLabel = !strategy || is8a ? 'Direct 8(a) awards' : 'Direct awards';
   const subParts = [
     naics ? `Primary award NAICS ${naics}` : null,
     is8a ? (exitY ? `8(a) firm, timing through ${exitY}` : '8(a) firm') : null,
@@ -1493,7 +1515,7 @@ export function buildFmpHostDocModel(
       rows: metricRows,
     });
   }
-  sections.push({ id: 'sec-read', heading: 'The read', blocks: readBlocks });
+  sections.push({ id: 'sec-read', heading: strategy ? `About the company: where ${firm} stands` : 'The read', blocks: readBlocks });
 
   // ── 2. Pathways (first body section after the read) ──
   const directBuyers = [...new Set(awardRows.map((r) => r.buyer).filter((b) => b && b !== 'Not stated'))].slice(0, 3);
@@ -1509,7 +1531,7 @@ export function buildFmpHostDocModel(
     : 'Pathways in priority order';
   const pathwayBlocks: Block[] = [para(
     'p-pathways-intro',
-    'Ranked by fit with the award record and by the clock: vehicles first, then sources sought, then direct 8(a) routes.',
+    `Ranked by fit with the award record and by the clock: vehicles first, then sources sought, then ${directLabel.toLowerCase()} routes.`,
     'recommendation',
   )];
 
@@ -1553,7 +1575,9 @@ export function buildFmpHostDocModel(
       cites: SRC,
     });
     items.push({
-      text: `**Direct 8(a) awards.** Ask each buyer in your award record for direct 8(a) offers${exitY ? `, with 8(a) timing through ${exitY}` : ''}.`,
+      text: !strategy || is8a
+        ? `**Direct 8(a) awards.** Ask each buyer in your award record for direct 8(a) offers${exitY ? `, with 8(a) timing through ${exitY}` : ''}.`
+        : '**Direct awards.** Ask each buyer you already serve about small purchases and set-asides you are eligible for.',
       claim: 'recommendation',
       cites: SRC,
     });
@@ -1568,11 +1592,13 @@ export function buildFmpHostDocModel(
     const buyerNames = directBuyers.length ? directBuyers : buyerSpend.slice(0, 3).map((b) => b.agency);
     pathwayBlocks.push(para(
       'p-pathway-direct',
-      `**${shown.length + 1}. Direct 8(a) awards at the buyers already served.** Buyers in the award and market data include ${listText(buyerNames)}.`,
+      `**${shown.length + 1}. ${directLabel} at the buyers already served.** Buyers in the award and market data include ${listText(buyerNames)}.`,
     ));
     pathwayBlocks.push(para(
       'p-pathway-direct-move',
-      `**Move:** Ask each small-business office about direct 8(a) offers${exitY ? ` while 8(a) timing runs through ${exitY}` : ''}.`,
+      !strategy || is8a
+        ? `**Move:** Ask each small-business office about direct 8(a) offers${exitY ? ` while 8(a) timing runs through ${exitY}` : ''}.`
+        : '**Move:** Ask each small-business office which small purchases and set-asides fit your work.',
       'recommendation',
     ));
   }
@@ -1714,16 +1740,28 @@ export function buildFmpHostDocModel(
               claim: 'recommendation' as const,
               cites: SRC,
             },
-            {
-              text: `**From base offices to highway engineers.** Award buyers in this profile${directBuyers.length ? ` (${listText(directBuyers)})` : ''} are the offices that already know the firm's work — keep them on the vehicle and sources-sought list.`,
-              claim: 'recommendation' as const,
-              cites: SRC,
-            },
-            {
-              text: '**From bid-build to design-build.** When a pathway asks for design capability, name the design partner before the response is due — do not invent a partner that was not self-reported.',
-              claim: 'recommendation' as const,
-              cites: SRC,
-            },
+            civilFrame
+              ? {
+                text: `**From base offices to highway engineers.** Award buyers in this profile${directBuyers.length ? ` (${listText(directBuyers)})` : ''} are the offices that already know the firm's work — keep them on the vehicle and sources-sought list.`,
+                claim: 'recommendation' as const,
+                cites: SRC,
+              }
+              : {
+                text: `**From one-off bids to the buyers already served.** ${directBuyers.length ? `Award buyers in this plan (${listText(directBuyers)}) already know ${firm}'s work; keep` : 'Keep'} them on the vehicle and sources-sought list.`,
+                claim: 'recommendation' as const,
+                cites: SRC,
+              },
+            civilFrame
+              ? {
+                text: '**From bid-build to design-build.** When a pathway asks for design capability, name the design partner before the response is due — do not invent a partner that was not self-reported.',
+                claim: 'recommendation' as const,
+                cites: SRC,
+              }
+              : {
+                text: '**From open bids to forecasts and recompetes.** Position before a notice posts: the forecasts and contracts coming back in this plan are where the time to prepare is.',
+                claim: 'recommendation' as const,
+                cites: SRC,
+              },
           ],
         },
       ],
@@ -1788,11 +1826,11 @@ export function buildFmpHostDocModel(
       id: 'b-pain',
       ordered: false,
       items: [
-        {
+        ...(civilFrame ? [{
           text: `Deferred maintenance and aging infrastructure keep repair and rehabilitation work moving${civilTerms.length ? ` in ${listText(civilTerms.slice(0, 4))}` : ''}.`,
           claim: 'assumption' as const,
           origin: 'Standing market pressure. Web search returned no usable snippets this turn, so confirm against current GAO, CRS and agency budget documents.',
-        },
+        }] : []),
         {
           text: 'Schedule pressure pushes buyers toward multiple-award vehicles and faster delivery methods.',
           claim: 'assumption' as const,
@@ -1847,7 +1885,9 @@ export function buildFmpHostDocModel(
     !all.some((other, j) => j !== i && other.length < line.length && line.includes(other)));
   const readyItems: Array<{ text: string; claim: 'recommendation'; cites: string[] }> = [
     {
-      text: `**DSBS keywords.** Update DSBS keywords to match the award NAICS${naics ? ` ${naics}` : ''} and ${civilTerms.length ? `these civil terms: ${civilTerms.join(', ')}` : 'the civil pathway terms in this profile'}.`,
+      text: civilFrame
+        ? `**DSBS keywords.** Update DSBS keywords to match the award NAICS${naics ? ` ${naics}` : ''} and ${civilTerms.length ? `these civil terms: ${civilTerms.join(', ')}` : 'the civil pathway terms in this profile'}.`
+        : `**DSBS keywords.** Update DSBS keywords to match the award NAICS${naics ? ` ${naics}` : ''}${strategy?.workTerms.length ? ` and your own work terms: ${strategy.workTerms.slice(0, 8).join(', ')}` : ' and the work words buyers use in the pathways above'}.`,
       claim: 'recommendation',
       cites: SRC,
     },
@@ -1876,7 +1916,9 @@ export function buildFmpHostDocModel(
       cites: SRC,
     },
     {
-      text: '**Team and surge plan.** Name your design, inspection or joint-venture partner and your surge plan before the buyer asks.',
+      text: civilFrame
+        ? '**Team and surge plan.** Name your design, inspection or joint-venture partner and your surge plan before the buyer asks.'
+        : '**Team and surge plan.** Name your teaming partner and your surge plan before the buyer asks.',
       claim: 'recommendation',
       cites: SRC,
     },
@@ -1887,9 +1929,41 @@ export function buildFmpHostDocModel(
     blocks: [{ type: 'bullets', id: 'b-ready', ordered: false, items: readyItems }],
   });
 
+  // ── 9. Strategy plan: the next 90 days, built only from the pathways this turn returned ──
+  if (strategy) {
+    const moveRows = shown.slice(0, 5).map((pw) => ({
+      move: pw.kind === 'forecast' ? `Position for ${pw.title}` : pw.kind === 'recompete' ? `Prepare for the recompete of ${pw.title}` : `Pursue ${pw.title}`,
+      step: pw.move || (pw.kind === 'notice'
+        ? 'Read the notice and send any question to its point of contact this week'
+        : 'Ask the buying office about timing and set-aside before a notice posts'),
+      why: pw.when ? `${pw.when}${pw.buyer ? `; ${pw.buyer}` : ''}` : pw.buyer ? `Buyer: ${pw.buyer}` : 'Ranked in the pathways above',
+    }));
+    moveRows.push({
+      move: 'Fix SAM and DSBS',
+      step: 'Make the readiness checklist changes above',
+      why: 'Every buyer and prime looks the company up before replying',
+    });
+    sections.push({
+      id: 'sec-90',
+      heading: 'Next 90 days',
+      blocks: [{
+        type: 'table',
+        id: 't-90',
+        claim: 'recommendation',
+        cites: SRC,
+        columns: [
+          { key: 'move', label: 'Move' },
+          { key: 'step', label: 'First step' },
+          { key: 'why', label: 'Why first' },
+        ],
+        rows: moveRows,
+      }],
+    });
+  }
+
   const model: DocModel = {
     schema: DOC_SCHEMA,
-    title: `${company} Federal Market Profile`,
+    title: strategy ? `${company}: Federal Strategy Plan` : `${company} Federal Market Profile`,
     ...(subtitle ? { subtitle } : {}),
     date,
     preparedFor: company,

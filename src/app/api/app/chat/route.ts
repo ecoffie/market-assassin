@@ -1662,6 +1662,15 @@ export async function POST(request: NextRequest) {
                   const evidence = ensureFmpEvidence(customerFmp);
                   const resolved = resolveFmpCreateDocumentArgs(plannerArgs, evidence, {
                     customerText: customerFmp,
+                    // Strategy plan: the fallback document is THIS company's plan, not the RBA benchmark shape.
+                    strategy: strategyPlanAsk
+                      ? {
+                        ...(strategyCompany?.legalName ? { companyName: strategyCompany.legalName } : {}),
+                        construction: strategyDefenseSectionApplies(evidence),
+                        is8a: !!(strategyProfile?.profile?.certifications ?? []).some((c) => /8\s*\(\s*a\s*\)/i.test(c.name)),
+                        workTerms: strategyProfile?.profile?.keywords?.slice(0, 8) ?? [],
+                      }
+                      : null,
                     defenseBuyersAppear: !!(fmpWriteupCtx?.defenseBuyersAppear)
                       || fmpDefenseBuyersAppear(customerFmp)
                       || (strategyDefenseSectionApplies(evidence) && fmpDefenseBuyersAppearFromEvidence(evidence)),
