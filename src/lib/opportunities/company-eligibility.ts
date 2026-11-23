@@ -27,6 +27,7 @@
  */
 import { classifySetAside, type SetAsideKind } from '@/lib/beginner/labels';
 import { sizeUnderNaics, type CompanyAnchor } from './company-anchor';
+import { isAssistanceOnly } from '@/lib/sam/registration-purpose';
 
 export type EligibilityStatus = 'ELIGIBLE' | 'NOT_ELIGIBLE' | 'UNKNOWN';
 
@@ -98,6 +99,35 @@ function unevaluatedRestrictionReason(raw: string | null, kind: SetAsideKind): s
   return `The record lists a restriction ("${t}") that this screen cannot evaluate against the company record.`;
 }
 
+function purposeLabel(anchor: CompanyAnchor): string {
+  return anchor.registration_purpose?.purpose_description || 'Federal Assistance Awards';
+}
+
+/**
+ * Appended to EVERY verdict for a company whose SAM purpose is assistance-only (Z1). It does not
+ * change the status (the screen judges the notice's restriction; registration can be updated
+ * before an offer), but the customer must never read ELIGIBLE without knowing this.
+ */
+function registrationCaveat(anchor: CompanyAnchor): string {
+  if (!isAssistanceOnly(anchor.registration_purpose)) return '';
+  return ` SAM lists ${anchor.legal_name || anchor.uei}'s registration purpose as ${purposeLabel(anchor)} only, so it is not currently registered for contract awards.`;
+}
+
+/**
+ * Why size is unavailable, when the company record itself says why. A live Entity API record
+ * with NO registered NAICS is a fact (not a data gap); an assistance-only purpose explains it.
+ * Anything else keeps the generic "no per-NAICS size" reason.
+ */
+function sizeUnavailableReason(anchor: CompanyAnchor, label: string, naics: string): string {
+  if (anchor.source === 'sam_entity_api' && anchor.naics.length === 0) {
+    const why = isAssistanceOnly(anchor.registration_purpose)
+      ? ` (registration purpose: ${purposeLabel(anchor)} only)`
+      : '';
+    return `This is a ${label} under NAICS ${naics}; SAM registration lists no NAICS${why}, so size under this NAICS is not established.`;
+  }
+  return `This is a ${label} under NAICS ${naics}; the company record available here carries no per-NAICS size, so size is not established.`;
+}
+
 function sizeFact(anchor: CompanyAnchor, naics: string | null): EligibilityVerdict['basis']['company_size_under_naics'] {
   if (!naics) return 'no_naics_on_record';
   return sizeUnderNaics(anchor, naics);
@@ -120,7 +150,8 @@ export function evaluateEligibility(
   const basis = { set_aside: raw, set_aside_kind: kind, naics, company_size_under_naics: size, record } as const;
   const name = anchor.legal_name || anchor.uei;
   const planned = record === 'forecast' ? ' (the agency\'s anticipated set-aside, not a final solicitation)' : '';
-  const v = (status: EligibilityStatus, reason: string): EligibilityVerdict => ({ status, reason: reason + planned, basis: { ...basis } });
+  const caveat = registrationCaveat(anchor);
+  const v = (status: EligibilityStatus, reason: string): EligibilityVerdict => ({ status, reason: reason + planned + caveat, basis: { ...basis } });
 
   if (kind === 'not_stated') {
     return v('UNKNOWN', 'The record does not state a set-aside. A missing set-aside is not the same as unrestricted, so eligibility is not established.');
@@ -148,7 +179,7 @@ export function evaluateEligibility(
     return v('UNKNOWN', `This is a ${label} under NAICS ${naics}; ${name} has no size representation for ${naics} in SAM (NAICS not on its registration).`);
   }
   if (size === 'size_unavailable') {
-    return v('UNKNOWN', `This is a ${label} under NAICS ${naics}; the company record available here carries no per-NAICS size, so size is not established.`);
+    return v('UNKNOWN', sizeUnavailableReason(anchor, label, naics));
   }
 
   // size === 'Y' — small under this NAICS (SAM self-representation).
@@ -185,7 +216,7 @@ export function evaluateRecompeteEligibility(
     : '';
   return {
     status: 'UNKNOWN',
-    reason: `Not a live solicitation — the recompete's set-aside has not been stated.${prior ? ` The prior award was "${prior}".` : ''}${sizeBit}`,
+    reason: `Not a live solicitation — the recompete's set-aside has not been stated.${prior ? ` The prior award was "${prior}".` : ''}${sizeBit}${registrationCaveat(anchor)}`,
     basis: { set_aside: prior, set_aside_kind: 'recompete_not_stated', naics, company_size_under_naics: size, record: 'recompete' },
   };
 }

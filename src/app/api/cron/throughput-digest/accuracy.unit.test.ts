@@ -115,6 +115,9 @@ describe('the route pages every list read', () => {
   it('names the excluded cohort in the message', () => {
     // A denominator that silently shrinks hides the opposite bug.
     expect(SRC).toContain('unmatchable by design');
-    expect(SRC).toContain('test/healthcheck accounts ignored');
+    // The briefing line's wording lives in the shared summary module the route imports.
+    const summary = readFileSync(join(process.cwd(), 'src/lib/briefings/classification-drop-summary.ts'), 'utf8');
+    expect(SRC).toContain('describeBriefingClassificationDrops(report, syntheticDrops)');
+    expect(summary).toContain('test/healthcheck accounts ignored');
   });
 });

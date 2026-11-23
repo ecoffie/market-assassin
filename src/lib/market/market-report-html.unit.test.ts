@@ -70,6 +70,19 @@ describe('market report — the measurement bridge', () => {
     expect(html).not.toContain('How this market was measured');
   });
 
+  it('with ONE tier, still says what the agency and contractor tables are ranked on (its note, verbatim)', () => {
+    const note = 'This literal-phrase reading is what the agency and contractor tables below are ranked on (FY23-25).';
+    const html = renderMarketReportHtml({ ...base, summary: summary({ size_tiers: [{ ...TIERS[0], role: 'sections_basis', note }] }) } as never);
+    expect(html).not.toContain('How this market was measured');
+    expect(html).toContain(note);
+  });
+
+  it('does not repeat the note when the measurement table already shows it', () => {
+    const note = 'Ranked on the synonym reading.';
+    const html = renderMarketReportHtml({ ...base, summary: summary({ size_tiers: [TIERS[0], { ...TIERS[1], note }] }) } as never);
+    expect(html.split(note).length - 1).toBe(1);
+  });
+
   it('renders the undercount note as an honest floor warning', () => {
     const html = renderMarketReportHtml({
       ...base,

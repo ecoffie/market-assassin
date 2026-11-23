@@ -4,13 +4,15 @@
  *
  * Drives the real /opportunity-map page. Every API is served by Playwright route interception (nothing
  * reaches production or a database): /api/app/chat streams a packaged market report, and
- * /reports/<id>/pdf answers with the PDF given by --pdf (or a 503 for the error case). Checks, on desktop
+ * /reports/<id>/pdf answers with the PDF given by --pdf (or, for the error case, the route's own 503 HTML
+ * error page, which is what a browser navigation receives). Checks, on desktop
  * and phone:
  *   1. the report preview scrolls with the mouse wheel AND with the keyboard right after it opens (before
  *      the fix, focus stayed in the chat box so Page Down never reached the report);
  *   2. the dead in-frame "Save as PDF" (window.print in a script-less frame) is hidden;
- *   3. Export → Download PDF (outside the frame) saves a file that starts with %PDF- and is byte-identical
- *      to what the route sent;
+ *   3. Export → Download PDF saves a file that starts with %PDF- and is byte-identical to what the route
+ *      sent, and the request is a browser NAVIGATION (hidden frame), not a script fetch + blob. The blob
+ *      version passed here in headless Chromium yet saved nothing in production (2026-11-22);
  *   4. a failed export shows the server's message in the pane, and the button offers "Try again".
  *
  * Usage:  npx next dev -p 3100
@@ -34,6 +36,8 @@ if (PDF.subarray(0, 5).toString('latin1') !== '%PDF-') { console.error('--pdf is
 const REPORT_ID = 'AbCdEfGhIjKlMnOpQrStUv';
 const sections = Array.from({ length: 30 }, (_, i) => `<div class="sec"><h2>Section ${i + 1}</h2><p>Line of report text.</p></div>`).join('');
 const HTML = `<!doctype html><html><head><meta charset="utf-8"><style>.sec{padding:20px;border:1px solid #ddd;margin:12px}</style></head><body><header class="rp" style="position:relative"><h1>Facilities maintenance</h1><button class="pdfbtn" onclick="window.print()">Save as PDF</button></header>${sections}</body></html>`;
+// Same shape as fail() in src/app/reports/[id]/pdf/route.ts for a non-JSON request (a navigation).
+const ERROR_PAGE = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>PDF not available</title></head><body><div class="c"><h1>PDF not available</h1><p>We couldn't create the PDF just now. Try again in a minute. The report itself is unchanged.</p><p style="margin-top:16px"><a href="/reports/${REPORT_ID}">Back to the report</a></p></div></body></html>`;
 const tokPayload = Buffer.from(JSON.stringify({ email: 'fixture@example.com', exp: 9999999999 })).toString('base64url');
 const sse = (evts) => evts.map((e) => `data: ${JSON.stringify(e)}\n\n`).join('');
 
@@ -70,9 +74,11 @@ for (const [label, opts] of [['desktop 1440x900', { viewport: { width: 1440, hei
       { type: 'done' },
     ]) }));
     let pdfRequests = 0;
+    const pdfKinds = [];
     await page.route(`**/reports/${REPORT_ID}/pdf`, (r) => {
       pdfRequests++;
-      if (mode === 'error') return r.fulfill({ status: 503, headers: { 'content-type': 'application/json' }, body: JSON.stringify({ success: false, error: 'pdf_unavailable', message: "We couldn't create the PDF just now. Try again in a minute. The report itself is unchanged." }) });
+      pdfKinds.push(`${r.request().resourceType()}${r.request().isNavigationRequest() ? ':nav' : ''}`);
+      if (mode === 'error') return r.fulfill({ status: 503, headers: { 'content-type': 'text/html; charset=utf-8' }, body: ERROR_PAGE });
       return r.fulfill({ status: 200, headers: { 'content-type': 'application/pdf', 'content-disposition': 'attachment; filename="facilities-maintenance-market-report.pdf"' }, body: PDF });
     });
 
@@ -114,6 +120,7 @@ for (const [label, opts] of [['desktop 1440x900', { viewport: { width: 1440, hei
       check(`${tag} button offers Try again`, (await item.textContent()) === 'Try again');
     }
     check(`${tag} one PDF request`, pdfRequests === 1, String(pdfRequests));
+    check(`${tag} the PDF is requested by navigation, not fetch`, pdfKinds[0] === 'document:nav', pdfKinds.join(','));
     check(`${tag} no page errors`, pageErrors.length === 0, pageErrors.slice(0, 2).join(' | '));
     await ctx.close();
   }
