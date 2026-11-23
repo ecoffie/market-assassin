@@ -114,7 +114,9 @@ describe('RC-5: no internal implementation detail in rendered HTML', () => {
   ];
 
   it('the rendered report contains no internal-comment signature', () => {
-    const html = renderMarketReportHtml({ ...base, summary: summary({ size_tiers: TIERS }) } as never);
+    // The embedded report font is base64 data, not text anyone reads; its alphabet can spell "XXX" by chance.
+    const html = renderMarketReportHtml({ ...base, summary: summary({ size_tiers: TIERS }) } as never)
+      .replace(/url\(data:font\/woff2;base64,[A-Za-z0-9+/=]+\)/g, 'url(data:font/woff2)');
     for (const sig of INTERNAL_SIGNATURES) {
       expect(html, `rendered HTML leaked internal signature "${sig}"`).not.toContain(sig);
     }

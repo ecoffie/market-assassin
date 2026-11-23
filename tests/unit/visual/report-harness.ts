@@ -15,7 +15,10 @@ export const CHROME = [process.env.PUPPETEER_EXECUTABLE_PATH, '/opt/pw-browsers/
   .filter((p): p is string => !!p)
   .find((p) => existsSync(p));
 
-/** poppler reads the text layer faithfully; pdf.js (pdf-parse) drops some tabular digits. */
+/**
+ * poppler reads the text layer faithfully; pdf.js (pdf-parse) drops some tabular digits. The suites call it with -raw
+ * (drawing order), so a wrapped table cell stays in one piece instead of interleaving with the next column.
+ */
 export const PDFTOTEXT = process.env.HARNESS_NO_PDFTOTEXT ? undefined : ['/usr/bin/pdftotext', '/usr/local/bin/pdftotext'].find((p) => existsSync(p));
 
 export async function launch(): Promise<LaunchedBrowser> {
@@ -44,7 +47,7 @@ export async function pdfPages(pdf: Buffer): Promise<string[]> {
   if (PDFTOTEXT) {
     const n = (await pdfPageCount(pdf));
     return Array.from({ length: n }, (_, i) =>
-      execFileSync(PDFTOTEXT, ['-f', String(i + 1), '-l', String(i + 1), '-enc', 'UTF-8', '-', '-'], { input: pdf, encoding: 'utf8' }));
+      execFileSync(PDFTOTEXT, ['-f', String(i + 1), '-l', String(i + 1), '-enc', 'UTF-8', '-raw', '-', '-'], { input: pdf, encoding: 'utf8' }));
   }
   const { PDFParse } = await import('pdf-parse');
   const parser = new PDFParse({ data: new Uint8Array(pdf) });

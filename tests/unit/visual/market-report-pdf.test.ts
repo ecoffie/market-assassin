@@ -89,7 +89,7 @@ describe.runIf(!!CHROME)('market report PDF — full report', () => {
     if (PDFTOTEXT) {
       // The running footer is printed on every page; drop it so a paragraph that continues on the next page
       // still reads as one line.
-      const all = squash(execFileSync(PDFTOTEXT, ['-enc', 'UTF-8', '-', '-'], { input: pdf, encoding: 'utf8' })
+      const all = squash(execFileSync(PDFTOTEXT, ['-enc', 'UTF-8', '-raw', '-', '-'], { input: pdf, encoding: 'utf8' })
         .replace(/Mindy · Federal market report · .*|Page \d+ of \d+/g, ''));
       expect(unexpected(lines.filter((l) => !all.includes(squash(l))), KNOWN_PRINT_DEFECTS.missingLines)).toEqual([]);
     } else {
