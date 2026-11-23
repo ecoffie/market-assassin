@@ -278,6 +278,7 @@ function formatGoaling(call: ToolCall): GroundedField<string> {
     agency?: string | null;
     fiscal_year?: number;
     goals?: Array<{
+      key?: string;
       category: string;
       goal_pct: number;
       actual_setaside_pct: number | null;
@@ -302,8 +303,9 @@ function formatGoaling(call: ToolCall): GroundedField<string> {
   // The Small Business (prime) row is the COMBINED set-aside share (sba-goaling scores it on set_aside_share),
   // already stated in the head line, so it is not listed again as a program (it used to be printed as
   // "general small-business set-aside" when it held only the SBA/SBP codes).
+  // Keyed on `key` (#goaling-indicator); /prime/i is the fallback for a payload without one.
   const shares = r.goals
-    .filter((g) => !/prime/i.test(g.category))
+    .filter((g) => (g.key ? g.key !== 'small_business' : !/prime/i.test(g.category)))
     .map((g) => `${g.category} ${g.actual_setaside_pct === null ? 'unavailable (lookup failed)' : `${g.actual_setaside_pct}%`}`);
   const head =
     typeof sbShare === 'number'

@@ -43,8 +43,8 @@ describe('get_sba_goaling_share prime row', () => {
     lib.value = detail();
     const { getSbaGoalingShare } = await import('./sba-goaling');
     const r = await getSbaGoalingShare({ agency: 'VA', fiscal_year: 2026 });
-    const prime = r.goals!.find((g) => g.category === 'Small Business (prime)')!;
-    expect(prime).toEqual({ category: 'Small Business (prime)', goal_pct: 23, actual_setaside_pct: 9.4, gap_pct: -13.6, meets_goal: false });
+    const prime = r.goals!.find((g) => g.key === 'small_business')!;
+    expect(prime).toMatchObject({ key: 'small_business', goal_pct: 23, actual_setaside_pct: 9.4, gap_pct: -13.6, meets_goal: false });
     expect(prime.actual_setaside_pct).toBe(r._meta.small_business_setaside_share);
     expect(r._meta.meets_small_business_goal).toBe(false);
   });
@@ -58,14 +58,15 @@ describe('get_sba_goaling_share prime row', () => {
     expect(row('SDVOSB')).toMatchObject({ goal_pct: 3, actual_setaside_pct: 8.8, meets_goal: true });
     expect(row('WOSB / EDWOSB')).toMatchObject({ goal_pct: 5, actual_setaside_pct: 0.01 });
     expect(row('HUBZone')).toMatchObject({ goal_pct: 3, actual_setaside_pct: 0.01 });
-    expect(r.goals!.map((g) => g.category)).toEqual(['Small Business (prime)', '8(a) / SDB', 'SDVOSB', 'WOSB / EDWOSB', 'HUBZone']);
+    expect(r.goals!.map((g) => g.category)).toEqual(['Small Business (prime): combined set-aside-code share', '8(a) / SDB', 'SDVOSB', 'WOSB / EDWOSB', 'HUBZone']);
+    expect(r.goals!.map((g) => g.key)).toEqual(['small_business', 'sdb_8a', 'sdvosb', 'wosb', 'hubzone']);
   });
 
   it('a bucket label change cannot re-point the prime row at a single bucket', async () => {
     lib.value = detail({ set_aside_breakdown: VA_BREAKDOWN.map((b) => (b.codes.includes('SBA') ? { ...b, label: 'Small Business anything' } : b)) });
     const { getSbaGoalingShare } = await import('./sba-goaling');
     const r = await getSbaGoalingShare({ agency: 'VA', fiscal_year: 2026 });
-    expect(r.goals!.find((g) => g.category === 'Small Business (prime)')!.actual_setaside_pct).toBe(9.4);
+    expect(r.goals!.find((g) => g.key === 'small_business')!.actual_setaside_pct).toBe(9.4);
   });
 
   it('a failed bucket: prime row unknown (null) and meets_small_business_goal null, never 0/false', async () => {
@@ -75,7 +76,7 @@ describe('get_sba_goaling_share prime row', () => {
     });
     const { getSbaGoalingShare } = await import('./sba-goaling');
     const r = await getSbaGoalingShare({ agency: 'VA', fiscal_year: 2026 });
-    expect(r.goals!.find((g) => g.category === 'Small Business (prime)')).toMatchObject({ actual_setaside_pct: null, gap_pct: null, meets_goal: null });
+    expect(r.goals!.find((g) => g.key === 'small_business')).toMatchObject({ actual_setaside_pct: null, gap_pct: null, meets_goal: null });
     expect(r.goals!.find((g) => g.category === 'WOSB / EDWOSB')).toMatchObject({ actual_setaside_pct: null, meets_goal: null });
     expect(r.goals!.find((g) => g.category === 'SDVOSB')!.actual_setaside_pct).toBe(8.8);
     expect(r._meta.meets_small_business_goal).toBeNull();
@@ -88,6 +89,7 @@ describe('get_sba_goaling_share prime row', () => {
     expect(r._meta.basis).toMatch(/FLOOR on true small-business achievement/);
     expect(r._meta.basis).toMatch(/NOT the official SBA Scorecard/);
     expect(r._meta.basis).toMatch(/prime\) row is the COMBINED set-aside-code share/);
-    expect(r._meta.basis).toMatch(/recipient_small_business_share is the broader read/);
+    expect(r._meta.basis).toMatch(/recipient_small_business_share is a separate, broader read of who won/);
+    expect(r._meta.basis.match(/recipient_small_business_share/g)).toHaveLength(1);
   });
 });
