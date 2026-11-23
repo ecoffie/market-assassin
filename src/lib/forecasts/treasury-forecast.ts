@@ -106,7 +106,7 @@ export function treasuryValueRange(v: string | undefined): { min?: number; max?:
     if (!m) return NaN;
     const n = parseFloat(m[1].replace(/,/g, ''));
     const mult = { K: 1e3, M: 1e6, B: 1e9 }[(m[2] || '').toUpperCase() as 'K' | 'M' | 'B'] ?? 1;
-    return n * mult;
+    return Math.round(n * mult); // whole dollars: agency_forecasts.estimated_value_* are BIGINT
   }).filter(n => Number.isFinite(n) && n > 0);
   if (!nums.length) return {};
   const min = Math.round(Math.min(...nums)), max = Math.round(Math.max(...nums));

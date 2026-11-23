@@ -52,10 +52,10 @@ export const metadata: Metadata = {
     canonical: "/",
   },
   title: "Mindy — Your 24/7 Federal Market Intelligence Analyst",
-  description: "Mindy scans 24,000+ federal opportunities daily, scores your fit, and tells you which to pursue. The big contractors have armies. You have Mindy.",
+  description: "Mindy scans federal opportunities daily, scores your fit, and tells you which to pursue. The big contractors have armies. You have Mindy.",
   openGraph: {
     title: "Meet Mindy.",
-    description: "Your 24/7 Federal Market Intelligence Analyst. While you sleep, Mindy scans 24,000+ opportunities, scores your fit, and tells you what to bid on.",
+    description: "Your 24/7 Federal Market Intelligence Analyst. While you sleep, Mindy scans federal opportunities, scores your fit, and tells you what to bid on.",
     siteName: "Mindy",
     type: "website",
     // og:image is auto-wired from src/app/opengraph-image.tsx — the

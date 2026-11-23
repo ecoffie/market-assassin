@@ -56,7 +56,8 @@ export function parseMoney(s: string | null | undefined): number | undefined {
   const n = parseFloat(m[1]);
   if (!Number.isFinite(n)) return undefined;
   const mult = { K: 1e3, M: 1e6, B: 1e9 }[(m[2] || '').toUpperCase() as 'K' | 'M' | 'B'];
-  return mult ? n * mult : n;
+  // Whole dollars: agency_forecasts.estimated_value_* are BIGINT ("$1.9M" = 1899999.9999999998 unrounded).
+  return Math.round(mult ? n * mult : n);
 }
 
 /**

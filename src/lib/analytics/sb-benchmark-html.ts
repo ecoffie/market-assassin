@@ -13,6 +13,7 @@
  * Visual system: the Mindy public site (src/lib/public-site) — shared header/footer, self-hosted
  * fonts (no CDN) and the `--mp-*` roles. Print hides the shared chrome so the report prints alone.
  */
+import { shareImageMetaTags } from '@/lib/seo/share-image';
 import type { Benchmark, AgencyRow } from './sb-participation-benchmark';
 import { mpRawBodyClose, mpRawBodyOpen, mpRawHeadHtml } from '@/lib/public-site/html';
 
@@ -59,6 +60,7 @@ export function renderSbBenchmarkHtml(b: Benchmark, opts: { edition: string; ver
 <meta property="og:title" content="Small-Business Participation Benchmark ${esc(edition)}">
 <meta property="og:description" content="${esc(desc)}">
 <meta property="og:url" content="${esc(canonical)}">
+${shareImageMetaTags()}
 <meta name="robots" content="index,follow">
 ${mpRawHeadHtml()}
 <style>
