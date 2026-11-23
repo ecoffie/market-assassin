@@ -34,6 +34,15 @@ notice type is Sources Sought, Request for Information or Presolicitation carry 
 host rule tells the host to point them out first and that a sources-sought response is a short
 capability answer, not a proposal. Title keywords never trigger it. Ranking is unchanged.
 
+**`find_opportunities` evidence labels** (no recall or price change):
+- Coming back: a text match found ONLY in an architect-engineering PSC title (all "C" codes) is now
+  `RELATED_MARKET_CANDIDATE` with basis `design_service_code` — it buys design of that subject, not
+  the work. Live case: "landscaping" + VA returned a lab-design contract (PSC C211) as DIRECT_MATCH.
+  A query that asks for design / architecture / engineering keeps it DIRECT.
+- Open now and Coming back items carry `purchase_type` (`product` when the PSC starts with a digit,
+  `service` when it starts with a letter); a product row's `why_this_matched` says it buys equipment
+  or supplies, not a service.
+
 Also fixed: a past-performance section with nothing saved is no longer sent to the model. It
 returns a fill-in template (`meta.pastPerformanceGap`) instead of invented past work.
 
