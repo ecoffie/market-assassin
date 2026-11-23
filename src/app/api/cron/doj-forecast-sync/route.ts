@@ -61,7 +61,8 @@ export async function GET(request: NextRequest) {
       last_successful_check: nowIso,
       upstream_fingerprint: r.fingerprint,
       upstream_population: r.safeCurrentUpstream,
-      held_population: r.safeCurrentUpstream,
+      // Untitled new rows are identified but NOT stored — they are not represented.
+      held_population: r.safeCurrentUpstream - r.newWithoutTitle,
       source_state: 'current',
       intervention_state: 'none_required',
       updated_at: nowIso,
@@ -100,6 +101,8 @@ export async function GET(request: NextRequest) {
       reconciliation: {
         matchedSafe: r.matchedSafe,
         newProven: r.newProven,
+        newWithoutTitle: r.newWithoutTitle,
+        newWithoutTitleSample: r.newWithoutTitleSample,
         changedSafe: r.changedSafe,
         unchangedSafe: r.unchangedSafe,
         inserted: r.inserted,
@@ -115,6 +118,7 @@ export async function GET(request: NextRequest) {
       receipts: {
         insertAttempted: r.insertAttempted, insertFailed: r.insertFailed,
         updateAttempted: r.updateAttempted, updateFailed: r.updateFailed,
+        writeErrors: r.writeErrors,
       },
       dataAdvanced: r.dataAdvanced,
       sourceState: 'current',
