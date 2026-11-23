@@ -8,6 +8,7 @@
 import { forecastLinkFields } from '@/lib/forecasts/forecast-link';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { forecastSyncClock } from '@/lib/forecasts/query';
+import { dedupeForecasts, type ForecastIdentityLike } from '@/lib/forecasts/forecast-identity';
 import { classifySearchFailure } from './search-failure';
 import { recompeteRowAnnotations } from '@/lib/recompete/annotate';
 import { parseAwardLineage, NOT_ORDER_UNDER_VEHICLE_OR } from '@/lib/recompete/award-lineage';
@@ -201,6 +202,8 @@ export interface HorizonResult {
   evidence_counts?: EvidenceCounts | null;
   /** Coming Soon only: forecast publisher coverage when it is not complete (canonical plan). */
   coverage?: { state: 'partial' | 'unestablished'; gaps: ForecastCoverageGap[] };
+  /** Coming Soon only: cross-listed copies of the same forecast listing removed from the window (forecast-identity.ts). */
+  duplicates_removed?: number;
   /** Coming Back only: task/delivery orders the plan matched and excluded (null = count unavailable). Internal. */
   orders_excluded?: number | null;
   /** Coming back only: how the returned awards were competed (USASpending award record). */
@@ -1278,7 +1281,12 @@ async function queryComingSoon(
       const base = await applyForecastPlan(client.from(source).select(COLS), p.basePlan).limit(Math.max(limit, 200));
       if (!base.error) baseRows = (base.data || []) as Row[];
     }
-    const all = inRegion(unionRows(baseRows, (data || []) as Row[], 'id') as Row[], 'pop_state', p);
+    // The same listing ingested twice (`GW-L:FHWA-2026-167` + legacy `FHWA_2026_167`) is ONE forecast —
+    // shared identity rule with generate_market_report (forecast-identity.ts). Exact listing id only.
+    const { rows: all, removed: forecastDuplicatesRemoved } = dedupeForecasts(
+      inRegion(unionRows(baseRows, (data || []) as Row[], 'id') as Row[], 'pop_state', p) as Array<Row & ForecastIdentityLike>,
+      { listingOnly: true },
+    );
     const scores = new Map(rankRecords(p.plan, all, ['title', 'description', 'naics_description', 'department']).map((s) => [s.row, s]));
     const rows = [...all].sort((a, b) => {
       const bd = (scores.get(b)?.breadth ?? 0) - (scores.get(a)?.breadth ?? 0);
@@ -1371,9 +1379,11 @@ async function queryComingSoon(
 
     return {
       status: partial ? 'partial' : 'grounded',
-      matched_count: count ?? null,
+      // Cross-listed twins removed from the window are not separate forecasts (same as Coming back's lineage dedupe).
+      matched_count: count == null ? null : Math.max(count - forecastDuplicatesRemoved, items.length),
       returned_count: items.length,
       window_size: forecastWindow,
+      duplicates_removed: forecastDuplicatesRemoved,
       items,
       source,
       as_of: asOf,
