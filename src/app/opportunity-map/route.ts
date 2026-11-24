@@ -10970,7 +10970,7 @@ const ASK_MINDY_CSS =
   + '.amk-rep-err{flex:none;margin:0;padding:8px 14px;border-bottom:1px solid #fde2e2;background:#fef2f2;color:#b91c1c;font:500 12.5px Inter,system-ui,sans-serif}.amk-rep-err[hidden]{display:none}'
   + '.amk-rep-note{font:500 11.5px Inter,system-ui,sans-serif;color:#64748b;max-width:220px;text-align:right}'
   + '.amk-rep-x{border:0;background:none;color:#8595a6;cursor:pointer;font:400 24px/1 Inter,system-ui,sans-serif;padding:0 4px}'
-  + '.amk-rep-body{position:relative;flex:1;min-height:0;background:#f4f6fa;overflow:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}.amk-rep-f{position:absolute;inset:0;width:100%;height:100%;border:0;background:#fff}'
+  + '.amk-rep-body{position:relative;flex:1;min-height:0;background:#f4f6fa;overflow:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}.amk-rep-f{position:absolute;inset:0;width:100%;height:100%;border:0;background:#fff}.amk-rep-f.fit{position:static;display:block;inset:auto}.amk-rep-body:focus{outline:none}'
   + '.amk-rep-msg{position:absolute;inset:0;display:none;align-items:center;justify-content:center;flex-direction:column;gap:10px;text-align:center;padding:24px;font:500 13.5px Inter,system-ui,sans-serif;color:#475569;background:#fff}'
   + '.amk-rep-msg button{border:1px solid #bcd3fb;background:#eaf1fe;color:#1d4ed8;font:600 12px Inter,system-ui,sans-serif;border-radius:8px;padding:7px 12px;cursor:pointer}'
   + '.amk-repbtn{flex:none;border:1px solid #bcd3fb;background:#eaf1fe;color:#1d4ed8;font:600 11.5px Inter,system-ui,sans-serif;border-radius:8px;padding:5px 10px;cursor:pointer;align-self:flex-start}'
@@ -11415,20 +11415,116 @@ const ASK_MINDY_JS = `<script>(function(){
   function fileItems(files){ return files.map(function(f){ return {label:FMT_LABEL[f.format],fmt:f.format,run:function(b){ exportFile(f,b); }}; }); }
   // Preview HTML goes into the script-less frame. Its own "Save as PDF" button (window.print) cannot run
   // there, so it is hidden; Export in the pane header is the working path.
+  // Scrolling: the PANE BODY scrolls, not the frame. Once the report loads, the frame is sized to its
+  // content (repFit), so wheel, trackpad, touch, keyboard and the scrollbar all act on an ordinary element
+  // of this page. A container-sized frame left scrolling to the inner document, which did not move in a
+  // production browser (2026-11-22). Measuring needs allow-same-origin; the frame still has NO scripts,
+  // forms, popups or top navigation. If the document cannot be read, the frame keeps the old full-pane
+  // layout and its own document scrolls (html is forced scrollable below).
+  // Same-origin frame, so it is locked down further (Agent 4 review of this change):
+  // - a Content-Security-Policy meta is the FIRST thing in its head: no request of any kind leaves the
+  //   frame (default-src 'none'; only inline styles and data: images/fonts), so nothing in it can reach
+  //   an /api route or any URL with our cookies; no <base>, no form submission;
+  // - <meta http-equiv="refresh"> and <base> are removed before the HTML goes in;
+  // - link clicks never navigate the frame: http(s) links open a new tab, mailto opens the mail app,
+  //   anything else does nothing (repLinks).
+  // The HTML itself is only our renderers' output (market report, Vault preview), with every user and
+  // model string escaped.
+  var REP_FRAME_CSP='<meta http-equiv="Content-Security-Policy" content="default-src \\'none\\'; style-src \\'unsafe-inline\\'; img-src data:; font-src data:; base-uri \\'none\\'; form-action \\'none\\'">';
+  var REP_FRAME_CSS='<style>.pdfbtn{display:none!important}html{height:auto!important;overflow:auto!important}body{height:auto!important;min-height:0!important;overflow:visible!important}</style>';
+  // The HTML is parsed into an INERT document (DOMParser: no scripts run, nothing loads) and cleaned there,
+  // then serialized. String regexes are bypassable (an entity-encoded http-equiv="&#114;efresh" still
+  // decodes to refresh), and a same-origin frame that navigates to our origin carries our cookies, which
+  // the old opaque frame did not. Removed: script, iframe, frame, frameset, object, embed, applet, form,
+  // base, link, noscript, template, portal, math, SVG animation (it can rewrite attributes), style inside
+  // SVG, every meta except charset / viewport, every on* attribute, any URL attribute that is not
+  // http(s)/mailto/#fragment (data: is allowed only for images, which the CSP also permits).
+  var REP_KILL='script,iframe,frame,frameset,object,embed,applet,form,base,link,noscript,template,portal,math,svg style,animate,set,animateMotion,animateTransform,discard';
+  var REP_URL_ATTR=/^(href|xlink:href|src|srcset|action|formaction|poster|background|data|ping|lowsrc|dynsrc|cite|longdesc|usemap|codebase|manifest|icon)$/i;
+  function repSanitize(html){
+    var doc=null; try{ doc=new DOMParser().parseFromString(String(html||''),'text/html'); }catch(e){ doc=null; }
+    if(!doc||!doc.documentElement) return null;
+    var kill=doc.querySelectorAll(REP_KILL), i, j;
+    for(i=kill.length-1;i>=0;i--){ if(kill[i].parentNode) kill[i].parentNode.removeChild(kill[i]); }
+    var metas=doc.querySelectorAll('meta');
+    for(i=metas.length-1;i>=0;i--){
+      var mt=metas[i], keep=!mt.hasAttribute('http-equiv')&&(mt.hasAttribute('charset')||String(mt.getAttribute('name')||'').toLowerCase()==='viewport');
+      if(!keep&&mt.parentNode) mt.parentNode.removeChild(mt);
+    }
+    var all=doc.getElementsByTagName('*');
+    for(i=0;i<all.length;i++){
+      var el=all[i], attrs=[];
+      for(j=0;j<el.attributes.length;j++) attrs.push(el.attributes[j]);
+      for(j=0;j<attrs.length;j++){
+        var a=attrs[j], n=a.name, v=String(a.value||'').replace(/[\\u0000-\\u0020\\u007f]+/g,'');
+        if(/^on/i.test(n)){ el.removeAttribute(n); continue; }
+        if(REP_URL_ATTR.test(n)){
+          var ok=/^(href|xlink:href)$/i.test(n)?/^(https?:|mailto:|#)/i.test(v):(/^(src|srcset)$/i.test(n)&&/^data:image\\//i.test(v));
+          if(!ok) el.removeAttribute(n);
+        }
+      }
+    }
+    return doc;
+  }
+  function repFrameHtml(html){
+    var doc=repSanitize(html);
+    if(!doc) return REP_FRAME_CSP+'<p>This preview could not be shown. Use Open hosted link.</p>';
+    var head=doc.head||doc.documentElement.insertBefore(doc.createElement('head'),doc.body);
+    var st=doc.createElement('style'); st.textContent=REP_FRAME_CSS.replace(/^<style>|<[/]style>$/g,''); head.appendChild(st);
+    // The policy goes in THROUGH THE DOM, as the head's first child, before serializing. A string insert after
+    // the first "<head" could land inside an attribute value (the serializer does not escape "<" there, e.g.
+    // <html data-x="<head>">), and the policy would never apply.
+    var holder=doc.createElement('div'); holder.innerHTML=REP_FRAME_CSP; var csp=holder.firstChild;
+    head.insertBefore(csp,head.firstChild);
+    return '<!doctype html>'+doc.documentElement.outerHTML;
+  }
   function repSetDoc(E,html){
-    var hide='<style>.pdfbtn{display:none!important}</style>';
-    E.f.srcdoc=/<[/]head>/i.test(html)?html.replace(/<[/]head>/i,hide+'</head>'):hide+html;
+    E.f.classList.remove('fit'); E.f.style.height='';
+    E.f.srcdoc=repFrameHtml(html);
     E.f.style.visibility='visible'; E.msg.style.display='none'; repError('');
+  }
+  function repLinks(E){
+    var d=null; try{ d=E.f.contentDocument; }catch(e){ d=null; }
+    if(!d||d.__amkLinks) return; d.__amkLinks=1;
+    d.addEventListener('click',function(ev){
+      var t=ev.target, a=t&&t.closest?t.closest('a[href]'):null; if(!a) return;
+      ev.preventDefault();
+      var href=String(a.getAttribute('href')||'');
+      if(/^https?:/i.test(href)){ try{ window.open(href,'_blank','noopener'); }catch(e){} }
+      else if(/^mailto:/i.test(href)){ try{ window.location.href=href; }catch(e){} }
+    },true);
+  }
+  function repFit(E){
+    var d=null; try{ d=E.f.contentDocument; }catch(e){ d=null; }
+    if(!d||!d.documentElement||!d.body||!d.body.firstChild) return false;
+    var de=d.documentElement;
+    E.f.classList.add('fit'); E.f.style.height='1px';
+    var h=Math.max(de.scrollHeight,d.body.scrollHeight);
+    if(!(h>1)){ E.f.classList.remove('fit'); E.f.style.height=''; return false; }
+    // The inner document must not be a vertical scroller (it would keep the wheel); a wide table may still
+    // scroll sideways, so its scrollbar's height is added.
+    de.style.setProperty('overflow-y','hidden','important'); de.style.setProperty('overflow-x','auto','important');
+    E.f.style.height=h+'px';
+    var bar=h-de.clientHeight; if(bar>0&&bar<40) E.f.style.height=(h+bar)+'px';
+    return true;
   }
   function ensurePane(){
     if(repEls) return repEls;
     var el=document.createElement('aside'); el.className='amk-rep'; el.id='amkRep'; el.setAttribute('aria-hidden','true'); el.setAttribute('role','dialog'); el.setAttribute('aria-label','Report'); el.setAttribute('data-testid','amk-report-pane');
-    el.innerHTML='<div class="amk-rep-hd"><button type="button" class="amk-rep-back">Back to chat</button><div class="amk-rep-tt"><b class="amk-rep-t"></b><span class="amk-rep-v"></span></div><div class="amk-rep-exp"></div><button type="button" class="amk-rep-x" aria-label="Close report">&times;</button></div><p class="amk-rep-err" role="alert" data-testid="amk-report-error" hidden></p><div class="amk-rep-body"><iframe class="amk-rep-f" sandbox="" title="Report"></iframe><div class="amk-rep-msg"></div></div>';
+    el.innerHTML='<div class="amk-rep-hd"><button type="button" class="amk-rep-back">Back to chat</button><div class="amk-rep-tt"><b class="amk-rep-t"></b><span class="amk-rep-v"></span></div><div class="amk-rep-exp"></div><button type="button" class="amk-rep-x" aria-label="Close report">&times;</button></div><p class="amk-rep-err" role="alert" data-testid="amk-report-error" hidden></p><div class="amk-rep-body" tabindex="-1"><iframe class="amk-rep-f" sandbox="allow-same-origin" title="Report"></iframe><div class="amk-rep-msg"></div></div>';
     document.body.appendChild(el);
     repEls={el:el,t:el.querySelector('.amk-rep-t'),v:el.querySelector('.amk-rep-v'),exp:el.querySelector('.amk-rep-exp'),f:el.querySelector('.amk-rep-f'),msg:el.querySelector('.amk-rep-msg'),err:el.querySelector('.amk-rep-err')};
     // Keyboard reading: once a report has loaded, focus moves into it so Space / Page Down / arrows scroll it
     // (focus used to stay in the chat box, so the keys typed there and the report never moved).
-    repEls.f.addEventListener('load',function(){ if(repIsOpen()&&repEls.f.style.visibility==='visible'){ try{ repEls.f.focus(); }catch(e){} } });
+    var body=el.querySelector('.amk-rep-body'); repEls.body=body;
+    repEls.f.addEventListener('load',function(){
+      if(repEls.f.style.visibility!=='visible') return;
+      var fitted=repFit(repEls); repLinks(repEls); body.scrollTop=0;
+      if(repIsOpen()){ try{ (fitted?body:repEls.f).focus(); }catch(e){} }
+    });
+    // A width change reflows the report, so its height is measured again.
+    var lastW=0, refit=function(){ var w=body.clientWidth; if(w&&w!==lastW){ lastW=w; if(repEls.f.classList.contains('fit')) repFit(repEls); } };
+    if(window.ResizeObserver){ try{ new ResizeObserver(refit).observe(body); }catch(e){ window.addEventListener('resize',refit); } } else { window.addEventListener('resize',refit); }
     el.querySelector('.amk-rep-x').onclick=function(){ repHide(true); };
     el.querySelector('.amk-rep-back').onclick=function(){ repHide(true); };
     return repEls;

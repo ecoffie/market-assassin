@@ -14,7 +14,10 @@
  *   production that saved nothing, while the route itself returned a valid PDF (2026-11-22);
  * - a failure loads the route's HTML error page in that frame, and its message is shown in the pane;
  * - the in-frame button is hidden;
- * - the preview can be scrolled with the keyboard as soon as it opens.
+ * - the preview can be scrolled with the keyboard as soon as it opens;
+ * - the PANE BODY scrolls: the frame is sized to its report, because a container-sized frame left scrolling
+ *   to the inner document, which did not move in a production browser (757x485 and the /app iframe,
+ *   2026-11-22).
  *
  * Browser proof: scripts/acceptance/map-report-pane.mjs.
  */
@@ -108,9 +111,10 @@ describe('Map report pane: a packaged market report exports a real PDF', () => {
     await t.ask('market report for facilities maintenance');
     expect(pane(t.doc).classList.contains('show')).toBe(true);
     const srcdoc = (t.doc.querySelector('.amk-rep-f') as HTMLIFrameElement).srcdoc;
-    expect(srcdoc).toContain('<style>.pdfbtn{display:none!important}</style></head>');
+    expect(srcdoc).toMatch(/<style>\.pdfbtn\{display:none!important\}html\{height:auto!important;overflow:auto!important\}body\{[^}]*\}<\/style><\/head>/);
     expect(srcdoc).toContain('REPORT BODY');
-    expect((t.doc.querySelector('.amk-rep-f') as HTMLIFrameElement).getAttribute('sandbox')).toBe(''); // still script-less
+    // Still script-less: same-origin ONLY, so the pane can measure the report (no scripts/forms/popups/navigation).
+    expect((t.doc.querySelector('.amk-rep-f') as HTMLIFrameElement).getAttribute('sandbox')).toBe('allow-same-origin');
     expect(pdfItem(t.doc)?.textContent).toBe('Download PDF');
     expect(t.doc.querySelectorAll('.amk-exp-panel [role="menuitem"]').length).toBe(1); // PDF only: the one real export
     expect([...t.doc.querySelectorAll('.amk-rep-exp > a')].map((a) => a.textContent)).toEqual(['Open hosted link']);
@@ -182,6 +186,65 @@ describe('Map report pane: the preview can be scrolled', () => {
     expect(MAP).toMatch(/\.amk-rep-body\{[^}]*overflow:auto;-webkit-overflow-scrolling:touch/);
   });
 
+  const fakeHeight = (f: HTMLIFrameElement, h: number) => {
+    const de = f.contentDocument!.documentElement;
+    Object.defineProperty(de, 'scrollHeight', { configurable: true, get: () => h });
+    Object.defineProperty(de, 'clientHeight', { configurable: true, get: () => parseInt(f.style.height, 10) || 0 });
+  };
+
+  it('a loaded report is sized to its full height, the pane body takes focus, and the report is not a second scroller', async () => {
+    const t = boot({ chat: reportTurn() });
+    await t.ask('market report');
+    const f = t.doc.querySelector('.amk-rep-f') as HTMLIFrameElement;
+    const body = t.doc.querySelector('.amk-rep-body') as HTMLElement;
+    const d = f.contentDocument!; d.open(); d.write(HTML); d.close();
+    fakeHeight(f, 5953);
+    body.scrollTop = 200;
+    f.dispatchEvent(new t.w.Event('load'));
+    expect(f.classList.contains('fit')).toBe(true);
+    expect(f.style.height).toBe('5953px');
+    expect(d.documentElement.style.getPropertyValue('overflow-y')).toBe('hidden');
+    // Must be !important to beat the injected html{overflow:auto!important} (jsdom drops the priority, so the
+    // source is asserted; the browser acceptance asserts the computed value).
+    expect(MAP).toContain("de.style.setProperty('overflow-y','hidden','important')");
+    expect(body.getAttribute('tabindex')).toBe('-1');
+    expect(t.doc.activeElement).toBe(body); // keyboard scrolls the pane
+    expect(body.scrollTop).toBe(0); // a new report starts at the top
+    expect(MAP).toContain('.amk-rep-f.fit{position:static;display:block;inset:auto}');
+  });
+
+  it('a horizontal scrollbar inside the report is added to the height, so the last line is not hidden', async () => {
+    const t = boot({ chat: reportTurn() });
+    await t.ask('market report');
+    const f = t.doc.querySelector('.amk-rep-f') as HTMLIFrameElement;
+    const d = f.contentDocument!; d.open(); d.write(HTML); d.close();
+    const de = d.documentElement;
+    Object.defineProperty(de, 'scrollHeight', { configurable: true, get: () => 3000 });
+    Object.defineProperty(de, 'clientHeight', { configurable: true, get: () => (parseInt(f.style.height, 10) || 0) - 14 });
+    f.dispatchEvent(new t.w.Event('load'));
+    expect(f.style.height).toBe('3014px');
+  });
+
+  it('a new report resets the fit, and a report whose document cannot be read keeps the full-pane frame', async () => {
+    const t = boot({ chat: reportTurn() });
+    await t.ask('market report');
+    const f = t.doc.querySelector('.amk-rep-f') as HTMLIFrameElement;
+    const d = f.contentDocument!; d.open(); d.write(HTML); d.close();
+    fakeHeight(f, 4000);
+    f.dispatchEvent(new t.w.Event('load'));
+    expect(f.classList.contains('fit')).toBe(true);
+    // A revision / another report: the frame goes back to full-pane until it is measured again.
+    (t.doc.querySelector('.amk-rep-x') as HTMLButtonElement).click();
+    (t.doc.querySelector('.amk-repcard-open') as HTMLButtonElement).click();
+    expect(f.classList.contains('fit')).toBe(false);
+    expect(f.style.height).toBe('');
+    Object.defineProperty(f, 'contentDocument', { configurable: true, get: () => null });
+    const focus = vi.spyOn(f, 'focus');
+    f.dispatchEvent(new t.w.Event('load'));
+    expect(f.classList.contains('fit')).toBe(false);
+    expect(focus).toHaveBeenCalledTimes(1); // fallback: the frame's own document scrolls
+  });
+
   it('focus moves into the loaded report so the keyboard scrolls it, and opening the drawer does not take it back', async () => {
     const t = boot({ chat: reportTurn() });
     await t.ask('market report');
@@ -192,3 +255,144 @@ describe('Map report pane: the preview can be scrolled', () => {
     expect(MAP).toContain('setTimeout(function(){ if(input&&!repIsOpen()) input.focus(); },220);');
   });
 });
+
+describe('Map report pane: the same-origin preview frame is locked down (Agent 4 review, 2026-11-22)', () => {
+  const frame = (doc: Document) => doc.querySelector('.amk-rep-f') as HTMLIFrameElement;
+
+  it('the sandbox is exactly allow-same-origin: never scripts, forms, popups, modals or top navigation', async () => {
+    const t = boot({ chat: reportTurn() });
+    await t.ask('market report');
+    const sb = frame(t.doc).getAttribute('sandbox');
+    expect(sb).toBe('allow-same-origin');
+    expect((sb ?? '').split(/\s+/).filter(Boolean)).toEqual(['allow-same-origin']); // the exact token list
+    for (const token of ['allow-scripts', 'allow-forms', 'allow-popups', 'allow-modals', 'allow-top-navigation', 'allow-downloads']) expect(sb).not.toContain(token);
+    expect(MAP.match(/sandbox="[^"]*"/g)?.filter((m) => m.includes('allow-')) ?? []).toEqual(['sandbox="allow-same-origin"']); // the only token anywhere in the Map page
+  });
+
+  it('a Content-Security-Policy that blocks every request is the first thing in the frame, and refresh / base tags are removed', async () => {
+    const hostile = '<!doctype html><html><head><meta http-equiv="refresh" content="0;url=/api/app/chat-sessions?email=x"><META HTTP-EQUIV=Refresh CONTENT="1; URL=/api/x"><base href="https://evil.example/"><title>R</title></head><body><p>REPORT BODY</p></body></html>';
+    const t = boot({ chat: reportTurn({ html: hostile }) });
+    await t.ask('market report');
+    const srcdoc = frame(t.doc).srcdoc;
+    const head = srcdoc.slice(srcdoc.indexOf('<head>') + '<head>'.length);
+    expect(head.startsWith('<meta http-equiv="Content-Security-Policy" content="default-src \'none\'; style-src \'unsafe-inline\'; img-src data:; font-src data:; base-uri \'none\'; form-action \'none\'">')).toBe(true);
+    expect(srcdoc).not.toMatch(/http-equiv="?refresh/i);
+    expect(srcdoc).not.toMatch(/<base\b/i);
+    expect(srcdoc).toContain('REPORT BODY');
+  });
+
+  it('HTML without a head still gets the policy first', async () => {
+    const t = boot({ chat: reportTurn({ html: '<p>BARE</p>' }) });
+    await t.ask('market report');
+    const srcdoc = frame(t.doc).srcdoc;
+    expect(srcdoc).toMatch(/^<!doctype html><html><head><meta http-equiv="Content-Security-Policy"/);
+    expect(srcdoc).toContain('<p>BARE</p>');
+  });
+
+  // Parsed the way the frame will parse it, so entity-encoded or reordered attributes cannot slip through.
+  const cleaned = async (hostile: string) => {
+    const t = boot({ chat: reportTurn({ html: `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">${hostile}</head><body><p>REPORT BODY</p>${hostile}</body></html>` }) });
+    await t.ask('market report');
+    const srcdoc = frame(t.doc).srcdoc;
+    const d = new t.w.DOMParser().parseFromString(srcdoc, 'text/html');
+    return { srcdoc, d };
+  };
+
+  it.each([
+    ['plain refresh', '<meta http-equiv="refresh" content="0;url=/api/app/chat-sessions?email=a@b.c">'],
+    ['entity-encoded http-equiv', '<meta http-equiv="&#114;efresh" content="0;url=/api/x">'],
+    ['hex entity, mixed case', '<META HTTP-EQUIV="&#x52;EFRESH" CONTENT="0; URL=/api/x">'],
+    ['content before http-equiv', '<meta content="0;url=/api/x" http-equiv=refresh>'],
+    ['unquoted, extra whitespace', '<meta   http-equiv = refresh   content=0;url=/api/x>'],
+    ['any other http-equiv', '<meta http-equiv="set-cookie" content="a=b">'],
+    ['refresh in body inside noscript', '<noscript><meta http-equiv="refresh" content="0;url=/api/x"></noscript>'],
+  ])('no meta except charset/viewport survives: %s', async (_name, hostile) => {
+    const { d } = await cleaned(hostile);
+    const metas = [...d.querySelectorAll('meta')].map((m) => m.getAttribute('http-equiv') ?? m.getAttribute('name') ?? (m.hasAttribute('charset') ? 'charset' : '?'));
+    expect(metas).toEqual(['Content-Security-Policy', 'charset', 'viewport']); // the policy first, then the two harmless ones
+    expect(d.querySelector('meta[http-equiv="Content-Security-Policy"]')).toBe(d.head.firstElementChild);
+  });
+
+  it.each([
+    ['base', '<base href="https://evil.example/">'],
+    ['form', '<form action="/api/app/vault/documents" method="post"><input name="x"></form>'],
+    ['script', '<script>alert(1)</script>'],
+    ['iframe', '<iframe src="/api/x"></iframe>'],
+    ['object / embed', '<object data="/api/x"></object><embed src="/api/x">'],
+    ['link prefetch', '<link rel="prefetch" href="/api/x">'],
+    ['template', '<template><meta http-equiv="refresh" content="0;url=/api/x"></template>'],
+    ['svg animation rewriting href', '<svg><a href="https://ok.example/"><animate attributeName="href" to="/api/x"/><text>t</text></a></svg>'],
+    ['math', '<math><mi xlink:href="/api/x">x</mi></math>'],
+  ])('dangerous elements are removed: %s', async (_name, hostile) => {
+    const { d } = await cleaned(hostile);
+    expect(d.querySelector('base,form,script,iframe,object,embed,link,template,animate,set,math')).toBeNull();
+    expect(d.body.textContent).toContain('REPORT BODY');
+  });
+
+  it('on* attributes and non-http(s)/mailto/# URLs are removed; safe links and data: images stay', async () => {
+    const { d } = await cleaned(
+      '<a id="js" href="javascript:alert(1)">a</a><a id="js2" href=" jav&#x09;ascript:alert(1)">b</a><a id="rel" href="/api/app/vault/documents/download?id=1">c</a>'
+      + '<a id="ext" href="https://www.sam.gov/opp/1">d</a><a id="mail" href="mailto:x@example.com">e</a><a id="frag" href="#sec">f</a>'
+      + '<img id="img" src="/api/should-not-load.png" onerror="alert(1)"><img id="data" src="data:image/png;base64,AAAA"><div id="h" onclick="x()" onmouseover="y()">h</div>'
+      + '<svg><a id="sv" xlink:href="/api/x"><text>s</text></a></svg>',
+    );
+    const href = (id: string) => d.getElementById(id)?.getAttribute('href') ?? null;
+    expect(href('js')).toBeNull();
+    expect(href('js2')).toBeNull();
+    expect(href('rel')).toBeNull();
+    expect(href('ext')).toBe('https://www.sam.gov/opp/1');
+    expect(href('mail')).toBe('mailto:x@example.com');
+    expect(href('frag')).toBe('#sec');
+    expect(d.getElementById('img')!.hasAttribute('src')).toBe(false);
+    expect(d.getElementById('img')!.hasAttribute('onerror')).toBe(false);
+    expect(d.getElementById('data')!.getAttribute('src')).toBe('data:image/png;base64,AAAA');
+    expect([...d.getElementById('h')!.attributes].map((a) => a.name)).toEqual(['id']);
+    expect(d.querySelector('[id="sv"]')!.getAttribute('xlink:href')).toBeNull();
+    expect([...d.querySelectorAll('*')].flatMap((e) => [...e.attributes]).filter((a) => /^on/i.test(a.name))).toEqual([]);
+  });
+
+  it.each([
+    ['"<head>" inside an attribute of <html>', '<!doctype html><html data-x="<head>"><head><title>R</title></head><body><p>REPORT BODY</p></body></html>'],
+    ['"<head>" inside an attribute in the body', '<!doctype html><html><head><title>R</title></head><body><p title="<head><meta>">REPORT BODY</p></body></html>'],
+    ['no head at all, attribute with "<head"', '<p data-y="<head x>">REPORT BODY</p>'],
+  ])('the policy is inserted through the DOM, so it is the first head child even when %s', async (_name, html) => {
+    const t = boot({ chat: reportTurn({ html }) });
+    await t.ask('market report');
+    const d = new t.w.DOMParser().parseFromString(frame(t.doc).srcdoc, 'text/html'); // parsed the way the frame parses it
+    const first = d.head.firstElementChild!;
+    expect(first.tagName).toBe('META');
+    expect(first.getAttribute('http-equiv')).toBe('Content-Security-Policy');
+    expect(first.getAttribute('content')).toBe("default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:; base-uri 'none'; form-action 'none'");
+    expect(d.querySelectorAll('meta[http-equiv="Content-Security-Policy"]').length).toBe(1); // never smuggled into an attribute
+    expect(d.body.textContent).toContain('REPORT BODY');
+  });
+
+  it('the policy is never spliced into the serialized string', () => {
+    expect(MAP).toContain('head.insertBefore(csp,head.firstChild);');
+    expect(MAP).not.toMatch(/serialized\.replace\(/);
+  });
+
+  it('the old string-regex stripping is gone (it was bypassable)', () => {
+    expect(MAP).toContain('new DOMParser().parseFromString');
+    expect(MAP).not.toMatch(/replace\(\/<meta\[\^>\]\*http-equiv/);
+  });
+
+  it('links never navigate the frame: http(s) opens a new tab with noopener, mailto goes to the mail app, anything else does nothing', async () => {
+    const t = boot({ chat: reportTurn() });
+    await t.ask('market report');
+    const f = frame(t.doc);
+    const d = f.contentDocument!;
+    d.open(); d.write('<!doctype html><html><head></head><body><a id="ext" href="https://www.sam.gov/opp/1">SAM</a><a id="api" href="/api/app/vault/documents/download?id=1">x</a><a id="js" href="javascript:alert(1)">y</a><span id="txt">plain</span></body></html>'); d.close();
+    const open = vi.fn();
+    (t.w as unknown as { open: typeof open }).open = open;
+    f.dispatchEvent(new t.w.Event('load'));
+    const click = (id: string) => { const ev = new d.defaultView!.MouseEvent('click', { bubbles: true, cancelable: true }); d.getElementById(id)!.dispatchEvent(ev); return ev.defaultPrevented; };
+    expect(click('ext')).toBe(true);
+    expect(open).toHaveBeenCalledWith('https://www.sam.gov/opp/1', '_blank', 'noopener');
+    expect(click('api')).toBe(true); // prevented, and nothing opened
+    expect(click('js')).toBe(true);
+    expect(open).toHaveBeenCalledTimes(1);
+    expect(click('txt')).toBe(false); // ordinary clicks are untouched
+  });
+});
+
