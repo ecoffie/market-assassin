@@ -48,9 +48,20 @@ export function placeOfPerformanceWinsExpr(codes: string[]): string | null {
   if (!codes.length) return null;
   // The buying office stands in for an empty place of performance ONLY when the work is not stated to be
   // abroad (Agent 4, 2026-11-24): an MCC Zambia road study bought by a DC office passed a VA/MD/DC filter.
-  // pop_country is ISO3 ('USA' = domestic, as the map's country filter uses); null = not stated → still kept.
-  return `pop_state.in.(${codes.join(',')}),and(pop_state.is.null,or(pop_country.is.null,pop_country.eq.USA))`;
+  // pop_country is ISO3 ('USA' = domestic, as the map's country filter uses); null/empty = not stated → still
+  // kept. Every domestic spelling (USA, US, United States; any case) counts as domestic, so a feed that stores a
+  // different spelling never silently drops domestic work (Agent 4 review, 2026-11-24). ilike without % or _ is a
+  // case-insensitive equality.
+  return `pop_state.in.(${codes.join(',')}),and(pop_state.is.null,or(${DOMESTIC_COUNTRY_OR}))`;
 }
+
+/** Spellings of the United States that mean "domestic" in pop_country (compared case-insensitively). */
+export const DOMESTIC_COUNTRY_SPELLINGS = ['USA', 'US', 'UNITED STATES'] as const;
+const DOMESTIC_COUNTRY_OR = [
+  'pop_country.is.null',
+  'pop_country.eq.""',
+  ...DOMESTIC_COUNTRY_SPELLINGS.map((c) => (c.includes(' ') ? `pop_country.ilike."${c}"` : `pop_country.ilike.${c}`)),
+].join(',');
 
 /** Post-fetch guard with the same rule, for every horizon: a row whose place-of-performance state is
  *  known and not one of the asked states is out of scope. Unknown location is kept (not guessed) — unless
@@ -61,7 +72,7 @@ export function performedOutsideRegion(popState: unknown, states: string[], popC
   const st = String(popState ?? '').trim().toUpperCase();
   if (st !== '') return !states.includes(st);
   const country = String(popCountry ?? '').trim().toUpperCase();
-  return country !== '' && country !== 'USA';
+  return country !== '' && !(DOMESTIC_COUNTRY_SPELLINGS as readonly string[]).includes(country);
 }
 
 export function applyRecompetePlan(query: any, plan: DiscoveryPlan): any {

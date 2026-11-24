@@ -70,8 +70,8 @@ const forecast = (id: string, pop_state: string | null): Row => ({
 
 describe('placeOfPerformanceWinsExpr / performedOutsideRegion', () => {
   it('place of performance decides when known; office counts only when it is missing', () => {
-    expect(placeOfPerformanceWinsExpr(['FL'])).toBe('pop_state.in.(FL),and(pop_state.is.null,or(pop_country.is.null,pop_country.eq.USA))');
-    expect(placeOfPerformanceWinsExpr(['FL', 'GA'])).toBe('pop_state.in.(FL,GA),and(pop_state.is.null,or(pop_country.is.null,pop_country.eq.USA))');
+    expect(placeOfPerformanceWinsExpr(['FL'])).toBe('pop_state.in.(FL),and(pop_state.is.null,or(pop_country.is.null,pop_country.eq."",pop_country.ilike.USA,pop_country.ilike.US,pop_country.ilike."UNITED STATES"))');
+    expect(placeOfPerformanceWinsExpr(['FL', 'GA'])).toBe('pop_state.in.(FL,GA),and(pop_state.is.null,or(pop_country.is.null,pop_country.eq."",pop_country.ilike.USA,pop_country.ilike.US,pop_country.ilike."UNITED STATES"))');
     expect(placeOfPerformanceWinsExpr([])).toBeNull();
     expect(performedOutsideRegion('PR', ['FL'])).toBe(true);
     expect(performedOutsideRegion('fl', ['FL'])).toBe(false);
@@ -91,6 +91,12 @@ describe('placeOfPerformanceWinsExpr / performedOutsideRegion', () => {
     // A known in-region state wins regardless of country; a known out-of-region state is still out.
     expect(performedOutsideRegion('VA', ['VA', 'MD', 'DC'], 'ZMB')).toBe(false);
     expect(performedOutsideRegion('PR', ['VA', 'MD', 'DC'], 'USA')).toBe(true);
+    // Every domestic spelling, any case, is domestic (Agent 4 review 2026-11-24): never silently dropped.
+    for (const c of ['USA', 'usa', 'US', 'us', 'Us', 'United States', 'UNITED STATES', 'united states', ' United States ']) {
+      expect(performedOutsideRegion(null, ['VA'], c), c).toBe(false);
+    }
+    // Look-alikes are not the US.
+    for (const c of ['USAF', 'UNITED KINGDOM', 'UMI', 'PRI']) expect(performedOutsideRegion(null, ['VA'], c), c).toBe(true);
     // No region asked → nothing dropped, even abroad.
     expect(performedOutsideRegion(null, [], 'ZMB')).toBe(false);
   });
