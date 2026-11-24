@@ -17,7 +17,7 @@ const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 const COLUMNS =
-  'contract_id,piid,incumbent_name,incumbent_uei,awarding_agency,awarding_sub_agency,naics_code,naics_description,psc_code,description,total_obligation,potential_total_value,period_of_performance_start,period_of_performance_current_end,place_of_performance_state,place_of_performance_city,set_aside_type,set_aside_enriched,competition_type,number_of_offers,estimated_recompete_date,lead_time_months,recompete_likelihood,contract_type,last_synced_at';
+  'contract_id,piid,incumbent_name,incumbent_uei,awarding_agency,awarding_sub_agency,naics_code,naics_description,psc_code,description,total_obligation,potential_total_value,period_of_performance_start,period_of_performance_current_end,place_of_performance_state,place_of_performance_city,set_aside_type,set_aside_enriched,competition_type,number_of_offers,estimated_recompete_date,lead_time_months,recompete_likelihood,contract_type,last_synced_at,source_url,data_source';
 
 /**
  * Extra rows fetched beyond `limit` so collapsing a duplicate award (dedupe-orders.ts) never

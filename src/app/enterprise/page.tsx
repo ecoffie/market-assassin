@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
+  alternates: { canonical: '/enterprise' },
   title: 'Mindy Enterprise — the federal change-history feed',
   description: 'A bulk API into the recorded diff of every federal contract — what slipped, what grew, who lost — joined to financials. For funds, lenders, PE, and surety.',
 };

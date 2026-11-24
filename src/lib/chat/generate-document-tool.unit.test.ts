@@ -11,6 +11,7 @@ import { SOURCE_KIND_VALUES, BLOCK_TYPE_VALUES, CLAIM_VALUES } from '@/lib/docum
 import { CARD_CHAT_TOOLS } from './card-chat';
 import { chatToolPolicy } from './chat-tool-policy';
 import { VAULT_GROUNDED_TOOLS } from './chat-tool-executor';
+import { requestedDocSections } from './requested-doc-sections';
 
 const ME = 'erika@example.com';
 const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
@@ -68,6 +69,8 @@ function setup(opts: {
   pdfDegraded?: boolean;
   federalMarketProfile?: boolean;
   defenseBuyersAppear?: boolean;
+  requestedSections?: ReturnType<typeof requestedDocSections>;
+  provenance?: Array<{ retrievedAt: string; asOf?: string | null; url?: string | null; recordIds?: string[] }>;
 } = {}) {
   const tables: Record<string, R[]> = { user_boilerplate_docs: opts.rows ?? [], mindy_chat_sessions: [] };
   const storage = fakeStorage();
@@ -80,6 +83,8 @@ function setup(opts: {
     request: { headers: { get: () => null } },
     chatSessionId: null,
     today: () => '2026-11-17',
+    ...(opts.requestedSections ? { requestedSections: opts.requestedSections } : {}),
+    ...(opts.provenance ? { provenance: () => opts.provenance! } : {}),
     ...(opts.federalMarketProfile
       ? {
         federalMarketProfile: true,
@@ -478,5 +483,105 @@ describe('parseCreateDocumentDeliverables', () => {
     expect(parseCreateDocumentDeliverables(JSON.stringify({ ok: false, error: 'prohibited_marking' }))).toBeNull();
     expect(parseCreateDocumentDeliverables(JSON.stringify({ ok: true, files: [] }))).toBeNull();
     expect(parseCreateDocumentDeliverables('not-json')).toBeNull();
+  });
+});
+
+describe('create_document: the sections the customer asked for are in the saved DocModel (Claude Local 2026-11-22)', () => {
+  const ASK = 'Turn this into a PDF report with an executive summary, risks, actions and sources';
+  // A planner doc_model that left the requested sections out (the production defect): body only.
+  const bodyOnly = () => model({
+    sources: [
+      { id: 's1', kind: 'usaspending', label: 'USAspending award data', url: 'https://www.usaspending.gov/award/CONT_AWD_36C24825C0020' },
+      { id: 's2', kind: 'sam_notice', label: 'SAM.gov notice', url: 'https://sam.gov/opp/abc/view' },
+    ],
+    sections: [
+      { id: 'sec-demand', heading: 'Where demand is', blocks: [
+        { type: 'paragraph', id: 'p1', text: 'VA obligated $412.5M for janitorial services in FY2025.', claim: 'fact', cites: ['s1'] },
+        { type: 'paragraph', id: 'p2', text: 'The current contract expires in March 2027.', claim: 'fact', cites: ['s1'] },
+      ] },
+      { id: 'sec-fit', heading: 'How you fit', blocks: [
+        { type: 'paragraph', id: 'p3', text: 'An open notice at the Augusta VA asks for the same services.', claim: 'fact', cites: ['s2'] },
+        { type: 'paragraph', id: 'p4', text: 'Staffing costs at the Augusta site could rise faster than planned.', claim: 'assumption', origin: 'Planning premise for pricing; not confirmed with the buyer.' },
+        { type: 'paragraph', id: 'p5', text: 'Request a capability briefing with the Augusta VA contracting office this month.', claim: 'recommendation', cites: ['s2'] },
+      ] },
+    ],
+  });
+
+  it('a request for executive summary, risks, actions and sources produces them in the saved DocModel, with sources', async () => {
+    const s = setup({ requestedSections: requestedDocSections(ASK) });
+    const r = await s.tool.execute({ doc_model: bodyOnly() });
+    expect(r).toMatchObject({ ok: true, requested_sections: { requested: ['executive_summary', 'risks', 'actions', 'sources'], added: ['executive_summary', 'risks', 'actions'], missing: [] } });
+    const saved = s.docs()[0].doc_model;
+    const headings = saved.sections.map((x: R) => x.heading);
+    expect(headings[0]).toBe('Executive summary');
+    // level 1: the renderer's contents page counts level-1 sections
+    for (const h of ['Executive summary', 'Risks', 'Recommended actions']) expect(saved.sections.find((x: R) => x.heading === h).level).toBe(1);
+    expect(headings).toContain('Risks');
+    expect(headings).toContain('Recommended actions');
+    // every format renders the completed model
+    for (const x of s.renders) expect(x.model.sections.map((y: R) => y.heading)).toEqual(headings);
+    const items = (h: string) => saved.sections.find((x: R) => x.heading === h).blocks[0].items as R[];
+    // built from the document's own statements, labels and cites copied: no new fact, no new source
+    const bodyTexts = new Set(bodyOnly().sections.flatMap((x: R) => x.blocks.map((b: R) => b.text)));
+    for (const h of ['Executive summary', 'Risks', 'Recommended actions']) for (const it of items(h)) expect(bodyTexts.has(it.text)).toBe(true);
+    expect(items('Executive summary')[0]).toMatchObject({ text: 'VA obligated $412.5M for janitorial services in FY2025.', claim: 'fact', cites: ['s1'] });
+    expect(items('Recommended actions')).toEqual([{ text: 'Request a capability briefing with the Augusta VA contracting office this month.', claim: 'recommendation', cites: ['s2'] }]);
+    expect(items('Risks')[0]).toMatchObject({ claim: 'assumption', origin: expect.stringContaining('not confirmed') });
+    expect(saved.sources.map((x: R) => x.id)).toEqual(['s1', 's2']);
+    // Sources: every declared source is cited, so the rendered Sources list carries both
+    const cited = new Set(saved.sections.flatMap((x: R) => x.blocks.flatMap((b: R) => [...(b.cites ?? []), ...((b.items ?? []) as R[]).flatMap((i) => i.cites ?? [])])));
+    expect([...cited].sort()).toEqual(['s1', 's2']);
+    expect(String(r.note)).not.toMatch(/NOT in the saved file/);
+  });
+
+  it('a doc_model that already carries the requested sections is saved unchanged', async () => {
+    const s = setup({ requestedSections: requestedDocSections(ASK) });
+    const full = bodyOnly();
+    full.sections = [
+      { id: 'x', heading: 'Executive summary', blocks: [{ type: 'paragraph', id: 'e', text: 'VA spends on janitorial services.', claim: 'fact', cites: ['s1'] }] },
+      ...full.sections,
+      { id: 'r', heading: 'Key risks', blocks: [{ type: 'paragraph', id: 'r1', text: 'Staffing costs could rise faster than planned.', claim: 'assumption', origin: 'Planning premise; not verified.' }] },
+      { id: 'n', heading: 'Next steps', blocks: [{ type: 'paragraph', id: 'n1', text: 'Call the office.', claim: 'recommendation' }] },
+    ];
+    const r = await s.tool.execute({ doc_model: full });
+    expect(r).toMatchObject({ ok: true, requested_sections: { added: [], missing: [] } });
+    expect(s.docs()[0].doc_model.sections.map((x: R) => x.heading)).toEqual(['Executive summary', 'Where demand is', 'How you fit', 'Key risks', 'Next steps']);
+  });
+
+  it('nothing to build from: the file is saved without padding and the answer is told to say so plainly', async () => {
+    const s = setup({ requestedSections: requestedDocSections('Make a Word doc with risks, action items and citations') });
+    const r = await s.tool.execute({ doc_model: model({ sources: [], sections: [{ id: 'a', heading: 'Overview', blocks: [{ type: 'paragraph', id: 'p', text: 'The firm cleans federal offices.', claim: 'recommendation' }] }] }) });
+    expect(r).toMatchObject({ ok: true, requested_sections: { added: ['actions'], missing: ['risks', 'sources'] } });
+    expect(s.docs()[0].doc_model.sections.map((x: R) => x.heading)).toEqual(['Overview', 'Recommended actions']);
+    expect(String(r.note)).toMatch(/asked for Risks, Sources in the document, but they are NOT in the saved file/);
+  });
+
+  it('no sections named: the tool is unchanged (no requested_sections field, model untouched)', async () => {
+    const s = setup({ requestedSections: requestedDocSections('Make this a PDF') });
+    const r = await s.tool.execute({ doc_model: bodyOnly() });
+    expect(r).not.toHaveProperty('requested_sections');
+    expect(s.docs()[0].doc_model.sections.map((x: R) => x.heading)).toEqual(['Where demand is', 'How you fit']);
+  });
+});
+
+describe('create_document: source provenance from tool results (read dates, links, data-date subtitle)', () => {
+  it('fills DocSource read date and link from a matching tool result, and an empty subtitle from its as-of date', async () => {
+    const s = setup({ provenance: [{ retrievedAt: '2026-11-22T15:04:00Z', asOf: '2026-11-20', url: 'https://www.usaspending.gov/award/CONT_AWD_W9124D26D0005', recordIds: ['W9124D26D0005'] }] });
+    const r = await s.tool.execute({ doc_model: model({ sources: [{ id: 's1', kind: 'usaspending', label: 'USAspending award', recordId: 'W9124D26D0005' }] }) });
+    expect(r).toMatchObject({ ok: true, source_provenance: { filledRetrievedAt: 1, filledUrl: 1, unmatched: 0, subtitleSet: true } });
+    const saved = s.docs()[0].doc_model;
+    expect(saved.sources[0]).toMatchObject({ retrievedAt: '2026-11-22', url: 'https://www.usaspending.gov/award/CONT_AWD_W9124D26D0005', recordId: 'W9124D26D0005' });
+    expect(saved.subtitle).toBe('Data as of 2026-11-20');
+    // statements untouched
+    expect(saved.sections[0].blocks[0].text).toBe('VA obligated $412.5M for janitorial services.');
+  });
+
+  it('no matching tool result: the source is saved without the model\'s unverified link or date (never shown as verified)', async () => {
+    const s = setup({ provenance: [{ retrievedAt: '2026-11-22T15:04:00Z', url: 'https://sam.gov/opp/zzz/view', recordIds: ['zzz'] }] });
+    const r = await s.tool.execute({ doc_model: model({ sources: [{ id: 's1', kind: 'usaspending', label: 'USAspending award data', url: 'https://www.usaspending.gov/search', retrievedAt: '2025-06-01' }] }) });
+    expect(r).toMatchObject({ ok: true, source_provenance: { unmatched: 1, filledRetrievedAt: 0, removedUnverified: 2, subtitleSet: false } });
+    expect(s.docs()[0].doc_model.sources[0]).toEqual({ id: 's1', kind: 'usaspending', label: 'USAspending award data' });
+    // what the customer sees: the rendered Word/PDF model carries no unverified date
+    expect(s.renders.every((x) => x.model.sources[0].retrievedAt === undefined)).toBe(true);
   });
 });

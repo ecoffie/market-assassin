@@ -2,6 +2,7 @@ import { Metadata } from 'next';
 import PublicShell from '@/components/public-site/PublicShell';
 
 export const metadata: Metadata = {
+  alternates: { canonical: '/mindy-intelligence' },
   title: "Mindy's Living Intelligence Layer | How Mindy Works",
   description:
     'Mindy is not just an AI tool — it is a Living Intelligence Layer. Your business profile fused with a curated GovCon knowledge corpus, producing federal-grade drafts, briefings, and insights no generic LLM can match.',

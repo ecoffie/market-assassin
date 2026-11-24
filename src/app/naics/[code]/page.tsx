@@ -38,6 +38,7 @@ import {
 import { recipientSlug } from '@/lib/bigquery/recipients';
 import { AGENCIES_SEO } from '@/data/agencies-seo';
 import { SeoTemporarilyUnavailableError } from '@/lib/seo/seo-unavailable';
+import { buildNaicsTitles } from '@/lib/seo/seo-title-clip';
 
 // Prerender every top-100 NAICS at build. 100 entries is cheap and
 // keeps the pages on the edge cache — no serverless invocation per
@@ -161,15 +162,16 @@ export async function generateMetadata({
     description.length > 158
       ? `${description.slice(0, 155).trimEnd()}...`
       : description;
+  const { title, ogTitle } = buildNaicsTitles(resolvedCode, titleStr);
 
   return {
-    title: `NAICS ${resolvedCode}: ${titleStr} — Federal Contracts | Mindy`,
+    title,
     description: trimmed,
     alternates: {
       canonical: `https://getmindy.ai/naics/${resolvedCode}`,
     },
     openGraph: {
-      title: `NAICS ${resolvedCode}: ${titleStr} — Federal Contracts | Mindy`,
+      title: ogTitle,
       description: trimmed,
       type: 'article',
       url: `https://getmindy.ai/naics/${resolvedCode}`,

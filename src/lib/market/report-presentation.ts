@@ -101,3 +101,47 @@ export function dedupeRecompetes<T extends RecompeteLike>(rows: T[]): T[] {
     return true;
   });
 }
+
+/**
+ * PROVENANCE (Design & Output's "Data and sources" section, #2396; Agent 4 approved 2026-11-23).
+ * Labels come only from evidence on the row. Never a column DEFAULT: recompete_opportunities.data_source
+ * defaults to 'usaspending' and federal_contacts.source defaults to 'sam_opportunities_poc', so neither alone
+ * is evidence. A row without evidence is null ("not stated").
+ */
+export type RecompeteSourceLabel = 'USASpending award record' | 'Legacy contracts import';
+export interface RecompeteProvenance { source_label: RecompeteSourceLabel | null; source_url: string | null; as_of: string | null; as_of_label: 'last synced' }
+
+const USASPENDING_AWARD_ID = /^CONT_(?:AWD|IDV)_/i;
+function isUsaspendingUrl(u: unknown): boolean {
+  if (typeof u !== 'string' || !u) return false;
+  try { return /(^|\.)usaspending\.gov$/i.test(new URL(u).hostname); } catch { return false; }
+}
+
+/**
+ * Row-level evidence wins: a USASpending award id (CONT_AWD_/CONT_IDV_) or a usaspending.gov URL means
+ * "USASpending award record" EVEN IF data_source says 'contracts-data-import'. Only without that evidence does
+ * data_source='contracts-data-import' label the row a legacy import. Otherwise null.
+ */
+export function recompeteProvenance(row: { contract_id?: unknown; source_url?: unknown; data_source?: unknown; last_synced_at?: unknown }): RecompeteProvenance {
+  const url = isUsaspendingUrl(row.source_url) ? String(row.source_url) : null;
+  const usa = url !== null || USASPENDING_AWARD_ID.test(String(row.contract_id ?? ''));
+  const label: RecompeteSourceLabel | null = usa
+    ? 'USASpending award record'
+    : row.data_source === 'contracts-data-import' ? 'Legacy contracts import' : null;
+  const asOf = typeof row.last_synced_at === 'string' && row.last_synced_at ? row.last_synced_at : null;
+  return { source_label: label, source_url: url, as_of: asOf, as_of_label: 'last synced' };
+}
+
+/** Section-level: each distinct label with its row count; rows without evidence counted as "not_stated". */
+export function recompeteSourceSummary(rows: Array<{ source_label: RecompeteSourceLabel | null }>): Array<{ label: RecompeteSourceLabel | 'not_stated'; count: number }> {
+  const m = new Map<RecompeteSourceLabel | 'not_stated', number>();
+  for (const r of rows) { const k = r.source_label ?? 'not_stated'; m.set(k, (m.get(k) ?? 0) + 1); }
+  return [...m.entries()].map(([label, count]) => ({ label, count }));
+}
+
+/** Contacts: the SAM notice each person was listed on; the section as-of is the newest such notice. */
+export const CONTACTS_SOURCE_LABEL = 'SAM.gov notice points of contact (government buyers)' as const;
+export function contactsAsOf(people: Array<{ source: { notice_posted: string | null } }>): string | null {
+  const dates = people.map((p) => p.source.notice_posted).filter((d): d is string => Boolean(d)).sort();
+  return dates.length ? dates[dates.length - 1] : null;
+}

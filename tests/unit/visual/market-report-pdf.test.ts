@@ -40,8 +40,11 @@ const unexpected = (found: string[], known: string[]) => found.filter((x) => !kn
  */
 const KNOWN_PRINT_DEFECTS = { missingLines: [] as string[], overflowingTables: [] as string[], clippedText: [] as string[] };
 
-/** Pages the full fixture may use. It printed 8 (two of them a third full or less) before the layout fix. */
-const PAGE_BUDGET = 6;
+/**
+ * Pages the full fixture may use. It printed 8 (two of them a third full or less) before the layout fix, then 6;
+ * the "Data and sources" section (Track C3) adds a well-filled seventh page (1,028 characters).
+ */
+const PAGE_BUDGET = 7;
 
 /** Section headings this report must carry, in reading order. Each one is backed by data in the fixture. */
 const SECTIONS = [
@@ -89,7 +92,7 @@ describe.runIf(!!CHROME)('market report PDF — full report', () => {
     if (PDFTOTEXT) {
       // The running footer is printed on every page; drop it so a paragraph that continues on the next page
       // still reads as one line.
-      const all = squash(execFileSync(PDFTOTEXT, ['-enc', 'UTF-8', '-', '-'], { input: pdf, encoding: 'utf8' })
+      const all = squash(execFileSync(PDFTOTEXT, ['-enc', 'UTF-8', '-raw', '-', '-'], { input: pdf, encoding: 'utf8' })
         .replace(/Mindy · Federal market report · .*|Page \d+ of \d+/g, ''));
       expect(unexpected(lines.filter((l) => !all.includes(squash(l))), KNOWN_PRINT_DEFECTS.missingLines)).toEqual([]);
     } else {

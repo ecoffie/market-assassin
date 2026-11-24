@@ -108,7 +108,7 @@ describe('Map Ask Mindy report pane', () => {
     expect(t.doc.querySelector('.amk-exp-panel')?.hidden).toBe(false);
     expect([...t.doc.querySelectorAll('.amk-exp-panel button')].map((b) => b.textContent)).toEqual(['PDF', 'Word']);
     const before = t.calls.length;
-    (t.doc.querySelector('.amk-exp-panel button[data-fmt="pdf"]') as HTMLButtonElement).click();
+    (t.doc.querySelector('.amk-exp-panel [data-fmt="pdf"]') as HTMLButtonElement).click();
     await t.settle();
     const dl = t.calls.slice(before).find((c) => c.url.startsWith('/api/app/vault/documents/download'))!;
     expect(dl.url).toContain(`id=${PDF}`);

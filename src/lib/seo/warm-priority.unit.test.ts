@@ -6,6 +6,8 @@ const m = vi.hoisted(() => ({
   z: new Map<string, number>(), set: new Set<string>(), kv: new Map<string, unknown>(),
   profiles: new Map<string, { total_obligated: number; award_count: number }>(),
   failOn: new Set<string>(), warmed: [] as string[],
+  // contracts p1: [uei, liveBq] per call; state per uei for the cache/serving-table read (default 'ok')
+  p1: [] as Array<[string, boolean]>, p1Cached: new Map<string, string>(), p1Live: new Map<string, string>(),
 }));
 vi.mock('@vercel/kv', () => ({
   kv: {
@@ -39,6 +41,11 @@ vi.mock('@/lib/bigquery/recipients', () => ({
   getTopNaicsForRecipient: vi.fn(async () => []),
   getRecentAwardsForRecipient: vi.fn(async (_u: string[], uei: string) => { m.warmed.push(uei); return []; }),
   getExecutivesForRecipient: vi.fn(async () => []),
+  getPaginatedAwardsForRecipient: vi.fn(async (_u: string[], uei: string, _p: number, _s: number, live?: boolean) => {
+    m.p1.push([uei, Boolean(live)]);
+    const state = live ? (m.p1Live.get(uei) ?? 'ok') : (m.p1Cached.get(uei) ?? 'ok');
+    return { rows: [], total: 0, available: state === 'ok', state };
+  }),
   recipientSlug: (n: string) => n.toLowerCase(),
   seoCacheKeys: { recentAwards: (uei: string) => `recent:${uei}` },
 }));
@@ -55,6 +62,7 @@ const req = (headers: Record<string, string> = { authorization: 'Bearer s3cret' 
 beforeEach(() => {
   process.env.CRON_SECRET = 's3cret';
   m.z.clear(); m.set.clear(); m.kv.clear(); m.profiles.clear(); m.failOn.clear(); m.warmed = [];
+  m.p1 = []; m.p1Cached.clear(); m.p1Live.clear();
   m.kv.set('cron:warm-contractor-pages:cursor', 0);
 });
 
@@ -108,4 +116,30 @@ describe('hourly priority drain', () => {
 
 it('the priority key is namespaced apart from the legacy set', () => {
   expect(WARM_PRIORITY_KEY).not.toBe('seo:warm:queue:contractor-slugs');
+});
+
+
+describe('warm also makes contracts page 1 servable (2026-11-24: contracts-page 500s)', () => {
+  const queue = (slug: string) => { m.profiles.set(slug, { total_obligated: 5e8, award_count: 40 }); m.z.set(slug, 100); };
+
+  it('a slug whose page 1 is already cached / in the serving table spends NO live read', async () => {
+    queue('cohort-co');
+    await GET(req());
+    expect(m.p1).toEqual([['cohort-co', false]]);
+  });
+
+  it('a slug with no servable page 1 gets ONE live read of page 1 (same award rows, page size 50)', async () => {
+    queue('outside-co');
+    m.p1Cached.set('outside-co', 'unavailable');
+    await GET(req());
+    expect(m.p1).toEqual([['outside-co', false], ['outside-co', true]]);
+  });
+
+  it('a BigQuery failure on the live page-1 read reports the warm as failed (the drain stops, as for profile sections)', async () => {
+    queue('quota-co');
+    m.p1Cached.set('quota-co', 'unavailable');
+    m.p1Live.set('quota-co', 'failed');
+    const body = await (await GET(req())).json();
+    expect(JSON.stringify(body)).toMatch(/fail/i);
+  });
 });

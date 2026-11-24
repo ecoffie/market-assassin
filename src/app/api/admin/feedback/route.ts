@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { sendEmail } from '@/lib/send-email';
+import { feedbackOutreachPreferencesUrl } from '@/lib/email/admin-outreach-destinations';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
@@ -314,7 +315,7 @@ export async function POST(request: NextRequest) {
                   </ul>
 
                   <div style="text-align: center; margin: 30px 0;">
-                    <a href="https://getmindy.ai/briefings" style="display: inline-block; background: linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%); color: white; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 16px;">
+                    <a href="${feedbackOutreachPreferencesUrl(email)}" style="display: inline-block; background: linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%); color: white; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 16px;">
                       Update My Preferences
                     </a>
                   </div>

@@ -14,6 +14,7 @@
  */
 import type { Metadata } from 'next';
 import { siteShareImages } from '@/lib/seo/share-image';
+import { clipAtWord } from '@/lib/seo/seo-title-clip';
 import Link from 'next/link';
 import { notFound, permanentRedirect } from 'next/navigation';
 import MemberAwareCta from '@/components/MemberAwareCta';
@@ -74,7 +75,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const period = fiscalPeriodLabel(f.fiscalYear, f.anticipatedQuarter);
   const suffix = ` — ${agency} Forecast${period ? ` (${period})` : ''} | Mindy`;
   const maxTitle = Math.max(30, 90 - suffix.length);
-  const titleStr = `${f.title.length > maxTitle ? `${f.title.slice(0, maxTitle - 1).trimEnd()}…` : f.title}${suffix}`;
+  const titleStr = `${clipAtWord(f.title, maxTitle)}${suffix}`;
   const value = forecastValueLabel(f.valueMin, f.valueMax, f.valueRangeText);
   const facts = [
     period && `anticipated ${period}`,

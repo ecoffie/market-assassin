@@ -5,7 +5,7 @@
  */
 import { describe, it, expect, afterEach } from 'vitest';
 import { spawn } from 'node:child_process';
-import { mkdtempSync, rmSync, existsSync, readdirSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, chmodSync, rmSync, existsSync, readdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
@@ -141,6 +141,35 @@ describe('gate-slot: queue, never skip', () => {
     expect(r.out).toMatch(/KEPT/);
     const own = await bash('gate_slot_acquire >/dev/null 2>&1; gate_slot_release; ls "$MINDY_GATE_SLOT_DIR"', { ...env, MINDY_GATE_SLOT_DIR: slotDir() });
     expect(own.out.trim()).toBe('');
+  }, 15_000);
+
+  it('acquire does not depend on `date` or `seq` (a failed fork of either must not block or skip the slot scan)', async () => {
+    // CI root cause of 'timed out waiting for 2 held slot(s); have 1' (#2247, #2311, #2255, before #2350):
+    // the helper took its clock from $(date +%s) and its slot list from $(seq). When that subprocess failed
+    // under load, start was empty, so "waited" became the whole epoch and the holder returned BLOCKED at
+    // once (or scanned zero slots). Stand-ins for both commands that print nothing and fail reproduce
+    // that here, deterministically; the helper must still take a free slot.
+    const dir = slotDir();
+    const shim = path.join(dir, 'shim-bin');
+    mkdirSync(shim);
+    for (const cmd of ['date', 'seq']) {
+      writeFileSync(path.join(shim, cmd), '#!/bin/sh\nexit 1\n');
+      chmodSync(path.join(shim, cmd), 0o755);
+    }
+    const env = {
+      MINDY_GATE_SLOT_DIR: path.join(dir, 'slots'),
+      MINDY_GATE_SLOTS: '2',
+      MINDY_GATE_SLOT_POLL_S: '0.1',
+      MINDY_GATE_SLOT_TIMEOUT_S: '5',
+      PATH: `${shim}:${process.env.PATH ?? ''}`,
+    };
+    // Watchdog: the pre-#2350 helper never returns here (zero slots scanned, clock stuck at 0), so end it
+    // after 8 s rather than leave an orphan looping; the assertions below then report the failure.
+    const first = await bash('( sleep 8; kill -TERM $$ ) 2>/dev/null & w=$!; date >/dev/null && echo DATE_WORKS; gate_slot_acquire && echo GOT "$GATE_SLOT_HELD"; rc=$?; kill $w 2>/dev/null; exit $rc', env);
+    expect(first.out).not.toMatch(/DATE_WORKS/); // the stand-in is really the `date` the helper would call
+    expect(first.code).toBe(0);
+    expect(first.out).toMatch(/GOT .*slot-1/);
+    expect(first.out).not.toMatch(/BLOCKED/);
   }, 15_000);
 });
 

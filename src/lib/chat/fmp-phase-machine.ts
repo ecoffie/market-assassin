@@ -5,7 +5,7 @@
  * inside unlocked phases; it cannot jump to market size before awards, or write-up
  * before contacts + web were attempted.
  *
- * Phases (customer-favoring order from the RBA acceptance chain):
+ * Phases (customer-favoring order: what the firm wins before what the market holds):
  *   identity → awards → pathways → vehicles → market_size → contacts → web → writeup
  *
  * Self-report is host-note only (not a tool phase).
@@ -38,7 +38,7 @@ export const FMP_PHASE_ORDER: readonly FmpPhase[] = [
  * Max planner↔tool rounds for one FMP customer turn (R1 + continuations).
  *
  * generate_market_report is an allowed_write and chat caps writes at 1/round, so each
- * per-state market report burns its own round. Measured 2026-11-20 cold RBA run:
+ * per-state market report burns its own round. Measured 2026-11-20 on a cold profile run:
  * awards → pathways → vehicles → 3× market_size exhausted 6 and never reached
  * contacts / web / create_document. 12 covers identity/awards + pathways + vehicles +
  * up to 3 market + contacts + web + write_document (+ one writeup rewrite).
@@ -121,14 +121,14 @@ export interface FmpPhaseState {
 
 export function initialFmpPhaseState(customerText: string, opts: { companyStates?: readonly string[] } = {}): FmpPhaseState {
   const textStates = extractProfileStates(customerText);
-  // A strategy plan with saved company states runs one market report per state (at most 3); with none, one
-  // national report. The RBA benchmark default (3) applies only when no company context is given.
+  // One market report per state the customer named; else per saved company state (at most 3); with neither, one
+  // national report. No default region.
   const companyStates = opts.companyStates;
   const target = textStates.length > 0
     ? textStates.length
     : companyStates
       ? Math.max(1, Math.min(3, companyStates.length))
-      : 3;
+      : 1;
   return {
     completed: new Set(),
     marketReportCount: 0,

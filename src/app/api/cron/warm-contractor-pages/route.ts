@@ -38,8 +38,10 @@ import {
   getTopNaicsForRecipient,
   getRecentAwardsForRecipient,
   getExecutivesForRecipient,
+  getPaginatedAwardsForRecipient,
   recipientSlug,
 } from '@/lib/bigquery/recipients';
+import { SERVED_PAGE_SIZE } from '@/lib/awards-serving';
 import { WARM_QUEUE_KEY } from '@/lib/seo/served-slugs';
 import {
   WARM_PRIORITY_KEY, WARM_PRIORITY_PER_RUN, WARM_PRIORITY_DAILY_CAP, warmDailyKey, isThinContractor,
@@ -123,6 +125,16 @@ async function warmSlug(slug: string, opts: { skipThin?: boolean } = {}): Promis
   // queryCached swallows BigQuery errors into a 'failed' mark. A failed core section means the
   // warm did not happen (quota exhausted, most likely): report it so the drain stops.
   if (bqResultState(seoCacheKeys.recentAwards(rollupUei, 25), 0) === 'failed') return 'failed';
+
+  // CONTRACTS PAGE 1 (Data Core, 2026-11-24). This warm used to revalidate /contracts without warming its data, so a
+  // contracts cold-budget refusal queued a warm that never fixed the page (11-23/24: 822 contracts-page 500s). Ask the
+  // cache + durable serving table first (no BigQuery): the top-12k cohort's page 1 is already built offline. Only a
+  // slug with no servable page 1 spends a live read — same award rows, same byte ceiling, inside this run's warm cap.
+  const p1 = await getPaginatedAwardsForRecipient(ueis, rollupUei, 1, SERVED_PAGE_SIZE);
+  if (p1.state !== 'ok') {
+    const live = await getPaginatedAwardsForRecipient(ueis, rollupUei, 1, SERVED_PAGE_SIZE, true);
+    if (live.state === 'failed') return 'failed';
+  }
 
   // A previous cold crawl may have cached a 404 via ISR — force
   // regeneration now that the data keys are warm.

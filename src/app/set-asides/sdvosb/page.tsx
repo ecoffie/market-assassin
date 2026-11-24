@@ -18,6 +18,7 @@
  *   service-connected disability)
  */
 import type { Metadata } from 'next';
+import { siteShareImages } from '@/lib/seo/share-image';
 import Link from 'next/link';
 
 export const metadata: Metadata = {
@@ -42,6 +43,7 @@ export const metadata: Metadata = {
       'Mindy filters SAM.gov, agency forecasts, and recompetes for SDVOSB set-asides — plus a dedicated stream for VA Veterans First opportunities.',
     type: 'website',
     url: 'https://getmindy.ai/set-asides/sdvosb',
+    images: siteShareImages(),
   },
 };
 

@@ -16,6 +16,7 @@ import type { Metadata } from 'next';
 import { listPublicMcpTools } from '@/lib/mcp/public-catalog';
 
 export const metadata: Metadata = {
+  alternates: { canonical: '/mcp/about' },
   title: 'What is Mindy MCP? — Federal contracting intelligence for your AI agent',
   description:
     'Plug real federal-contracting intelligence into Claude, Cursor, ChatGPT, or any agent you build — grounded in SAM.gov, USASpending, SEC EDGAR, GSA CALC, and 8 years of proprietary GovCon data, with a contract that never fabricates.',
