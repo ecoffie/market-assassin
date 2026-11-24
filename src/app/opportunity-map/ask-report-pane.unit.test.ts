@@ -1,6 +1,6 @@
 /**
  * Map Ask Mindy — in-chat REPORT PANE (the REAL drawer script, ASK_MINDY_JS, in jsdom).
- * A create_document turn ends with a `deliverables` event: the answer gets an "Open report" card (no
+ * A create_document turn ends with a `deliverables` event: the answer gets an "Open document" card (no
  * format chips), and the report opens in a pane BESIDE the chat with an Export menu, read from the
  * owner-scoped preview route inside a script-less sandboxed iframe. A revision replaces what the pane shows.
  * The open report survives a reload (and brings the signed ledger back so "revise it" resolves), is
