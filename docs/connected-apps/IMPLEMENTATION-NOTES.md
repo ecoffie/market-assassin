@@ -83,7 +83,7 @@ Tests cover:
 
 ## 3b. Built in Slice A, part 2 (branch `feat/connected-apps-slice-a2`, stacked on #2424, flag off)
 
-Server side of "use a file from my Drive / OneDrive in Ask Mindy". The picker UI is the next commit.
+Use a file from Drive or OneDrive in Ask Mindy: server side plus the Ask Mindy control.
 
 - **Selection is the authority, not the model.**
   - `POST /api/app/connected-apps/selections` confirms the picked file through the connection's own grant (exists, readable type, under 15 MB).
@@ -99,11 +99,16 @@ Server side of "use a file from my Drive / OneDrive in Ask Mindy". The picker UI
   - `read_connected_file` is offered only on a turn with a verified selection, never in card chat. It is a free tool, classified as a chat-private read in `chat-tool-policy.ts`.
   - The trace records `connected_files:<n>[:dropped=<m>]`.
 - **`POST /api/app/connected-apps/picker-token`** gives the browser picker a short-lived **access** token (never the refresh token, `no-store`), plus the public Google Picker key and app id. This is the provider-documented pattern.
-- **Tests:** 23 new (handle signing, isolation, expiry, domain separation, provider mapping and errors, export vs download, size cap, NUL strip, fence integrity, coach/client isolation, dead connection, file-id swap, route gates, token response shape).
+- **Ask Mindy control (`src/components/app/chat/ConnectedFiles.tsx`).**
+  - Hidden unless the list endpoint answers, so it is invisible while the flag is off.
+  - Connect shows the server's `access_note` and leaves Mindy only on "Continue". The consent outcome (`connect=ok|error`) is shown in plain words, then stripped from the address bar.
+  - Google uses Google's own Picker (`drive.file`). The pick is exchanged for a handle and shown as a removable chip (up to 5). Handles go with every question as `connectedFiles` and are cleared on New chat.
+  - **OneDrive picking is not wired yet.** The control says "coming next" rather than offering a broken picker; the server already reads OneDrive handles.
+- **Tests:** 29 new (handle signing, isolation, expiry, domain separation, provider mapping and errors, export vs download, size cap, NUL strip, fence integrity, coach/client isolation, dead connection, file-id swap, route gates, token response shape).
 
 ## 4. Next slices
 
-- **Slice A, part 2 (server built, see 3b):** remaining work is the picker UI in Ask Mindy (Google Picker, OneDrive picker v8) and the connect/disconnect entry point.
+- **Slice A, part 2 (built, see 3b):** remaining work is the OneDrive picker v8 hand-off in the browser.
   - It reads only the selected file and extracts bounded text with `extract.ts`.
   - The output carries `provider`, `connected_account`, `source_id`, `source_url` and `retrieved_at` provenance, separate from federal-record provenance.
   - Prompt-injection guard on file content.
