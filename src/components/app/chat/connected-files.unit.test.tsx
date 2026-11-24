@@ -2,8 +2,8 @@
 /**
  * Connected files UI: hidden when the feature is off for this user; Connect shows what the provider grant
  * allows and leaves Mindy only when the customer clicks Continue; the provider callback's outcome is shown in
- * plain words and stripped from the address bar; picked files are removable chips; OneDrive picking says it is
- * coming rather than pretending.
+ * plain words and stripped from the address bar; picked files are removable chips; OneDrive uses Mindy's own
+ * chooser (browse folders, pick a readable file).
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act } from 'react';
@@ -18,6 +18,14 @@ const h = vi.hoisted(() => ({
 vi.mock('../authHeaders', () => ({
   authedFetch: vi.fn(async (url: string, _e: string, init?: { method?: string; body?: string }) => {
     h.calls.push({ url, body: init?.body });
+    if (url.includes('/browse')) {
+      const b = JSON.parse(init?.body || '{}');
+      const items = b.folder_id === 'fold-1'
+        ? [{ id: 'file-1', name: 'Cap Statement.pdf', kind: 'file', size: 10, modified: null }]
+        : [{ id: 'fold-1', name: 'Proposals', kind: 'folder', size: null, modified: null }];
+      return { ok: true, status: 200, json: async () => ({ items }) };
+    }
+    if (url.includes('/selections')) return { ok: true, status: 200, json: async () => ({ file_handle: 'fh1.x.y', file: { name: 'Cap Statement.pdf' } }) };
     const r = url.includes('/start') ? h.start : h.list;
     return { ok: r.status < 300, status: r.status, json: async () => r.body };
   }),
@@ -89,11 +97,20 @@ describe('ConnectedFiles', () => {
     expect(onChange).toHaveBeenCalledWith([]);
   });
 
-  it('a connected OneDrive says picking is coming, rather than offering a broken picker', async () => {
+  it('OneDrive: browse folders in Mindy\'s chooser, pick a readable file, get a chip', async () => {
     h.list = { status: 200, body: { connections: [{ id: 'c2', provider: 'microsoft', connected_email: 'o@acme.com', status: 'connected' }], providers: [{ provider: 'microsoft', available: true }] } };
-    await mount();
+    const onChange = await mount();
     await click(button('Use a file from Drive or OneDrive'));
-    expect(el.textContent).toContain('OneDrive (o@acme.com): file picking is coming next');
+    await click(button('Pick from OneDrive (o@acme.com)'));
+    expect(el.querySelector('[role="dialog"]')?.getAttribute('aria-label')).toBe('Pick a file from OneDrive');
+    await click(button('Proposals'));
+    const browse = h.calls.filter((c) => c.url.includes('/browse'));
+    expect(JSON.parse(browse[browse.length - 1].body!)).toMatchObject({ connection_id: 'c2', folder_id: 'fold-1' });
+    await click(button('Cap Statement.pdf'));
+    const sel = h.calls.find((c) => c.url.includes('/selections'))!;
+    expect(JSON.parse(sel.body!)).toMatchObject({ connection_id: 'c2', file_id: 'file-1' });
+    expect(onChange).toHaveBeenCalledWith([{ handle: 'fh1.x.y', name: 'Cap Statement.pdf', provider: 'microsoft' }]);
+    expect(el.querySelector('[role="dialog"]')).toBeNull();
   });
 
   it('a connection needing re-consent offers Reconnect', async () => {

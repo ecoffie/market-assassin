@@ -93,3 +93,31 @@ describe('POST /picker-token', () => {
     expect((await POST(post('picker-token', { email: 'owner@acme.com', connection_id: 'conn-1' }))).status).toBe(503);
   });
 });
+
+describe('POST /browse (OneDrive chooser)', () => {
+  const ms = { ...connection, provider: 'microsoft' };
+  it('lists the own OneDrive through the server; the Microsoft token is never returned', async () => {
+    h.token.mockImplementation(async () => ({ ok: true, token: 'ms-secret-token', provider: 'microsoft', connection: ms }));
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ value: [{ id: 'f1', name: 'Cap.pdf', size: 5, file: { mimeType: 'application/pdf' } }] }))));
+    const { POST } = await import('./browse/route');
+    const r = await POST(post('browse', { email: 'owner@acme.com', connection_id: 'conn-1', q: 'cap' }));
+    const j = await r.json();
+    expect(j.items).toEqual([{ id: 'f1', name: 'Cap.pdf', kind: 'file', size: 5, modified: null }]);
+    expect(JSON.stringify(j)).not.toContain('ms-secret-token');
+    expect(r.headers.get('cache-control')).toBe('no-store');
+  });
+  it('a Google connection is refused (drive.file uses Google Picker; Mindy does not list a Google drive)', async () => {
+    const { POST } = await import('./browse/route');
+    expect((await POST(post('browse', { email: 'owner@acme.com', connection_id: 'conn-1' }))).status).toBe(400);
+  });
+});
+
+describe('POST /picker-token is Google-only', () => {
+  it('a Microsoft connection gets no token in the browser', async () => {
+    h.token.mockImplementation(async () => ({ ok: true, token: 'ms-secret-token', provider: 'microsoft', connection: { ...connection, provider: 'microsoft' } }));
+    const { POST } = await import('./picker-token/route');
+    const r = await POST(post('picker-token', { email: 'owner@acme.com', connection_id: 'conn-1' }));
+    expect(r.status).toBe(400);
+    expect(await r.text()).not.toContain('ms-secret-token');
+  });
+});

@@ -154,3 +154,42 @@ export async function readFileText(provider: Provider, token: string, meta: File
     throw new FileReadError('unreadable');
   }
 }
+
+/**
+ * Microsoft: Mindy's own file chooser over Graph, on the existing `Files.Read` grant (no SharePoint
+ * `MyFiles.Read` / consumer `OneDrive.ReadOnly` scopes, which Microsoft's v8 picker requires, and no
+ * Microsoft token in the browser). Lists the user's OWN drive only, at the customer's click: folders and
+ * files Mindy can read, metadata only. The model never calls this.
+ */
+export interface DriveEntry {
+  id: string;
+  name: string;
+  kind: 'folder' | 'file';
+  size: number | null;
+  modified: string | null;
+}
+
+export const DRIVE_PAGE = 100;
+
+export function driveListUrl(opts: { folderId?: string | null; query?: string | null }): string {
+  const sel = `$select=id,name,size,file,folder,lastModifiedDateTime&$top=${DRIVE_PAGE}`;
+  const q = String(opts.query || '').trim().slice(0, 100);
+  if (q) return `https://graph.microsoft.com/v1.0/me/drive/root/search(q='${encodeURIComponent(q.replace(/'/g, "''"))}')?${sel}`;
+  if (opts.folderId) return `https://graph.microsoft.com/v1.0/me/drive/items/${encodeURIComponent(opts.folderId)}/children?${sel}`;
+  return `https://graph.microsoft.com/v1.0/me/drive/root/children?${sel}`;
+}
+
+export async function listOneDrive(token: string, opts: { folderId?: string | null; query?: string | null }, f: Fetch = fetch): Promise<DriveEntry[]> {
+  const res = await f(driveListUrl(opts), { headers: { authorization: `Bearer ${token}` } });
+  if (!res.ok) providerFail(res.status);
+  const j = (await res.json()) as { value?: Array<Record<string, unknown>> };
+  const out: DriveEntry[] = [];
+  for (const it of j.value || []) {
+    const isFolder = !!it.folder;
+    const m: FileMeta = { id: String(it.id), name: String(it.name || ''), mime: String(((it.file || {}) as Record<string, unknown>).mimeType || ''), size: it.size != null ? Number(it.size) : null, webUrl: null, modified: (it.lastModifiedDateTime as string) ?? null };
+    // Only what the customer can actually use: folders to open, and files Mindy can read under the cap.
+    if (!isFolder && (!kindForMeta(m) || (m.size != null && m.size > MAX_FILE_BYTES))) continue;
+    out.push({ id: m.id, name: m.name, kind: isFolder ? 'folder' : 'file', size: isFolder ? null : m.size, modified: m.modified });
+  }
+  return out.sort((a, b) => (a.kind === b.kind ? a.name.localeCompare(b.name) : a.kind === 'folder' ? -1 : 1));
+}

@@ -8,12 +8,14 @@
  *   then navigates to the provider. The callback returns here with ?connect=ok|error.
  * - Pick: Google's own Picker (drive.file: Mindy can open only what is picked). The pick is exchanged for a
  *   signed file handle (POST /selections), shown as a removable chip and sent with each question.
- * - OneDrive: the server reads OneDrive picks already; the OneDrive picker hand-off ships next.
+ * - OneDrive: Mindy's own chooser (OneDriveChooser) over the existing Files.Read grant, server-side, so no
+ *   Microsoft token reaches the browser and no extra Microsoft permission is needed.
  * Mindy never lists or searches the drive from here.
  */
 import { useCallback, useEffect, useState } from 'react';
 import { HardDrive, Loader2, X } from 'lucide-react';
 import { authedFetch } from '../authHeaders';
+import { OneDriveChooser } from './OneDriveChooser';
 
 export interface ConnectedFile {
   handle: string;
@@ -85,6 +87,7 @@ export function ConnectedFiles({ email, files, onChange, disabled }: {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [pendingConnect, setPendingConnect] = useState<{ provider: 'google' | 'microsoft'; url: string; note: string } | null>(null);
+  const [browsing, setBrowsing] = useState<Connection | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -217,7 +220,9 @@ export function ConnectedFiles({ email, files, onChange, disabled }: {
                     Pick from Google Drive ({c.connected_email})
                   </button>
                 ) : (
-                  <div key={c.id} className="px-2 py-1.5 text-faint">OneDrive ({c.connected_email}): file picking is coming next</div>
+                  <button key={c.id} type="button" className="block w-full rounded px-2 py-1.5 text-left text-white hover:bg-white/5" onClick={() => { setOpen(false); setMessage(null); setBrowsing(c); }}>
+                    Pick from OneDrive ({c.connected_email})
+                  </button>
                 )
               ))}
               {providers.filter((p) => p.available && !connectedProviders.has(p.provider)).map((p) => (
@@ -231,6 +236,15 @@ export function ConnectedFiles({ email, files, onChange, disabled }: {
             </div>
           )}
         </div>
+      )}
+      {browsing && (
+        <OneDriveChooser
+          email={email}
+          connectionId={browsing.id}
+          account={browsing.connected_email}
+          onPicked={(f) => { if (!files.some((x) => x.handle === f.handle)) onChange([...files, f].slice(-5)); }}
+          onClose={() => setBrowsing(null)}
+        />
       )}
       {message && <p className="mt-1 text-faint" role="status">{message}</p>}
     </div>

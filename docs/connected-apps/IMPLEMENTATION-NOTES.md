@@ -103,12 +103,17 @@ Use a file from Drive or OneDrive in Ask Mindy: server side plus the Ask Mindy c
   - Hidden unless the list endpoint answers, so it is invisible while the flag is off.
   - Connect shows the server's `access_note` and leaves Mindy only on "Continue". The consent outcome (`connect=ok|error`) is shown in plain words, then stripped from the address bar.
   - Google uses Google's own Picker (`drive.file`). The pick is exchanged for a handle and shown as a removable chip (up to 5). Handles go with every question as `connectedFiles` and are cleared on New chat.
-  - **OneDrive picking is not wired yet.** The control says "coming next" rather than offering a broken picker; the server already reads OneDrive handles.
-- **Tests:** 29 new (handle signing, isolation, expiry, domain separation, provider mapping and errors, export vs download, size cap, NUL strip, fence integrity, coach/client isolation, dead connection, file-id swap, route gates, token response shape).
+  - **OneDrive uses Mindy's own chooser (`OneDriveChooser.tsx`), not Microsoft's v8 picker.**
+    - Per Microsoft's docs (learn.microsoft.com/onedrive/developer/controls/file-pickers), the v8 picker runs on SharePoint tokens, not Graph, and "you cannot reuse tokens for Graph calls". It needs extra delegated permissions: SharePoint `MyFiles.Read` for business, `OneDrive.ReadOnly` for personal accounts. It also needs a SharePoint token in the browser.
+    - Those widen the consent screen and the review for no added capability, because the `Files.Read` grant already reads the user's own files.
+    - So `POST /api/app/connected-apps/browse` lists or searches the user's OWN OneDrive through Graph on the existing grant, at the customer's click. It returns folders and readable files only, metadata only, with no-store caching.
+    - The Microsoft token never reaches the browser, and `/picker-token` is now Google-only.
+    - Picks go through the same signed-handle `/selections`. The model still cannot list or search a drive.
+- **Tests:** 35 new (OneDrive listing, OData quote escaping, provider refusals, chooser flow; plus handle signing, isolation, expiry, domain separation, provider mapping and errors, export vs download, size cap, NUL strip, fence integrity, coach/client isolation, dead connection, file-id swap, route gates, token response shape).
 
 ## 4. Next slices
 
-- **Slice A, part 2 (built, see 3b):** remaining work is the OneDrive picker v8 hand-off in the browser.
+- **Slice A, part 2:** built (see 3b), for Google Drive and OneDrive.
   - It reads only the selected file and extracts bounded text with `extract.ts`.
   - The output carries `provider`, `connected_account`, `source_id`, `source_url` and `retrieved_at` provenance, separate from federal-record provenance.
   - Prompt-injection guard on file content.

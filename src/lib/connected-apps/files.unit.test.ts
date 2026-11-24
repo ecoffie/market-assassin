@@ -90,3 +90,32 @@ describe('download', () => {
     expect((await readFileText('microsoft', 't', meta({ name: 'notes.txt', mime: 'text/plain' }), f)).text).toBe('hello world');
   });
 });
+
+describe('OneDrive chooser listing (Graph, Files.Read)', () => {
+  it('root, folder and name search URLs; a quote in the search cannot break out of the OData string', async () => {
+    const { driveListUrl } = await import('./files');
+    expect(driveListUrl({})).toMatch(/^https:\/\/graph\.microsoft\.com\/v1\.0\/me\/drive\/root\/children\?/);
+    expect(driveListUrl({ folderId: 'F1' })).toContain('/me/drive/items/F1/children?');
+    const u = driveListUrl({ query: "o'brien cap" });
+    expect(u).toContain("/me/drive/root/search(q='o''brien%20cap')");
+    expect(driveListUrl({ query: 'x'.repeat(500) })).toContain(`q='${'x'.repeat(100)}'`);
+  });
+  it('lists only folders and files Mindy can read, folders first, never another drive', async () => {
+    const { listOneDrive } = await import('./files');
+    let url = '';
+    const f = (async (u: string) => { url = u; return json({ value: [
+      { id: 'a', name: 'Zeta.pdf', size: 10, file: { mimeType: 'application/pdf' } },
+      { id: 'b', name: 'Proposals', folder: { childCount: 3 } },
+      { id: 'c', name: 'logo.png', size: 10, file: { mimeType: 'image/png' } },
+      { id: 'd', name: 'Huge.pdf', size: MAX_FILE_BYTES + 1, file: { mimeType: 'application/pdf' } },
+      { id: 'e', name: 'Alpha.docx', size: 10, file: { mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' } },
+    ] }); }) as typeof fetch;
+    const items = await listOneDrive('t', {}, f);
+    expect(items.map((i) => [i.id, i.kind])).toEqual([['b', 'folder'], ['e', 'file'], ['a', 'file']]);
+    expect(url).toContain('/me/drive/');
+  });
+  it('a dead token is no_access, not an empty folder', async () => {
+    const { listOneDrive } = await import('./files');
+    await expect(listOneDrive('t', {}, (async () => json({}, 401)) as typeof fetch)).rejects.toThrow(/no_access/);
+  });
+});
