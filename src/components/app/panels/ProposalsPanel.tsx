@@ -69,6 +69,8 @@ const QUESTION_PROMPTS = [
 
 interface UploadedRfp {
   fileName: string;
+  /** pursuit_documents id for a document Mindy pulled from SAM.gov (opens via doc-download). */
+  docId?: string;
   fileSize: number;
   charCount: number;
   pageCount?: number;
@@ -1592,6 +1594,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
           .filter(d => d.extracted_text)
           .map(d => ({
             fileName: d.filename,
+            docId: typeof d.id === 'string' ? d.id : undefined,
             fileSize: d.size_bytes || 0,
             charCount: d.char_count || (d.extracted_text?.length ?? 0),
             pageCount: d.page_count,
@@ -1807,6 +1810,17 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
         title={activePursuit?.title || uploadedRfp?.fileName || proposalFlowName}
         subtitle={[activePursuit?.agency, noticeTypeLabel(activePursuit?.notice_type), due ? `Due ${due}` : ''].filter(Boolean).join(' · ') || undefined}
         documentNames={sourceDocuments.map(d => d.fileName)}
+        documents={sourceDocuments.map(d => ({ name: d.fileName, docId: d.docId }))}
+        samUrl={activePursuit?.notice_id ? `https://sam.gov/opp/${activePursuit.notice_id}/view` : null}
+        onOpenDoc={async (docId) => {
+          // Open the tab first (inside the click) so a popup blocker allows it, then point it at the file.
+          const w = window.open('', '_blank');
+          try {
+            const res = await authedFetch(`/api/app/proposal/doc-download?email=${encodeURIComponent(email || '')}&doc_id=${encodeURIComponent(docId)}`, email);
+            const d = await res.json().catch(() => null);
+            if (d?.url && w) w.location.href = d.url; else w?.close();
+          } catch { w?.close(); }
+        }}
         loadingDocs={autoLoadStatus === 'loading' || uploading}
         loadMessage={autoLoadStatus === 'no-docs' || autoLoadStatus === 'error' ? autoLoadMessage : (uploading ? 'Mindy is reading your file…' : autoLoadMessage)}
         sectionLabels={currentSectionTabs.map(t => t.label)}
