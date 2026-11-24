@@ -23,6 +23,7 @@
  * because a heal means the purchase path missed someone.
  */
 import { primaryItem } from '@/lib/billing/subscription-items';
+import { teamSeatPlanForPriceId } from '@/lib/billing/team-seat-plans';
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { applyCreditOnce } from '@/lib/mcp/credits';
@@ -83,10 +84,13 @@ async function activeSubscribers(): Promise<{ subs: Candidate[]; activeIds: Set<
       activeIds.add(s.id);
       // Pro + credit add-on subscriptions have two items: read the Pro/Team one.
       const amt = primaryItem(s)?.price?.unit_amount ?? 0;
+      // Team by seats: matched by price id (its amounts collide with credit plans), seats x 1,500.
+      const seat = s.items.data.map((i) => teamSeatPlanForPriceId(i.price?.id)).find(Boolean) ?? null;
       const cust = s.customer;
       const email = (cust && typeof cust !== 'string' && !cust.deleted ? cust.email : null)?.toLowerCase();
       if (!email) continue;
-      if (PRO_AMOUNTS.has(amt)) subs.push({ email, amount: PRO_MONTHLY_CREDITS, group: 'pro-sub', subscriptionId: s.id });
+      if (seat) subs.push({ email, amount: seat.plan.credits, group: 'team-sub', subscriptionId: s.id });
+      else if (PRO_AMOUNTS.has(amt)) subs.push({ email, amount: PRO_MONTHLY_CREDITS, group: 'pro-sub', subscriptionId: s.id });
       // A Team subscription whose organization is provisioned for pooling replenishes
       // its POOL instead (routeSubscriptionGrants below). Until it is provisioned, the
       // allowance still lands on the billing contact's personal balance, as before.

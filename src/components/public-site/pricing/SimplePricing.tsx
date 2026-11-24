@@ -26,8 +26,9 @@ import {
   TEAM_ANNUAL_PER_MONTH, TEAM_ANNUAL_USD, TEAM_MONTHLY_USD, TEAM_TRIAL_ANNUAL, TEAM_TRIAL_MONTHLY, pctOff,
 } from './app-plan-links';
 import { PRO_CREDIT_ADDONS, PENDING_ADDON_KEY, addonCheckoutHref, addonPrice, proWithAddonCheckoutHref, type ProCreditAddon } from '@/lib/billing/pro-credit-addons';
+import { TEAM_SEAT_COUNTS, TEAM_SEAT_PRICING_ON, teamSeatPlan, type TeamSeatCount } from '@/lib/billing/team-seat-plans';
 
-type Feature = [title: string, detail: string];
+type Feature = [title: string, detail: React.ReactNode];
 type Plan = {
   name: string; tag: string; featured?: boolean;
   price: string | null; was?: string; per: string; trial: boolean;
@@ -150,7 +151,7 @@ function ProAddonPicker({ annual, addon, onPick, proCredits }: {
 }
 
 type Cell = boolean | string;
-type CompareGroup = [group: string, rows: Array<[label: string, pro: Cell, team: Cell, ent: Cell]>];
+type CompareGroup = [group: string, rows: Array<[label: React.ReactNode, pro: Cell, team: Cell, ent: Cell]>];
 
 export default function SimplePricing({ proCredits, teamCredits, forecastsLabel, faqs }: {
   proCredits: number; teamCredits: number; forecastsLabel: string; faqs: { q: string; a: string }[];
@@ -158,6 +159,9 @@ export default function SimplePricing({ proCredits, teamCredits, forecastsLabel,
   const [annual, setAnnual] = useState(false);
   // Extra monthly credits picked on the Pro card (null = Pro's own credits only).
   const [addon, setAddon] = useState<ProCreditAddon | null>(null);
+  // Team by seats (held behind NEXT_PUBLIC_TEAM_SEAT_PRICING until Eric approves).
+  const [teamSeats, setTeamSeats] = useState<TeamSeatCount>(2);
+  const seatPlan = TEAM_SEAT_PRICING_ON ? teamSeatPlan(teamSeats) : null;
   // Same token every Mindy page sends; /api/app/me verifies it server-side. Any failure leaves the
   // public page as is (never guesses a plan).
   const [me, setMe] = useState<MePlan | null>(null);
@@ -200,8 +204,8 @@ export default function SimplePricing({ proCredits, teamCredits, forecastsLabel,
       cta: 'Start free trial', href: addon ? proWithAddonCheckoutHref(addon, annual) : (annual ? PRO_TRIAL_ANNUAL : PRO_TRIAL_MONTHLY),
       lead: 'Find and win your own contracts.', base: 'Everything you need to start',
       features: [
-        ['Opportunities matched to you', 'Daily alerts and briefings for your NAICS, keywords and agencies.'],
-        ['Recompetes, 12 months out', 'Contracts coming back to market, with the incumbent.'],
+        ['Opportunities matched to you', <>Daily alerts and briefings for the industries, keywords and agencies you choose (industries are set by <Link href="/glossary/naics-code">NAICS codes</Link>).</>],
+        ['Contracts coming back, 12 months out', <>Contracts the government will bid again (<Link href="/glossary/recompete">recompetes</Link>), with the company that holds the contract now.</>],
         ['Market research', 'Who buys, who wins and what they spend.'],
         ['Mindy in your AI', 'Use Mindy inside Claude, ChatGPT or Cursor.'],
       ],
@@ -210,14 +214,14 @@ export default function SimplePricing({ proCredits, teamCredits, forecastsLabel,
         : ['Monthly usage included', `${fmt(proCredits)} credits / month`],
     },
     {
-      name: 'Team', tag: 'Built for BD teams working several markets at once.',
+      name: 'Team', tag: 'Built for business development teams working several markets at once.',
       price: annual ? `$${fmt(TEAM_ANNUAL_PER_MONTH)}` : `$${TEAM_MONTHLY_USD}`,
       was: annual ? `$${TEAM_MONTHLY_USD}` : undefined,
       per: annual ? '/ mo, billed annually' : '/ mo, billed monthly', trial: true,
       cta: 'Start free trial', href: annual ? TEAM_TRIAL_ANNUAL : TEAM_TRIAL_MONTHLY,
       lead: 'Win more as a team.', base: 'All Pro features, plus',
       features: [
-        ['Up to 5 users', 'One plan for your whole BD team.'],
+        ['Up to 5 users', 'One plan for your whole team.'],
         ['Shared pipeline', 'Everyone sees the same pursuits and deadlines.'],
         ['Team dashboard and roles', 'See who is working what.'],
         ['Onboarding call', 'We set up your markets with you.'],
@@ -226,7 +230,7 @@ export default function SimplePricing({ proCredits, teamCredits, forecastsLabel,
       footer: <>10 or more users? <a href={SALES_URL}>Talk to us for a volume quote</a></>,
     },
     {
-      name: 'Enterprise', tag: 'For primes, APEX Accelerators and agencies rolling Mindy out at scale.',
+      name: 'Enterprise', tag: 'For large prime contractors, APEX Accelerators (government contracting help centers) and agencies rolling Mindy out at scale.',
       price: null, per: 'Annual contract, priced for your organization', trial: false,
       cta: 'Speak to sales', href: SALES_URL, outline: true,
       lead: 'Fit Mindy to your organization.', base: 'All Team features, plus',
@@ -239,7 +243,22 @@ export default function SimplePricing({ proCredits, teamCredits, forecastsLabel,
     },
   ];
 
-  const plans = applyCurrentPlan(basePlans, me);
+  // Team by seats: the chosen size sets the Team card's price, button, users line and credits.
+  const withSeats = (p: Plan): Plan => (p.name !== 'Team' || !seatPlan ? p : {
+    ...p,
+    price: `$${fmt(annual ? seatPlan.annualPerMonthUsd : seatPlan.monthlyUsd)}`,
+    was: undefined,
+    per: annual ? '/ mo, billed annually. Add seats any time.' : '/ mo, billed monthly. Add seats any time.',
+    cta: `Start with ${seatPlan.seats} seats`,
+    href: `/api/checkout/team-seats?seats=${seatPlan.seats}&billing=${annual ? 'annual' : 'monthly'}`,
+    features: [
+      [`${seatPlan.seats} users included`, seatPlan.seats < 5 ? 'Add up to 5 as the team grows, at any time.' : 'Room for the whole team on one plan.'],
+      ['Everyone gets their own alerts', 'Saved searches and a daily briefing per person, not one shared inbox.'],
+      ...p.features.slice(1),
+    ],
+    usage: ['Monthly usage included', `${fmt(seatPlan.credits)} credits / month, shared by the team`],
+  });
+  const plans = applyCurrentPlan(basePlans.map(withSeats), me);
   const byName = Object.fromEntries(plans.map((p) => [p.name, p]));
 
   // Full breakdown (Fyxer's "A plan to suit every need"). Same claims as the cards above and the
@@ -248,13 +267,13 @@ export default function SimplePricing({ proCredits, teamCredits, forecastsLabel,
     ['Find opportunities', [
       ['Daily opportunity alerts', true, true, true],
       ['AI-matched daily briefings', true, true, true],
-      ['Unlimited NAICS codes and keywords', true, true, true],
+      [<>Unlimited industries (<Link href="/glossary/naics-code">NAICS codes</Link>) and keywords</>, true, true, true],
       ['Target agency filtering', true, true, true],
       ['Weekly market deep dives', true, true, true],
     ]],
     ['Competitive intelligence', [
-      ['Recompete alerts, 12 months out', true, true, true],
-      ['Incumbent visibility', true, true, true],
+      [<>Alerts on contracts coming back to bid (<Link href="/glossary/recompete">recompetes</Link>), 12 months out</>, true, true, true],
+      ['The company that holds the contract now', true, true, true],
       ['Competitor tracking', true, true, true],
       ['Agency spending analysis', true, true, true],
       [`${forecastsLabel} agency forecasts`, true, true, true],
@@ -308,6 +327,13 @@ export default function SimplePricing({ proCredits, teamCredits, forecastsLabel,
           <article key={p.name} className={`card ${p.featured ? 'featured' : ''} ${p.current ? 'current' : ''}`}>
             <h2>{p.name}{p.current ? <span className="mine">Your plan</span> : p.featured && <span className="pop">Most popular</span>}</h2>
             <p className="tag">{p.tag}</p>
+            {p.name === 'Team' && seatPlan && !p.current && (
+              <div className="seat-pick" role="group" aria-label="Team size">
+                {TEAM_SEAT_COUNTS.map((n) => (
+                  <button key={n} type="button" aria-pressed={teamSeats === n} className={teamSeats === n ? 'on' : ''} onClick={() => setTeamSeats(n)}>{n} users</button>
+                ))}
+              </div>
+            )}
             {p.price ? (
               <div className="price"><span className="now">{p.price}</span>{p.was && <span className="was">{p.was}</span>}</div>
             ) : (
@@ -372,8 +398,8 @@ export default function SimplePricing({ proCredits, teamCredits, forecastsLabel,
             {compare.map(([group, rows]) => (
               <tbody key={group}>
                 <tr className="grp"><th scope="rowgroup" colSpan={4}>{group}</th></tr>
-                {rows.map(([label, a, b, c]) => (
-                  <tr key={label}><th scope="row">{label}</th><td>{cell(a)}</td><td className="hl">{cell(b)}</td><td>{cell(c)}</td></tr>
+                {rows.map(([label, a, b, c], i) => (
+                  <tr key={i}><th scope="row">{label}</th><td>{cell(a)}</td><td className="hl">{cell(b)}</td><td>{cell(c)}</td></tr>
                 ))}
               </tbody>
             ))}
@@ -454,6 +480,7 @@ const CSS = `
 .sp .card li .tick{color:var(--mp-ok);font-weight:700}
 .sp .card li b{display:block;font-weight:600}
 .sp .card li small{display:block;color:var(--mp-muted);font-size:13px}
+.sp .card li small a,.sp .cmp th[scope=row] a{color:inherit;text-decoration:underline;text-underline-offset:2px}
 .sp .usage{margin-top:auto;border:1px solid var(--mp-line);border-radius:12px;padding:14px 16px;background:var(--mp-wash);display:grid;gap:4px}
 .sp .usage .ul{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--mp-muted)}
 .sp .usage b{font-size:14px;font-weight:600}
@@ -470,6 +497,10 @@ const CSS = `
 .sp .addon-pick .x{color:var(--mp-muted);font-weight:500}
 .sp .addon-note{margin:-6px 0 18px;font-size:13px;line-height:1.45;color:var(--mp-muted)}
 .sp .cta.addon-cta{margin-top:12px}
+.sp .seat-pick{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;padding:4px;margin:0 0 14px;border-radius:12px;background:var(--mp-wash)}
+.sp .seat-pick button{min-height:44px;border:0;border-radius:9px;background:transparent;font:inherit;font-size:14px;font-weight:600;color:var(--mp-muted);cursor:pointer}
+.sp .seat-pick button.on{background:var(--mp-surface);color:var(--mp-ink);box-shadow:0 1px 3px rgba(18,16,14,.12)}
+.sp .seat-pick button:focus-visible{outline:3px solid var(--mp-navy);outline-offset:2px}
 .sp .cmp{margin:80px 0 0}
 .sp .cmp h2{font-family:var(--mp-font-serif);font-size:clamp(28px,3.4vw,40px);font-weight:700;text-align:center;margin:0 0 28px}
 .sp .cmp-scroll{overflow-x:auto;border:1px solid var(--mp-line);border-radius:18px;background:var(--mp-surface)}

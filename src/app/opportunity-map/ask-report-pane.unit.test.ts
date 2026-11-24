@@ -1,6 +1,6 @@
 /**
  * Map Ask Mindy — in-chat REPORT PANE (the REAL drawer script, ASK_MINDY_JS, in jsdom).
- * A create_document turn ends with a `deliverables` event: the answer gets an "Open report" card (no
+ * A create_document turn ends with a `deliverables` event: the answer gets an "Open document" card (no
  * format chips), and the report opens in a pane BESIDE the chat with an Export menu, read from the
  * owner-scoped preview route inside a script-less sandboxed iframe. A revision replaces what the pane shows.
  * The open report survives a reload (and brings the signed ledger back so "revise it" resolves), is
@@ -81,6 +81,7 @@ describe('Map Ask Mindy report pane', () => {
     const card = t.doc.querySelector('[data-testid="amk-report-card"]')!;
     expect(card).toBeTruthy();
     expect(card.textContent).toContain('Koamana-Build-report');
+    expect(card.querySelector('.amk-repcard-open')?.textContent).toBe('Open document'); // a saved Vault document (Design & Output label)
     expect(card.textContent).toContain('Version 1');
     expect(card.querySelector('.amk-repcard-exp')).toBeNull();
     expect(card.querySelector('[data-fmt="pdf"]')).toBeNull();
@@ -92,7 +93,7 @@ describe('Map Ask Mindy report pane', () => {
     expect(prev.url).toContain(`id=${DOCX}`); // the Word row is the primary id
     expect(prev.headers['x-mi-auth-token']).toBeTruthy();
     const frame = pane.querySelector('iframe')!;
-    expect(frame.getAttribute('sandbox')).toBe(''); // no scripts, no same-origin
+    expect(frame.getAttribute('sandbox')).toBe('allow-same-origin'); // no scripts, forms, popups or navigation; same-origin only so the pane can size it
     expect(frame.getAttribute('srcdoc')).toContain('REPORT BODY');
     expect(pane.querySelector('.amk-rep-t')!.textContent).toBe('Koamana Build report');
     expect(pane.querySelector('.amk-rep-v')!.textContent).toContain('Version 1');
@@ -107,7 +108,7 @@ describe('Map Ask Mindy report pane', () => {
     expect(t.doc.querySelector('.amk-exp-panel')?.hidden).toBe(false);
     expect([...t.doc.querySelectorAll('.amk-exp-panel button')].map((b) => b.textContent)).toEqual(['PDF', 'Word']);
     const before = t.calls.length;
-    (t.doc.querySelector('.amk-exp-panel button[data-fmt="pdf"]') as HTMLButtonElement).click();
+    (t.doc.querySelector('.amk-exp-panel [data-fmt="pdf"]') as HTMLButtonElement).click();
     await t.settle();
     const dl = t.calls.slice(before).find((c) => c.url.startsWith('/api/app/vault/documents/download'))!;
     expect(dl.url).toContain(`id=${PDF}`);
@@ -155,6 +156,8 @@ describe('Map Ask Mindy report pane', () => {
     expect(JSON.parse(t.store.mindy_map_report).open).toBe(false);
     const btn = t.doc.querySelector('[data-testid="amk-report-btn"]') as HTMLButtonElement;
     expect(btn).toBeTruthy();
+    expect(btn.textContent).toBe('Saved document'); // the header button opens the saved Vault document, not the market report
+    expect(btn.title).toBe('Open your saved document');
     btn.click();
     await t.settle();
     expect(pane.classList.contains('show')).toBe(true);

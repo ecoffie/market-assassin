@@ -268,6 +268,9 @@ export const ACCOUNT_MENU_JS = '<script>'
   // One-time Nov 28 event pop-up on the server-rendered pages (React pages load it from the root
   // layout). The script guards itself (window.__lcbPop + localStorage), so loading it twice is harmless.
   + '(function(){try{if(window.__lcbPopLoad)return;window.__lcbPopLoad=1;var s=document.createElement("script");s.src="/event-popup.js";s.defer=true;document.head.appendChild(s);}catch(e){}})();'
+  // "Get help" button on the server-rendered pages (React pages load it from the root layout).
+  // The script guards itself (window.__mindyHelp), so loading it twice is harmless.
+  + '(function(){try{if(window.__mindyHelpLoad)return;window.__mindyHelpLoad=1;var s=document.createElement("script");s.src="/help-widget.js";s.defer=true;document.head.appendChild(s);}catch(e){}})();'
   + '</script>'
   // Deploy identity so `verify:maps-account --live --expect-sha` can tell THIS
   // release from whichever production build is currently serving. Hex-only; the

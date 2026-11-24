@@ -384,13 +384,22 @@ describe('fmp-writeup-grounding', () => {
       }
     });
 
+    it('a person-shaped place name is recognized from the evidence ("<Name> Parkway"), never from a list of places', () => {
+      const ev = accumulateFmpEvidence([{
+        tool: 'get_agency_forecasts',
+        content: JSON.stringify({ forecasts: [{ id: 'fc-1', title: 'Rehabilitation', description: 'Rehabilitate the retaining wall on Mabel Ortiz Parkway.', poc: 'Mabel Ortiz', contact: 'Noel Rangel' }] }),
+      }]);
+      expect(ev.contactNames).not.toContain('Mabel Ortiz');
+      expect(ev.contactNames).toContain('Noel Rangel');
+    });
+
     it('rejects procurement / set-aside / placeholder phrases; still accepts real people', () => {
       for (const junk of [
         'No Range Specified', 'Sole Source', 'Sources Sought', 'Combined Synopsis', 'Set-Aside Small',
         'Set Aside Total', 'Full Open', 'Small Business', 'Woman Owned', 'Veteran Owned', 'Hubzone Set',
         'Not Applicable', 'Unknown Contact', 'None Listed', 'Limited Competition', 'Unrestricted Award',
         'Contract Ceiling', 'Obligations Amount', 'Request Rfq', 'No Contact', 'Notice Tbd',
-        'Firm Fixed Price', 'Weatherproofing Units', 'Asphalt Overlay', 'Clara Barton',
+        'Firm Fixed Price', 'Weatherproofing Units', 'Asphalt Overlay',
       ]) expect(looksLikePersonContactName(junk), junk).toBe(false);
       for (const person of ['Helson Roman', 'David Bogner', 'Terry Agena', 'Noel Rangel']) {
         expect(looksLikePersonContactName(person), person).toBe(true);
@@ -702,7 +711,7 @@ describe('fmp-writeup-grounding', () => {
         );
       });
 
-      it('caps open RFQs so vehicle/SS fill the six-pathway slots (Claude frame)', () => {
+      it('caps open RFQs so vehicle/SS fill the six-pathway slots (pathways before open bids)', () => {
         const open = (n: number, sol: string) => ({
           notice_id: `open${n}`.padEnd(32, '0'),
           solicitation_number: sol,
@@ -756,16 +765,18 @@ describe('fmp-writeup-grounding', () => {
           },
         ]);
         const ids = ev.pathways?.map((p) => p.noticeId) ?? [];
-        expect(ids[0]).toBe('693C73-27-R-000006');
-        expect(ids).toEqual(expect.arrayContaining(['FA706027RXXX2', 'W912DR27H1CWY']));
-        expect(ev.pathways?.some((p) => /JBAB and Andrews/i.test(p.title))).toBe(true);
+        // A vehicle leads (no project-specific boost decides which one); every vehicle / sources sought is kept.
+        expect(['693C73-27-R-000006', 'FA706027RXXX2']).toContain(ids[0]);
+        expect(ids).toEqual(expect.arrayContaining(['693C73-27-R-000006', 'FA706027RXXX2', 'W912DR27H1CWY']));
+        // The bare MACC title is named from its OWN notice description, not from code.
+        expect(ev.pathways?.find((p) => p.noticeId === 'FA706027RXXX2')?.title).toMatch(/^Multiple Award Construction Contract \(MACC\): Market research at Joint Base/);
         const openCount = (ev.pathways ?? []).filter((p) => /HUMBOLT/i.test(p.title)).length;
         expect(openCount).toBeLessThanOrEqual(1);
         // Special Notice twin of Capitol must not consume a second slot.
         expect((ev.pathways ?? []).filter((p) => /Capitol Perimeter/i.test(p.title)).length).toBe(1);
       });
 
-      it('renames bare FA706027RXXX2 MACC to JBAB even when description is omitted (search_sam shape)', () => {
+      it('a bare vehicle title with no description stays as the notice says (no name is invented)', () => {
         const bare = {
           notice_id: 'jbab0001jbab0001jbab0001jbab0001',
           solicitation_number: 'FA706027RXXX2',
@@ -780,10 +791,10 @@ describe('fmp-writeup-grounding', () => {
           { tool: 'get_contractor_award_history', content: HISTORY },
           { tool: 'find_opportunities', content: findOpen([bare, civilA, civilB]) },
         ]);
-        expect(ev.pathways?.find((p) => p.noticeId === 'FA706027RXXX2')?.title).toMatch(/JBAB and Andrews/i);
+        expect(ev.pathways?.find((p) => p.noticeId === 'FA706027RXXX2')?.title).toBe('Multiple Award Construction Contract (MACC)');
       });
 
-      it('parses get_agency_forecasts rows into forecast pathways (GWMP / Clara Barton class)', () => {
+      it('parses get_agency_forecasts rows into forecast pathways, keeping the publisher\'s own title', () => {
         const ev = accumulateFmpEvidence([
           { tool: 'get_contractor_award_history', content: HISTORY },
           {
@@ -808,7 +819,8 @@ describe('fmp-writeup-grounding', () => {
           },
         ]);
         const fc = ev.pathways?.find((p) => p.kind === 'forecast');
-        expect(fc?.title).toMatch(/Clara Barton Parkway/i);
+        // No title rewrite from code: the forecast keeps the publisher's title.
+        expect(fc?.title).toBe('MD NP GWMP 6(2)');
         expect(fc?.when).toMatch(/2027-09-01/);
       });
 

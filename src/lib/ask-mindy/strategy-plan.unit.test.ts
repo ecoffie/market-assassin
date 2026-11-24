@@ -136,9 +136,13 @@ describe('company context: the RBA civil defaults never reach another company', 
     expect(buildFmpPathwayFindArgs('Write a federal strategy plan for us', { company, plannerQuery: 'custodial services federal buildings' })).toMatchObject({ query: 'custodial services federal buildings' });
     expect(JSON.stringify(buildFmpPathwayFindArgs('plan for us', { company }))).not.toMatch(/highway|bridge|heavy civil/);
   });
-  it('without company context the benchmark FMP behavior is unchanged', () => {
-    expect(buildFmpPathwayFindArgs('Build a federal market profile for RBA')).toMatchObject({ query: 'highway bridge heavy civil' });
-    expect(buildFmpNextMarketReportArgs('Build a federal market profile for RBA', 0)).toMatchObject({ naics: '237310' });
+  it('without company context there is no default trade, code or region either', () => {
+    const find = buildFmpPathwayFindArgs('Build a federal market profile for RBA');
+    expect(find.query).toBe('Build a federal market profile for RBA');
+    expect(JSON.stringify(find)).not.toMatch(/highway|bridge|heavy civil/);
+    const report = buildFmpNextMarketReportArgs('Build a federal market profile for RBA', 0);
+    expect(report.naics).toBeUndefined();
+    expect(JSON.stringify(report)).not.toMatch(/237310/);
   });
   it('market report: award NAICS first, then the company code, never 237310; states rotate over the company states', () => {
     expect(buildFmpNextMarketReportArgs('plan for us', 0, { company })).toEqual({ state: 'GA', naics: '561720', client_name: 'Ridgeline Test Facilities LLC' });
@@ -148,7 +152,7 @@ describe('company context: the RBA civil defaults never reach another company', 
   it('phase state: one market report per company state (max 3), one national report with none', () => {
     expect(initialFmpPhaseState('plan for us', { companyStates: ['GA', 'SC'] }).marketReportTarget).toBe(2);
     expect(initialFmpPhaseState('plan for us', { companyStates: [] }).marketReportTarget).toBe(1);
-    expect(initialFmpPhaseState('Build a federal market profile for RBA').marketReportTarget).toBe(3);
+    expect(initialFmpPhaseState('Build a federal market profile for RBA').marketReportTarget).toBe(1);
   });
 });
 
