@@ -37,6 +37,7 @@ import { hasProAccess } from '@/lib/access/resolve-access';
 // podcast retrieval (retrieveRagContext / retrievePodcastEpisodes) is gone entirely.
 import { loadBidderProfileResult, formatProfileForPrompt } from '@/lib/proposal/loaders';
 import { contractIdentityNote, contractEvidence, contractEvidenceNote, priorAwardIds } from '@/lib/chat/contract-evidence';
+import { ledgerForTrace } from '@/lib/chat/ledger-persistence';
 import { askMindyStrategyPlanEnabledFor, isStrategyPlanRequest, STRATEGY_PLAN_CHAT_CONTRACT, strategyPlanCheck, strategyProfileNote, strategyCompanyContext, strategyFitNote, type StrategyProfileInput } from '@/lib/ask-mindy/strategy-plan';
 import { isUserOverBudget, recordLlmUsage } from '@/lib/llm/usage-cost';
 import { makeTier0Tools, TIER0_TOOL_DEFS, TIER0_TOOL_NAMES } from '@/lib/chat/tier0-tools';
@@ -104,6 +105,7 @@ import {
 } from '@/lib/chat/fmp-writeup-validate';
 import {
   accumulateFmpEvidence,
+  fmpFirmDoesConstruction,
   buildFmpCreateDocumentAnswerNote,
   buildFmpWriteupGroundingNote,
   FMP_DOC_TOOL_ROUND_MAX_TOKENS,
@@ -117,6 +119,7 @@ import { ASK_MINDY_RULES_LAYER, askMindyRulesEnabledFor, askMindyRulesPromptBloc
 import { askMindyRecipesEnabledFor } from '@/lib/ask-mindy/flags';
 import { loadCompanyProfile } from '@/lib/ask-mindy/company-profile';
 import { fitRankingNote, rankFindResult } from '@/lib/ask-mindy/compose';
+import { provenanceRecords } from '@/lib/chat/doc-provenance';
 import { requestedDocSections, requestedSectionsPlannerNote, routeSectionedReport, sectionedReportPlannerNote, packagedReportGapNote } from '@/lib/chat/requested-doc-sections';
 /** How long the answer waits for the company profile before skipping the ranking note (value first). */
 const FIT_PROFILE_WAIT_MS = 1500;
@@ -994,6 +997,8 @@ export async function POST(request: NextRequest) {
           };
           /** Packaged generate_market_report deliverable (hosted URL + inline HTML for the Ask pane). */
           market_report?: { report_id: string | null; url: string | null; title: string; html: string };
+          /** The signed source ledger this turn sent the client (ASK_MINDY_RECIPES): restored when History reopens. */
+          ledger?: SourceLedger;
         } = { planner: null, planner_attempts: [], tools_offered: 0, tool_executions: [], answer: null, answer_attempts: [], notices: [],
               ...(selectedCtx ? { context: { kind: 'opportunity' as const, notice_id: selectedCtx.noticeId } } : {}) };
         if (selectedNoticeMiss) turnTrace.notices.push(`selected_notice:${selectedNoticeMiss}`);
@@ -1082,6 +1087,8 @@ export async function POST(request: NextRequest) {
               request,
               chatSessionId: body.sessionId === sessionId ? turnSessionId : null,
               ...(requestedSections.length ? { requestedSections } : {}),
+              // Read dates / links / record ids for DocSources, from this turn's tool results and earlier signed ledgers.
+              provenance: () => provenanceRecords(turnSources, priorLedgers.flatMap((l) => l.entries)),
               // FMP step-8 validator: refuse incomplete / banned profiles before Vault save.
               ...(federalMarketProfileAsk && fmpWriteupCtx
                 ? {
@@ -1393,7 +1400,7 @@ export async function POST(request: NextRequest) {
                   splitViewPreamble(message).rest || message,
                 );
                 for (const c of reportArgs.changes) turnTrace.notices.push(`market_report_args_enforced:${c}`);
-                // Federal Market Profile identity gate: legal name / UEI — never trade alias alone (VRBA trap).
+                // Federal Market Profile identity gate: legal name / UEI — never trade alias alone (similar-name trap).
                 const identityArgs = enforceFederalMarketProfileIdentityArgs(
                   String(tc.function?.name || ''),
                   reportArgs.args,
@@ -1633,23 +1640,19 @@ export async function POST(request: NextRequest) {
                     tool: String(tc.function?.name || ''),
                     args: String(tc.function?.arguments ?? ''),
                   }));
-                // The defense construction-oversight (PAE) section is for construction firms (the RBA benchmark). On a
-                // strategy turn it applies only when the company's own work is construction (award or profile NAICS 23x).
-                const strategyDefenseSectionApplies = (evidence: FmpWriteupEvidence): boolean => {
-                  if (!strategyPlanAsk) return true;
-                  const awardNaics = (evidence as { dominantNaics?: string | null }).dominantNaics ?? '';
-                  return String(awardNaics).startsWith('23') || String(strategyCompany?.naics ?? '').startsWith('23');
-                };
+                // The defense construction-oversight (PAE) section is for construction firms only, on every FMP and
+                // strategy turn: the firm's award NAICS, else its saved profile NAICS, else the customer's words. An Army
+                // buyer in a janitorial firm's evidence never adds it.
+                const defenseSectionApplies = (evidence: FmpWriteupEvidence, customerFmp: string): boolean =>
+                  fmpFirmDoesConstruction(evidence, customerFmp, strategyCompany?.naics ?? null);
                 const ensureFmpEvidence = (customerFmp: string): FmpWriteupEvidence => {
                   fmpEvidence = accumulateFmpEvidence(fmpToolContents, customerFmp);
                   if (fmpWriteupCtx) {
                     fmpWriteupCtx.requiredSnippets = requiredSnippetsForWriteup(fmpEvidence);
-                    // Name-only asks omit "defense"/"PAE"; flip on once pathway buyers show DoD.
-                    if (!fmpWriteupCtx.defenseBuyersAppear
-                      && strategyDefenseSectionApplies(fmpEvidence)
-                      && fmpDefenseBuyersAppearFromEvidence(fmpEvidence)) {
-                      fmpWriteupCtx.defenseBuyersAppear = true;
-                    }
+                    // Required only for a construction firm whose ask or pathway buyers show DoD (name-only asks omit
+                    // "defense"/"PAE"). Recomputed from the evidence, so a non-construction firm is never held to it.
+                    fmpWriteupCtx.defenseBuyersAppear = defenseSectionApplies(fmpEvidence, customerFmp)
+                      && (fmpDefenseBuyersAppear(customerFmp) || fmpDefenseBuyersAppearFromEvidence(fmpEvidence));
                   }
                   return fmpEvidence;
                 };
@@ -1659,9 +1662,17 @@ export async function POST(request: NextRequest) {
                   const evidence = ensureFmpEvidence(customerFmp);
                   const resolved = resolveFmpCreateDocumentArgs(plannerArgs, evidence, {
                     customerText: customerFmp,
-                    defenseBuyersAppear: !!(fmpWriteupCtx?.defenseBuyersAppear)
-                      || fmpDefenseBuyersAppear(customerFmp)
-                      || (strategyDefenseSectionApplies(evidence) && fmpDefenseBuyersAppearFromEvidence(evidence)),
+                    // Strategy plan: the fallback document is THIS company's plan, built from its own profile.
+                    strategy: strategyPlanAsk
+                      ? {
+                        ...(strategyCompany?.legalName ? { companyName: strategyCompany.legalName } : {}),
+                        construction: defenseSectionApplies(evidence, customerFmp),
+                        is8a: !!(strategyProfile?.profile?.certifications ?? []).some((c) => /8\s*\(\s*a\s*\)/i.test(c.name)),
+                        workTerms: strategyProfile?.profile?.keywords?.slice(0, 8) ?? [],
+                      }
+                      : null,
+                    defenseBuyersAppear: defenseSectionApplies(evidence, customerFmp)
+                      && (fmpDefenseBuyersAppear(customerFmp) || fmpDefenseBuyersAppearFromEvidence(evidence)),
                     requiredSnippets: fmpWriteupCtx?.requiredSnippets,
                   });
                   turnTrace.notices.push(resolved.notice);
@@ -1828,7 +1839,7 @@ export async function POST(request: NextRequest) {
                       id: `call_fmp_force_${fmpRound}`,
                       function: { name: forcedToolName, arguments: forcedToolInjectArgs(forcedToolName) },
                     }];
-                    // Civil FMP: one FIND alone misses JBAB / Capitol / GWMP — add named follow-ups.
+                    // FMP: add follow-ups on the customer's own work keywords (buildFmpPathwaySupplementalCalls).
                     if (forcedToolName === 'find_opportunities') {
                       const supplements = buildFmpPathwaySupplementalCalls(customerFmpText, {
                         awardStates: awardStatesFromTools,
@@ -1972,8 +1983,8 @@ export async function POST(request: NextRequest) {
                       const s = supplements[si];
                       if (s.name === 'get_agency_forecasts') {
                         const kw = String(s.args.keyword || '').toLowerCase();
-                        // Do NOT skip all forecasts when one already ran — "GWMP parkway bridge"
-                        // as a single ILIKE misses "MD NP GWMP 6(2)"; Clara Barton must still fire.
+                        // Skip only a forecast keyword that already ran this turn, not every forecast: a multi-word
+                        // ILIKE can miss rows a different keyword finds.
                         if (kw && haveForecastKw.has(kw)) continue;
                       }
                       if (s.name === 'lookup_solicitation') {
@@ -2729,7 +2740,15 @@ export async function POST(request: NextRequest) {
           });
         }
         // P3 (A2): the compact source ledger, kept by the client and re-sent with history.
-        send({ type: 'sources', ledger: ledgerFromSources(turnSources) });
+        const turnLedger = ledgerFromSources(turnSources);
+        send({ type: 'sources', ledger: turnLedger });
+        // Persist the same signed ledger with the assistant row (ASK_MINDY_RECIPES, default off): a reopened
+        // conversation keeps its "#12" references and contract identity. Capped; never tool bodies.
+        if (askMindyRecipesEnabledFor(auth.email)) {
+          const stored = ledgerForTrace(turnLedger);
+          if ('ledger' in stored) turnTrace.ledger = stored.ledger;
+          else turnTrace.notices.push(stored.notice);
+        }
         send({ type: 'citations', sources: citedSources });
 
         // Card chat charge: ONCE PER QUESTION. A complete answer is saved with its sources and debited in ONE
