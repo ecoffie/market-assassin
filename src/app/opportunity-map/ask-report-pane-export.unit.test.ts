@@ -161,6 +161,7 @@ describe('Map report pane: a packaged market report exports a real PDF', () => {
     const t = boot({ chat: reportTurn() });
     await t.ask('market report');
     (t.doc.querySelector('.amk-rep-x') as HTMLButtonElement).click();
+    expect(t.doc.querySelector('.amk-repcard-open')?.textContent).toBe('Open market report');
     (t.doc.querySelector('.amk-repcard-open') as HTMLButtonElement).click();
     expect(pane(t.doc).classList.contains('show')).toBe(true);
     expect(pdfItem(t.doc)?.textContent).toBe('Download PDF');

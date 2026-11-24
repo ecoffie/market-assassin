@@ -1,6 +1,6 @@
 /**
  * Map Ask Mindy — in-chat REPORT PANE (the REAL drawer script, ASK_MINDY_JS, in jsdom).
- * A create_document turn ends with a `deliverables` event: the answer gets an "Open report" card (no
+ * A create_document turn ends with a `deliverables` event: the answer gets an "Open document" card (no
  * format chips), and the report opens in a pane BESIDE the chat with an Export menu, read from the
  * owner-scoped preview route inside a script-less sandboxed iframe. A revision replaces what the pane shows.
  * The open report survives a reload (and brings the signed ledger back so "revise it" resolves), is
@@ -81,6 +81,7 @@ describe('Map Ask Mindy report pane', () => {
     const card = t.doc.querySelector('[data-testid="amk-report-card"]')!;
     expect(card).toBeTruthy();
     expect(card.textContent).toContain('Koamana-Build-report');
+    expect(card.querySelector('.amk-repcard-open')?.textContent).toBe('Open document'); // a saved Vault document (Design & Output label)
     expect(card.textContent).toContain('Version 1');
     expect(card.querySelector('.amk-repcard-exp')).toBeNull();
     expect(card.querySelector('[data-fmt="pdf"]')).toBeNull();
@@ -155,6 +156,8 @@ describe('Map Ask Mindy report pane', () => {
     expect(JSON.parse(t.store.mindy_map_report).open).toBe(false);
     const btn = t.doc.querySelector('[data-testid="amk-report-btn"]') as HTMLButtonElement;
     expect(btn).toBeTruthy();
+    expect(btn.textContent).toBe('Saved document'); // the header button opens the saved Vault document, not the market report
+    expect(btn.title).toBe('Open your saved document');
     btn.click();
     await t.settle();
     expect(pane.classList.contains('show')).toBe(true);
