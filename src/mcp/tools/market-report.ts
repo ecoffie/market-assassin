@@ -446,7 +446,12 @@ export function marketOfficeCodes(contracts: Array<Record<string, unknown>>, max
   return [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, max).map(([c]) => c);
 }
 
-export async function generateMarketReport(input: MarketReportInput): Promise<MarketReportResult> {
+/**
+ * Evidence only: every section measured, statuses and publication state set, NOTHING rendered or saved.
+ * Ask Mindy reads this, decides what to recommend, and only then publishes (publishMarketReport).
+ * generateMarketReport = gather + publish, unchanged for MCP callers.
+ */
+export async function gatherMarketEvidence(input: MarketReportInput): Promise<MarketReportResult> {
   const keyword = (input.keyword || '').trim();
   const naicsIn = (input.naics || '').trim();
   // A saved search's FULL code set — parse the comma list into exact 6-digit codes and
@@ -1058,17 +1063,33 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
     },
   };
 
-  /**
-   * Client-ready deliverable (Mindy-branded, self-contained) — ONLY above the
-   * evidence bar.
-   *
-   * ⚠️ The gate withheld `deliverable.url` and persistence but still RENDERED and
-   * returned the branded HTML, and the HTML is the artifact a customer actually
-   * forwards to their client. Withholding the link while handing over the page
-   * reads as "we published it, here it is inline" — the refusal has to cover both
-   * or it covers neither. The caller keeps every structured section (the data is
-   * honest and it paid for it); what is withheld is the client-facing page.
-   */
+  return result;
+}
+
+/** The persisted request params, normalized exactly as gatherMarketEvidence normalizes them. */
+function reportParams(input: MarketReportInput) {
+  return {
+    keyword: (input.keyword || '').trim(),
+    naics: (input.naics || '').trim(),
+    agency: normalizeAgencyToToptier(input.agency || ''),
+    state: (input.state && normalizeStateCode(input.state)) || undefined,
+    set_aside: (input.set_aside || '').trim() || undefined,
+    client_name: input.client_name || null,
+  };
+}
+
+/**
+ * Publication: render the client-facing page and save the shareable copy, ONLY above the evidence bar.
+ *
+ * ⚠️ The gate withheld `deliverable.url` and persistence but still RENDERED and
+ * returned the branded HTML, and the HTML is the artifact a customer actually
+ * forwards to their client. Withholding the link while handing over the page
+ * reads as "we published it, here it is inline" — the refusal has to cover both
+ * or it covers neither. The caller keeps every structured section (the data is
+ * honest and it paid for it); what is withheld is the client-facing page.
+ */
+export async function publishMarketReport(result: MarketReportResult, input: MarketReportInput): Promise<MarketReportResult> {
+  const deliverableWorthy = result._meta.publication_state === 'publish';
   result.deliverable.html = deliverableWorthy ? renderMarketReportHtml(result) : '';
 
   // Persist → shareable link. Only for a verified caller, and only when we actually
@@ -1078,9 +1099,9 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
     const { deliverable: _omit, ...payload } = result; // store the payload; HTML re-renders on view
     const id = await saveMarketReport({
       ownerEmail: input.userEmail,
-      subject,
+      subject: result.subject,
       clientName: input.client_name?.trim() || null,
-      params: { keyword, naics: naicsIn, agency, state, set_aside: setAside, client_name: input.client_name || null },
+      params: reportParams(input),
       payload: payload as unknown as Record<string, unknown>,
     });
     if (id) {
@@ -1095,6 +1116,10 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
   }
 
   return result;
+}
+
+export async function generateMarketReport(input: MarketReportInput): Promise<MarketReportResult> {
+  return publishMarketReport(await gatherMarketEvidence(input), input);
 }
 
 function buildHint(r: MarketReportResult): NonNullable<MarketReportResult['_ai_hint']> {
