@@ -37,6 +37,7 @@ import { resolvePlayersGeoScope } from '@/lib/players/geography';
 import { combinePlayersStatuses, type PlayersStatus, type PlayersCoverage } from '@/lib/players/truth';
 import { recordPlayersResult } from '@/lib/players/telemetry';
 import { termOfArtNaicsCodes } from '@/lib/market/sector-expansions';
+import { companySetAsideBuckets } from '@/lib/opportunities/map-data';
 import { isUsableContactCard, placeholderNameFilter, displayContactName } from '@/lib/gov-contacts/contact-quality';
 import { governmentBuyersOnly } from '@/lib/gov-contacts/contact-kind';
 import { formatAgencyDisplay } from '@/lib/mindy/agency-display';
@@ -544,7 +545,12 @@ export async function GET(request: NextRequest) {
   const sort = (p.get('sort') || '').trim().toLowerCase();
   // Set-aside GROUP keys — same vocabulary as the opportunity map's SET_GROUPS
   // (SDVOSB/SB/8A/WOSB/HZ), so one param name means the same thing everywhere.
-  const setAside = (p.get('setAside') || '').trim().toUpperCase();
+  // New map keys translate here (SDVOSB_ONLY → SDVOSB); VOSB has no Players bucket → not applicable.
+  const saT = companySetAsideBuckets(p.get('setAside') || '');
+  const setAside = saT.buckets;
+  const setAsideNote = saT.unsupported.length
+    ? 'Veteran-owned (VOSB, VA only) and Very Small Business are not Players set-aside buckets — firms are not filtered by them.'
+    : null;
   // Companies — searchRecipients honors naics on its rollup path (state+naics scoped together,
   // cheap); as of 2026-08-03 it ALSO honors agency (an awards-table scan when set — see
   // searchRecipients doc comment). Buyers — agency ilike (department_ind_agency, 100% populated).
@@ -580,6 +586,13 @@ export async function GET(request: NextRequest) {
     });
   }
 
+  if (type === 'companies' && setAsideNote && !setAside) {
+    return NextResponse.json({
+      success: true, mode: 'contacts', type, pins: [], totalInView: 0, totalForFilters: 0, status: 'success_zero',
+      notApplicable: setAsideNote,
+    });
+  }
+
   const t0 = Date.now();
   try {
     if (type === 'buyers') {
@@ -597,7 +610,7 @@ export async function GET(request: NextRequest) {
       total: out.totalForFilters, shown: out.totalInView, status: out.status,
       source: out.coverage.source, sourceActionMax: out.coverage.sourceActionMax, ms: Date.now() - t0,
     });
-    return NextResponse.json({ success: true, mode: 'contacts', type, ...out });
+    return NextResponse.json({ success: true, mode: 'contacts', type, ...out, ...(setAsideNote ? { setAsideNote } : {}) });
   } catch (e) {
     console.error('[contacts-map] error:', (e as Error).message);
     // An error is UNAVAILABLE — the client must never render it as 0 Players or as sales copy.

@@ -85,7 +85,8 @@ export function setAsideLabel(set: string | null | undefined): string {
   switch (k) {
     case 'SDVOSB': return 'SDVOSB Set-Aside';
     case 'VETERAN SA':
-    case 'VOSB':    return 'Veteran-Owned Set-Aside';
+    case 'VOSB':    return 'Veteran-Owned Set-Aside (VA)'; // VSA/VSS: Department of Veterans Affairs only
+    case 'VSB':     return 'Very Small Business Set-Aside'; // USASpending: "VERY SMALL BUSINESS" — not veteran
     case 'SB':      return 'Small Business Set-Aside';
     case '8A':
     case '8(A)':    return '8(a) Set-Aside';

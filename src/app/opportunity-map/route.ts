@@ -9,7 +9,7 @@ import { SAFE_MARKDOWN_SCRIPT } from '@/lib/chat/safe-markdown';
 import { NextRequest, NextResponse } from 'next/server';
 import { LEAFLET_JS_TAG } from './leaflet-assets';
 import { PLAYERS_HEADER_TEXT_JS, PROVEN_PLAYERS_LABEL, PROVEN_PLAYERS_DESCRIPTION } from '@/lib/players/copy';
-import { getMapOpportunities, SET_GROUPS } from '@/lib/opportunities/map-data';
+import { getMapOpportunities, SET_GROUPS, LEGACY_SET_ALIASES } from '@/lib/opportunities/map-data';
 import { STATE_CENTROIDS } from '@/lib/geo/state-centroids';
 import { US_STATE_NAMES } from '@/lib/utils/us-states';
 import { INDUSTRY_PRESETS } from '@/lib/industry-presets';
@@ -60,7 +60,7 @@ const EMBED_CTA_JS = "<script>if(!window.openOppDrawer){window.openOppDrawer=fun
 
 // Our set-aside group key → the token the prototype's setKey()/cardHTML expect.
 const SET_TO_EVC: Record<string, string> = {
-  SDVOSB: 'SDVOSB', SB: 'SB', '8A': '8(a)', WOSB: 'WOSB', HZ: 'HUBZone', OTHER: 'Other', NONE: 'None',
+  SDVOSB: 'SDVOSB', VOSB: 'VOSB', VSB: 'VSB', SB: 'SB', '8A': '8(a)', WOSB: 'WOSB', HZ: 'HUBZone', OTHER: 'Other', NONE: 'None',
 };
 
 // Clean the raw department into a short, readable agency label for the card.
@@ -1686,9 +1686,12 @@ const DIBBS_FLAG_JS = '<script>window.__DIBBS_MAP_ENABLED=' + String(DIBBS_MAP_E
 const CARD_CHAT_FLAG_JS = '<script>window.__CARD_CHAT_ENABLED=' + String(isCardChatEnabled()) + ';</script>';
 // What a signed-in Save search can watch (F1). Defined before VIEWPORT_JS, whose handler calls it.
 const WATCH_SCOPE_SCRIPT = '<script>' + WATCH_SCOPE_JS + '</script>';
+// Legacy set-aside filter keys → the checkboxes a restore ticks (map-data LEGACY_SET_ALIASES). Before
+// VIEWPORT_JS, whose __applySavedSearch reads it.
+const SET_ALIASES_SCRIPT = '<script>window.__SET_ALIASES=' + JSON.stringify(LEGACY_SET_ALIASES) + ';</script>';
 const VIEWPORT_JS = `<script>
 (function(){
-  var SETMAP={SDVOSB:'SDVOSB',SB:'SB','8A':'8(a)',WOSB:'WOSB',HZ:'HUBZone',OTHER:'Other',NONE:'None'};
+  var SETMAP={SDVOSB:'SDVOSB',VOSB:'VOSB',VSB:'VSB',SB:'SB','8A':'8(a)',WOSB:'WOSB',HZ:'HUBZone',OTHER:'Other',NONE:'None'};
   // Company set-aside chip colors — reuses the map's existing legend palette exactly (see
   // LEGEND_HTML): SDVOSB green, Small Biz blue, 8(a) purple, WOSB red, HUBZone amber.
   var SET_CHIP_COLOR={SDVOSB:'#22a06b',SB:'#3b82f6','8A':'#8b5cf6',WOSB:'#ef4444',HZ:'#f59e0b'};
@@ -1976,7 +1979,11 @@ const VIEWPORT_JS = `<script>
       var lbl=document.getElementById('agencyLabel'); if(lbl)lbl.textContent=intent.agency;
       var ab=document.getElementById('agencyBtn'); if(ab)ab.classList.add('on'); applied=true; }
     if(intent.state){ FILT.state=intent.state; var mfS=document.getElementById('mfState'); if(mfS)mfS.value=intent.state; applied=true; }
-    if(intent.setAside){ FILT.setAsideMulti=(FILT.setAsideMulti?FILT.setAsideMulti+',':'')+intent.setAside; applied=true; }
+    // The parser's lowercase vals never matched a (case-sensitive) SET_GROUPS key → map the veteran
+    // ones to the canonical filter keys HERE (never make the lookup case-insensitive: that would
+    // change what an already-saved lowercase search returns).
+    if(intent.setAside){ var _saCanon={sdvosb:'SDVOSB_ONLY',vosb:'VOSB'}; var _saKeys=String(intent.setAside).split(',').map(function(v){ return _saCanon[v]||v; }).join(',');
+      FILT.setAsideMulti=(FILT.setAsideMulti?FILT.setAsideMulti+',':'')+_saKeys; applied=true; }
     if(intent.horizon && !_players){ if(window.__horizons){ window.__horizons[intent.horizon]=true; } if(window.__syncHorizonCounts)window.__syncHorizonCounts(); applied=true; }
     // "biggest/top" → sort by $ won. Players only (companies sort is server-side, value=high→low). Set
     // the companies sort + reflect the sort-menu label/select so it reads "Contract $ won (high to low)".
@@ -4796,6 +4803,13 @@ const VIEWPORT_JS = `<script>
     var _saOpen=false; try{ _saOpen=!!document.querySelector('.sa-set[value="OPEN"]:checked'); }catch(e){}
     FILT.fullOpen=(_mfSet.indexOf('OPEN')>=0)||_saOpen;
     FILT.setAsideMulti=_mfSet.filter(function(v){return v!=='OPEN';}).join(',');
+    // A restored LEGACY set-aside key (e.g. 'SDVOSB' → both SDVOSB + VOSB boxes ticked) keeps sending
+    // its ORIGINAL token — the server's frozen code list — until the user changes a set-aside box.
+    var _lg=window.__saLegacy;
+    if(_lg){
+      if(FILT.setAside===_lg.setAside && _mfSet.filter(function(v){return v!=='OPEN';}).sort().join(',')===_lg.boxes){ FILT.setAsideMulti=_lg.setAsideMulti; }
+      else { FILT.setAside=''; window.__saLegacy=null; }
+    }
     FILT.noticeMulti=_checked('.mf-notice');
     // Value = a min–max PAIR now (Zillow). Compose the "min-max" string fetchView already expects.
     // Either bound alone is valid ("1000000-" = $1M+, "-5000000" = under $5M). Empty both → no filter.
@@ -5576,9 +5590,15 @@ const VIEWPORT_JS = `<script>
     // Reflect the restored filters onto the visible controls so the bar isn't lying.
     if(window.__valReflect)window.__valReflect(FILT.valueRange||'');
     // Set-aside is Filters-panel only now → restore the .mf-set checkboxes (the top-bar pill is gone).
-    if(FILT.setAside||FILT.fullOpen){
-      var picks=String(FILT.setAside||'').split(',').filter(Boolean);
+    window.__saLegacy=null;
+    if(FILT.setAside||FILT.setAsideMulti||FILT.fullOpen){
+      var picks=(String(FILT.setAside||'')+','+String(FILT.setAsideMulti||'')).split(',').filter(Boolean);
+      // Legacy keys (LEGACY_SET_ALIASES — 'SDVOSB' is no longer a checkbox) tick their replacement boxes.
+      var _alias=window.__SET_ALIASES||{}, _hasLegacy=false;
+      picks.slice().forEach(function(k){ if(_alias[k]){ _hasLegacy=true; picks=picks.concat(_alias[k]); } });
       document.querySelectorAll('.mf-set').forEach(function(c){ c.checked=(c.value==='OPEN')?!!FILT.fullOpen:(picks.indexOf(c.value)>=0); });
+      if(_hasLegacy){ var _bx=[]; document.querySelectorAll('.mf-set:checked').forEach(function(c){ if(c.value!=='OPEN')_bx.push(c.value); });
+        window.__saLegacy={ setAside:FILT.setAside, setAsideMulti:FILT.setAsideMulti, boxes:_bx.sort().join(',') }; }
     }
     // Restore the Agency pill from a saved search's FILT.agency: reverse-map the match substring to a
     // preset NAME if one matches; else show the raw value (a saved free-text agency is still honest).
@@ -12180,7 +12200,7 @@ export async function GET(request: NextRequest) {
     // <div>, so anything after it gets parsed INTO that hidden .lgm-ov (display:none) and the
     // fixed FAB/drawer compute to 0×0. Leading the body keeps the mobile chrome a direct <body> child.
     // MARKET_FEEDBACK_JS precedes VIEWPORT_JS so window.__mf exists before the first fetch round reports to it.
-    const bodyInject = MOBILE_HTML + DRAWER_HTML + ASK_MINDY_HTML + LOGIN_MODAL_HTML + DIBBS_FLAG_JS + WATCH_SCOPE_SCRIPT + HIERARCHY_HORIZON_LIMIT_JS + PLAYERS_COPY_JS + LAYOUT_MOVE_JS + MARKET_FEEDBACK_JS + VIEWPORT_JS + DRAW_JS + SAVE_JS + DRAWER_JS + BOOT_VIEW_JS + SEARCH_PANEL_JS + SORT_EXTRA_JS + CARD_CHAT_FLAG_JS + SAFE_MARKDOWN_SCRIPT + ASK_MINDY_JS + LOGIN_MODAL_JS + ACCOUNT_MENU_JS + ZHEAD_HEIGHT_JS + CARD_TRACK_JS + MOBILE_JS + '</body>';
+    const bodyInject = MOBILE_HTML + DRAWER_HTML + ASK_MINDY_HTML + LOGIN_MODAL_HTML + DIBBS_FLAG_JS + WATCH_SCOPE_SCRIPT + SET_ALIASES_SCRIPT + HIERARCHY_HORIZON_LIMIT_JS + PLAYERS_COPY_JS + LAYOUT_MOVE_JS + MARKET_FEEDBACK_JS + VIEWPORT_JS + DRAW_JS + SAVE_JS + DRAWER_JS + BOOT_VIEW_JS + SEARCH_PANEL_JS + SORT_EXTRA_JS + CARD_CHAT_FLAG_JS + SAFE_MARKDOWN_SCRIPT + ASK_MINDY_JS + LOGIN_MODAL_JS + ACCOUNT_MENU_JS + ZHEAD_HEIGHT_JS + CARD_TRACK_JS + MOBILE_JS + '</body>';
     html = html.replace('</body>', () => bodyInject);
     html = html.replace('__STATE_CENTROIDS__', () => JSON.stringify(STATE_CENTROIDS));
     // Code→name for the State picker (50 states + DC). Already a shared constant — the Filters

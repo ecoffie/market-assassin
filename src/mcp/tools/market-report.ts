@@ -116,13 +116,15 @@ function normalizeAgencyToToptier(v: string): string {
  * buckets in agency-spending-detail.ts). Returns undefined for an unknown/blank value
  * so the report just skips the filter rather than fabricating a scope.
  */
-function setAsideToUsaspendingCodes(v: string | undefined): string[] | undefined {
+export function setAsideToUsaspendingCodes(v: string | undefined): string[] | undefined {
   const k = (v || '').trim().toUpperCase();
   if (!k) return undefined;
   const MAP: Record<string, string[]> = {
     SB: ['SBA', 'SBP'], SMALL: ['SBA', 'SBP'], 'SMALL BUSINESS': ['SBA', 'SBP'],
     '8A': ['8A', '8AN'], '8(A)': ['8A', '8AN'],
-    SDVOSB: ['SDVOSBC', 'SDVOSBS'],
+    SDVOSB: ['SDVOSBC', 'SDVOSBS'], SDVOSB_ONLY: ['SDVOSBC', 'SDVOSBS'], // map filter keys
+    VOSB: ['VSA', 'VSS'], // VA-only Veteran-Owned (SAM.gov)
+    VSB: ['VSB'],         // Very Small Business (USASpending) — not veteran
     WOSB: ['WOSB', 'EDWOSB'], EDWOSB: ['WOSB', 'EDWOSB'],
     HZ: ['HZC', 'HZS'], HUBZONE: ['HZC', 'HZS'],
   };

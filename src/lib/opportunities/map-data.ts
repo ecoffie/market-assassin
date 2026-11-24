@@ -141,9 +141,51 @@ export function resolvePinCoord(row: {
   return { lat, lng, state, city: g.city, source };
 }
 
-/** Set-aside groups — key, display label, pin color. Colors mirror the prototype's palette. */
-export const SET_GROUPS: Array<{ key: string; label: string; color: string; codes: string[] }> = [
-  { key: 'SDVOSB', label: 'SDVOSB', color: '#10b981', codes: ['SDVOSBC', 'SDVOSBS', 'VSA', 'VSB', 'SDVOSB'] },
+/**
+ * ⚠️ FROZEN — the code list the bare filter key `'SDVOSB'` has always expanded to. Saved searches
+ * (`saved_searches.filters`), anon watches, localStorage and `?setAside=SDVOSB` links store that key
+ * with no version, so it must keep returning EXACTLY these rows (Eric: preserve legacy behaviour, no
+ * migration). It is a HISTORICAL MISCLASSIFICATION, kept only for saved-filter compatibility:
+ *   - VSA = "VETERAN SET ASIDE" (VA-only Veteran-Owned, not service-disabled), and
+ *   - VSB = "VERY SMALL BUSINESS" (not veteran-owned at all),
+ * neither of which is SDVOSB. New selections use `SDVOSB_ONLY` / `VOSB` / `VSB` below, which do NOT
+ * reproduce this list — a restored legacy filter keeps sending the legacy token until the user changes a
+ * set-aside box, which is what keeps its rows identical. 2026-11-22.
+ */
+export const LEGACY_SDVOSB_FILTER_CODES: readonly string[] = Object.freeze(['SDVOSBC', 'SDVOSBS', 'VSA', 'VSB', 'SDVOSB']);
+
+/** Legacy filter keys no longer offered as a checkbox → the checkboxes a restore should tick. */
+// The closest current boxes for display only — NOT an equivalent code list (see LEGACY_SDVOSB_FILTER_CODES).
+export const LEGACY_SET_ALIASES: Record<string, string[]> = { SDVOSB: ['SDVOSB_ONLY', 'VOSB'] };
+
+/**
+ * Map set-aside filter keys → the Players (contacts-map) BigQuery buckets (SDVOSB/SB/8A/WOSB/HZ).
+ * SDVOSB_ONLY → 'SDVOSB'; legacy 'SDVOSB' is unchanged. There is NO veteran-owned bucket, so VOSB is
+ * reported in `unsupported` (the caller says "not applicable") — never silently matched to 0 firms.
+ */
+export function companySetAsideBuckets(raw: string): { buckets: string; unsupported: string[] } {
+  const out: string[] = [];
+  const unsupported: string[] = [];
+  for (const t of raw.split(',').map((s) => s.trim().toUpperCase()).filter(Boolean)) {
+    if (t === 'SDVOSB_ONLY') out.push('SDVOSB');
+    else if (t === 'VOSB' || t === 'VSB') unsupported.push(t); // no Players bucket for either
+    else out.push(t);
+  }
+  return { buckets: [...new Set(out)].join(','), unsupported };
+}
+
+/**
+ * Set-aside groups — filter `key`, display label, pin color, SAM codes. `pin` (when set) is the
+ * display bucket a matching pin carries instead of `key` (true SDVOSB pins stay `set: 'SDVOSB'`).
+ * Colors mirror the prototype's palette.
+ */
+export const SET_GROUPS: Array<{ key: string; label: string; color: string; codes: string[]; pin?: string }> = [
+  { key: 'SDVOSB_ONLY', pin: 'SDVOSB', label: 'SDVOSB', color: '#10b981', codes: ['SDVOSBC', 'SDVOSBS', 'SDVOSB'] },
+  // Official meanings (pinned in set-aside-codes.unit.test.ts): VSA/VSS = Veteran-Owned Small Business
+  // set-aside / sole source, specific to the Department of Veterans Affairs (Vets First) — never
+  // government-wide. VSB = "Very Small Business" (USASpending), NOT veteran-owned: its own honest group.
+  { key: 'VOSB', label: 'VOSB (VA only)', color: '#14b8a6', codes: ['VSA', 'VSS'] },
+  { key: 'VSB', label: 'Very Small Business', color: '#64748b', codes: ['VSB'] },
   { key: 'SB', label: 'Small Business', color: '#3b82f6', codes: ['SBA', 'SBP', 'SB'] },
   { key: '8A', label: '8(a)', color: '#a855f7', codes: ['8A', '8AN', '8(A)'] },
   { key: 'WOSB', label: 'WOSB / EDWOSB', color: '#ef4444', codes: ['WOSB', 'WOSBSS', 'EDWOSB', 'EDWOSBSS'] },
@@ -153,7 +195,18 @@ export const SET_GROUPS: Array<{ key: string; label: string; color: string; code
 ];
 
 const CODE_TO_GROUP = new Map<string, string>();
-for (const g of SET_GROUPS) for (const c of g.codes) CODE_TO_GROUP.set(c, g.key);
+for (const g of SET_GROUPS) for (const c of g.codes) CODE_TO_GROUP.set(c, g.pin ?? g.key);
+
+/**
+ * The SAM codes a set-aside FILTER key expands to: the frozen legacy `'SDVOSB'` list first, then a
+ * SET_GROUPS key (exact, case-sensitive — a stored lowercase key keeps meaning what it meant).
+ * null = not a group key (the caller treats it as a raw code, as before).
+ */
+export function setAsideFilterCodes(key: string): string[] | null {
+  if (key === 'SDVOSB') return [...LEGACY_SDVOSB_FILTER_CODES];
+  const g = SET_GROUPS.find((x) => x.key === key);
+  return g ? g.codes : null;
+}
 
 export function setGroupKey(code: string | null | undefined): string {
   const c = (code || '').toUpperCase().trim();
@@ -161,7 +214,7 @@ export function setGroupKey(code: string | null | undefined): string {
 }
 
 const KIND_TO_GROUP: Partial<Record<SetAsideKind, string>> = {
-  sb: 'SB', '8a': '8A', sdvosb: 'SDVOSB', vosb: 'SDVOSB', wosb: 'WOSB', edwosb: 'WOSB', hubzone: 'HZ',
+  sb: 'SB', '8a': '8A', sdvosb: 'SDVOSB', vosb: 'VOSB', wosb: 'WOSB', edwosb: 'WOSB', hubzone: 'HZ',
 };
 
 /**
@@ -194,8 +247,9 @@ export function mapSetAside(raw: string | null | undefined): { key: string; open
   if (kind === 'not_stated') return { key: 'NONE', open: false };
   return { key: KIND_TO_GROUP[kind] ?? 'OTHER', open: false };
 }
-export const SET_COLOR: Record<string, string> = Object.fromEntries(SET_GROUPS.map((g) => [g.key, g.color]));
-export const SET_LABEL: Record<string, string> = Object.fromEntries(SET_GROUPS.map((g) => [g.key, g.label]));
+// Keyed by the pin display bucket (`pin ?? key`) — what mapSetAside/setGroupKey return.
+export const SET_COLOR: Record<string, string> = Object.fromEntries(SET_GROUPS.map((g) => [g.pin ?? g.key, g.color]));
+export const SET_LABEL: Record<string, string> = Object.fromEntries(SET_GROUPS.map((g) => [g.pin ?? g.key, g.label]));
 
 /** NAICS 2-digit sector → clean "service line" category (the filter axis). */
 const SECTOR: Record<string, string> = {

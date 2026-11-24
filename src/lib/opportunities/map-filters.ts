@@ -3,7 +3,7 @@
  * (`/api/app/opportunity-map`) and the saved-search alert cron, so a saved search
  * re-runs with EXACTLY the same filtering the user saw. One source of truth.
  */
-import { SET_GROUPS } from './map-data';
+import { setAsideFilterCodes } from './map-data';
 import { multiAgency, agencyIlikeConds, agencyOrExpr } from './agency-match';
 import { buildSearchOr } from '@/lib/mi-dashboard/search';
 import { resolveQueryIntent, setAsideOrExpr } from '@/lib/search/query-intent';
@@ -262,8 +262,7 @@ export function applyMapFilters(query: any, f: MapFilters) {
   const saConds: string[] = [];
   if (setAsides.length) {
     const codes = [...new Set(setAsides.flatMap((k) => {
-      const group = SET_GROUPS.find((g) => g.key === k);
-      return group ? group.codes : [k];
+      return setAsideFilterCodes(k) ?? [k];
     }))].filter(Boolean); // drop '' from the NONE group here — Full & Open owns the null/empty case
     if (codes.length) saConds.push(`set_aside_code.in.(${codes.join(',')})`);
   }

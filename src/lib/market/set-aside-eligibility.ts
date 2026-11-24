@@ -56,10 +56,15 @@ export function normalizeBusinessType(t: string): string {
 
 /** Canonical spellings → the certification's OWN reserved pool (added to the base). */
 const CERTIFICATION_SET_ASIDES: Record<string, string[]> = {
-  sdvosb: ['SDVOSBC'],
-  servicedisabledveteranowned: ['SDVOSBC'],
-  vosb: ['VSB'],
-  veteranowned: ['VSB'],
+  // An SDVOSB is also a veteran-owned small business, so it qualifies for the VA's VOSB set-asides too
+  // (Veterans First, 38 U.S.C. 8127). VSA/VSS appear only on Department of Veterans Affairs notices.
+  sdvosb: ['SDVOSBC', 'VSA', 'VSS'],
+  servicedisabledveteranowned: ['SDVOSBC', 'VSA', 'VSS'],
+  // VOSB = VA-only Veteran-Owned set-aside / sole source (SAM.gov: "specific to Department of Veterans
+  // Affairs"). It was ['VSB'] — VSB is "VERY SMALL BUSINESS", not veteran-owned (USASpending), so
+  // VOSB-certified firms were matched to the wrong pool and missed VA's VSA/VSS work.
+  vosb: ['VSA', 'VSS'],
+  veteranowned: ['VSA', 'VSS'],
   '8a': ['8A'],
   smalldisadvantagedbusiness: ['8A'],
   wosb: ['WOSB'],
@@ -135,8 +140,8 @@ export function setAsideOrFilter(codes: string[]): string | null {
 const VAULT_CODE_TO_SAM: Record<string, string[]> = {
   'SB-Total': [],            // base pool already in SMALL_BUSINESS_SET_ASIDES
   '8(a)': ['8A'],
-  'SDVOSB': ['SDVOSBC'],
-  'VOSB': ['VSB'],
+  'SDVOSB': ['SDVOSBC', 'VSA', 'VSS'], // an SDVOSB is also a VOSB (VA Veterans First)
+  'VOSB': ['VSA', 'VSS'],              // was ['VSB'] = Very Small Business (wrong)
   'WOSB': ['WOSB'],
   'EDWOSB': ['EDWOSB'],
   'HUBZone': ['HZC'],

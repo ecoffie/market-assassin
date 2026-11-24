@@ -247,7 +247,8 @@ const setAsideMapping: Record<string, string> = {
   'WOSB': 'WOSB',
   'EDWOSB': 'EDWOSB',
   'SDVOSB': 'SDVOSBC',
-  'VOSB': 'VSB',
+  // SAM accepts one set-aside code; VOSB = VSA (VA Veteran-Owned set-aside). 'VSB' is Very Small Business.
+  'VOSB': 'VSA',
 };
 
 /**
