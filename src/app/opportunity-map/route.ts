@@ -10966,7 +10966,7 @@ const ASK_MINDY_CSS =
   + '.amk-rep-exp{display:flex;align-items:center;gap:6px;flex:none;position:relative}.amk-rep-exp:empty{display:none}'
   + '.amk-exp-menu{position:relative}.amk-exp-toggle{border:1px solid #dde3ec;background:#fff;color:#334155;font:600 12px Inter,system-ui,sans-serif;border-radius:8px;padding:5px 12px;cursor:pointer}.amk-exp-toggle:hover{background:#f1f5f9}.amk-exp-toggle[aria-expanded="true"]{background:#f1f5f9}'
   + '.amk-exp-panel{position:absolute;right:0;top:calc(100% + 4px);z-index:5;min-width:160px;padding:6px;border:1px solid #dde3ec;border-radius:10px;background:#fff;box-shadow:0 8px 24px rgba(15,23,42,.12);display:flex;flex-direction:column;gap:2px}'
-  + '.amk-exp-panel[hidden]{display:none!important}.amk-exp-panel button{border:0;background:transparent;color:#334155;font:600 12px Inter,system-ui,sans-serif;border-radius:7px;padding:8px 10px;cursor:pointer;text-align:left}.amk-exp-panel button:hover{background:#f1f5f9}.amk-exp-panel button:disabled{opacity:.6;cursor:default}'
+  + '.amk-exp-panel[hidden]{display:none!important}.amk-exp-panel button{border:0;background:transparent;color:#334155;font:600 12px Inter,system-ui,sans-serif;border-radius:7px;padding:8px 10px;cursor:pointer;text-align:left}.amk-exp-panel button:hover{background:#f1f5f9}.amk-exp-panel button:disabled{opacity:.6;cursor:default}.amk-exp-panel a.amk-exp-link{display:block;color:#334155;font:600 12px Inter,system-ui,sans-serif;border-radius:7px;padding:8px 10px;text-decoration:none}.amk-exp-panel a.amk-exp-link:hover{background:#f1f5f9}'
   + '.amk-rep-err{flex:none;margin:0;padding:8px 14px;border-bottom:1px solid #fde2e2;background:#fef2f2;color:#b91c1c;font:500 12.5px Inter,system-ui,sans-serif}.amk-rep-err[hidden]{display:none}'
   + '.amk-rep-note{font:500 11.5px Inter,system-ui,sans-serif;color:#64748b;max-width:220px;text-align:right}'
   + '.amk-rep-x{border:0;background:none;color:#8595a6;cursor:pointer;font:400 24px/1 Inter,system-ui,sans-serif;padding:0 4px}'
@@ -11197,6 +11197,7 @@ const ASK_MINDY_JS = `<script>(function(){
   function renderConversation(msgs){
     body.innerHTML='';
     msgs.forEach(function(m){ if(!m||typeof m.content!=='string') return; var d=addMsg(m.role==='user'?'user':'assistant', m.content); if(m.role!=='user'&&m.files&&m.files.length) repCard(cleanFiles(m.files),d); if(m.role!=='user'){ var r=savedReport(m.report); if(r) repSavedCard(r,d); } });
+    body.scrollTop=body.scrollHeight; // a reopened conversation shows its end (its report card) above the composer
   }
   function newChat(){
     if(busy||oppCtx) return;
@@ -11383,49 +11384,28 @@ const ASK_MINDY_JS = `<script>(function(){
       .then(function(d){ if(d&&d.url){ try{ if(window.__track) window.__track('tool_use','map_report_export',{format:file.format}); }catch(e){} location.href=d.url; } else { btn.textContent='Try again'; repError('The '+FMT_LABEL[file.format]+' file could not be prepared. Try again, or reopen the report from your Vault.'); } },function(){ btn.textContent='Try again'; repError('The file could not be prepared. Check your connection and try again.'); })
       .then(function(){ btn.disabled=false; if(btn.textContent==='Preparing...') btn.textContent=label; });
   }
-  // Packaged market report: a real PDF from /reports/<id>/pdf (same renderer as the hosted page). The browser
-  // downloads it by NAVIGATING a hidden frame to that URL (the response is Content-Disposition: attachment),
-  // never through a blob: a blob plus a synthetic link click after a long wait was blocked in production and
-  // saved nothing. A failure answers with the route's own HTML error page, which DOES load in the frame, so
-  // its message is read back and shown in the pane.
+  // Packaged market report: a real PDF from /reports/<id>/pdf (same renderer as the hosted page).
+  // The menu item is a REAL LINK the customer clicks, opening that URL in a new tab: the response is an
+  // attachment, so the browser saves it (and closes the tab); a failure shows the route's readable error
+  // page in that tab. Two script-driven downloads inside the Map's frames saved nothing in a production
+  // browser with no error shown (a blob + synthetic click, then a hidden frame, Claude Local 2026-11-22/23),
+  // while the hosted page's own link - a real top-level link - did save the file.
   var REPORT_ID_RX=/^[A-Za-z0-9_-]{16,64}$/;
-  var PDF_SETTLE_MS=10000, PDF_FRAME_TTL_MS=120000, pdfFrame=null;
-  function downloadReportPdf(reportId,btn){
-    var label='Download PDF'; btn.disabled=true; btn.textContent='Preparing PDF...'; repError('');
-    // The button settles after PDF_SETTLE_MS (no event tells us a download began); an error page that
-    // arrives later still shows, so a slow failure is never silent.
-    var errored=false;
-    var settle=function(){ if(errored||pdfFrame!==f) return; btn.disabled=false; btn.textContent=label; };
-    var failWith=function(msg){
-      if(errored||pdfFrame!==f) return; errored=true; btn.disabled=false; btn.textContent='Try again';
-      repError(msg||'The PDF could not be created. Try again in a minute.');
-    };
-    if(pdfFrame&&pdfFrame.parentNode) pdfFrame.parentNode.removeChild(pdfFrame);
-    var f=document.createElement('iframe'); pdfFrame=f;
-    f.setAttribute('data-testid','amk-report-pdf-frame'); f.setAttribute('aria-hidden','true'); f.setAttribute('tabindex','-1'); f.title='PDF download';
-    f.style.cssText='position:absolute;width:0;height:0;border:0;visibility:hidden;left:-9999px;top:0';
-    f.addEventListener('load',function(){
-      var d=null; try{ d=f.contentDocument; }catch(e){ d=null; }
-      if(!d){ failWith(''); return; }
-      var body=d.body?(d.body.textContent||'').replace(/\\s+/g,' ').trim():'';
-      if(d.title!=='PDF not available'&&!body) return;
-      var p=d.querySelector('.c p'); var msg=p?(p.textContent||'').trim():'';
-      failWith(msg);
-    });
-    document.body.appendChild(f);
-    f.src='/reports/'+encodeURIComponent(reportId)+'/pdf';
-    try{ if(window.__track) window.__track('tool_use','map_report_export',{format:'pdf',source:'market_report'}); }catch(e){}
-    setTimeout(settle,PDF_SETTLE_MS);
-    setTimeout(function(){ if(f.parentNode) f.parentNode.removeChild(f); if(pdfFrame===f) pdfFrame=null; },PDF_FRAME_TTL_MS);
+  function reportPdfItem(reportId){
+    return {label:'Download PDF',fmt:'pdf',href:'/reports/'+encodeURIComponent(reportId)+'/pdf',
+      run:function(){ try{ if(window.__track) window.__track('tool_use','map_report_export',{format:'pdf',source:'market_report'}); }catch(e){} }};
   }
-  // items: [{label, fmt, run(btn)}]
+  // items: [{label, fmt, run(btn), href?}] - an item with href is a real link (opens in a new tab).
   function exportMenu(items,host){
     host.innerHTML=''; if(!items.length) return;
     var wrap=document.createElement('div'); wrap.className='amk-exp-menu'; wrap.setAttribute('data-testid','amk-export-menu');
     var toggle=document.createElement('button'); toggle.type='button'; toggle.className='amk-exp-toggle'; toggle.setAttribute('data-testid','amk-export-toggle'); toggle.setAttribute('aria-expanded','false'); toggle.textContent='Export';
     var panel=document.createElement('div'); panel.className='amk-exp-panel'; panel.hidden=true; panel.setAttribute('role','menu');
     items.forEach(function(it){
-      var b=document.createElement('button'); b.type='button'; b.setAttribute('data-fmt',it.fmt); b.setAttribute('role','menuitem'); b.textContent=it.label;
+      var b;
+      if(it.href){ b=document.createElement('a'); b.href=it.href; b.target='_blank'; b.rel='noopener'; b.className='amk-exp-link'; b.title='Opens in a new tab'; b.setAttribute('aria-label',it.label+' (opens in a new tab)'); }
+      else { b=document.createElement('button'); b.type='button'; }
+      b.setAttribute('data-fmt',it.fmt); b.setAttribute('role','menuitem'); b.textContent=it.label;
       b.onclick=function(){ it.run(b); panel.hidden=true; toggle.setAttribute('aria-expanded','false'); };
       panel.appendChild(b);
     });
@@ -11528,7 +11508,7 @@ const ASK_MINDY_JS = `<script>(function(){
     function mrExport(){
       var E3=ensurePane();
       // PDF only: the one format this report has a real export for. Without a saved copy there is nothing to render.
-      exportMenu(reportId?[{label:'Download PDF',fmt:'pdf',run:function(b){ downloadReportPdf(reportId,b); }}]:[],E3.exp);
+      exportMenu(reportId?[reportPdfItem(reportId)]:[],E3.exp);
       if(!reportId){ var n=document.createElement('span'); n.className='amk-rep-note'; n.setAttribute('data-testid','amk-report-no-export'); n.textContent='This report was not saved, so it cannot be downloaded. Ask Mindy to create it again.'; E3.exp.appendChild(n); }
       if(url){ var a=document.createElement('a'); a.href=url; a.target='_blank'; a.rel='noopener'; a.textContent='Open hosted link'; a.style.cssText='font:600 12px Inter,system-ui,sans-serif;color:#1d4ed8;margin-left:4px'; E3.exp.appendChild(a); }
     }

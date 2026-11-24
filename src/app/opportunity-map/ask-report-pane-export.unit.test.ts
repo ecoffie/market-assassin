@@ -100,7 +100,7 @@ const reportTurn = (over: Record<string, unknown> = {}) => [
 
 const pane = (doc: Document) => doc.querySelector('[data-testid="amk-report-pane"]') as HTMLElement;
 const err = (doc: Document) => doc.querySelector('[data-testid="amk-report-error"]') as HTMLElement;
-const pdfItem = (doc: Document) => doc.querySelector('.amk-exp-panel button[data-fmt="pdf"]') as HTMLButtonElement | null;
+const pdfItem = (doc: Document) => doc.querySelector('.amk-exp-panel [data-fmt="pdf"]') as HTMLElement | null;
 
 describe('Map report pane: a packaged market report exports a real PDF', () => {
   it('shows the report with its in-frame print button hidden, and Export → Download PDF in the header', async () => {
@@ -112,105 +112,38 @@ describe('Map report pane: a packaged market report exports a real PDF', () => {
     expect(srcdoc).toContain('REPORT BODY');
     expect((t.doc.querySelector('.amk-rep-f') as HTMLIFrameElement).getAttribute('sandbox')).toBe(''); // still script-less
     expect(pdfItem(t.doc)?.textContent).toBe('Download PDF');
-    expect(t.doc.querySelectorAll('.amk-exp-panel button').length).toBe(1); // PDF only: the one real export
-    expect([...t.doc.querySelectorAll('.amk-rep-exp a')].map((a) => a.textContent)).toEqual(['Open hosted link']);
+    expect(t.doc.querySelectorAll('.amk-exp-panel [role="menuitem"]').length).toBe(1); // PDF only: the one real export
+    expect([...t.doc.querySelectorAll('.amk-rep-exp > a')].map((a) => a.textContent)).toEqual(['Open hosted link']);
   });
 
-  it('Download PDF navigates a hidden frame to /reports/<id>/pdf: no fetch, no blob, no synthetic link', async () => {
+  it('Download PDF is a real link to /reports/<id>/pdf that opens a new tab: no fetch, no blob, no hidden frame', async () => {
     const t = boot({ chat: reportTurn() });
     await t.ask('market report');
-    pdfItem(t.doc)!.click();
+    const a = pdfItem(t.doc) as HTMLAnchorElement;
+    expect(a.tagName).toBe('A');
+    expect(a.getAttribute('href')).toBe(`/reports/${REPORT_ID}/pdf`);
+    expect(a.getAttribute('target')).toBe('_blank');
+    expect(a.getAttribute('rel')).toBe('noopener');
+    expect(a.hasAttribute('download')).toBe(false); // a failure must show the route's error page, never save it as a file
+    expect(a.getAttribute('role')).toBe('menuitem');
+    expect(a.textContent).toBe('Download PDF');
+    expect(a.getAttribute('title')).toBe('Opens in a new tab'); // says where it goes
+    expect(a.getAttribute('aria-label')).toBe('Download PDF (opens in a new tab)');
+    // The browser follows the link itself; the handler only records the export and closes the menu.
+    const track = vi.fn();
+    (t.w as unknown as { __track: typeof track }).__track = track;
+    const ev = new t.w.MouseEvent('click', { bubbles: true, cancelable: true });
+    (t.doc.querySelector('[data-testid="amk-export-toggle"]') as HTMLButtonElement).click();
+    a.dispatchEvent(ev);
+    expect(ev.defaultPrevented).toBe(false);
+    expect(track).toHaveBeenCalledWith('tool_use', 'map_report_export', { format: 'pdf', source: 'market_report' });
+    expect((t.doc.querySelector('.amk-exp-panel') as HTMLElement).hidden).toBe(true);
     await t.settle();
-    const frames = t.doc.querySelectorAll('[data-testid="amk-report-pdf-frame"]');
-    expect(frames.length).toBe(1);
-    const f = frames[0] as HTMLIFrameElement;
-    expect(f.getAttribute('src')).toBe(`/reports/${REPORT_ID}/pdf`);
-    expect(f.getAttribute('aria-hidden')).toBe('true');
-    expect(f.style.visibility).toBe('hidden');
-    expect(f.hasAttribute('sandbox')).toBe(false); // a sandboxed frame could not download
-    expect(t.calls.some((c) => c.url.startsWith('/reports/'))).toBe(false); // one render, by the browser
+    expect(t.calls.some((c) => c.url.startsWith('/reports/'))).toBe(false);
     expect(t.blobs()).toBe(0);
     expect(t.saved).toEqual([]);
-    expect(pdfItem(t.doc)!.disabled).toBe(true);
-    expect(pdfItem(t.doc)!.textContent).toBe('Preparing PDF...');
-    t.advance(10_000);
-    expect(pdfItem(t.doc)!.disabled).toBe(false);
-    expect(pdfItem(t.doc)!.textContent).toBe('Download PDF');
-    expect(err(t.doc).hidden).toBe(true);
-    t.advance(120_000);
-    expect(t.doc.querySelectorAll('[data-testid="amk-report-pdf-frame"]').length).toBe(0); // cleaned up
-  });
-
-  const loadInFrame = (doc: Document, html: string) => {
-    const f = doc.querySelector('[data-testid="amk-report-pdf-frame"]') as HTMLIFrameElement;
-    const d = f.contentDocument!;
-    d.open(); d.write(html); d.close();
-    f.dispatchEvent(new (doc.defaultView as unknown as { Event: typeof Event }).Event('load'));
-  };
-  const routeErrorPage = (message: string) => `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>PDF not available</title></head><body><div class="c"><h1>PDF not available</h1><p>${message}</p></div></body></html>`;
-
-  it('a route failure (its HTML error page loads in the frame) shows the message and offers Try again', async () => {
-    const message = "We couldn't create the PDF just now. Try again in a minute. The report itself is unchanged.";
-    const t = boot({ chat: reportTurn() });
-    await t.ask('market report');
-    pdfItem(t.doc)!.click();
-    await t.settle();
-    loadInFrame(t.doc, routeErrorPage(message));
-    expect(err(t.doc).hidden).toBe(false);
-    expect(err(t.doc).getAttribute('role')).toBe('alert');
-    expect(err(t.doc).textContent).toBe(message);
-    expect(pdfItem(t.doc)!.textContent).toBe('Try again');
-    expect(pdfItem(t.doc)!.disabled).toBe(false);
-    t.advance(10_000);
-    expect(pdfItem(t.doc)!.textContent).toBe('Try again'); // the settle never hides a failure
-  });
-
-  it('a failure that arrives AFTER the button settled still shows (a slow failure is never silent)', async () => {
-    const t = boot({ chat: reportTurn() });
-    await t.ask('market report');
-    pdfItem(t.doc)!.click();
-    await t.settle();
-    t.advance(10_000);
-    expect(pdfItem(t.doc)!.textContent).toBe('Download PDF');
-    loadInFrame(t.doc, routeErrorPage('Too many PDF downloads in a short time. Wait a few minutes and try again.'));
-    expect(err(t.doc).textContent).toMatch(/Too many PDF downloads/);
-    expect(pdfItem(t.doc)!.textContent).toBe('Try again');
-  });
-
-  it('any other page in the frame (e.g. a platform error) is a failure with a generic message', async () => {
-    const t = boot({ chat: reportTurn() });
-    await t.ask('market report');
-    pdfItem(t.doc)!.click();
-    await t.settle();
-    loadInFrame(t.doc, '<!doctype html><html><head><title>504</title></head><body>An error occurred with this application.</body></html>');
-    expect(err(t.doc).textContent).toMatch(/could not be created/);
-    expect(pdfItem(t.doc)!.textContent).toBe('Try again');
-  });
-
-  it('an empty load (about:blank, or a browser that fires load for a download) is not an error', async () => {
-    const t = boot({ chat: reportTurn() });
-    await t.ask('market report');
-    pdfItem(t.doc)!.click();
-    await t.settle();
-    loadInFrame(t.doc, '');
-    expect(err(t.doc).hidden).toBe(true);
-    t.advance(10_000);
-    expect(pdfItem(t.doc)!.textContent).toBe('Download PDF');
-  });
-
-  it('Try again replaces the old frame (one download frame at a time) and starts a fresh download', async () => {
-    const t = boot({ chat: reportTurn() });
-    await t.ask('market report');
-    pdfItem(t.doc)!.click();
-    await t.settle();
-    loadInFrame(t.doc, routeErrorPage('Too many PDF downloads in a short time. Wait a few minutes and try again.'));
-    pdfItem(t.doc)!.click();
-    await t.settle();
-    expect(t.doc.querySelectorAll('[data-testid="amk-report-pdf-frame"]').length).toBe(1);
-    expect(err(t.doc).hidden).toBe(true);
-    expect(pdfItem(t.doc)!.textContent).toBe('Preparing PDF...');
-    t.advance(10_000);
-    expect(pdfItem(t.doc)!.textContent).toBe('Download PDF');
+    expect(t.doc.querySelector('iframe[data-testid="amk-report-pdf-frame"]')).toBeNull();
+    expect(MAP).not.toContain('function downloadReportPdf'); // the script-driven download is gone
   });
 
   it('a report that was not saved (no report_id) offers no download and says why', async () => {
