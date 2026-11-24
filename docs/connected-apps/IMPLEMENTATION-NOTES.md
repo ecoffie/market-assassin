@@ -81,9 +81,29 @@ Tests cover:
    - `CONNECTED_APPS` + `CONNECTED_APPS_ALLOWLIST`.
 4. **Migration:** `npm run migrate -- --go --only 20261124_connected_accounts.sql`, after Agent 4 review and Eric's approval.
 
+## 3b. Built in Slice A, part 2 (branch `feat/connected-apps-slice-a2`, stacked on #2424, flag off)
+
+Server side of "use a file from my Drive / OneDrive in Ask Mindy". The picker UI is the next commit.
+
+- **Selection is the authority, not the model.**
+  - `POST /api/app/connected-apps/selections` confirms the picked file through the connection's own grant (exists, readable type, under 15 MB).
+  - It returns a **file handle**: HMAC-signed (domain-separated from the OAuth state), bound to the acting scope, the connection, the provider and the file id, valid 24 h.
+  - `read_connected_file` accepts only a handle. A raw file id from the model, a forged handle, or one signed for another workspace is refused before any provider call.
+  - This is what limits Microsoft `Files.Read` to the file the customer chose.
+- **Every read re-checks.** The acting scope is re-resolved from the closure, the handle is re-verified against it, the connection is re-checked (revoked or reauth needed fails closed), and the provider must return the same file id.
+- **One extraction pipeline.** Bytes are capped at 15 MB (metadata and body) and extracted by `src/lib/documents/extract.ts`. Native Google Docs and Sheets are exported to .docx and .xlsx. NUL bytes are stripped.
+- **Untrusted content.** Text is fenced with the same `UPLOADED_DOCUMENT` fence and rule as uploads (a file cannot close its own fence). Results go into the turn's document texts for the web-search privacy guard.
+- **Provenance.** Each read returns provider, connected account, source id, source link, modified date and retrieval time, kept separate from federal-record provenance.
+- **Chat wiring.**
+  - The client sends `connectedFiles` (handles). The server verifies them and adds a note listing the picked files.
+  - `read_connected_file` is offered only on a turn with a verified selection, never in card chat. It is a free tool, classified as a chat-private read in `chat-tool-policy.ts`.
+  - The trace records `connected_files:<n>[:dropped=<m>]`.
+- **`POST /api/app/connected-apps/picker-token`** gives the browser picker a short-lived **access** token (never the refresh token, `no-store`), plus the public Google Picker key and app id. This is the provider-documented pattern.
+- **Tests:** 23 new (handle signing, isolation, expiry, domain separation, provider mapping and errors, export vs download, size cap, NUL strip, fence integrity, coach/client isolation, dead connection, file-id swap, route gates, token response shape).
+
 ## 4. Next slices
 
-- **Slice A, part 2:** file selection (Google Picker with `drive.file`; OneDrive file picker) and a provider-neutral `read_connected_file` chat tool.
+- **Slice A, part 2 (server built, see 3b):** remaining work is the picker UI in Ask Mindy (Google Picker, OneDrive picker v8) and the connect/disconnect entry point.
   - It reads only the selected file and extracts bounded text with `extract.ts`.
   - The output carries `provider`, `connected_account`, `source_id`, `source_url` and `retrieved_at` provenance, separate from federal-record provenance.
   - Prompt-injection guard on file content.
