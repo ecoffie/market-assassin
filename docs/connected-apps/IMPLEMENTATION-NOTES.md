@@ -33,7 +33,7 @@ Spec: [CONNECTED-APPS-SPEC-2026-11-24.md](./CONNECTED-APPS-SPEC-2026-11-24.md). 
   - Refresh, and revoke where the provider supports it (Google yes; Microsoft has no per-grant revoke, so disconnect discards our token).
   - Provider errors become sanitized codes.
 - `src/lib/connected-apps/store.ts`
-  - Every read is filtered by acting scope; there is no lookup by id alone.
+  - Every read is filtered by acting scope **and the Mindy user who connected the account** (`owner_email`). In a client workspace shared by several coaches, one coach can never list, use or disconnect a colleague's connection. There is no lookup by id alone (Agent 4 review, fixed in `bb750006`).
   - Tokens are encrypted and never returned in views.
   - Refreshes when the token is near expiry.
   - A dead grant becomes `reauth_needed` and fails closed. A transient failure does not.
@@ -85,7 +85,8 @@ Tests cover:
 
 Use a file from Drive or OneDrive in Ask Mindy: server side plus the Ask Mindy control.
 
-- **Selection is the authority, not the model.**
+- **Selection is the authority, not the model.** File handles also carry the picker's email, so a colleague in the same workspace is refused (`other_user`).
+- **Selection details:**
   - `POST /api/app/connected-apps/selections` confirms the picked file through the connection's own grant (exists, readable type, under 15 MB).
   - It returns a **file handle**: HMAC-signed (domain-separated from the OAuth state), bound to the acting scope, the connection, the provider and the file id, valid 24 h.
   - `read_connected_file` accepts only a handle. A raw file id from the model, a forged handle, or one signed for another workspace is refused before any provider call.
