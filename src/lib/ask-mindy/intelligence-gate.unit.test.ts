@@ -27,7 +27,7 @@ const base = { question: 'janitorial FL', reportInput: { keyword: 'janitorial se
 describe('runIntelligenceGate', () => {
   it('publishes only after the evaluator passes, and the report carries the decision', async () => {
     const publish = vi.fn(async (r: any) => ({ ...r, deliverable: { html: '<x>', url: 'https://getmindy.ai/reports/abc', report_id: 'abc' } }));
-    const r = await runIntelligenceGate({ ...base, deps: { gather: async () => evidence(), publish, analyst, evaluate: async () => ({ pass: true, results: ['relevant', 'pursuable', 'reasoned', 'actionable', 'clear'].map(pass) as never, fix: [], usage: { input: 1, output: 1 }, model: 'e' }) } });
+    const r = await runIntelligenceGate({ ...base, deps: { findOpen: async () => null, gather: async () => evidence(), publish, analyst, evaluate: async () => ({ pass: true, results: ['relevant', 'pursuable', 'reasoned', 'actionable', 'clear'].map(pass) as never, fix: [], usage: { input: 1, output: 1 }, model: 'e' }) } });
     expect(r.status).toBe('complete');
     expect(r.attempts).toBe(1);
     expect(publish).toHaveBeenCalledTimes(1);
@@ -38,7 +38,7 @@ describe('runIntelligenceGate', () => {
   it('retries once with the evaluator feedback, then discloses and does NOT publish', async () => {
     const publish = vi.fn();
     const a = vi.fn(async () => ({ decision, dropped: [], usage: { input: 1, output: 1 }, model: 'm' }));
-    const r = await runIntelligenceGate({ ...base, deps: { gather: async () => evidence(), publish, analyst: a, evaluate: async () => ({ pass: false, results: [fail('actionable')] as never, fix: ['make the move concrete'], usage: { input: 1, output: 1 }, model: 'e' }) } });
+    const r = await runIntelligenceGate({ ...base, deps: { findOpen: async () => null, gather: async () => evidence(), publish, analyst: a, evaluate: async () => ({ pass: false, results: [fail('actionable')] as never, fix: ['make the move concrete'], usage: { input: 1, output: 1 }, model: 'e' }) } });
     expect(r.status).toBe('disclosed');
     expect(r.attempts).toBe(2);
     expect(a).toHaveBeenCalledTimes(2);
@@ -50,7 +50,7 @@ describe('runIntelligenceGate', () => {
   it('a retry that passes publishes', async () => {
     const publish = vi.fn(async (x: any) => x);
     let n = 0;
-    const r = await runIntelligenceGate({ ...base, deps: { gather: async () => evidence(), publish, analyst, evaluate: async () => (++n === 1 ? { pass: false, results: [fail('clear')] as never, fix: ['lead with the decision'], usage: { input: 1, output: 1 }, model: 'e' } : { pass: true, results: [pass('clear')] as never, fix: [], usage: { input: 1, output: 1 }, model: 'e' }) } });
+    const r = await runIntelligenceGate({ ...base, deps: { findOpen: async () => null, gather: async () => evidence(), publish, analyst, evaluate: async () => (++n === 1 ? { pass: false, results: [fail('clear')] as never, fix: ['lead with the decision'], usage: { input: 1, output: 1 }, model: 'e' } : { pass: true, results: [pass('clear')] as never, fix: [], usage: { input: 1, output: 1 }, model: 'e' }) } });
     expect(r.status).toBe('complete');
     expect(r.attempts).toBe(2);
     expect(publish).toHaveBeenCalledTimes(1);
@@ -58,14 +58,14 @@ describe('runIntelligenceGate', () => {
 
   it('a failed market measurement says unknown, never small, and runs no model', async () => {
     const a = vi.fn();
-    const r = await runIntelligenceGate({ ...base, deps: { gather: async () => evidence('measurement_failure'), analyst: a as never } });
+    const r = await runIntelligenceGate({ ...base, deps: { findOpen: async () => null, gather: async () => evidence('measurement_failure'), analyst: a as never } });
     expect(r.status).toBe('measurement_failure');
     expect(a).not.toHaveBeenCalled();
     expect(r.answer).toMatch(/not a sign the market is small/);
   });
 
   it('record checks run on the real fixture: 3 pass', async () => {
-    const r = await runIntelligenceGate({ ...base, deps: { gather: async () => evidence(), publish: async (x: any) => x, analyst, evaluate: async () => ({ pass: true, results: [] as never, fix: [], usage: { input: 0, output: 0 }, model: 'e' }) } });
+    const r = await runIntelligenceGate({ ...base, deps: { findOpen: async () => null, gather: async () => evidence(), publish: async (x: any) => x, analyst, evaluate: async () => ({ pass: true, results: [] as never, fix: [], usage: { input: 0, output: 0 }, model: 'e' }) } });
     expect(r.checks.filter((c) => c.verdict === 'pursue')).toHaveLength(3);
   });
 });
@@ -80,5 +80,18 @@ describe('flag and rendering', () => {
     expect(t.startsWith('Go after West Palm Beach')).toBe(true);
     expect(t).toContain('Next move: Check SAM.gov now');
     expect(t.trim().endsWith('Are you small?')).toBe(true);
+  });
+});
+
+describe('openNoticesAsRecords', () => {
+  it('collapses repeat postings of one solicitation and prefixes ids', async () => {
+    const { openNoticesAsRecords } = await import('./intelligence-gate');
+    const recs = openNoticesAsRecords([
+      { notice_id: 'a', solicitation_number: 'FA805127R0001', title: 'AFCAP VI' },
+      { notice_id: 'b', solicitation_number: 'FA805127R0001', title: 'AFCAP VI' },
+      { notice_id: 'c', title: 'Cylinder rental' },
+    ]);
+    expect(recs.map((r) => r.contract_id)).toEqual(['notice:a', 'notice:c']);
+    expect(recs.every((r) => r.kind === 'open')).toBe(true);
   });
 });

@@ -25,7 +25,11 @@ export type CheckCode =
   | 'set_aside_8a_unconfirmed'
   | 'set_aside_small_business_unconfirmed'
   | 'last_award_not_competed'
-  | 'capture_window_passed';
+  | 'capture_window_passed'
+  | 'deadline_passed'
+  | 'deadline_this_week'
+  | 'market_research_notice'
+  | 'related_market_unconfirmed';
 
 export type Verdict = 'pursue' | 'blocked' | 'out_of_scope';
 
@@ -56,6 +60,15 @@ export interface CandidateRecord {
   place_of_performance_state?: string | null;
   period_of_performance_current_end?: string | null;
   capture_start_passed?: boolean | string | null;
+  /** 'open' = a live SAM notice (open now); default = a contract coming back. */
+  kind?: 'open' | 'recompete';
+  title?: string | null;
+  /** Open notices: "City, ST" (place of performance, else the buying office). */
+  location_label?: string | null;
+  response_deadline?: string | null;
+  notice_type?: string | null;
+  /** find_opportunities evidence class: DIRECT_MATCH, RELATED_MARKET_CANDIDATE, HOLDER_SIGNAL. */
+  evidence_class?: string | null;
 }
 
 export interface MarketScope {
@@ -115,6 +128,7 @@ export function checkRecord(
   scope: MarketScope,
   elig: CustomerEligibility | undefined,
   competition: CompetitionFacts | undefined,
+  nowMs: number = Date.now(),
 ): RecordCheck {
   const exclusions: CheckReason[] = [];
   const barriers: CheckReason[] = [];
@@ -125,13 +139,13 @@ export function checkRecord(
   // 1. Relevant: location.
   if (want) {
     const recState = rec.place_of_performance_state ? String(rec.place_of_performance_state).toUpperCase() : null;
-    const named = statesNamedInDescription(desc).filter((s) => s !== want);
+    const named = [...new Set([...statesNamedInDescription(desc), ...statesNamedInDescription(rec.location_label)])].filter((s) => s !== want);
     if (recState && recState !== want) {
       exclusions.push({ code: 'out_of_state', detail: `Place of performance is ${recState}, not ${want}.` });
     } else if (named.length) {
       exclusions.push({
         code: 'location_conflict',
-        detail: `The record lists ${recState ?? 'no state'}, but its description names ${named.join(', ')} ("${desc.slice(0, 90)}").`,
+        detail: `The record ${recState ? `lists ${recState}` : 'lists no state'}, but it names ${named.join(', ')} ("${(rec.location_label || desc).slice(0, 90)}").`,
       });
     }
   }
@@ -177,6 +191,22 @@ export function checkRecord(
     barriers.push({ code: 'last_award_not_competed', detail: `The last award was not competed${competition.sole_source_reason ? ` (${competition.sole_source_reason})` : ''}. The next one may also go to one source.` });
   }
 
+  // Open notices: the find engine's own evidence class, the deadline, and what kind of notice it is.
+  if (rec.kind === 'open') {
+    if (rec.evidence_class && rec.evidence_class !== 'DIRECT_MATCH') {
+      exclusions.push({ code: 'related_market_unconfirmed', detail: `The search matched it as related market work (${rec.evidence_class}), not confirmed demand for this work.` });
+    }
+    const due = rec.response_deadline ? Date.parse(rec.response_deadline) : NaN;
+    if (Number.isFinite(due) && due < nowMs) {
+      exclusions.push({ code: 'deadline_passed', detail: `The response deadline (${rec.response_deadline!.slice(0, 10)}) has passed.` });
+    } else if (Number.isFinite(due) && due - nowMs <= 7 * 86400000) {
+      actions.push({ code: 'deadline_this_week', detail: `Responses are due ${rec.response_deadline!.slice(0, 10)}, within a week. Decide now and pull the full notice from SAM.gov today.` });
+    }
+    if (/sources sought|request for information|\brfi\b|presolicitation|special notice/i.test(String(rec.notice_type || ''))) {
+      actions.push({ code: 'market_research_notice', detail: `This is a ${rec.notice_type} notice, not the bid itself. Responding${rec.response_deadline ? ` by ${rec.response_deadline.slice(0, 10)}` : ''} puts you in front of the buyer before the solicitation is written and can help keep it set aside for small businesses.` });
+    }
+  }
+
   // Time-critical move implied by the record.
   if (truthy(rec.capture_start_passed)) {
     actions.push({
@@ -185,7 +215,7 @@ export function checkRecord(
     });
   }
 
-  const verdict: Verdict = exclusions.some((e) => e.code === 'out_of_state' || e.code === 'location_conflict' || e.code === 'work_mismatch')
+  const verdict: Verdict = exclusions.some((e) => e.code === 'out_of_state' || e.code === 'location_conflict' || e.code === 'work_mismatch' || e.code === 'related_market_unconfirmed')
     ? 'out_of_scope'
     : exclusions.length
       ? 'blocked'
@@ -198,6 +228,7 @@ export function checkRecords(
   scope: MarketScope,
   elig: CustomerEligibility | undefined,
   competition: Map<string, CompetitionFacts>,
+  nowMs: number = Date.now(),
 ): RecordCheck[] {
-  return records.map((r) => checkRecord(r, scope, elig, competition.get(r.contract_id)));
+  return records.map((r) => checkRecord(r, scope, elig, competition.get(r.contract_id), nowMs));
 }

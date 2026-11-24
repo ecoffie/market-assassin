@@ -6,6 +6,7 @@
  */
 import { gatherMarketEvidence, publishMarketReport, type MarketReportInput, type MarketReportResult } from '@/mcp/tools/market-report';
 import { competitionFactsFor, type CompetitionLookup } from '@/lib/opportunities/competition-facts';
+import { findOpportunities, type FindOpportunitiesResult } from '@/lib/opportunities/find-opportunities';
 import { checkRecords, type CandidateRecord, type CustomerEligibility, type RecordCheck } from './evidence-checks';
 import { runAnalyst, buildAnalystPrompt, type AnalystDecision, type AnalystInput } from './analyst';
 import { evaluateDecision, type Evaluation } from './evaluator';
@@ -62,6 +63,35 @@ export function marketContext(ev: MarketReportResult, state?: string | null): An
   };
 }
 
+/** Open-now items from find_opportunities as checkable records (id prefixed so it never collides with an award id). */
+export function openNoticesAsRecords(items: Array<Record<string, unknown>>): CandidateRecord[] {
+  // One solicitation is often posted several times (amendments, reposts): keep the first of each.
+  const seen = new Set<string>();
+  return items
+    .filter((it) => it && (it.notice_id || (it.identity as { id?: string } | undefined)?.id))
+    .filter((it) => {
+      const key = String(it.solicitation_number || it.title || it.notice_id).trim().toUpperCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .map((it) => ({
+      kind: 'open' as const,
+      contract_id: `notice:${String(it.notice_id || (it.identity as { id?: string }).id)}`,
+      title: (it.title as string) ?? null,
+      description: (it.title as string) ?? null,
+      awarding_sub_agency: (it.sub_agency as string) ?? (it.buyer as string) ?? null,
+      location_label: (it.location_label as string) ?? null,
+      response_deadline: (it.response_deadline as string) ?? (it.relevant_date as string) ?? null,
+      notice_type: (it.notice_type as string) ?? null,
+      set_aside_type: (it.set_aside as string) ?? null,
+      psc_code: (it.psc_code as string) ?? null,
+      naics_code: (it.naics_code as string) ?? null,
+      evidence_class: (it.evidence_class as string) ?? null,
+      sam_url: (it.sam_url as string) ?? null,
+    } as CandidateRecord));
+}
+
 /** The chat answer: a deterministic rendering of the decision (no second model, no new facts). */
 export function renderDecisionAnswer(d: AnalystDecision, opts: { reportUrl?: string | null; disclosed?: string[] } = {}): string {
   const parts: string[] = [d.headline, ''];
@@ -91,6 +121,7 @@ export async function runIntelligenceGate(args: {
     publish?: typeof publishMarketReport;
     analyst?: typeof runAnalyst;
     evaluate?: typeof evaluateDecision;
+    findOpen?: (q: { query: string; state: string | null }) => Promise<FindOpportunitiesResult | null>;
   };
 }): Promise<GateResult> {
   const gather = args.deps?.gather ?? gatherMarketEvidence;
@@ -99,7 +130,13 @@ export async function runIntelligenceGate(args: {
   const evaluate = args.deps?.evaluate ?? evaluateDecision;
   const cost = { analystIn: 0, analystOut: 0, evalIn: 0, evalOut: 0 };
 
-  const ev = await gather(args.reportInput);
+  const query = String(args.reportInput.keyword || args.reportInput.naics || '').trim();
+  const findOpen = args.deps?.findOpen ?? (async (q: { query: string; state: string | null }) =>
+    findOpportunities({ query: q.query, location: q.state, horizons: { open_now: true, coming_back: false, coming_soon: false }, limit_per_horizon: 25 }, { competitionLookup: null }));
+  const [ev, open] = await Promise.all([
+    gather(args.reportInput),
+    query ? findOpen({ query, state: args.reportInput.state || null }).catch(() => null) : Promise.resolve(null),
+  ]);
   if (ev._meta.publication_state === 'measurement_failure') {
     return {
       status: 'measurement_failure', decision: null, evaluation: null, attempts: 0, checks: [], report: ev, cost,
@@ -107,13 +144,25 @@ export async function runIntelligenceGate(args: {
     };
   }
 
-  const recs = ((ev.sections.recompetes?.contracts as unknown[]) || []) as CandidateRecord[];
+  const recompetes = ((ev.sections.recompetes?.contracts as unknown[]) || []) as CandidateRecord[];
+  const openH = open?.horizons?.open_now;
+  const openRecs = openNoticesAsRecords(openH?.items || []);
+  const recs = [...openRecs, ...recompetes];
   const ms = ev.sections.market_size as { topPscList?: Array<{ code: string; pct: number }> } | null;
   const scope = { state: args.reportInput.state || null, pscShares: (ms?.topPscList || []).map((p) => ({ code: p.code, pct: p.pct })) };
-  const comp = await competitionFactsFor(recs.map((r) => r.contract_id), args.competitionLookup, { budgetMs: 8000 });
+  const comp = await competitionFactsFor(recompetes.map((r) => r.contract_id), args.competitionLookup, { budgetMs: 8000 });
   const checks = checkRecords(recs, scope, args.eligibility, comp);
 
-  const input: AnalystInput = { question: args.question, profile: args.profile, market: marketContext(ev, scope.state), records: recs, checks };
+  const market = marketContext(ev, scope.state);
+  market.openNowLine = !openH || openH.status === 'unavailable'
+    ? 'the open-bid search was unavailable; open bids are UNKNOWN, not zero'
+    : (() => {
+        const items = (openH.items || []).length;
+        const matched = openH.matched_count ?? items;
+        const dupes = items - openRecs.length;
+        return `${matched} open SAM.gov notice(s) matched the search${dupes > 0 ? `; ${dupes} were repeat postings of the same solicitation, leaving ${openRecs.length} distinct bid(s)` : ''}${matched > items ? `; the top ${items} were returned and ${matched - items} were not` : `; all were checked`}`;
+      })();
+  const input: AnalystInput = { question: args.question, profile: args.profile, market, records: recs, checks };
   const evidence = buildAnalystPrompt(input);
 
   let decision: AnalystDecision | null = null;

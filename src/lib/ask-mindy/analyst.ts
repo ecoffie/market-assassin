@@ -79,12 +79,15 @@ Rules:
 - Use only facts in the evidence. Never add an agency, contract, date, dollar amount, person or requirement that is not there. Never say something does not exist (no open bids, no forecasts, no competitors) unless the evidence establishes it; if a source was not searched, say so.
 - A pursuit must be one of the PASSING records, cited by its exact contract_id. Rank them: strongest first. Recommend at most 3.
 - "why" is 1 to 3 short reasons drawn from the record (location, value, set-aside, how it was competed, timing).
+- An OPEN NOW bid with a near deadline usually beats a contract coming back; a market-research notice (sources sought, presolicitation) is a chance to shape the bid, so say so.
 - "barrier" is the biggest obstacle from that record's barriers, in plain words, or null if none.
 - "next_move" is one concrete action the customer can take this week. If the record says the capture window has passed, the move is to check SAM.gov for the follow-on solicitation now.
 - "ruled_out" says in one or two plain sentences what was excluded and why (wrong state, different work, mandatory nonprofit source), with counts.
 - "gaps" lists what the evidence could not establish that would change the decision (for example forecast coverage, the customer's set-aside status). Short phrases.
 - "headline" is one sentence a busy owner can act on.
 - "next_question" is one plain-English question that would most improve the recommendation.
+- Never describe the process: no "review", "passed", "checks", "records", "evidence" or "excluded". Talk about bids and contracts ("none of the 5 open bids is cleaning work: they are base support, cylinder rental and fuel storage").
+- "ruled_out": open bids and contracts coming back are separate groups; give each group's count and the plain reason, and name what the open ones actually were.
 - Write for a small-business owner, not a contracting officer. No acronyms without saying what they mean. No em dashes.
 - If no record passed, say so plainly in the headline, return an empty pursuits list, and explain in gaps what would be needed.`;
 
@@ -99,7 +102,19 @@ export function buildAnalystPrompt(input: AnalystInput): string {
   const passing = input.checks.filter((c) => c.verdict === 'pursue');
   const excluded = input.checks.filter((c) => c.verdict !== 'pursue');
   const line = (r: CandidateRecord & Record<string, unknown>) =>
-    [
+    r.kind === 'open'
+      ? [
+          'OPEN NOW',
+          String(r.awarding_sub_agency || r.incumbent_name || 'buyer not stated'),
+          String(r.title || r.description || '').slice(0, 140),
+          `location ${r.location_label || 'not stated'}`,
+          `notice type ${r.notice_type || 'not stated'}`,
+          `responses due ${r.response_deadline ? String(r.response_deadline).slice(0, 10) : 'not stated'}`,
+          `set-aside ${r.set_aside_type || 'not stated'}`,
+          r.sam_url ? `link ${r.sam_url}` : '',
+        ].filter(Boolean).join(' · ')
+      : [
+          'COMING BACK',
       r.awarding_sub_agency || 'office not stated',
       String(r.description || '').slice(0, 140),
       `place of performance ${r.place_of_performance_state || 'not stated'}`,
@@ -107,7 +122,7 @@ export function buildAnalystPrompt(input: AnalystInput): string {
       `current period ends ${r.period_of_performance_current_end || 'not stated'}`,
       `set-aside ${r.set_aside_type || 'not stated'}`,
       `incumbent ${r.incumbent_name || 'not stated'}`,
-    ].join(' · ');
+        ].join(' · ');
   const passingText = passing.length
     ? passing
         .map((c) => {
@@ -120,8 +135,18 @@ export function buildAnalystPrompt(input: AnalystInput): string {
         })
         .join('\n')
     : '(none)';
+  const excludedLine = (c: RecordCheck) => {
+    const r = byId.get(c.contract_id) as (CandidateRecord & Record<string, unknown>) | undefined;
+    const what = String(r?.title || r?.description || 'untitled').slice(0, 90);
+    return `- ${what}: ${c.exclusions.map((e) => e.detail).join(' ')}`;
+  };
+  const exOpen = excluded.filter((c) => byId.get(c.contract_id)?.kind === 'open');
+  const exBack = excluded.filter((c) => byId.get(c.contract_id)?.kind !== 'open');
   const excludedText = excluded.length
-    ? excluded.map((c) => `- ${c.verdict}: ${c.exclusions.map((e) => e.detail).join(' ')}`).join('\n')
+    ? [
+        exOpen.length ? `Open now, ${exOpen.length} excluded:\n${exOpen.map(excludedLine).join('\n')}` : '',
+        exBack.length ? `Coming back, ${exBack.length} excluded:\n${exBack.map(excludedLine).join('\n')}` : '',
+      ].filter(Boolean).join('\n')
     : '(none)';
   return [
     `CUSTOMER QUESTION: ${input.question}`,
@@ -132,7 +157,7 @@ export function buildAnalystPrompt(input: AnalystInput): string {
     `FORECASTS: ${input.market.forecastsLine}`,
     `OPEN SOLICITATIONS: ${input.market.openNowLine || 'NOT searched for this answer. Do not say whether any are open; list checking SAM.gov for open bids as a gap.'}`,
     '',
-    `PASSING RECORDS (contracts coming back that this customer could pursue):`,
+    `PASSING RECORDS (OPEN NOW = live bids or notices on SAM.gov; COMING BACK = current contracts ending soon):`,
     passingText,
     '',
     `EXCLUDED RECORDS (do not recommend):`,
