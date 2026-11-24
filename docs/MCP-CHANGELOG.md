@@ -13,6 +13,24 @@ Authoritative counts (never trust a grep — tools register via two paths: expli
 
 ---
 
+## November 2026 — find_opportunities: honest evidence scope + full-result groups (no tool or credit change)
+
+**`find_opportunities` `horizons.open_now`** gains two additive fields; `evidence_counts` is unchanged. Both ship behind
+`OPEN_EVIDENCE_GROUPS` (only the literal `'true'` turns them on); while it is off the output is byte-identical to before.
+- **`evidence_counts_scope`** says what `evidence_counts` covers: `{ unit: 'rows', rows_classified, window_limit: 500,
+  order: 'response_deadline', classes: ['DIRECT_MATCH','RELATED_MARKET_CANDIDATE'], covers_full_result }`. Before this,
+  an agent could read `evidence_counts` (classified over the 500-row deadline-ordered window, "other" never counted) as
+  totals beside `matched_count` (the exact full count): one tested search had `matched_count` 1,279 and evidence counts
+  269 + 38.
+- **`evidence_totals`** gives full-result groups in rows: `direct` (DIRECT_MATCH), `related` (RELATED_MARKET_CANDIDATE),
+  `other` (everything else), with `direct + related + other === total`, ONLY when the classified window is the whole
+  result (exact `matched_count` known, equal to the rows classified, not a company-anchored union). Otherwise the groups
+  are `null` with `reason` = `not_computed_over_window` | `total_unknown` | `company_union`; unknown is never 0.
+  Computed from rows already classified: no extra query, no added latency.
+
+Evidence rules are Agent 1's released `labelOpenRow`, unmodified; retrieval and ranking are unchanged. Credits unchanged
+(no tool added, removed or repriced, so the catalog counts stay 54 public / 65 internal).
+
 ## November 2026 — search_govcon_jobs (public 53 → 54, internal 64 → 65)
 
 **`search_govcon_jobs`** (5 credits) — federal contracting job openings from USAJobs (default OPM
