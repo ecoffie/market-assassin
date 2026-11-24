@@ -118,6 +118,8 @@ import { CURRENT_FIND_CHAT_CONTRACT } from '@/lib/mcp/potato-journey';
 import { ASK_MINDY_RULES_LAYER, askMindyRulesEnabledFor, askMindyRulesPromptBlock, rulesLayerFindContract } from '@/lib/chat/ask-mindy-rules';
 import { askMindyRecipesEnabledFor } from '@/lib/ask-mindy/flags';
 import { loadCompanyProfile } from '@/lib/ask-mindy/company-profile';
+import { intelligenceGateEnabledFor, runIntelligenceGate, type GateResult } from '@/lib/ask-mindy/intelligence-gate';
+import { gateEligible, extractWorkPhrase, profileForGate } from '@/lib/ask-mindy/gate-intent';
 import { fitRankingNote, rankFindResult } from '@/lib/ask-mindy/compose';
 import { provenanceRecords } from '@/lib/chat/doc-provenance';
 import { requestedDocSections, requestedSectionsPlannerNote, routeSectionedReport, sectionedReportPlannerNote, packagedReportGapNote } from '@/lib/chat/requested-doc-sections';
@@ -700,6 +702,67 @@ export async function POST(request: NextRequest) {
         // Unresolved workspace → NO profile (the private tools refuse too): a coach acting for a
         // client must never get an answer built on their own profile.
         const profileEmail = vaultEmailFor(actingScope);
+
+        // Ask Mindy intelligence gate (ASK_MINDY_INTELLIGENCE_GATE, default off; src/lib/ask-mindy/intelligence-gate.ts).
+        // Market questions: gather evidence -> record checks -> analyst -> independent evaluator -> publish only on
+        // pass, else disclose. The chat answer and the report brief come from the same decision. Any other turn, or a
+        // turn where the customer's own words name no work, falls through to the existing path unchanged.
+        if (!cardCtx && intelligenceGateEnabledFor(auth.email)) {
+          const ask = splitViewPreamble(message).rest || message;
+          const eligible = gateEligible(ask);
+          const work = eligible.ok ? await extractWorkPhrase(ask).catch(() => null) : null;
+          if (eligible.ok && work) {
+            const profileLoad = await loadCompanyProfile(actingScope).catch(() => null);
+            const gateProfile = profileForGate(profileLoad && profileLoad.status === 'ok' ? profileLoad.profile : null);
+            let gate: GateResult | null = null;
+            try {
+              gate = await runIntelligenceGate({
+                question: ask,
+                reportInput: { keyword: work, state: eligible.state ?? undefined, userEmail: profileEmail || undefined } as Parameters<typeof runIntelligenceGate>[0]['reportInput'],
+                states: eligible.states,
+                profile: gateProfile.text,
+                eligibility: gateProfile.eligibility,
+              });
+            } catch (err) {
+              console.error('[chat] intelligence gate failed:', (err as Error)?.message);
+            }
+            if (gate) {
+              send({ type: 'token', content: gate.answer });
+              // Same event and trace shape as the packaged report path, so the Ask pane opens it and History restores it.
+              const gateReport = gate.report?.deliverable?.html
+                ? { report_id: gate.report.deliverable.report_id ?? null, url: gate.report.deliverable.url ?? null, title: String(gate.report.subject || 'Market report'), html: gate.report.deliverable.html }
+                : null;
+              if (gateReport) send({ type: 'market_report', ...gateReport });
+              send({ type: 'citations', sources: [] });
+              send({ type: 'done' });
+              closeStream();
+              const { analystIn, analystOut, evalIn, evalOut } = gate.cost;
+              void recordLlmUsage({ userEmail: auth.email, tool: 'chat', job: 'intelligence_gate_analyst', provider: 'anthropic', model: process.env.ASK_MINDY_ANALYST_MODEL || 'claude-opus-5-5', usage: { prompt_tokens: analystIn, completion_tokens: analystOut } });
+              void recordLlmUsage({ userEmail: auth.email, tool: 'chat', job: 'intelligence_gate_evaluator', provider: 'anthropic', model: process.env.ASK_MINDY_EVALUATOR_MODEL || 'claude-sonnet-5-5', usage: { prompt_tokens: evalIn, completion_tokens: evalOut } });
+              persistExchange({
+                email: auth.email!,
+                sessionId,
+                userMessage: message,
+                assistantMessage: gate.answer,
+                citedSources: [],
+                tokensUsed: analystIn + analystOut + evalIn + evalOut,
+                latencyMs: Date.now() - startedAt,
+                trace: {
+                  engine: 'intelligence_gate',
+                  gate_status: gate.status,
+                  attempts: gate.attempts,
+                  work,
+                  states: eligible.states,
+                  checks: gate.checks.map((c) => ({ id: c.contract_id, verdict: c.verdict, codes: [...c.exclusions, ...c.barriers, ...c.actions].map((x) => x.code) })),
+                  evaluation: gate.evaluation?.results.map((r) => ({ c: r.criterion, pass: r.pass })),
+                  ...(gateReport ? { market_report: { report_id: gateReport.report_id, url: gateReport.url, title: gateReport.title, html: '' } } : {}),
+                },
+              }).catch((err) => console.error('[chat] persist failed:', err));
+              return;
+            }
+            // Gate error: fall through to the existing path so the customer still gets an answer.
+          }
+        }
         // Ask Mindy fit ranking (ASK_MINDY_RECIPES, default off; src/lib/ask-mindy/compose.ts). Off → nothing is
         // loaded and no note is added. On → the company profile loads in parallel through the strict acting
         // scope only (never a raw email); a refused or failed load just means no ranking note (value first).
