@@ -111,6 +111,37 @@ Use a file from Drive or OneDrive in Ask Mindy: server side plus the Ask Mindy c
     - Picks go through the same signed-handle `/selections`. The model still cannot list or search a drive.
 - **Tests:** 35 new (OneDrive listing, OData quote escaping, provider refusals, chooser flow; plus handle signing, isolation, expiry, domain separation, provider mapping and errors, export vs download, size cap, NUL strip, fence integrity, coach/client isolation, dead connection, file-id swap, route gates, token response shape).
 
+## 3c. Live acceptance (Slice A), each provider independently
+
+Not run yet. As of 2026-11-24 there are no `CONNECTED_APPS_*` variables in any environment, and `20261124_connected_accounts.sql` is pending.
+
+**Setup (one preview branch, never production):**
+1. Admin console:
+   - Google OAuth web client with the Drive and Picker APIs, the `drive.file` scope, and a Picker key.
+   - Entra app with `Files.Read` and no `Mail.Send`.
+   - In both, register the redirect URI `https://<preview branch alias>/api/app/connected-apps/callback`.
+2. Migration, after Agent 4 and Eric approve: `npm run migrate -- --go --only 20261124_connected_accounts.sql`. The database is shared, so this creates the table in production (empty, service-role only).
+3. Preview-branch-scoped variables on a **Git-built** preview. CLI deploys do not get branch-scoped variables.
+   - `CONNECTED_APPS=true`, `CONNECTED_APPS_ALLOWLIST=<test account>`
+   - `CONNECTED_APPS_STATE_SECRET` and `CONNECTED_APPS_TOKEN_ENC_KEY` (fresh, 32+ characters, preview only)
+   - `CONNECTED_APPS_REDIRECT_BASE=https://<preview branch alias>`
+   - the Google and Microsoft client id and secret
+   - `NEXT_PUBLIC_CONNECTED_APPS_GOOGLE_PICKER_KEY` and `NEXT_PUBLIC_CONNECTED_APPS_GOOGLE_APP_ID`
+
+**Per provider:**
+1. Connect. Check that the access note is shown first, and the result after returning.
+2. Pick the company's capability statement.
+3. Ask the same market question twice: A without the file, B with it.
+4. Run `npx tsx scripts/acceptance/connected-file-ab.mts --email <acct> --a <A id> --b <B id> --doc <local .txt export> --provider google|microsoft`.
+
+**Accept only if all four gates pass:**
+1. The trace shows the file was offered and read.
+2. Every document claim has a verbatim quote that software finds in the document.
+3. Nothing in B contradicts the document.
+4. B is more company-specific, and the document changed the recommendation, not just the wording.
+
+Then disconnect, confirm the token is discarded, and confirm a later read fails closed.
+
 ## 4. Next slices
 
 - **Slice A, part 2:** built (see 3b), for Google Drive and OneDrive.
