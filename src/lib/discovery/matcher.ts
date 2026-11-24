@@ -192,10 +192,23 @@ export const CONCEPTS: ReadonlyArray<{ id: string; forms: string[]; acronyms?: s
    * shipped, ANY of bridge · highway · heavy · civil) — the first starves recall, the second admitted warships.
    * Taxonomy for the same intent (NAICS 237310 + PSC Y1LB/Z1LB/Z2LB) lives in market-interpretation.ts PHRASE_PRESET.
    * Not a form, on purpose: bare "lane" (swim lane, street names) and "street" (every postal address).
+   * ⚠️ Nor bare "road" / "pavement" (Claude Local live replay 2026-11-24, #2377): "road" admitted every notice set
+   * in "Hampton Roads, Virginia" — BOP Residential Reentry Services (623990) and Norfolk Harbor maintenance
+   * dredging — plus an MCC consulting study in Zambia whose title merely ends "… Roads". A road word counts only
+   * inside a road-WORK phrase (construction / repair / rehabilitation / improvement / maintenance / resurfacing /
+   * widening / paving, "access road"), and pavement only as pavement repair/rehabilitation/preservation/…;
+   * "roadway", "paving", "repaving" and "resurfacing" are work words on their own.
    */
   {
     id: 'highway and bridge',
-    forms: ['highway', 'bridge', 'road', 'roadway', 'pavement', 'paving'],
+    forms: [
+      'highway', 'bridge', 'roadway',
+      'road construction', 'road reconstruction', 'road repair', 'road rehabilitation', 'road improvement',
+      'road maintenance', 'road resurfacing', 'road widening', 'road paving', 'access road',
+      'pavement repair', 'pavement rehabilitation', 'pavement preservation', 'pavement replacement',
+      'pavement maintenance', 'pavement reconstruction',
+      'paving', 'repaving', 'resurfacing',
+    ],
     names: [
       'bridge and highway', 'bridges and highways', 'highway and bridge', 'highways and bridges',
       'bridge & highway', 'highway & bridge', 'road and bridge', 'roads and bridges', 'bridge and road', 'bridges and roads',

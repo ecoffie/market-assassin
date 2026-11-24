@@ -71,6 +71,27 @@ describe('RBA: "bridge and highway heavy civil construction" (VA, MD, DC)', () =
     ]) expect(matchesText(p.matcher, [t]), t).toBe(true);
   });
 
+  it('a road word alone (place names, passing mentions) never admits — Claude Local live replay 2026-11-24', () => {
+    // The exact Open rows the live replay DIRECT_MATCHed, titles verbatim from production SAM.
+    for (const t of [
+      'Residential Reentry Services and Home Confinement Services located within the Hampton Roads, Virginia Metro Area to include the cities of Virginia Beach, Norfolk, Chesapeake, Newport News, Hampton, Portsmouth, Suffolk, Poquoson, and Williamsburg.',
+      'Norfolk Harbor Inner Channel to Newport News Maintenance Dredging located in Hampton Roads, Virginia',
+      'ZAMBIA- Consultant Services for the Feasibility Study, Concept Designs, Environmental and Social Impact Assessment and Construction Monitoring Services for the Improvement of the T5 and D274/R185a Roads',
+      'Pavement condition sensors',
+    ]) expect(matchesText(p.matcher, [t]), t).toBe(false);
+  });
+
+  it('real road work is still admitted through road-work phrases', () => {
+    for (const t of [
+      'PROJECT VA ST FB KNGMN-WLKR GTS: geometric road improvements, additional left-turn lane',
+      'Z--Access Road Repair National Elk Refuge',
+      'Road maintenance IDIQ, George Washington and Jefferson National Forests',
+      'Pavement rehabilitation from MP 86 to MP 89 on the Blue Ridge Parkway',
+      'Prince William Forest Park failed culvert and road reconstruction',
+      'Bridge deck replacement',
+    ]) expect(matchesText(p.matcher, [t]), t).toBe(true);
+  });
+
   it('Coming back resolves to the road/bridge market (237310 + Y1LB/Z1LB/Z2LB), not the 236/237/238 Construction preset', () => {
     expect(p.expansion.capability_kind).toBe('industry_preset');
     expect(p.expansion.direct.naics).toEqual(['237310']);
