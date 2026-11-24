@@ -576,10 +576,12 @@ describe('create_document: source provenance from tool results (read dates, link
     expect(saved.sections[0].blocks[0].text).toBe('VA obligated $412.5M for janitorial services.');
   });
 
-  it('no matching tool result: the source is saved exactly as the model wrote it', async () => {
+  it('no matching tool result: the source is saved without the model\'s unverified link or date (never shown as verified)', async () => {
     const s = setup({ provenance: [{ retrievedAt: '2026-11-22T15:04:00Z', url: 'https://sam.gov/opp/zzz/view', recordIds: ['zzz'] }] });
-    const r = await s.tool.execute({ doc_model: model() });
-    expect(r).toMatchObject({ ok: true, source_provenance: { unmatched: 1, filledRetrievedAt: 0, subtitleSet: false } });
-    expect(s.docs()[0].doc_model.sources[0]).toEqual({ id: 's1', kind: 'usaspending', label: 'USAspending award data', url: 'https://www.usaspending.gov/search' });
+    const r = await s.tool.execute({ doc_model: model({ sources: [{ id: 's1', kind: 'usaspending', label: 'USAspending award data', url: 'https://www.usaspending.gov/search', retrievedAt: '2025-06-01' }] }) });
+    expect(r).toMatchObject({ ok: true, source_provenance: { unmatched: 1, filledRetrievedAt: 0, removedUnverified: 2, subtitleSet: false } });
+    expect(s.docs()[0].doc_model.sources[0]).toEqual({ id: 's1', kind: 'usaspending', label: 'USAspending award data' });
+    // what the customer sees: the rendered Word/PDF model carries no unverified date
+    expect(s.renders.every((x) => x.model.sources[0].retrievedAt === undefined)).toBe(true);
   });
 });

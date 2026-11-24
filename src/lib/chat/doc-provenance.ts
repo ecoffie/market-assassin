@@ -6,10 +6,14 @@
  * Rules (each is tested):
  *   - A DocSource is matched to a tool result by its url (normalized) or its recordId (a record key, notice id or
  *     document id the tool result carried). No match means nothing is filled: nothing is constructed or guessed.
- *   - retrievedAt comes from the matched result's read time (the tool-run time, or the signed ledger entry from an
- *     earlier turn). A model-written date that disagrees with it is replaced; one with no match is left as is.
- *   - url / recordId are copied from the match only when the model left them empty, and only when the match has
- *     exactly one of them (an ambiguous match fills nothing).
+ *   - retrievedAt comes ONLY from the matched result's read time (the tool-run time, or the signed ledger entry from
+ *     an earlier turn). A model-written date that disagrees is replaced. An UNMATCHED source's retrievedAt is REMOVED:
+ *     the document prints a source's date as when it was read, and the model may never present one (Eric, 2026-11-24).
+ *   - url / recordId of a matched source are copied from the match only when the model left them empty, and only
+ *     when the match has exactly one of them (an ambiguous match fills nothing). An UNMATCHED source of a tool kind
+ *     (usaspending, sam_notice, tool, web, other) loses its url / recordId too: only values a tool result verified are
+ *     shown. The customer's own documents (upload, vault) keep their recordId: that is the document's id, not a
+ *     retrieval claim.
  *   - The subtitle is set only when the model left it empty, from the matched results' own as-of dates
  *     ("Data as of 2026-11-20", or "Data as of 2026-09-30 to 2026-11-20" when they differ). No as-of date in the
  *     evidence → no subtitle. The source system is not inferred.
@@ -35,6 +39,8 @@ export interface ApplyProvenanceResult {
   filledUrl: number;
   filledRecordId: number;
   unmatched: number;
+  /** Unverified values removed from unmatched sources (dates, links, record ids the model wrote). */
+  removedUnverified: number;
   subtitleSet: boolean;
 }
 
@@ -62,12 +68,22 @@ function matchesFor(src: DocSource, records: readonly ProvenanceRecord[]): Prove
 
 /** Fill DocSource provenance and the data-date subtitle from tool-result records. Pure; never mutates its input. */
 export function applySourceProvenance(model: DocModel, records: readonly ProvenanceRecord[]): ApplyProvenanceResult {
-  const out: ApplyProvenanceResult = { model, filledRetrievedAt: 0, replacedRetrievedAt: 0, filledUrl: 0, filledRecordId: 0, unmatched: 0, subtitleSet: false };
-  if (!model || !Array.isArray(model.sources) || !records.length) return out;
+  const out: ApplyProvenanceResult = { model, filledRetrievedAt: 0, replacedRetrievedAt: 0, filledUrl: 0, filledRecordId: 0, unmatched: 0, removedUnverified: 0, subtitleSet: false };
+  if (!model || !Array.isArray(model.sources)) return out;
   const usedAsOf: string[] = [];
   const sources = model.sources.map((src) => {
     const m = matchesFor(src, records);
-    if (!m.length) { out.unmatched += 1; return src; }
+    if (!m.length) {
+      out.unmatched += 1;
+      const ownDocument = src.kind === 'upload' || src.kind === 'vault';
+      const next: DocSource = { ...src };
+      if (next.retrievedAt) { delete next.retrievedAt; out.removedUnverified += 1; }
+      if (!ownDocument) {
+        if (next.url) { delete next.url; out.removedUnverified += 1; }
+        if (next.recordId) { delete next.recordId; out.removedUnverified += 1; }
+      }
+      return next;
+    }
     const next: DocSource = { ...src };
     // Read time: the latest read among the matches (the record as the document saw it).
     const read = m.map((r) => dateOnly(r.retrievedAt)).filter((d): d is string => !!d).sort().pop() ?? null;

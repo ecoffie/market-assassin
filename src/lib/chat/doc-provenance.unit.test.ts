@@ -25,20 +25,30 @@ describe('applySourceProvenance', () => {
     expect(r).toMatchObject({ filledRetrievedAt: 2, filledUrl: 1, filledRecordId: 1, unmatched: 0 });
   });
 
-  it('no match fills nothing (no constructed link, id or date)', () => {
-    const src = { id: 's1', kind: 'web' as const, label: 'Some page', url: 'https://example.org/report' };
-    const r = applySourceProvenance(doc([src]), REC);
-    expect(r.model.sources).toEqual([src]);
-    expect(r.unmatched).toBe(1);
+  it('no match: nothing is filled, and the model\'s unverified date, link and record id are removed', () => {
+    const r = applySourceProvenance(doc([
+      { id: 's1', kind: 'web', label: 'Some page', url: 'https://example.org/report', retrievedAt: '2025-02-02' },
+      { id: 's2', kind: 'sam_notice', label: 'A notice', recordId: 'ZZZ999XX' },
+    ]), REC);
+    expect(r.model.sources).toEqual([
+      { id: 's1', kind: 'web', label: 'Some page' },
+      { id: 's2', kind: 'sam_notice', label: 'A notice' },
+    ]);
+    expect(r).toMatchObject({ unmatched: 2, removedUnverified: 3, filledRetrievedAt: 0 });
   });
 
-  it('a model-written date that disagrees with the tool result is replaced; one with no match is kept', () => {
+  it('the customer\'s own document (upload / vault) keeps its document id, but never an unverified read date', () => {
+    const r = applySourceProvenance(doc([{ id: 'u1', kind: 'upload', label: 'Capability statement.pdf', recordId: 'doc-123', retrievedAt: '2025-01-01' }]), REC);
+    expect(r.model.sources).toEqual([{ id: 'u1', kind: 'upload', label: 'Capability statement.pdf', recordId: 'doc-123' }]);
+  });
+
+  it('a model-written date that disagrees with the tool result is replaced by the real read date; one with no match is removed', () => {
     const r = applySourceProvenance(doc([
       { id: 's1', kind: 'usaspending', label: 'Award', recordId: 'W9124D26D0005', retrievedAt: '2025-01-01' },
       { id: 's2', kind: 'web', label: 'Page', retrievedAt: '2025-02-02' },
     ]), REC);
     expect(r.model.sources[0].retrievedAt).toBe('2026-11-22');
-    expect(r.model.sources[1].retrievedAt).toBe('2025-02-02');
+    expect(r.model.sources[1].retrievedAt).toBeUndefined();
     expect(r.replacedRetrievedAt).toBe(1);
   });
 
@@ -66,12 +76,12 @@ describe('applySourceProvenance', () => {
     expect(applySourceProvenance(agree, recs).model.subtitle).toBe('Data as of 2026-11-20');
   });
 
-  it('never mutates its input; no records means the model is returned as is', () => {
-    const m = doc([{ id: 's1', kind: 'usaspending', label: 'A', recordId: 'W9124D26D0005' }]);
+  it('never mutates its input; with no records at all, every unverified date / link / id is still removed', () => {
+    const m = doc([{ id: 's1', kind: 'usaspending', label: 'A', recordId: 'W9124D26D0005', retrievedAt: '2026-01-01' }]);
     const before = JSON.stringify(m);
     applySourceProvenance(m, REC);
     expect(JSON.stringify(m)).toBe(before);
-    expect(applySourceProvenance(m, []).model).toBe(m);
+    expect(applySourceProvenance(m, []).model.sources).toEqual([{ id: 's1', kind: 'usaspending', label: 'A' }]);
   });
 });
 

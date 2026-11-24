@@ -379,9 +379,10 @@ export function makeGenerateDocumentTool(deps: GenerateDocumentDeps) {
     // Source provenance from this conversation's tool results: read dates, links and record ids, and a data-date
     // subtitle, never written by the model and never constructed without a matching result.
     let provenance: Omit<ReturnType<typeof applySourceProvenance>, 'model'> | null = null;
-    const records = deps.provenance?.() ?? [];
-    if (records.length) {
-      const p = applySourceProvenance(model, records);
+    // Applied whenever the caller supplies provenance, even with no records: an unmatched source must not keep a
+    // model-written date, link or record id that would print as verified.
+    if (deps.provenance) {
+      const p = applySourceProvenance(model, deps.provenance());
       if (validateDocModel(p.model).ok) {
         model = p.model;
         const { model: _m, ...counts } = p;
