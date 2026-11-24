@@ -218,7 +218,7 @@ describe('a packaged market report comes back with its conversation (Claude Loca
   // Before: reopening a saved conversation (History) or reloading showed the answer text only. The market
   // report's card, preview and Export menu were gone, so the PDF download could not be reached.
   const pane = (doc: Document) => doc.querySelector('[data-testid="amk-report-pane"]') as HTMLElement | null;
-  const pdfItem = (doc: Document) => doc.querySelector('.amk-exp-panel button[data-fmt="pdf"]') as HTMLButtonElement | null;
+  const pdfItem = (doc: Document) => doc.querySelector('.amk-exp-panel [data-fmt="pdf"]') as HTMLButtonElement | null;
   const ONE = { success: true, session: { id: SID2, title: 'Facilities' }, messages: [
     { id: 'm1', role: 'user', content: 'Market report for facilities maintenance' },
     { id: 'm2', role: 'assistant', content: 'Here is your report.', market_report: { report_id: REPORT_ID, title: 'Facilities maintenance' } },
@@ -237,6 +237,9 @@ describe('a packaged market report comes back with its conversation (Claude Loca
     await reopen(t);
     const card = t.doc.querySelector('[data-testid="amk-report-card"]');
     expect(card?.querySelector('b')?.textContent).toBe('Facilities maintenance');
+    expect(card?.querySelector('.amk-repcard-open')?.textContent).toBe('Open market report'); // same label as the live card
+    const chat = t.doc.getElementById('amkBody') as HTMLElement;
+    expect(chat.scrollTop).toBe(chat.scrollHeight); // the reopened conversation shows its end, with the card
     expect(t.calls.some((c) => c.url.startsWith('/reports/'))).toBe(false); // card only, no auto-load
     t.click('[data-testid="amk-report-card"] .amk-repcard-open');
     await t.settle();
@@ -246,11 +249,11 @@ describe('a packaged market report comes back with its conversation (Claude Loca
     expect(f.srcdoc).toContain('HOSTED REPORT BODY');
     expect(f.srcdoc).toContain('.pdfbtn{display:none!important}');
     expect(pdfItem(t.doc)?.textContent).toBe('Download PDF');
-    expect([...t.doc.querySelectorAll('.amk-rep-exp a')].map((a) => (a as HTMLAnchorElement).getAttribute('href'))).toEqual([`https://getmindy.ai/reports/${REPORT_ID}`]);
+    expect([...t.doc.querySelectorAll('.amk-rep-exp > a')].map((a) => (a as HTMLAnchorElement).getAttribute('href'))).toEqual([`https://getmindy.ai/reports/${REPORT_ID}`]);
     expect(t.doc.querySelectorAll('[data-testid="amk-report-card"]').length).toBe(1); // opening adds no second card
-    // Download PDF is the #2354 hidden-frame navigation.
-    pdfItem(t.doc)!.click();
-    expect((t.doc.querySelector('[data-testid="amk-report-pdf-frame"]') as HTMLIFrameElement).getAttribute('src')).toBe(`/reports/${REPORT_ID}/pdf`);
+    // Download PDF is a real link to the PDF route (opens a new tab).
+    expect(pdfItem(t.doc)!.getAttribute('href')).toBe(`/reports/${REPORT_ID}/pdf`);
+    expect(pdfItem(t.doc)!.getAttribute('target')).toBe('_blank');
   });
 
   it('a reload in the same tab keeps the card (the live turn records the report id and title)', async () => {

@@ -15,7 +15,15 @@
  */
 import Link from 'next/link';
 import FirstQuestions from './FirstQuestions';
-import { ANY_ASSISTANT_LINE, OTHER_ASSISTANTS, CLAUDE_COMPUTER_NOTE } from './setup-copy';
+import {
+  ANY_ASSISTANT_LINE,
+  OTHER_ASSISTANTS,
+  CLAUDE_COMPUTER_NOTE,
+  AI_CHOOSER,
+  AI_SECTIONS_CLASS,
+  AI_CHOOSER_CSS,
+  stepBodyParts,
+} from './setup-copy';
 import Image from 'next/image';
 import type { Metadata } from 'next';
 
@@ -40,12 +48,15 @@ interface Step { n: number; title: string; body: string; img?: string }
  * Bold the UI targets inside step copy. A setup guide is scanned, not read — the reader
  * is hunting for the thing to click, so "Settings" and "⌘ + ," must pop out of the
  * sentence. Wrap them in *asterisks* in the copy above and they render bold here.
+ * An address the reader must visit is written [label](href) and renders as a real link.
  */
 function emphasize(body: string) {
-  return body.split(/(\*[^*]+\*)/g).map((part, i) =>
-    part.startsWith('*') && part.endsWith('*') && part.length > 2
-      ? <strong key={i} className="font-semibold text-(--mp-ink)">{part.slice(1, -1)}</strong>
-      : <span key={i}>{part}</span>,
+  return stepBodyParts(body).map((part, i) =>
+    part.kind === 'bold'
+      ? <strong key={i} className="font-semibold text-(--mp-ink)">{part.text}</strong>
+      : part.kind === 'link'
+        ? <Link key={i} href={part.href} className="text-(--mp-navy) underline underline-offset-2 hover:text-(--mp-navy-hover)">{part.text}</Link>
+        : <span key={i}>{part.text}</span>,
   );
 }
 
@@ -54,7 +65,7 @@ const CLAUDE: Step[] = [
   { n: 2, title: 'Go to Connectors', body: 'In the Settings window, look down the left sidebar. Under *Customize*, click *Connectors*.', img: 'step-02.jpg' },
   { n: 3, title: 'Click "Add", then "Browse connectors"', body: 'The *Add* button is at the top right of the Connectors page.', img: 'step-03.jpg' },
   { n: 4, title: 'Find Mindy and click "Connect to Claude"', body: 'Search *mindy*, open the Mindy result, and click the orange *Connect to Claude* button.', img: 'step-04.jpg' },
-  { n: 5, title: 'Sign in to Mindy', body: 'A Mindy window opens. Sign in with Google, Microsoft, or email. New to Mindy? Start a 14-day free trial of Pro or Team first at getmindy.ai/pricing (no charge for 14 days).', img: 'step-05.jpg' },
+  { n: 5, title: 'Sign in to Mindy', body: 'A Mindy window opens. Sign in with Google, Microsoft, or email. New to Mindy? Start a 14-day free trial of Pro or Team first at [getmindy.ai/pricing](/pricing) (no charge for 14 days).', img: 'step-05.jpg' },
   { n: 6, title: 'Allow the connection', body: 'Mindy asks to connect to your account. Click *Allow*.', img: 'step-06.jpg' },
   { n: 7, title: 'Connected', body: 'Back in Claude you will see Mindy marked *Connected* with a green check.', img: 'step-07.jpg' },
   { n: 8, title: 'Set Mindy to "Always allow" (recommended)', body: 'By default Claude asks permission on every Mindy call. On the Mindy connector page, open the *Read-only tools* dropdown and choose *Always allow* so Mindy just works.', img: 'step-08.jpg' },
@@ -64,7 +75,7 @@ const CHATGPT: Step[] = [
   { n: 1, title: 'First, turn on Developer mode', body: 'You must do this before you can add Mindy. *Settings → Security and login → Developer mode*, and switch it on. You will see an "elevated risk" warning — that is ChatGPT’s standard notice for any custom tool. Mindy is safe; continue.', img: 'step-09.jpg' },
   { n: 2, title: 'Go back to Plugins and add Mindy', body: 'With Developer mode on, the custom-plugin option now works. Open *Plugins*, click the *+* at the top right. Name it *Mindy*, set *Connection → Server URL* to the address below, set *Authentication* to *OAuth*, agree to continue, and click *Create*.', img: 'step-10.jpg' },
   { n: 3, title: 'Click "Sign in with Mindy"', body: 'This is the step that connects the plugin to your account.', img: 'step-11.jpg' },
-  { n: 4, title: 'Sign in to Mindy', body: 'A Mindy window opens. Sign in to your account. New to Mindy? Start a 14-day free trial of Pro or Team first at getmindy.ai/pricing (no charge for 14 days). When you finish, it connects back to ChatGPT automatically.', img: 'step-12.jpg' },
+  { n: 4, title: 'Sign in to Mindy', body: 'A Mindy window opens. Sign in to your account. New to Mindy? Start a 14-day free trial of Pro or Team first at [getmindy.ai/pricing](/pricing) (no charge for 14 days). When you finish, it connects back to ChatGPT automatically.', img: 'step-12.jpg' },
   { n: 5, title: 'Allow permissions', body: 'Choose what Mindy is allowed to do. Pick *Allow low-risk actions* (the default) — Mindy can pull federal data without nagging you, and still asks before anything sensitive.', img: 'step-13.jpg' },
   { n: 6, title: 'Done — Mindy is connected', body: 'You will see Mindy connected, with its permissions set. Turn it on in a chat and ask away — same as Claude.', img: 'step-14.jpg' },
 ];
@@ -120,21 +131,33 @@ export default function McpSetupPage() {
           <code className="mt-1 block truncate font-(family-name:--mp-font-mono) text-[14px] text-(--mp-navy)">{MCP_URL}</code>
         </div>
 
-        {/* Which one */}
-        <div className="mt-6 grid gap-3 sm:grid-cols-2">
-          <a href="#claude" className="rounded-none border border-(--mp-navy) bg-(--mp-navy-wash) px-4 py-3 transition hover:bg-(--mp-surface)">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-(--mp-navy)">Easiest — start here</p>
-            <p className="mt-1 text-[15px] font-semibold text-(--mp-ink)">Claude</p>
-            <p className="mt-0.5 text-[13px] text-(--mp-muted)">Built in. Connect, sign in, allow, done.</p>
-          </a>
-          <a href="#chatgpt" className="rounded-none border border-(--mp-line) bg-(--mp-surface) px-4 py-3 transition hover:bg-(--mp-wash)">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-(--mp-muted)">Also works</p>
-            <p className="mt-1 text-[15px] font-semibold text-(--mp-ink)">ChatGPT</p>
-            <p className="mt-0.5 text-[13px] text-(--mp-muted)">More steps: Developer mode, add Mindy, sign in, permissions.</p>
-          </a>
-        </div>
+        {/* Which AI do you use? Each option jumps to its section and AI_CHOOSER_CSS hides the
+            other assistants' sections. Without JS or :has() every section stays visible. */}
+        <style>{AI_CHOOSER_CSS}</style>
+        <nav id={AI_CHOOSER.id} aria-labelledby="which-ai-heading" className="mt-6 scroll-mt-6">
+          <h2 id="which-ai-heading" className="text-[15px] font-semibold text-(--mp-ink)">{AI_CHOOSER.heading}</h2>
+          <div className="mt-3 grid gap-3 sm:grid-cols-3">
+            {AI_CHOOSER.options.map((o, i) => (
+              <a
+                key={o.id}
+                href={`#${o.id}`}
+                className={i === 0
+                  ? 'rounded-none border border-(--mp-navy) bg-(--mp-navy-wash) px-4 py-3 transition hover:bg-(--mp-surface)'
+                  : 'rounded-none border border-(--mp-line) bg-(--mp-surface) px-4 py-3 transition hover:bg-(--mp-wash)'}
+              >
+                <p className={`text-[11px] font-semibold uppercase tracking-wide ${i === 0 ? 'text-(--mp-navy)' : 'text-(--mp-muted)'}`}>{o.tag}</p>
+                <p className="mt-1 text-[15px] font-semibold text-(--mp-ink)">{o.label}</p>
+                <p className="mt-0.5 text-[13px] text-(--mp-muted)">{o.hint}</p>
+              </a>
+            ))}
+          </div>
+          <p className="mt-3 text-[13px]">
+            <a href={`#${AI_CHOOSER.id}`} className="text-(--mp-navy) underline underline-offset-2">{AI_CHOOSER.showAll}</a>
+          </p>
+        </nav>
 
-        <section id="claude" className="mt-14 scroll-mt-6">
+        <div className={AI_SECTIONS_CLASS}>
+        <section id="claude" data-ai="claude" className="mt-14 scroll-mt-6">
           <h2 className="text-[22px] font-bold text-(--mp-ink) font-(family-name:--mp-font-serif)">Claude — connect Mindy</h2>
           <p className="mt-1 text-[14px] text-(--mp-muted)">In the Claude desktop or web app. This is the easy one.</p>
           <p className="mt-2 text-[14px] text-(--mp-body)">{CLAUDE_COMPUTER_NOTE}</p>
@@ -151,7 +174,7 @@ export default function McpSetupPage() {
           </p>
         </section>
 
-        <section id="chatgpt" className="mt-16 scroll-mt-6">
+        <section id="chatgpt" data-ai="chatgpt" className="mt-16 scroll-mt-6">
           <h2 className="text-[22px] font-bold text-(--mp-ink) font-(family-name:--mp-font-serif)">ChatGPT — connect Mindy</h2>
           <p className="mt-1 text-[14px] text-(--mp-muted)">On the web (chatgpt.com). More steps than Claude — do them once, in order.</p>
           <StepList steps={CHATGPT} />
@@ -160,7 +183,7 @@ export default function McpSetupPage() {
           </div>
         </section>
 
-        <section id="other" className="mt-16 scroll-mt-6">
+        <section id="other" data-ai="other" className="mt-16 scroll-mt-6">
           <h2 className="text-[22px] font-bold text-(--mp-ink) font-(family-name:--mp-font-serif)">{OTHER_ASSISTANTS.heading}</h2>
           <p className="mt-1 text-[14px] text-(--mp-muted)">{OTHER_ASSISTANTS.intro}</p>
           <ol className="mt-4 list-decimal space-y-2 pl-5 text-[14px] leading-relaxed text-(--mp-muted)">
@@ -168,6 +191,7 @@ export default function McpSetupPage() {
           </ol>
           <p className="mt-4 rounded-none border border-(--mp-line) bg-(--mp-surface) px-4 py-3 text-[14px] text-(--mp-body)">{OTHER_ASSISTANTS.adminNote}</p>
         </section>
+        </div>
 
         {/* The question every single demo attendee asked: "do I have to say Mindy?"
             No. There is no magic word, and users cannot self-diagnose this — a chat that

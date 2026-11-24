@@ -80,10 +80,10 @@ beforeEach(() => {
 });
 afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); vi.restoreAllMocks(); });
 
-async function ask(message: string): Promise<SseEvent[]> {
+async function ask(message: string, history?: unknown[]): Promise<SseEvent[]> {
   const { POST } = await import('./route');
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const res = await POST(chatRequest({ message }) as any);
+  const res = await POST(chatRequest({ message, ...(history ? { history } : {}) }) as any);
   return withinMs(readSse(res), 8000, 'chat stream');
 }
 
@@ -140,5 +140,24 @@ describe('create_document through the real chat route', () => {
     await ask('Create my improved capability statement as a document');
     expect(plannerSystems.join('\n')).not.toContain('REQUESTED DOCUMENT SECTIONS');
     expect((h.saved[0].docModel as { sections: Array<{ heading: string }> }).sections.map((x) => x.heading)).toEqual(['Core competencies']);
+  });
+
+  it('source provenance: a source matching an earlier turn\'s signed record gets that read date (never one the model wrote)', async () => {
+    vi.stubEnv('CHAT_LEDGER_SECRET', 'test-ledger-secret');
+    const { signLedger } = await import('@/lib/chat/context-sources');
+    const ledger = signLedger([{ id: 'src:get_award_detail:1', kind: 'tool', tool: 'get_award_detail', label: 'Award detail', status: 'ok', asOf: '2026-11-20', retrievedAt: '2026-11-22T15:04:00Z', items: [{ key: 'W9124D26D0005', label: 'Award' }] }]);
+    plannerArgs = { doc_model: {
+      title: 'Award Brief',
+      sources: [{ id: 's1', kind: 'usaspending', label: 'USAspending award', recordId: 'W9124D26D0005', retrievedAt: '2024-01-01' }],
+      sections: [{ id: 'a', heading: 'Award', blocks: [{ type: 'paragraph', id: 'p1', text: 'The Army awarded the contract in 2026.', claim: 'fact', cites: ['s1'] }] }],
+    } };
+    await ask('Create a PDF brief of that award', [
+      { role: 'user', content: 'Tell me about contract W9124D26D0005' },
+      { role: 'assistant', content: 'It is an Army custodial IDV.', sources: ledger },
+    ]);
+    const model = h.saved[0].docModel as { subtitle?: string; sources: Array<{ retrievedAt?: string; recordId?: string }> };
+    expect(model.sources[0]).toMatchObject({ recordId: 'W9124D26D0005', retrievedAt: '2026-11-22' });
+    expect(model.subtitle).toBe('Data as of 2026-11-20');
+    expect(toolResultsSeen.join(' ')).toMatch(/"source_provenance":\{"filledRetrievedAt":0,"replacedRetrievedAt":1/);
   });
 });

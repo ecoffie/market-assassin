@@ -26,7 +26,7 @@ import {
   TEAM_ANNUAL_PER_MONTH, TEAM_ANNUAL_USD, TEAM_MONTHLY_USD, TEAM_TRIAL_ANNUAL, TEAM_TRIAL_MONTHLY, pctOff,
 } from './app-plan-links';
 
-type Feature = [title: string, detail: string];
+type Feature = [title: string, detail: React.ReactNode];
 type Plan = {
   name: string; tag: string; featured?: boolean;
   price: string | null; was?: string; per: string; trial: boolean;
@@ -154,7 +154,7 @@ function CreditPlansDropdown({ plans, annual }: { plans: CreditPlan[]; annual: b
 }
 
 type Cell = boolean | string;
-type CompareGroup = [group: string, rows: Array<[label: string, pro: Cell, team: Cell, ent: Cell]>];
+type CompareGroup = [group: string, rows: Array<[label: React.ReactNode, pro: Cell, team: Cell, ent: Cell]>];
 
 export default function SimplePricing({ proCredits, teamCredits, forecastsLabel, faqs, creditPlans = [] }: {
   proCredits: number; teamCredits: number; forecastsLabel: string; faqs: { q: string; a: string }[];
@@ -202,22 +202,22 @@ export default function SimplePricing({ proCredits, teamCredits, forecastsLabel,
       cta: 'Start free trial', href: annual ? PRO_TRIAL_ANNUAL : PRO_TRIAL_MONTHLY,
       lead: 'Find and win your own contracts.', base: 'Everything you need to start',
       features: [
-        ['Opportunities matched to you', 'Daily alerts and briefings for your NAICS, keywords and agencies.'],
-        ['Recompetes, 12 months out', 'Contracts coming back to market, with the incumbent.'],
+        ['Opportunities matched to you', <>Daily alerts and briefings for the industries, keywords and agencies you choose (industries are set by <Link href="/glossary/naics-code">NAICS codes</Link>).</>],
+        ['Contracts coming back, 12 months out', <>Contracts the government will bid again (<Link href="/glossary/recompete">recompetes</Link>), with the company that holds the contract now.</>],
         ['Market research', 'Who buys, who wins and what they spend.'],
         ['Mindy in your AI', 'Use Mindy inside Claude, ChatGPT or Cursor.'],
       ],
       usage: ['Monthly usage included', `${fmt(proCredits)} credits / month`],
     },
     {
-      name: 'Team', tag: 'Built for BD teams working several markets at once.',
+      name: 'Team', tag: 'Built for business development teams working several markets at once.',
       price: annual ? `$${fmt(TEAM_ANNUAL_PER_MONTH)}` : `$${TEAM_MONTHLY_USD}`,
       was: annual ? `$${TEAM_MONTHLY_USD}` : undefined,
       per: annual ? '/ mo, billed annually' : '/ mo, billed monthly', trial: true,
       cta: 'Start free trial', href: annual ? TEAM_TRIAL_ANNUAL : TEAM_TRIAL_MONTHLY,
       lead: 'Win more as a team.', base: 'All Pro features, plus',
       features: [
-        ['Up to 5 users', 'One plan for your whole BD team.'],
+        ['Up to 5 users', 'One plan for your whole team.'],
         ['Shared pipeline', 'Everyone sees the same pursuits and deadlines.'],
         ['Team dashboard and roles', 'See who is working what.'],
         ['Onboarding call', 'We set up your markets with you.'],
@@ -226,7 +226,7 @@ export default function SimplePricing({ proCredits, teamCredits, forecastsLabel,
       footer: <>10 or more users? <a href={SALES_URL}>Talk to us for a volume quote</a></>,
     },
     {
-      name: 'Enterprise', tag: 'For primes, APEX Accelerators and agencies rolling Mindy out at scale.',
+      name: 'Enterprise', tag: 'For large prime contractors, APEX Accelerators (government contracting help centers) and agencies rolling Mindy out at scale.',
       price: null, per: 'Annual contract, priced for your organization', trial: false,
       cta: 'Speak to sales', href: SALES_URL, outline: true,
       lead: 'Fit Mindy to your organization.', base: 'All Team features, plus',
@@ -248,13 +248,13 @@ export default function SimplePricing({ proCredits, teamCredits, forecastsLabel,
     ['Find opportunities', [
       ['Daily opportunity alerts', true, true, true],
       ['AI-matched daily briefings', true, true, true],
-      ['Unlimited NAICS codes and keywords', true, true, true],
+      [<>Unlimited industries (<Link href="/glossary/naics-code">NAICS codes</Link>) and keywords</>, true, true, true],
       ['Target agency filtering', true, true, true],
       ['Weekly market deep dives', true, true, true],
     ]],
     ['Competitive intelligence', [
-      ['Recompete alerts, 12 months out', true, true, true],
-      ['Incumbent visibility', true, true, true],
+      [<>Alerts on contracts coming back to bid (<Link href="/glossary/recompete">recompetes</Link>), 12 months out</>, true, true, true],
+      ['The company that holds the contract now', true, true, true],
       ['Competitor tracking', true, true, true],
       ['Agency spending analysis', true, true, true],
       [`${forecastsLabel} agency forecasts`, true, true, true],
@@ -357,8 +357,8 @@ export default function SimplePricing({ proCredits, teamCredits, forecastsLabel,
             {compare.map(([group, rows]) => (
               <tbody key={group}>
                 <tr className="grp"><th scope="rowgroup" colSpan={4}>{group}</th></tr>
-                {rows.map(([label, a, b, c]) => (
-                  <tr key={label}><th scope="row">{label}</th><td>{cell(a)}</td><td className="hl">{cell(b)}</td><td>{cell(c)}</td></tr>
+                {rows.map(([label, a, b, c], i) => (
+                  <tr key={i}><th scope="row">{label}</th><td>{cell(a)}</td><td className="hl">{cell(b)}</td><td>{cell(c)}</td></tr>
                 ))}
               </tbody>
             ))}
@@ -439,6 +439,7 @@ const CSS = `
 .sp .card li .tick{color:var(--mp-ok);font-weight:700}
 .sp .card li b{display:block;font-weight:600}
 .sp .card li small{display:block;color:var(--mp-muted);font-size:13px}
+.sp .card li small a,.sp .cmp th[scope=row] a{color:inherit;text-decoration:underline;text-underline-offset:2px}
 .sp .usage{margin-top:auto;border:1px solid var(--mp-line);border-radius:12px;padding:14px 16px;background:var(--mp-wash);display:grid;gap:4px}
 .sp .usage .ul{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--mp-muted)}
 .sp .usage b{font-size:14px;font-weight:600}

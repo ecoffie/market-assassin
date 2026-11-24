@@ -1478,3 +1478,8 @@ incomplete profile) for setup CTAs on free alert emails, then switch to "Welcome
 forever" with dashboard access — because Z: permanent beta banners train users to ignore
 you, and permanent nagging after a month punishes loyal email-only subscribers who still
 get value from alerts.**
+
+- **Always keep customer emails to the exact scope Eric asked for, not "helpfully" add related news (billing, cancellations) because each extra fact is a new thing the customer can react to.** (2026-10-24: asked for a credits-only email to a disputing customer; I added a paragraph about cancelled subscriptions.)
+- **Always pull FAR/CFR dollar thresholds from the live text (acquisition.gov / eCFR) before stating them, not from memory, because thresholds are inflation-adjusted and memory goes stale.** (2026-10-22: I quoted SDVOSB sole source as $4M/$7M; live FAR 19.1406 at FAC 2026-01 says $5M/$8.5M. Verified values now in `~/docs/govcon-data.md`.)
+
+- Always look up a customer and bring a data-backed recommendation for them to confirm, not an open question, because customers come to Mindy as the experts (Eric, 2026-11-07).

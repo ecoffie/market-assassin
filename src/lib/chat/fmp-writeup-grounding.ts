@@ -314,7 +314,7 @@ function collectContactNames(results: readonly FmpToolContent[]): { names: strin
     try {
       const p = JSON.parse(content) as unknown;
       const strings: string[] = [];
-      walkStrings(p, strings);
+      walkPersonCandidateStrings(p, strings);
       for (const s of strings) {
         // A "name" value is walked as a plain string.
         if (looksLikePersonName(s) && !places.has(s.trim().toLowerCase())) names.push(s.trim());
@@ -375,6 +375,54 @@ function parseJson(content: string): unknown | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * Keys whose string values describe a notice, buyer or place, never a person. A notice title like
+ * "Ranger Station Cleaning" is person-shaped, so the value's KEY decides, not its shape.
+ */
+const NOT_A_PERSON_KEYS = new Set([
+  'title', 'subject', 'description', 'summary', 'notice_type', 'noticetype', 'type', 'naics_description',
+  'psc_description', 'office', 'agency', 'sub_agency', 'department', 'buyer', 'organization', 'recipient',
+  'vendor', 'awardee', 'place', 'location', 'set_aside', 'set_aside_description', 'solicitation_title', 'project',
+  'external_id', 'value_range', 'status',
+]);
+const NOTICE_ID_KEYS = ['notice_id', 'noticeid', 'solicitation_number', 'solicitationnumber'];
+
+/** Like walkStrings, but skips values under NOT_A_PERSON_KEYS, and a notice row's `name` (FIND uses it as the title). */
+function walkPersonCandidateStrings(node: unknown, out: string[], depth = 0): void {
+  if (depth > 8 || out.length > 400) return;
+  if (typeof node === 'string') {
+    if (node.trim()) out.push(node);
+    return;
+  }
+  if (Array.isArray(node)) {
+    for (const x of node) walkPersonCandidateStrings(x, out, depth + 1);
+    return;
+  }
+  if (node && typeof node === 'object') {
+    const o = node as Record<string, unknown>;
+    const lowerKeys = Object.keys(o).map((k) => k.toLowerCase());
+    const isNoticeRow = NOTICE_ID_KEYS.some((k) => lowerKeys.includes(k));
+    for (const [k, v] of Object.entries(o)) {
+      const lk = k.toLowerCase();
+      if (typeof v === 'string' && (NOT_A_PERSON_KEYS.has(lk) || (lk === 'name' && isNoticeRow))) continue;
+      walkPersonCandidateStrings(v, out, depth + 1);
+    }
+  }
+}
+
+/**
+ * Identity of a record that carries no id: every scalar field it holds (keys sorted, values trimmed and
+ * lower-cased), so rows that differ in ANY field (agency, office, fiscal year, quarter, value band, NAICS, a notice
+ * number) never share a key. Only a row identical in every field is a duplicate.
+ */
+function noIdRowKey(o: Record<string, unknown>): string {
+  return Object.keys(o)
+    .filter((k) => ['string', 'number', 'boolean'].includes(typeof o[k]))
+    .sort()
+    .map((k) => `${k.toLowerCase()}=${String(o[k]).trim().toLowerCase()}`)
+    .join('|');
 }
 
 function walkObjects(node: unknown, cb: (o: Record<string, unknown>, key: string | null) => void, key: string | null = null, depth = 0): void {
@@ -479,10 +527,14 @@ function enrichPathwayTitle(title: string, summary?: string, _noticeId?: string)
 /** Collapse Special Notice + Sources Sought twins (a solicitation id and the same id with a PLA / amendment suffix). */
 function pathwayDedupeKey(p: FmpPathway): string {
   const titleKey = p.title.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().slice(0, 56);
+  // Never a title alone: two different buyers' rows can share a title, and merging them silently loses one.
+  const buyerKey = (p.buyer ?? '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
   // Title first for vehicles / SS — FIND returns a notice UUID while search_sam returns the
   // solicitation PIID for the same MATOC; sol-first keys never collapsed those twins.
   if (VEHICLE_WORD_RE.test(p.title) || SOURCES_SOUGHT_RE.test(`${p.title} ${p.noticeType ?? ''}`)) {
-    return `frame:${titleKey}`;
+    // Twins of one notice (a FIND uuid and a SAM solicitation number) can name the buyer differently (office vs
+    // department), so the frame key is title + NAICS + deadline, never the title alone.
+    return `frame:${titleKey}|${p.naics ?? ''}|${p.when ?? ''}`;
   }
   const sol = (p.noticeId || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
   // PIID-style solicitation (not a 32-hex notice UUID) — stem collapses PLA/amend twins.
@@ -494,7 +546,7 @@ function pathwayDedupeKey(p: FmpPathway): string {
     const stem = sol.replace(/(PLA|AMEND\d*|REV\d*)$/i, '');
     return `sol:${stem.slice(0, 14)}`;
   }
-  return `title:${titleKey}|${p.naics ?? ''}`;
+  return `title:${titleKey}|${p.naics ?? ''}|${buyerKey}|${p.when ?? ''}|${p.kind}`;
 }
 
 function dateOnly(s: string): string {
@@ -593,7 +645,12 @@ function extractPathways(
         ?? firstString(o, ['notice_id', 'noticeId'])
         ?? (toolMatches && inFindList && kind !== 'forecast' ? firstString(o, ['id']) : undefined);
       if (!solicitation && !notice && !forecastRow) return;
-      const id = solicitation || notice || firstString(o, ['forecast_id', 'external_id', 'id'])!;
+      // A forecast row may carry no id at all. Never crash, and never merge two DIFFERENT forecasts that share a title:
+      // a no-id row is keyed on EVERY scalar field it carries (agency, office, fiscal year/quarter, value, NAICS, any
+      // notice number...), so only a true duplicate (all fields equal) collapses.
+      const id = solicitation || notice || firstString(o, ['forecast_id', 'external_id', 'id'])
+        || (forecastRow ? `forecast:${noIdRowKey(o)}` : undefined);
+      if (!id) return;
       const idKey = id.toLowerCase();
       if (seen.has(idKey)) return;
       seen.add(idKey);
@@ -1386,6 +1443,20 @@ export function flattenDocModelText(model: DocModel): string {
 }
 
 /**
+ * Does THIS firm do construction? The defense construction-oversight (PAE) section is about how construction is
+ * bought and overseen, so it belongs only in a construction firm's profile, never because an Army or Navy buyer
+ * appears in a janitorial or IT firm's evidence. Evidence order: the firm's award NAICS, else its saved profile
+ * NAICS, else the customer's own words. Unknown is "no": the section is not added on a guess.
+ */
+export function fmpFirmDoesConstruction(evidence: Pick<FmpWriteupEvidence, 'dominantNaics'>, customerText: string, companyNaics?: string | null): boolean {
+  const award = String(evidence.dominantNaics ?? '').replace(/\D/g, '');
+  if (award) return award.startsWith('23');
+  const own = String(companyNaics ?? '').replace(/\D/g, '');
+  if (own) return own.startsWith('23');
+  return /\b(construction|civil works|heavy civil|general contractor|design[- ]build)\b/i.test(customerText || '');
+}
+
+/**
  * Host-built DocModel from accumulated FMP evidence. Claude-parity shell (the read, metrics,
  * pathways, proven awards, money, PAE, pressure, contacts, readiness) where EVERY row and figure
  * comes from tool JSON; a section whose evidence is absent is shorter, never invented.
@@ -1404,7 +1475,11 @@ export function buildFmpHostDocModel(
   const civilFrame = !strategy || strategy.construction;
   // Name-only asks omit "defense"/"PAE" in the prompt, but defense-buyer pathways in the evidence
   // still need the PAE section. OR evidence so a false prompt flag cannot suppress DoD buyers.
-  const defense = (!!opts.defenseBuyersAppear || fmpDefenseBuyersAppearFromEvidence(evidence)) && civilFrame;
+  // Construction firms only: a strategy context carries the decision (the route computes it with
+  // fmpFirmDoesConstruction, including the saved profile NAICS); otherwise decide from this evidence and the ask.
+  const firmDoesConstruction = strategy ? strategy.construction : fmpFirmDoesConstruction(evidence, customerText);
+  const defense = (!!opts.defenseBuyersAppear || fmpDefenseBuyersAppearFromEvidence(evidence))
+    && civilFrame && firmDoesConstruction;
   const date = (opts.today ?? (() => new Date().toISOString().slice(0, 10)))();
   const snippets = requiredSnippetsForWriteup(evidence);
   const naics = evidence.dominantNaics || snippets.find((s) => /^\d{6}$/.test(s)) || null;

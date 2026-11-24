@@ -30,6 +30,7 @@ import { detectProhibitedMarkings, markingRefusalMessage } from '@/lib/vault/mar
 import { vaultEmailFor, WORKSPACE_UNCONFIRMED_NOTE, type ChatActingScope } from './chat-acting-scope';
 import { vaultDocEnabledFor } from '@/lib/vault/flags';
 import { validateFmpWriteup, type FmpWriteupContext } from './fmp-writeup-validate';
+import { applySourceProvenance, type ProvenanceRecord } from './doc-provenance';
 import { ensureRequestedSections, requestedSectionsMissingNote, type RequestedSection, type RequestedSectionKey } from './requested-doc-sections';
 
 export const CREATE_DOCUMENT = 'create_document';
@@ -163,6 +164,12 @@ export interface GenerateDocumentDeps {
    * lacks is assembled from the document's own labeled statements; one with nothing to draw from is reported.
    */
   requestedSections?: readonly RequestedSection[];
+  /**
+   * Provenance records from this conversation's tool results (doc-provenance.ts). Read at execute time, so a
+   * document built after research rounds sees them. Fills DocSource retrievedAt / url / recordId and an empty
+   * subtitle; never constructs a value with no match.
+   */
+  provenance?: () => readonly ProvenanceRecord[];
 }
 
 type Row = { id: string; original_filename: string; mime_type: string | null; version: number | null; parent_id: string | null; doc_model: unknown };
@@ -369,6 +376,21 @@ export function makeGenerateDocumentTool(deps: GenerateDocumentDeps) {
       console.info('[create_document] requested_sections', JSON.stringify({ requested: deps.requestedSections.map((r) => (r.key === 'named' ? r.label : r.key)), present: ensured.present, added: requestedAdded, missing: requestedMissing }));
     }
 
+    // Source provenance from this conversation's tool results: read dates, links and record ids, and a data-date
+    // subtitle, never written by the model and never constructed without a matching result.
+    let provenance: Omit<ReturnType<typeof applySourceProvenance>, 'model'> | null = null;
+    // Applied whenever the caller supplies provenance, even with no records: an unmatched source must not keep a
+    // model-written date, link or record id that would print as verified.
+    if (deps.provenance) {
+      const p = applySourceProvenance(model, deps.provenance());
+      if (validateDocModel(p.model).ok) {
+        model = p.model;
+        const { model: _m, ...counts } = p;
+        void _m;
+        provenance = counts;
+      }
+    }
+
     const text = docModelText(model);
     const marking = detectProhibitedMarkings(markingText(model));
     if (marking.blocked && marking.kind) return { ok: false, error: 'prohibited_marking', note: markingRefusalMessage(marking.kind) };
@@ -467,8 +489,9 @@ export function makeGenerateDocumentTool(deps: GenerateDocumentDeps) {
       ...(repeats.length ? { repeated_sentences: repeats.length } : {}),
       ...(fmpWarnings.length ? { fmp_warnings: fmpWarnings } : {}),
       ...(deps.requestedSections?.length ? { requested_sections: { requested: deps.requestedSections.map((r) => (r.key === 'named' ? r.label : r.key)), added: requestedAdded, missing: requestedMissing } } : {}),
+      ...(provenance ? { source_provenance: provenance } : {}),
       diagnostics,
-      note: 'Saved privately to the Vault (Documents → Generated). Under this answer the user gets an "Open report" card (on the Map the report also opens in a reading pane beside the chat). Tell them they can read it there, open Export in the report for PDF/Word/Excel/CSV, ask you for changes (a new version is saved, the old one is kept), or find it under Documents → Generated. Do not paste download links or list format buttons in the chat text.'
+      note: 'Saved privately to the Vault (Documents → Generated). Under this answer the user gets an "Open document" card (on the Map the report also opens in a reading pane beside the chat). Tell them they can read it there, open Export in the report for PDF/Word/Excel/CSV, ask you for changes (a new version is saved, the old one is kept), or find it under Documents → Generated. Do not paste download links or list format buttons in the chat text.'
         + (unverified.length ? ` ${unverified.length} statement(s) are labeled "Unverified — no source"; say so.` : '')
         + (omitted.length ? ` ${omitted.length} decision-critical statement(s) without a source were left out; say so.` : '')
         + (uncitedSources.some((s) => s.kind === 'upload')

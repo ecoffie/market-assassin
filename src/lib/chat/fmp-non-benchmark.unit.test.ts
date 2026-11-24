@@ -34,11 +34,13 @@ const ev = accumulateFmpEvidence([
 ]);
 
 describe('a non-benchmark company: same structure, its own evidence, no benchmark leakage', () => {
-  it('host report keeps the structure (headings measured on main before the removal) and passes the write-up gate', () => {
+  it('host report keeps the structure and passes the write-up gate (no construction-oversight section for a janitorial firm)', () => {
     const model = buildFmpHostDocModel(ev, { customerText: ASK, today: () => '2026-11-23' });
+    // Headings measured on main, minus the defense construction-oversight (PAE) section: it is for construction
+    // firms only, and this firm's award NAICS is 561720 even though an Army buyer appears.
     expect(model.sections.map((s) => s.heading)).toEqual([
       'The read', 'Pathways in priority order', 'Where the money is moving',
-      'Who owns defense construction now: the PAE shift', 'What buyers are under pressure to fix',
+      'What buyers are under pressure to fix',
       'Who to talk to and what to say', 'Readiness checklist: what these buyers will ask to see',
     ]);
     const v = validateFmpWriteup(model, { defenseBuyersAppear: false, requiredSnippets: requiredSnippetsForWriteup(ev) });
