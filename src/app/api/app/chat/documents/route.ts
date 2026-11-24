@@ -8,7 +8,7 @@
  *   DELETE ?email=&session_id=&id=                       → archive one (soft; hard delete awaits Eric)
  *
  * Gated by VAULT_ASK_MINDY_UPLOADS=true (default OFF). Auth is the same STRONG auth the Vault routes
- * require, plus hasProAccess (the Ask Mindy gate). Upload, list and delete are free: no credits.
+ * require, plus canUseAskMindy (the Ask Mindy gate: Pro or verified staff). Upload, list and delete are free: no credits.
  *
  * Ownership (strict — src/lib/vault/upload.ts resolveVaultWriteOwner):
  *   - no workspace header             → the caller's own Vault
@@ -25,7 +25,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verifyUserOwnsEmail } from '@/lib/api-auth';
-import { hasProAccess } from '@/lib/access/resolve-access';
+import { canUseAskMindy } from '@/lib/access/chat-access';
 import { WORKSPACE_UNCONFIRMED_NOTE } from '@/lib/chat/chat-acting-scope';
 import { resolveVaultWriteOwner, saveVaultUpload, ASK_MINDY_UPLOAD_EXTS } from '@/lib/vault/upload';
 import {
@@ -72,7 +72,7 @@ async function gate(request: NextRequest): Promise<Gate> {
   const caller = auth.email.toLowerCase();
   // Per-caller flag (controlled test): not allowlisted looks exactly like "off".
   if (!isVaultChatDocumentsEnabled(caller)) return { ok: false, response: notFound() };
-  if (!(await hasProAccess(caller))) return { ok: false, response: json({ success: false, error: 'pro_required', upgrade: true }, 403) };
+  if (!(await canUseAskMindy(caller))) return { ok: false, response: json({ success: false, error: 'pro_required', upgrade: true }, 403) };
   if (!UUID_RE.test(sessionId)) return { ok: false, response: json({ success: false, error: 'session_id must be a UUID' }, 400) };
 
   const owner = await resolveVaultWriteOwner(caller, request);
