@@ -412,6 +412,19 @@ function walkPersonCandidateStrings(node: unknown, out: string[], depth = 0): vo
   }
 }
 
+/**
+ * Identity of a record that carries no id: every scalar field it holds (keys sorted, values trimmed and
+ * lower-cased), so rows that differ in ANY field (agency, office, fiscal year, quarter, value band, NAICS, a notice
+ * number) never share a key. Only a row identical in every field is a duplicate.
+ */
+function noIdRowKey(o: Record<string, unknown>): string {
+  return Object.keys(o)
+    .filter((k) => ['string', 'number', 'boolean'].includes(typeof o[k]))
+    .sort()
+    .map((k) => `${k.toLowerCase()}=${String(o[k]).trim().toLowerCase()}`)
+    .join('|');
+}
+
 function walkObjects(node: unknown, cb: (o: Record<string, unknown>, key: string | null) => void, key: string | null = null, depth = 0): void {
   if (depth > 9 || node == null) return;
   if (Array.isArray(node)) {
@@ -514,10 +527,14 @@ function enrichPathwayTitle(title: string, summary?: string, _noticeId?: string)
 /** Collapse Special Notice + Sources Sought twins (a solicitation id and the same id with a PLA / amendment suffix). */
 function pathwayDedupeKey(p: FmpPathway): string {
   const titleKey = p.title.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().slice(0, 56);
+  // Never a title alone: two different buyers' rows can share a title, and merging them silently loses one.
+  const buyerKey = (p.buyer ?? '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
   // Title first for vehicles / SS — FIND returns a notice UUID while search_sam returns the
   // solicitation PIID for the same MATOC; sol-first keys never collapsed those twins.
   if (VEHICLE_WORD_RE.test(p.title) || SOURCES_SOUGHT_RE.test(`${p.title} ${p.noticeType ?? ''}`)) {
-    return `frame:${titleKey}`;
+    // Twins of one notice (a FIND uuid and a SAM solicitation number) can name the buyer differently (office vs
+    // department), so the frame key is title + NAICS + deadline, never the title alone.
+    return `frame:${titleKey}|${p.naics ?? ''}|${p.when ?? ''}`;
   }
   const sol = (p.noticeId || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
   // PIID-style solicitation (not a 32-hex notice UUID) — stem collapses PLA/amend twins.
@@ -529,7 +546,7 @@ function pathwayDedupeKey(p: FmpPathway): string {
     const stem = sol.replace(/(PLA|AMEND\d*|REV\d*)$/i, '');
     return `sol:${stem.slice(0, 14)}`;
   }
-  return `title:${titleKey}|${p.naics ?? ''}`;
+  return `title:${titleKey}|${p.naics ?? ''}|${buyerKey}|${p.when ?? ''}|${p.kind}`;
 }
 
 function dateOnly(s: string): string {
@@ -628,9 +645,11 @@ function extractPathways(
         ?? firstString(o, ['notice_id', 'noticeId'])
         ?? (toolMatches && inFindList && kind !== 'forecast' ? firstString(o, ['id']) : undefined);
       if (!solicitation && !notice && !forecastRow) return;
-      // A forecast row may carry no id at all: dedupe it by its title rather than crash (it never shows an id).
+      // A forecast row may carry no id at all. Never crash, and never merge two DIFFERENT forecasts that share a title:
+      // a no-id row is keyed on EVERY scalar field it carries (agency, office, fiscal year/quarter, value, NAICS, any
+      // notice number...), so only a true duplicate (all fields equal) collapses.
       const id = solicitation || notice || firstString(o, ['forecast_id', 'external_id', 'id'])
-        || (forecastRow ? `forecast:${title}` : undefined);
+        || (forecastRow ? `forecast:${noIdRowKey(o)}` : undefined);
       if (!id) return;
       const idKey = id.toLowerCase();
       if (seen.has(idKey)) return;

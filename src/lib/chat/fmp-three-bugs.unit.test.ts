@@ -11,18 +11,34 @@ import { accumulateFmpEvidence, buildFmpHostDocModel, fmpFirmDoesConstruction } 
 const forecasts = (rows: unknown[]) => JSON.stringify({ forecasts: rows });
 
 describe('1. a forecast row with no id', () => {
-  it('does not crash; the forecast is kept as a pathway and deduped by its title', () => {
-    const run = () => accumulateFmpEvidence([{
-      tool: 'get_agency_forecasts',
-      content: forecasts([
-        { title: 'Custodial services recompete', description: 'Base-wide custodial services.', agency: 'Air Force', naics_code: '561720', award_date: '2027-06-01' },
-        { title: 'Custodial services recompete', description: 'Same row repeated by the publisher.', agency: 'Air Force', naics_code: '561720', award_date: '2027-06-01' },
-      ]),
-    }]);
-    expect(run).not.toThrow();
-    const fc = (run().pathways ?? []).filter((p) => p.kind === 'forecast');
-    expect(fc.map((p) => p.title)).toEqual(['Custodial services recompete']);
-    expect(fc[0].noticeId).toBeUndefined();
+  const run = (rows: unknown[]) => accumulateFmpEvidence([{ tool: 'get_agency_forecasts', content: forecasts(rows) }]);
+  const base = { title: 'Custodial services recompete', description: 'Base-wide custodial services.', agency: 'Air Force', office: 'AFICC', fiscal_year: 2027, naics_code: '561720', value_range: '$1M to $5M', award_date: '2027-06-01' };
+  const kept = (rows: unknown[]) => (run(rows).pathways ?? []).filter((p) => p.kind === 'forecast');
+
+  it('does not crash, and the forecast is kept (it never shows an id)', () => {
+    expect(() => run([base])).not.toThrow();
+    expect(kept([base]).map((p) => p.title)).toEqual(['Custodial services recompete']);
+    expect(kept([base])[0].noticeId).toBeUndefined();
+  });
+
+  it('two same-title forecasts that differ in agency, fiscal year, office, value or NAICS are BOTH kept', () => {
+    for (const diff of [{ agency: 'Navy' }, { fiscal_year: 2028 }, { office: 'NAVFAC' }, { value_range: '$5M to $10M' }, { naics_code: '561730' }]) {
+      expect(kept([base, { ...base, ...diff }]), JSON.stringify(diff)).toHaveLength(2);
+    }
+  });
+
+  it('a construction firm\'s ranked list never merges same-title rows from different buyers or dates', () => {
+    const history = JSON.stringify({ recipient: 'Test Firm LLC', primary_naics: '237310', total_obligations: 1000000, awards: [{ piid: 'W9124D26D0005', naics: '237310', awarding_agency: 'Federal Highway Administration', amount: 1000000 }] });
+    const fc = (agency: string, date: string) => ({ ...base, title: 'Bridge rehabilitation', description: 'Rehabilitate bridge deck and pavement.', naics_code: '237310', agency, award_date: date });
+    const ev = accumulateFmpEvidence([
+      { tool: 'get_contractor_award_history', content: history },
+      { tool: 'get_agency_forecasts', content: forecasts([fc('Federal Highway Administration', '2027-06-01'), fc('National Park Service', '2027-06-01'), fc('Federal Highway Administration', '2028-03-01')]) },
+    ]);
+    expect((ev.pathways ?? []).filter((p) => p.kind === 'forecast')).toHaveLength(3);
+  });
+
+  it('a true duplicate (every field equal) collapses to one', () => {
+    expect(kept([base, { ...base }])).toHaveLength(1);
   });
 });
 
