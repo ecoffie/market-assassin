@@ -3,6 +3,7 @@
 import { Suspense, lazy } from 'react';
 import type { AppPanel, AppTier } from '../UnifiedSidebar';
 import { parseSettingsSection, parseVaultSection } from '@/lib/app/deep-link-params';
+import { isTodayHomeEnabled } from '@/lib/app/today-home';
 
 // Lazy load panels for better performance
 const MindyChatPanel = lazy(() => import('./MindyChatPanel'));
@@ -40,6 +41,9 @@ const OsbpSmbResearchPanel = lazy(() => import('./OsbpSmbResearchPanel'));
 const MiccMrrPanel = lazy(() => import('./MiccMrrPanel'));
 // The Opportunity Map (and its Watchlist / Saved pages) in the app shell — a same-origin iframe.
 const MapShellPanel = lazy(() => import('./MapShellPanel'));
+// Today — one home after sign-in. Rendered only while NEXT_PUBLIC_TODAY_HOME is on (default OFF).
+const TodayPanel = lazy(() => import('./TodayPanel'));
+const TODAY_HOME = isTodayHomeEnabled();
 
 interface PanelContainerProps {
   activePanel: AppPanel;
@@ -67,6 +71,10 @@ function PanelLoading() {
 export default function PanelContainer({ activePanel, email, tier, onPanelChange, panelContext }: PanelContainerProps) {
   const renderPanel = () => {
     switch (activePanel) {
+      case 'today':
+        return TODAY_HOME
+          ? <TodayPanel email={email} onPanelChange={onPanelChange} />
+          : <DashboardPanel email={email} tier={tier} onPanelChange={onPanelChange} />;
       case 'map':
       case 'watchlist':
       case 'saved':

@@ -24,7 +24,7 @@ import { MARKET_FEEDBACK_CSS, MARKET_BOOT_HTML, MARKET_BOOT_APP_OPEN, MARKET_FEE
 import { LAYOUT_MOVE_JS } from './layout-move';
 import { HIERARCHY_HORIZON_LIMIT_JS } from '@/lib/opportunities/hierarchy-sub-agency';
 import { WATCH_SCOPE_JS } from '@/lib/saved-searches/watch-scope-client';
-import { MAP_APP_SHELL_CSS, MAP_APP_SHELL_RESIZE_JS, applyAppShell, isAppShellRequest } from './app-shell';
+import { MAP_APP_SHELL_CSS, MAP_APP_SHELL_RESIZE_JS, applyAppShell, applySignedInAppRedirect, isAppShellRequest } from './app-shell';
 
 export const dynamic = 'force-dynamic';
 
@@ -10966,11 +10966,11 @@ const ASK_MINDY_CSS =
   + '.amk-rep-exp{display:flex;align-items:center;gap:6px;flex:none;position:relative}.amk-rep-exp:empty{display:none}'
   + '.amk-exp-menu{position:relative}.amk-exp-toggle{border:1px solid #dde3ec;background:#fff;color:#334155;font:600 12px Inter,system-ui,sans-serif;border-radius:8px;padding:5px 12px;cursor:pointer}.amk-exp-toggle:hover{background:#f1f5f9}.amk-exp-toggle[aria-expanded="true"]{background:#f1f5f9}'
   + '.amk-exp-panel{position:absolute;right:0;top:calc(100% + 4px);z-index:5;min-width:160px;padding:6px;border:1px solid #dde3ec;border-radius:10px;background:#fff;box-shadow:0 8px 24px rgba(15,23,42,.12);display:flex;flex-direction:column;gap:2px}'
-  + '.amk-exp-panel[hidden]{display:none!important}.amk-exp-panel button{border:0;background:transparent;color:#334155;font:600 12px Inter,system-ui,sans-serif;border-radius:7px;padding:8px 10px;cursor:pointer;text-align:left}.amk-exp-panel button:hover{background:#f1f5f9}.amk-exp-panel button:disabled{opacity:.6;cursor:default}'
+  + '.amk-exp-panel[hidden]{display:none!important}.amk-exp-panel button{border:0;background:transparent;color:#334155;font:600 12px Inter,system-ui,sans-serif;border-radius:7px;padding:8px 10px;cursor:pointer;text-align:left}.amk-exp-panel button:hover{background:#f1f5f9}.amk-exp-panel button:disabled{opacity:.6;cursor:default}.amk-exp-panel a.amk-exp-link{display:block;color:#334155;font:600 12px Inter,system-ui,sans-serif;border-radius:7px;padding:8px 10px;text-decoration:none}.amk-exp-panel a.amk-exp-link:hover{background:#f1f5f9}'
   + '.amk-rep-err{flex:none;margin:0;padding:8px 14px;border-bottom:1px solid #fde2e2;background:#fef2f2;color:#b91c1c;font:500 12.5px Inter,system-ui,sans-serif}.amk-rep-err[hidden]{display:none}'
   + '.amk-rep-note{font:500 11.5px Inter,system-ui,sans-serif;color:#64748b;max-width:220px;text-align:right}'
   + '.amk-rep-x{border:0;background:none;color:#8595a6;cursor:pointer;font:400 24px/1 Inter,system-ui,sans-serif;padding:0 4px}'
-  + '.amk-rep-body{position:relative;flex:1;min-height:0;background:#f4f6fa;overflow:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}.amk-rep-f{position:absolute;inset:0;width:100%;height:100%;border:0;background:#fff}'
+  + '.amk-rep-body{position:relative;flex:1;min-height:0;background:#f4f6fa;overflow:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}.amk-rep-f{position:absolute;inset:0;width:100%;height:100%;border:0;background:#fff}.amk-rep-f.fit{position:static;display:block;inset:auto}.amk-rep-body:focus{outline:none}'
   + '.amk-rep-msg{position:absolute;inset:0;display:none;align-items:center;justify-content:center;flex-direction:column;gap:10px;text-align:center;padding:24px;font:500 13.5px Inter,system-ui,sans-serif;color:#475569;background:#fff}'
   + '.amk-rep-msg button{border:1px solid #bcd3fb;background:#eaf1fe;color:#1d4ed8;font:600 12px Inter,system-ui,sans-serif;border-radius:8px;padding:7px 12px;cursor:pointer}'
   + '.amk-repbtn{flex:none;border:1px solid #bcd3fb;background:#eaf1fe;color:#1d4ed8;font:600 11.5px Inter,system-ui,sans-serif;border-radius:8px;padding:5px 10px;cursor:pointer;align-self:flex-start}'
@@ -11197,6 +11197,7 @@ const ASK_MINDY_JS = `<script>(function(){
   function renderConversation(msgs){
     body.innerHTML='';
     msgs.forEach(function(m){ if(!m||typeof m.content!=='string') return; var d=addMsg(m.role==='user'?'user':'assistant', m.content); if(m.role!=='user'&&m.files&&m.files.length) repCard(cleanFiles(m.files),d); if(m.role!=='user'){ var r=savedReport(m.report); if(r) repSavedCard(r,d); } });
+    body.scrollTop=body.scrollHeight; // a reopened conversation shows its end (its report card) above the composer
   }
   function newChat(){
     if(busy||oppCtx) return;
@@ -11383,49 +11384,28 @@ const ASK_MINDY_JS = `<script>(function(){
       .then(function(d){ if(d&&d.url){ try{ if(window.__track) window.__track('tool_use','map_report_export',{format:file.format}); }catch(e){} location.href=d.url; } else { btn.textContent='Try again'; repError('The '+FMT_LABEL[file.format]+' file could not be prepared. Try again, or reopen the report from your Vault.'); } },function(){ btn.textContent='Try again'; repError('The file could not be prepared. Check your connection and try again.'); })
       .then(function(){ btn.disabled=false; if(btn.textContent==='Preparing...') btn.textContent=label; });
   }
-  // Packaged market report: a real PDF from /reports/<id>/pdf (same renderer as the hosted page). The browser
-  // downloads it by NAVIGATING a hidden frame to that URL (the response is Content-Disposition: attachment),
-  // never through a blob: a blob plus a synthetic link click after a long wait was blocked in production and
-  // saved nothing. A failure answers with the route's own HTML error page, which DOES load in the frame, so
-  // its message is read back and shown in the pane.
+  // Packaged market report: a real PDF from /reports/<id>/pdf (same renderer as the hosted page).
+  // The menu item is a REAL LINK the customer clicks, opening that URL in a new tab: the response is an
+  // attachment, so the browser saves it (and closes the tab); a failure shows the route's readable error
+  // page in that tab. Two script-driven downloads inside the Map's frames saved nothing in a production
+  // browser with no error shown (a blob + synthetic click, then a hidden frame, Claude Local 2026-11-22/23),
+  // while the hosted page's own link - a real top-level link - did save the file.
   var REPORT_ID_RX=/^[A-Za-z0-9_-]{16,64}$/;
-  var PDF_SETTLE_MS=10000, PDF_FRAME_TTL_MS=120000, pdfFrame=null;
-  function downloadReportPdf(reportId,btn){
-    var label='Download PDF'; btn.disabled=true; btn.textContent='Preparing PDF...'; repError('');
-    // The button settles after PDF_SETTLE_MS (no event tells us a download began); an error page that
-    // arrives later still shows, so a slow failure is never silent.
-    var errored=false;
-    var settle=function(){ if(errored||pdfFrame!==f) return; btn.disabled=false; btn.textContent=label; };
-    var failWith=function(msg){
-      if(errored||pdfFrame!==f) return; errored=true; btn.disabled=false; btn.textContent='Try again';
-      repError(msg||'The PDF could not be created. Try again in a minute.');
-    };
-    if(pdfFrame&&pdfFrame.parentNode) pdfFrame.parentNode.removeChild(pdfFrame);
-    var f=document.createElement('iframe'); pdfFrame=f;
-    f.setAttribute('data-testid','amk-report-pdf-frame'); f.setAttribute('aria-hidden','true'); f.setAttribute('tabindex','-1'); f.title='PDF download';
-    f.style.cssText='position:absolute;width:0;height:0;border:0;visibility:hidden;left:-9999px;top:0';
-    f.addEventListener('load',function(){
-      var d=null; try{ d=f.contentDocument; }catch(e){ d=null; }
-      if(!d){ failWith(''); return; }
-      var body=d.body?(d.body.textContent||'').replace(/\\s+/g,' ').trim():'';
-      if(d.title!=='PDF not available'&&!body) return;
-      var p=d.querySelector('.c p'); var msg=p?(p.textContent||'').trim():'';
-      failWith(msg);
-    });
-    document.body.appendChild(f);
-    f.src='/reports/'+encodeURIComponent(reportId)+'/pdf';
-    try{ if(window.__track) window.__track('tool_use','map_report_export',{format:'pdf',source:'market_report'}); }catch(e){}
-    setTimeout(settle,PDF_SETTLE_MS);
-    setTimeout(function(){ if(f.parentNode) f.parentNode.removeChild(f); if(pdfFrame===f) pdfFrame=null; },PDF_FRAME_TTL_MS);
+  function reportPdfItem(reportId){
+    return {label:'Download PDF',fmt:'pdf',href:'/reports/'+encodeURIComponent(reportId)+'/pdf',
+      run:function(){ try{ if(window.__track) window.__track('tool_use','map_report_export',{format:'pdf',source:'market_report'}); }catch(e){} }};
   }
-  // items: [{label, fmt, run(btn)}]
+  // items: [{label, fmt, run(btn), href?}] - an item with href is a real link (opens in a new tab).
   function exportMenu(items,host){
     host.innerHTML=''; if(!items.length) return;
     var wrap=document.createElement('div'); wrap.className='amk-exp-menu'; wrap.setAttribute('data-testid','amk-export-menu');
     var toggle=document.createElement('button'); toggle.type='button'; toggle.className='amk-exp-toggle'; toggle.setAttribute('data-testid','amk-export-toggle'); toggle.setAttribute('aria-expanded','false'); toggle.textContent='Export';
     var panel=document.createElement('div'); panel.className='amk-exp-panel'; panel.hidden=true; panel.setAttribute('role','menu');
     items.forEach(function(it){
-      var b=document.createElement('button'); b.type='button'; b.setAttribute('data-fmt',it.fmt); b.setAttribute('role','menuitem'); b.textContent=it.label;
+      var b;
+      if(it.href){ b=document.createElement('a'); b.href=it.href; b.target='_blank'; b.rel='noopener'; b.className='amk-exp-link'; b.title='Opens in a new tab'; b.setAttribute('aria-label',it.label+' (opens in a new tab)'); }
+      else { b=document.createElement('button'); b.type='button'; }
+      b.setAttribute('data-fmt',it.fmt); b.setAttribute('role','menuitem'); b.textContent=it.label;
       b.onclick=function(){ it.run(b); panel.hidden=true; toggle.setAttribute('aria-expanded','false'); };
       panel.appendChild(b);
     });
@@ -11435,20 +11415,116 @@ const ASK_MINDY_JS = `<script>(function(){
   function fileItems(files){ return files.map(function(f){ return {label:FMT_LABEL[f.format],fmt:f.format,run:function(b){ exportFile(f,b); }}; }); }
   // Preview HTML goes into the script-less frame. Its own "Save as PDF" button (window.print) cannot run
   // there, so it is hidden; Export in the pane header is the working path.
+  // Scrolling: the PANE BODY scrolls, not the frame. Once the report loads, the frame is sized to its
+  // content (repFit), so wheel, trackpad, touch, keyboard and the scrollbar all act on an ordinary element
+  // of this page. A container-sized frame left scrolling to the inner document, which did not move in a
+  // production browser (2026-11-22). Measuring needs allow-same-origin; the frame still has NO scripts,
+  // forms, popups or top navigation. If the document cannot be read, the frame keeps the old full-pane
+  // layout and its own document scrolls (html is forced scrollable below).
+  // Same-origin frame, so it is locked down further (Agent 4 review of this change):
+  // - a Content-Security-Policy meta is the FIRST thing in its head: no request of any kind leaves the
+  //   frame (default-src 'none'; only inline styles and data: images/fonts), so nothing in it can reach
+  //   an /api route or any URL with our cookies; no <base>, no form submission;
+  // - <meta http-equiv="refresh"> and <base> are removed before the HTML goes in;
+  // - link clicks never navigate the frame: http(s) links open a new tab, mailto opens the mail app,
+  //   anything else does nothing (repLinks).
+  // The HTML itself is only our renderers' output (market report, Vault preview), with every user and
+  // model string escaped.
+  var REP_FRAME_CSP='<meta http-equiv="Content-Security-Policy" content="default-src \\'none\\'; style-src \\'unsafe-inline\\'; img-src data:; font-src data:; base-uri \\'none\\'; form-action \\'none\\'">';
+  var REP_FRAME_CSS='<style>.pdfbtn{display:none!important}html{height:auto!important;overflow:auto!important}body{height:auto!important;min-height:0!important;overflow:visible!important}</style>';
+  // The HTML is parsed into an INERT document (DOMParser: no scripts run, nothing loads) and cleaned there,
+  // then serialized. String regexes are bypassable (an entity-encoded http-equiv="&#114;efresh" still
+  // decodes to refresh), and a same-origin frame that navigates to our origin carries our cookies, which
+  // the old opaque frame did not. Removed: script, iframe, frame, frameset, object, embed, applet, form,
+  // base, link, noscript, template, portal, math, SVG animation (it can rewrite attributes), style inside
+  // SVG, every meta except charset / viewport, every on* attribute, any URL attribute that is not
+  // http(s)/mailto/#fragment (data: is allowed only for images, which the CSP also permits).
+  var REP_KILL='script,iframe,frame,frameset,object,embed,applet,form,base,link,noscript,template,portal,math,svg style,animate,set,animateMotion,animateTransform,discard';
+  var REP_URL_ATTR=/^(href|xlink:href|src|srcset|action|formaction|poster|background|data|ping|lowsrc|dynsrc|cite|longdesc|usemap|codebase|manifest|icon)$/i;
+  function repSanitize(html){
+    var doc=null; try{ doc=new DOMParser().parseFromString(String(html||''),'text/html'); }catch(e){ doc=null; }
+    if(!doc||!doc.documentElement) return null;
+    var kill=doc.querySelectorAll(REP_KILL), i, j;
+    for(i=kill.length-1;i>=0;i--){ if(kill[i].parentNode) kill[i].parentNode.removeChild(kill[i]); }
+    var metas=doc.querySelectorAll('meta');
+    for(i=metas.length-1;i>=0;i--){
+      var mt=metas[i], keep=!mt.hasAttribute('http-equiv')&&(mt.hasAttribute('charset')||String(mt.getAttribute('name')||'').toLowerCase()==='viewport');
+      if(!keep&&mt.parentNode) mt.parentNode.removeChild(mt);
+    }
+    var all=doc.getElementsByTagName('*');
+    for(i=0;i<all.length;i++){
+      var el=all[i], attrs=[];
+      for(j=0;j<el.attributes.length;j++) attrs.push(el.attributes[j]);
+      for(j=0;j<attrs.length;j++){
+        var a=attrs[j], n=a.name, v=String(a.value||'').replace(/[\\u0000-\\u0020\\u007f]+/g,'');
+        if(/^on/i.test(n)){ el.removeAttribute(n); continue; }
+        if(REP_URL_ATTR.test(n)){
+          var ok=/^(href|xlink:href)$/i.test(n)?/^(https?:|mailto:|#)/i.test(v):(/^(src|srcset)$/i.test(n)&&/^data:image\\//i.test(v));
+          if(!ok) el.removeAttribute(n);
+        }
+      }
+    }
+    return doc;
+  }
+  function repFrameHtml(html){
+    var doc=repSanitize(html);
+    if(!doc) return REP_FRAME_CSP+'<p>This preview could not be shown. Use Open hosted link.</p>';
+    var head=doc.head||doc.documentElement.insertBefore(doc.createElement('head'),doc.body);
+    var st=doc.createElement('style'); st.textContent=REP_FRAME_CSS.replace(/^<style>|<[/]style>$/g,''); head.appendChild(st);
+    // The policy goes in THROUGH THE DOM, as the head's first child, before serializing. A string insert after
+    // the first "<head" could land inside an attribute value (the serializer does not escape "<" there, e.g.
+    // <html data-x="<head>">), and the policy would never apply.
+    var holder=doc.createElement('div'); holder.innerHTML=REP_FRAME_CSP; var csp=holder.firstChild;
+    head.insertBefore(csp,head.firstChild);
+    return '<!doctype html>'+doc.documentElement.outerHTML;
+  }
   function repSetDoc(E,html){
-    var hide='<style>.pdfbtn{display:none!important}</style>';
-    E.f.srcdoc=/<[/]head>/i.test(html)?html.replace(/<[/]head>/i,hide+'</head>'):hide+html;
+    E.f.classList.remove('fit'); E.f.style.height='';
+    E.f.srcdoc=repFrameHtml(html);
     E.f.style.visibility='visible'; E.msg.style.display='none'; repError('');
+  }
+  function repLinks(E){
+    var d=null; try{ d=E.f.contentDocument; }catch(e){ d=null; }
+    if(!d||d.__amkLinks) return; d.__amkLinks=1;
+    d.addEventListener('click',function(ev){
+      var t=ev.target, a=t&&t.closest?t.closest('a[href]'):null; if(!a) return;
+      ev.preventDefault();
+      var href=String(a.getAttribute('href')||'');
+      if(/^https?:/i.test(href)){ try{ window.open(href,'_blank','noopener'); }catch(e){} }
+      else if(/^mailto:/i.test(href)){ try{ window.location.href=href; }catch(e){} }
+    },true);
+  }
+  function repFit(E){
+    var d=null; try{ d=E.f.contentDocument; }catch(e){ d=null; }
+    if(!d||!d.documentElement||!d.body||!d.body.firstChild) return false;
+    var de=d.documentElement;
+    E.f.classList.add('fit'); E.f.style.height='1px';
+    var h=Math.max(de.scrollHeight,d.body.scrollHeight);
+    if(!(h>1)){ E.f.classList.remove('fit'); E.f.style.height=''; return false; }
+    // The inner document must not be a vertical scroller (it would keep the wheel); a wide table may still
+    // scroll sideways, so its scrollbar's height is added.
+    de.style.setProperty('overflow-y','hidden','important'); de.style.setProperty('overflow-x','auto','important');
+    E.f.style.height=h+'px';
+    var bar=h-de.clientHeight; if(bar>0&&bar<40) E.f.style.height=(h+bar)+'px';
+    return true;
   }
   function ensurePane(){
     if(repEls) return repEls;
     var el=document.createElement('aside'); el.className='amk-rep'; el.id='amkRep'; el.setAttribute('aria-hidden','true'); el.setAttribute('role','dialog'); el.setAttribute('aria-label','Report'); el.setAttribute('data-testid','amk-report-pane');
-    el.innerHTML='<div class="amk-rep-hd"><button type="button" class="amk-rep-back">Back to chat</button><div class="amk-rep-tt"><b class="amk-rep-t"></b><span class="amk-rep-v"></span></div><div class="amk-rep-exp"></div><button type="button" class="amk-rep-x" aria-label="Close report">&times;</button></div><p class="amk-rep-err" role="alert" data-testid="amk-report-error" hidden></p><div class="amk-rep-body"><iframe class="amk-rep-f" sandbox="" title="Report"></iframe><div class="amk-rep-msg"></div></div>';
+    el.innerHTML='<div class="amk-rep-hd"><button type="button" class="amk-rep-back">Back to chat</button><div class="amk-rep-tt"><b class="amk-rep-t"></b><span class="amk-rep-v"></span></div><div class="amk-rep-exp"></div><button type="button" class="amk-rep-x" aria-label="Close report">&times;</button></div><p class="amk-rep-err" role="alert" data-testid="amk-report-error" hidden></p><div class="amk-rep-body" tabindex="-1"><iframe class="amk-rep-f" sandbox="allow-same-origin" title="Report"></iframe><div class="amk-rep-msg"></div></div>';
     document.body.appendChild(el);
     repEls={el:el,t:el.querySelector('.amk-rep-t'),v:el.querySelector('.amk-rep-v'),exp:el.querySelector('.amk-rep-exp'),f:el.querySelector('.amk-rep-f'),msg:el.querySelector('.amk-rep-msg'),err:el.querySelector('.amk-rep-err')};
     // Keyboard reading: once a report has loaded, focus moves into it so Space / Page Down / arrows scroll it
     // (focus used to stay in the chat box, so the keys typed there and the report never moved).
-    repEls.f.addEventListener('load',function(){ if(repIsOpen()&&repEls.f.style.visibility==='visible'){ try{ repEls.f.focus(); }catch(e){} } });
+    var body=el.querySelector('.amk-rep-body'); repEls.body=body;
+    repEls.f.addEventListener('load',function(){
+      if(repEls.f.style.visibility!=='visible') return;
+      var fitted=repFit(repEls); repLinks(repEls); body.scrollTop=0;
+      if(repIsOpen()){ try{ (fitted?body:repEls.f).focus(); }catch(e){} }
+    });
+    // A width change reflows the report, so its height is measured again.
+    var lastW=0, refit=function(){ var w=body.clientWidth; if(w&&w!==lastW){ lastW=w; if(repEls.f.classList.contains('fit')) repFit(repEls); } };
+    if(window.ResizeObserver){ try{ new ResizeObserver(refit).observe(body); }catch(e){ window.addEventListener('resize',refit); } } else { window.addEventListener('resize',refit); }
     el.querySelector('.amk-rep-x').onclick=function(){ repHide(true); };
     el.querySelector('.amk-rep-back').onclick=function(){ repHide(true); };
     return repEls;
@@ -11457,7 +11533,7 @@ const ASK_MINDY_JS = `<script>(function(){
   function syncRepBtn(){
     var hd=drawer.querySelector('.amk-hd'), xb=document.getElementById('amkX'); if(!hd) return;
     if(rep&&!repIsOpen()&&!oppCtx){
-      if(!repBtn){ repBtn=document.createElement('button'); repBtn.type='button'; repBtn.className='amk-repbtn'; repBtn.setAttribute('data-testid','amk-report-btn'); repBtn.textContent='Report'; repBtn.title='Open your report'; repBtn.onclick=function(){ if(rep) repOpen(rep.id); }; }
+      if(!repBtn){ repBtn=document.createElement('button'); repBtn.type='button'; repBtn.className='amk-repbtn'; repBtn.setAttribute('data-testid','amk-report-btn'); repBtn.textContent='Saved document'; repBtn.title='Open your saved document'; repBtn.onclick=function(){ if(rep) repOpen(rep.id); }; }
       if(!repBtn.parentNode) hd.insertBefore(repBtn,xb||null);
     } else if(repBtn&&repBtn.parentNode){ repBtn.parentNode.removeChild(repBtn); }
   }
@@ -11494,13 +11570,13 @@ const ASK_MINDY_JS = `<script>(function(){
       .catch(function(){ if(seq===repSeq) repMessage('The report could not be loaded. Check your connection and try again.',id); });
   }
   // The reply that created or revised a document: a card under the answer + the pane opens on the new version.
-  // The "Open report" card under an answer. Returns the primary document id ('' when the files are unusable).
+  // The "Open document" card under an answer (a saved Vault document). Returns the primary document id ('' when the files are unusable).
   function repCard(files,aEl){
     var id=primaryId(files); if(!id) return '';
     var prim=files.filter(function(f){ return f.document_id===id; })[0]||files[0];
     var ver=0; files.forEach(function(f){ if(f.version>ver) ver=f.version; });
     var w=document.createElement('div'); w.className='amk-repcard'; w.setAttribute('data-testid','amk-report-card');
-    w.innerHTML='<div class="amk-repcard-t"><b></b><span></span></div><button type="button" class="amk-repcard-open">Open report</button>';
+    w.innerHTML='<div class="amk-repcard-t"><b></b><span></span></div><button type="button" class="amk-repcard-open">Open document</button>';
     w.querySelector('b').textContent=(prim.file_name||'Your report').replace(/[.](pdf|docx|xlsx|csv)$/i,'');
     w.querySelector('span').textContent='Version '+(ver||1)+' - saved to your Vault';
     w.querySelector('.amk-repcard-open').onclick=function(){ repOpen(id); };
@@ -11528,7 +11604,7 @@ const ASK_MINDY_JS = `<script>(function(){
     function mrExport(){
       var E3=ensurePane();
       // PDF only: the one format this report has a real export for. Without a saved copy there is nothing to render.
-      exportMenu(reportId?[{label:'Download PDF',fmt:'pdf',run:function(b){ downloadReportPdf(reportId,b); }}]:[],E3.exp);
+      exportMenu(reportId?[reportPdfItem(reportId)]:[],E3.exp);
       if(!reportId){ var n=document.createElement('span'); n.className='amk-rep-note'; n.setAttribute('data-testid','amk-report-no-export'); n.textContent='This report was not saved, so it cannot be downloaded. Ask Mindy to create it again.'; E3.exp.appendChild(n); }
       if(url){ var a=document.createElement('a'); a.href=url; a.target='_blank'; a.rel='noopener'; a.textContent='Open hosted link'; a.style.cssText='font:600 12px Inter,system-ui,sans-serif;color:#1d4ed8;margin-left:4px'; E3.exp.appendChild(a); }
     }
@@ -11536,7 +11612,7 @@ const ASK_MINDY_JS = `<script>(function(){
     syncRepBtn();
     if(!aEl) return; // re-opened from a saved card: that card already exists
     var w=document.createElement('div'); w.className='amk-repcard'; w.setAttribute('data-testid','amk-report-card');
-    w.innerHTML='<div class="amk-repcard-t"><b></b><span></span></div><button type="button" class="amk-repcard-open">Open report</button>';
+    w.innerHTML='<div class="amk-repcard-t"><b></b><span></span></div><button type="button" class="amk-repcard-open">Open market report</button>';
     w.querySelector('b').textContent=title;
     w.querySelector('span').textContent='Packaged research \\u00b7 same engine as MCP';
     w.querySelector('.amk-repcard-open').onclick=function(){
@@ -11555,7 +11631,7 @@ const ASK_MINDY_JS = `<script>(function(){
   }
   function repSavedCard(r,aEl){
     var w=document.createElement('div'); w.className='amk-repcard'; w.setAttribute('data-testid','amk-report-card');
-    w.innerHTML='<div class="amk-repcard-t"><b></b><span></span></div><button type="button" class="amk-repcard-open">Open report</button>';
+    w.innerHTML='<div class="amk-repcard-t"><b></b><span></span></div><button type="button" class="amk-repcard-open">Open market report</button>';
     w.querySelector('b').textContent=r.title;
     w.querySelector('span').textContent='Packaged research \\u00b7 same engine as MCP';
     w.querySelector('.amk-repcard-open').onclick=function(){ repOpenSaved(r); };
@@ -12139,5 +12215,8 @@ export async function GET(request: NextRequest) {
   // and adds the parent bridge; data, boot and fetch behaviour are untouched (see app-shell.ts).
   // Never for ?embed= (a different, static mode with its own boot rules).
   if (!embed && isAppShellRequest(reqUrl)) html = applyAppShell(html, MAP_APP_SHELL_CSS + MAP_APP_SHELL_RESIZE_JS);
+  // A signed-in customer on the STANDALONE map (an old bookmark) goes to the same view in the app,
+  // /app?panel=map&… (call 2026-11-23). No-op for ?shell=app and ?embed=; signed-out visitors stay.
+  html = applySignedInAppRedirect(html, reqUrl);
   return new NextResponse(html, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } });
 }

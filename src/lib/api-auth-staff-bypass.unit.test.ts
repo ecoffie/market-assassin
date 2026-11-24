@@ -49,7 +49,11 @@ describe('staff-domain bypass', () => {
   it('still recognises staff domains — the list itself is not the bug', () => {
     // getStaffRole is correct in isolation; the defect was calling it on unproven input.
     // Deleting the domains would break real staff, which is the wrong fix.
-    expect(CODE).toContain("domain === 'getmindy.ai'");
-    expect(CODE).toContain("return 'staff'");
+    // The list moved to access/staff-role.ts (2026-11-24) so access helpers can use it without
+    // pulling in api-auth; api-auth re-exports it.
+    const STAFF = readFileSync(join(__dirname, 'access', 'staff-role.ts'), 'utf8');
+    expect(STAFF).toContain("domain === 'getmindy.ai'");
+    expect(STAFF).toContain("return 'staff'");
+    expect(SRC).toContain("export { INTERNAL_TEAM_EMAILS, getStaffRole } from '@/lib/access/staff-role';");
   });
 });

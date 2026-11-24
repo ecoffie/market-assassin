@@ -23,3 +23,54 @@ export const OTHER_ASSISTANTS = {
 
 export const CLAUDE_COMPUTER_NOTE =
   'Add the connector on a computer, at claude.ai in a browser or in the Claude desktop app. You cannot add it from the phone app.';
+
+/** One piece of a setup step's copy: plain text, a *bold* UI target, or a [label](href) link. */
+export type StepBodyPart =
+  | { kind: 'text'; text: string }
+  | { kind: 'bold'; text: string }
+  | { kind: 'link'; text: string; href: string };
+
+/**
+ * Split step copy into parts. `*Settings*` → bold; `[getmindy.ai/pricing](/pricing)` → link.
+ * A link exists so an address the copy tells people to visit is clickable, not just text.
+ */
+export function stepBodyParts(body: string): StepBodyPart[] {
+  const parts: StepBodyPart[] = [];
+  for (const piece of body.split(/(\*[^*]+\*|\[[^\]]+\]\([^)\s]+\))/g)) {
+    if (!piece) continue;
+    const link = piece.match(/^\[([^\]]+)\]\(([^)\s]+)\)$/);
+    if (link) parts.push({ kind: 'link', text: link[1], href: link[2] });
+    else if (piece.length > 2 && piece.startsWith('*') && piece.endsWith('*')) parts.push({ kind: 'bold', text: piece.slice(1, -1) });
+    else parts.push({ kind: 'text', text: piece });
+  }
+  return parts;
+}
+
+/**
+ * "Which AI do you use?" chooser at the top of /mcp/setup. A rep demoed in Claude to a
+ * Copilot user who could not follow along: the page showed every assistant's steps in one
+ * long scroll. Each option jumps to its section and, through AI_CHOOSER_CSS, shows only that
+ * section. Labels and hints reuse copy already on this page; no new claims.
+ */
+export const AI_CHOOSER = {
+  id: 'which-ai',
+  heading: 'Which AI do you use?',
+  options: [
+    { id: 'claude', tag: 'Easiest — start here', label: 'Claude', hint: 'Built in. Connect, sign in, allow, done.' },
+    { id: 'chatgpt', tag: 'Also works', label: 'ChatGPT', hint: 'More steps: Developer mode, add Mindy, sign in, permissions.' },
+    { id: 'other', tag: 'Same pattern', label: 'Copilot, Cursor or other', hint: 'Any assistant that can add a remote MCP connector by its URL.' },
+  ],
+  showAll: 'Show steps for every assistant',
+} as const;
+
+/** Wrapper class around the per-assistant sections (each carries data-ai). */
+export const AI_SECTIONS_CLASS = 'setup-ai-sections';
+
+/**
+ * Pure CSS, no JavaScript: once the URL targets one assistant section (#claude, #chatgpt,
+ * #other), the other assistant sections are hidden. With no target, or a target outside the
+ * wrapper (#which-ai, #ask), every section stays visible, so a browser without JS or without
+ * :has() support simply shows the whole guide.
+ */
+export const AI_CHOOSER_CSS =
+  `.${AI_SECTIONS_CLASS}:has(> section[data-ai]:target) > section[data-ai]:not(:target){display:none}`;

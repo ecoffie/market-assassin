@@ -39,6 +39,10 @@ export async function GET(request: NextRequest) {
       .update({
         alerts_enabled: false,
         alert_frequency: 'paused',
+        // The daily briefing ("Active Solicitations") is gated by briefings_enabled, not
+        // alerts_enabled. Unsubscribe means ALL Mindy marketing mail: before this, a customer who
+        // cancelled and clicked unsubscribe kept getting the daily briefing (2026-11-23).
+        briefings_enabled: false,
         updated_at: new Date().toISOString(),
       }, { count: 'exact' })
       .eq('user_email', email.toLowerCase().trim());
@@ -107,6 +111,10 @@ export async function POST(request: NextRequest) {
       .update({
         alerts_enabled: false,
         alert_frequency: 'paused',
+        // The daily briefing ("Active Solicitations") is gated by briefings_enabled, not
+        // alerts_enabled. Unsubscribe means ALL Mindy marketing mail: before this, a customer who
+        // cancelled and clicked unsubscribe kept getting the daily briefing (2026-11-23).
+        briefings_enabled: false,
         updated_at: new Date().toISOString(),
       }, { count: 'exact' })
       .eq('user_email', auth.email!.toLowerCase().trim());
@@ -121,7 +129,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: 'Successfully unsubscribed from alerts',
+      message: 'Successfully unsubscribed from Mindy alerts and briefings',
     });
   } catch (error) {
     console.error('[Unsubscribe] Error:', error);

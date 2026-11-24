@@ -25,10 +25,16 @@ import { sendAppEngagement } from '@/components/app/track';
 import { getStoredPartnerRef } from '@/lib/mindy/partner-referral-client';
 import { signInWithGoogle, signInWithMicrosoft } from '@/lib/supabase/auth';
 import { parseAppDeepLink } from '@/lib/app/deep-link-params';
+import { magicLinkErrorMessage } from '@/lib/mindy/magic-link-error';
 import { MAP_SHELL_HOME_EVENT, isMapShellPanel } from '@/lib/app/map-shell';
 import { KNOWN_PANELS } from '@/lib/app/known-panels';
+import { homePanel, isTodayHomeEnabled, isTodayPanelParam } from '@/lib/app/today-home';
 import TrialOfferBanner from '@/components/app/TrialOfferBanner';
 import { TRIAL_CTA_LABEL } from '@/lib/public-site/trial-cta';
+
+// The "Today" home (src/lib/app/today-home.ts) — default OFF. While off, HOME_PANEL is 'dashboard' exactly as before.
+const TODAY_HOME = isTodayHomeEnabled();
+const HOME_PANEL: AppPanel = homePanel(TODAY_HOME, 'dashboard');
 
 /** The shared account-menu script (map + public pages) without its <script> wrapper. */
 const ACCOUNT_MENU_SCRIPT = ACCOUNT_MENU_JS.replace(/^<script>/, '').replace(/<\/script>[\s\S]*$/, '');
@@ -83,7 +89,7 @@ function AppDashboard() {
   // tabs (Vehicle Expiry Watch, SMB Market Research, Market Research Report). Off by
   // default for everyone — incl. staff & demo accounts — so they get the clean view.
   const [canSeePrototypes, setCanSeePrototypes] = useState(false);
-  const [activePanel, setActivePanel] = useState<AppPanel>('dashboard');
+  const [activePanel, setActivePanel] = useState<AppPanel>(HOME_PANEL);
   // Optional context the previous panel can pass to the next (e.g.
   // PipelinePanel sets { pursuit_id } when user clicks 'Draft Proposal'
   // so ProposalsPanel knows which pursuit to auto-load docs for).
@@ -160,7 +166,7 @@ function AppDashboard() {
   }, [oauthRedirectTo]);
   // Apple sign-in disabled until Apple OAuth provider is connected — handler removed;
   // restore it + signInWithApple import + the button when configured.
-  const activePanelRef = useRef<AppPanel>('dashboard');
+  const activePanelRef = useRef<AppPanel>(HOME_PANEL);
   // Single-flight guards so a burst of concurrent 401s triggers ONE recovery,
   // and so the proactive refresh only runs once per app load.
   // Holds the in-flight token-refresh promise so concurrent 401s share ONE
@@ -637,7 +643,7 @@ function AppDashboard() {
   const syncAppUrl = useCallback((panel: AppPanel, context?: Record<string, unknown>) => {
     if (typeof window === 'undefined') return;
     const params = new URLSearchParams();
-    if (panel !== 'dashboard') params.set('panel', panel);
+    if (panel !== HOME_PANEL) params.set('panel', panel);
     if (panel === 'research' && context?.keyword) {
       params.set('keyword', String(context.keyword));
     }
@@ -930,8 +936,8 @@ function AppDashboard() {
 
     // A reload of the in-app map keeps its view: the URL mirrors the map's own (src/lib/app/map-shell.ts).
     if (isReload && !isMapShellPanel(searchParams.get('panel'))) {
-      setActivePanel('dashboard');
-      activePanelRef.current = 'dashboard';
+      setActivePanel(HOME_PANEL);
+      activePanelRef.current = HOME_PANEL;
       if (typeof window !== 'undefined') {
         window.history.replaceState(null, '', '/app');
       }
@@ -939,7 +945,7 @@ function AppDashboard() {
     }
 
     const panelParam = searchParams.get('panel');
-    if (panelParam && KNOWN_PANELS.has(panelParam as AppPanel)) {
+    if (panelParam && (KNOWN_PANELS.has(panelParam as AppPanel) || isTodayPanelParam(panelParam, TODAY_HOME))) {
       setActivePanel(panelParam as AppPanel);
       activePanelRef.current = panelParam as AppPanel;
     }
@@ -965,6 +971,17 @@ function AppDashboard() {
       setPanelContext((prev) => ({ ...(prev || {}), ...deepLink }));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // A one-time sign-in link that was already used / superseded / expired lands here with an error
+  // hash and no session. Say so (and point to a new link or the password) instead of silently
+  // showing the form; strip the hash so a refresh does not repeat it. Display only — no auth change.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const linkError = magicLinkErrorMessage(window.location.hash);
+    if (!linkError) return;
+    setAuthError(linkError);
+    window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
   }, []);
 
   // Load user profile on mount

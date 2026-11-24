@@ -19,6 +19,7 @@ import { createClient } from '@supabase/supabase-js';
 import { DIBBS_MAP_ENABLED } from '@/lib/dibbs/availability';
 import { getMapOpportunities, getDibbsMapPins, getDibbsViewportPins, SET_GROUPS, mapSetAside, SET_LABEL, naicsCategory } from '@/lib/opportunities/map-data';
 import { getSbirMapPins } from '@/lib/sbir/sbir-map-pins';
+import { sbirExcludingFilters } from '@/lib/sbir/sbir-open-filters';
 import { sapBuyerTier } from '@/lib/opportunities/sap-friendly-agencies';
 import { computeGenome } from '@/lib/opportunities/genome';
 import { multiVal } from '@/lib/opportunities/map-filters';
@@ -410,8 +411,11 @@ export async function GET(request: NextRequest) {
     // SBIR/STTR topics under Open Opps (Eric 2026-07-28), opt-in via ?sources=...,sbir. Pinned at the
     // sponsoring branch HQ (APPROXIMATE — no place of performance), same fail-soft contract as DIBBS: a
     // SBIR read must never take down the SAM pins. bbox-filtered in JS (topics are a small set).
+    // A topic carries no set-aside, NAICS or PSC, so it can never satisfy those filters: with one
+    // active, the layer is skipped — otherwise every in-view topic was counted and pinned as a
+    // "match" for e.g. SDVOSB + NAICS (customer 2026-11-23; sbir-open-filters.ts).
     let sbirPins: ReturnType<typeof toPin>[] = [];
-    if (wantSbirSources(p.get('sources'))) {
+    if (wantSbirSources(p.get('sources')) && sbirExcludingFilters((k) => p.get(k), { profileNaics }).length === 0) {
       try {
         const all = await getSbirMapPins(400);
         sbirPins = all
