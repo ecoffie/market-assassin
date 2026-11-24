@@ -1,5 +1,7 @@
 /**
- * Connected accounts store. Every read is scoped to the acting scope; there is no "get by id" without it.
+ * Connected accounts store. Every read is scoped to the acting scope AND to the Mindy user who connected the
+ * account (owner_email): in a client workspace shared by several coaches, a coach can never list, use or
+ * disconnect a colleague's personal Google / Microsoft connection. There is no "get by id" without both.
  * Tokens are encrypted at rest and never returned to callers outside this module except as a live access token
  * for an immediate provider call.
  */
@@ -84,30 +86,36 @@ export async function saveConnection(
   return view(data as Row);
 }
 
-export async function listConnections(scopeKey: string, db: SupabaseClient = getWriteClient()): Promise<ConnectionView[]> {
-  const { data, error } = await db.from(TABLE).select(VIEW_COLS).eq('scope_key', scopeKey).neq('status', 'revoked').order('created_at', { ascending: true });
+const owner = (email: string) => String(email || '').trim().toLowerCase();
+
+/** The caller's own connections in this acting scope (never a colleague's). */
+export async function listConnections(scopeKey: string, ownerEmail: string, db: SupabaseClient = getWriteClient()): Promise<ConnectionView[]> {
+  if (!owner(ownerEmail)) return [];
+  const { data, error } = await db.from(TABLE).select(VIEW_COLS).eq('scope_key', scopeKey).eq('owner_email', owner(ownerEmail)).neq('status', 'revoked').order('created_at', { ascending: true });
   if (error) throw new Error(`connected-apps: list failed (${error.code})`);
   return ((data || []) as Row[]).map(view);
 }
 
-async function loadRow(scopeKey: string, id: string, db: SupabaseClient): Promise<Row | null> {
-  const { data, error } = await db.from(TABLE).select('*').eq('id', id).eq('scope_key', scopeKey).maybeSingle();
+async function loadRow(scopeKey: string, ownerEmail: string, id: string, db: SupabaseClient): Promise<Row | null> {
+  if (!owner(ownerEmail)) return null;
+  const { data, error } = await db.from(TABLE).select('*').eq('id', id).eq('scope_key', scopeKey).eq('owner_email', owner(ownerEmail)).maybeSingle();
   if (error) throw new Error(`connected-apps: load failed (${error.code})`);
   return (data as Row) || null;
 }
 
 /**
- * A live access token for an immediate provider call, refreshing when needed. Fails closed: wrong scope, revoked,
- * or a dead grant (marked reauth_needed) all return a typed refusal, never a token from another scope.
+ * A live access token for an immediate provider call, refreshing when needed. Fails closed: wrong scope, another
+ * person's connection, revoked, or a dead grant (marked reauth_needed) all return a typed refusal.
  */
 export async function accessTokenFor(
   scopeKey: string,
+  ownerEmail: string,
   id: string,
   deps: { db?: SupabaseClient; refresh?: typeof refreshTokens; now?: number } = {},
 ): Promise<{ ok: true; token: string; provider: Provider; connection: ConnectionView } | { ok: false; reason: 'not_found' | 'revoked' | 'reauth_needed' | 'refresh_failed' }> {
   const db = deps.db ?? getWriteClient();
   const now = deps.now ?? Date.now();
-  const row = await loadRow(scopeKey, id, db);
+  const row = await loadRow(scopeKey, ownerEmail, id, db);
   if (!row) return { ok: false, reason: 'not_found' };
   if (row.status === 'revoked') return { ok: false, reason: 'revoked' };
   if (row.status === 'reauth_needed') return { ok: false, reason: 'reauth_needed' };
@@ -116,18 +124,18 @@ export async function accessTokenFor(
     return { ok: true, token: dec(row.access_token_enc), provider: row.provider, connection: view(row) };
   }
   if (!row.refresh_token_enc) {
-    await db.from(TABLE).update({ status: 'reauth_needed', updated_at: new Date(now).toISOString() }).eq('id', row.id).eq('scope_key', scopeKey);
+    await db.from(TABLE).update({ status: 'reauth_needed', updated_at: new Date(now).toISOString() }).eq('id', row.id).eq('scope_key', scopeKey).eq('owner_email', row.owner_email);
     return { ok: false, reason: 'reauth_needed' };
   }
   try {
     const t = await (deps.refresh ?? refreshTokens)(row.provider, dec(row.refresh_token_enc));
     const patch: Record<string, unknown> = { access_token_enc: enc(t.accessToken), access_expires_at: new Date(t.expiresAt).toISOString(), updated_at: new Date(now).toISOString() };
     if (t.refreshToken) patch.refresh_token_enc = enc(t.refreshToken);
-    await db.from(TABLE).update(patch).eq('id', row.id).eq('scope_key', scopeKey);
+    await db.from(TABLE).update(patch).eq('id', row.id).eq('scope_key', scopeKey).eq('owner_email', row.owner_email);
     return { ok: true, token: t.accessToken, provider: row.provider, connection: view(row) };
   } catch (err) {
     if (err instanceof OAuthError && err.needsReauth) {
-      await db.from(TABLE).update({ status: 'reauth_needed', updated_at: new Date(now).toISOString() }).eq('id', row.id).eq('scope_key', scopeKey);
+      await db.from(TABLE).update({ status: 'reauth_needed', updated_at: new Date(now).toISOString() }).eq('id', row.id).eq('scope_key', scopeKey).eq('owner_email', row.owner_email);
       return { ok: false, reason: 'reauth_needed' };
     }
     return { ok: false, reason: 'refresh_failed' };
@@ -135,9 +143,9 @@ export async function accessTokenFor(
 }
 
 /** Disconnect: revoke at the provider when it supports it, then discard our tokens. No further provider calls. */
-export async function disconnect(scopeKey: string, id: string, deps: { db?: SupabaseClient; revoke?: typeof revokeAtProvider } = {}): Promise<'disconnected' | 'not_found'> {
+export async function disconnect(scopeKey: string, ownerEmail: string, id: string, deps: { db?: SupabaseClient; revoke?: typeof revokeAtProvider } = {}): Promise<'disconnected' | 'not_found'> {
   const db = deps.db ?? getWriteClient();
-  const row = await loadRow(scopeKey, id, db);
+  const row = await loadRow(scopeKey, ownerEmail, id, db);
   if (!row) return 'not_found';
   const token = row.refresh_token_enc ? dec(row.refresh_token_enc) : row.access_token_enc ? dec(row.access_token_enc) : null;
   if (token) await (deps.revoke ?? revokeAtProvider)(row.provider, token).catch(() => 'failed');

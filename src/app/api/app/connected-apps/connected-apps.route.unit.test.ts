@@ -181,8 +181,17 @@ describe('GET / DELETE', () => {
   it('list and disconnect run in the acting scope only', async () => {
     const { GET, DELETE } = await import('./route');
     await GET(new NextRequest('https://getmindy.ai/api/app/connected-apps?email=owner@acme.com'));
-    expect(h.list).toHaveBeenCalledWith('own:owner@acme.com');
+    expect(h.list).toHaveBeenCalledWith('own:owner@acme.com', 'owner@acme.com');
     await DELETE(new NextRequest('https://getmindy.ai/api/app/connected-apps', { method: 'DELETE', body: JSON.stringify({ email: 'owner@acme.com', id: 'conn-1' }) }));
-    expect(h.disconnect).toHaveBeenCalledWith('own:owner@acme.com', 'conn-1');
+    expect(h.disconnect).toHaveBeenCalledWith('own:owner@acme.com', 'owner@acme.com', 'conn-1');
+  });
+  it('in a client workspace, list and disconnect are bound to the calling coach, not just the workspace', async () => {
+    h.scope = { kind: 'client', email: 'coach-b@x.com', workspaceId: 'w-9', vaultEmail: 'v' };
+    process.env.CONNECTED_APPS_ALLOWLIST = 'coach-b@x.com';
+    const { GET, DELETE } = await import('./route');
+    await GET(new NextRequest('https://getmindy.ai/api/app/connected-apps?email=coach-b@x.com'));
+    expect(h.list).toHaveBeenLastCalledWith('ws:w-9', 'coach-b@x.com');
+    await DELETE(new NextRequest('https://getmindy.ai/api/app/connected-apps', { method: 'DELETE', body: JSON.stringify({ email: 'coach-b@x.com', id: 'conn-of-coach-a' }) }));
+    expect(h.disconnect).toHaveBeenLastCalledWith('ws:w-9', 'coach-b@x.com', 'conn-of-coach-a');
   });
 });
