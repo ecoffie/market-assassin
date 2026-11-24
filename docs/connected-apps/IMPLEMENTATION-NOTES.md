@@ -128,19 +128,30 @@ Not run yet. As of 2026-11-24 there are no `CONNECTED_APPS_*` variables in any e
    - the Google and Microsoft client id and secret
    - `NEXT_PUBLIC_CONNECTED_APPS_GOOGLE_PICKER_KEY` and `NEXT_PUBLIC_CONNECTED_APPS_GOOGLE_APP_ID`
 
-**Per provider:**
-1. Connect. Check that the access note is shown first, and the result after returning.
-2. Pick the company's capability statement.
-3. Ask the same market question twice: A without the file, B with it.
-4. Run `npx tsx scripts/acceptance/connected-file-ab.mts --email <acct> --a <A id> --b <B id> --doc <local .txt export> --provider google|microsoft`.
+**Acceptance preview (ready, 2026-11-24):**
+- Branch `preview/ca-accept`, Git-built.
+- Stable address: `https://market-assassin-git-preview-ca-accept-eric-coffies-projects.vercel.app`
+- Callback: `https://market-assassin-git-preview-ca-accept-eric-coffies-projects.vercel.app/api/app/connected-apps/callback`
+- Set on that branch only: the flag, allowlist (`erika@govcongiants.com`), redirect base, and two fresh secrets.
+- Eric adds the client id/secret pairs and the Picker key and app id. After that, rebuild the preview with an empty commit on the branch.
 
-**Accept only if all four gates pass:**
-1. The trace shows the file was offered and read.
-2. Every document claim has a verbatim quote that software finds in the document.
-3. Nothing in B contradicts the document.
-4. B is more company-specific, and the document changed the recommendation, not just the wording.
+**Per provider, independently (one does not wait for the other):**
+1. Connect. Check the access note shows before consent and the result shows after.
+2. Run each case with the same question, A without the file and B with it.
+3. Run `npx tsx --env-file=.env.local scripts/acceptance/connected-file-ab.mts ...` (usage in the script header).
+4. Disconnect. Confirm the token is discarded and a later read fails closed.
 
-Then disconnect, confirm the token is discarded, and confirm a later read fails closed.
+**Cases:**
+- **Material:** `material-cap-statement.txt` against the known opportunity **VA janitorial `36C24823P1623`** (Florida, SDVOSB set-aside, ends 2027-08-31). B's assessment of that opportunity must change because of the document's SDVOSB claim, with a verified quote.
+  - There is no "unchanged but justified" pass: a convincing explanation must not hide that the document had no influence.
+- **Relevance:** `overview-cap-statement.txt`, with no prescribed outcome. Every change must cite a verified quote that is relevant to the opportunity it changes. Green-cleaning products can legitimately matter for janitorial work.
+
+**Gates on every run:**
+1. The trace shows the file was read.
+2. Every document claim has a verbatim quote.
+3. Nothing contradicts the document.
+4. **Certification is not verified eligibility.** Set-asides that rest on the document's 8(a) or SDVOSB claim must be stated conditionally, as needing verification. Presenting the company as eligible outright fails.
+5. The case-specific gate above.
 
 ## 4. Next slices
 
