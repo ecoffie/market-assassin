@@ -47,12 +47,38 @@ Gap owners:
 - Data present but not turned into a decision → Ask Mindy.
 - Sound decision buried in the output → Design & Output.
 
-## Build steps
+## Build steps (status 2026-11-24, branch feat/ask-mindy-intelligence-gate)
 
-1. **Done (this branch):** `gatherMarketEvidence` / `publishMarketReport` split; `generateMarketReport` is unchanged for MCP (422 report tests pass).
-2. Analyst step: structured decisions from evidence + profile + fit scorer.
-3. Evaluator: record checks 1–2, rubric judge 3–5, one bounded retry or disclosure.
-4. Wire into chat behind a flag (default off): replace the forced `generate_market_report` with gather → analyst → evaluator → publish.
-5. Report leads with the brief; decisions are saved in the payload.
+1. **Done.** `gatherMarketEvidence` / `publishMarketReport` split; `generateMarketReport` is unchanged for MCP.
+2. **Done.** Record checks (`src/lib/ask-mindy/evidence-checks.ts`):
+   - location, including a description that names another state;
+   - work (PSC share);
+   - AbilityOne mandatory source (holder AND not competed);
+   - set-aside versus the profile;
+   - capture window;
+   - for open bids: related-market, deadline and market-research notices.
+3. **Done.** Analyst (`analyst.ts`, Opus 5.5): structured decisions. Software drops any pursuit that is not a passing record.
+4. **Done.** Evaluator (`evaluator.ts`, Sonnet 5.5): checks 1–2 in software, 3–5 by rubric. One bounded retry, then disclose.
+5. **Done.** Orchestrator (`intelligence-gate.ts`):
+   - open bids from `find_opportunities` run in parallel;
+   - the report leads with the decision brief;
+   - it publishes only on pass.
+6. **Done.** Chat route branch behind `ASK_MINDY_INTELLIGENCE_GATE` (+ allowlist):
+   - covers current-find and market-research turns that name the work in the customer's own words, one state at most;
+   - the work phrase is checked to be verbatim;
+   - the Vault profile loads through the acting scope;
+   - the `market_report` event and History trace are the same as the packaged path;
+   - a gate error falls through to the existing path.
+
+Live acceptance (Florida janitorial): complete on attempt 1, 5/5.
+- None of the 4 distinct open bids is cleaning work, which agrees with Claude + MCP the same day.
+- 3 ranked coming-back pursuits, each with barriers and this-week moves.
+- About $0.07 and 25 seconds.
+
+Known limits (next):
+- More than one state (for example VA/MD/DC) still takes the existing path.
+- Forecast gap-chasing (plan step 4: correct the search, or disclose coverage) is not built.
+- Small-business size is not in the profile, so it stays "not established".
+- Data Core: the report's recompete state filter leaked MS and DC rows labelled FL, and the contacts block labels Interior/FAA staff as VA. The record checks catch the first; both need fixing at the source.
 
 Not in scope: Map control (Phase 3), a second data engine, a second scoring system, more Claude comparison runs.

@@ -7815,3 +7815,16 @@ the notices. Test: `federal-events-ranking.unit.test.ts`.
 **SEO.** GovCon MCP credits / change Mindy account email / prepaid API credits survive email update.
 
 **Proof.** Migration `20260914_account_id_mcp_credits.sql` (hand-run). Unit: `src/lib/identity/pro-monthly-keys.unit.test.ts`, `src/lib/identity/account-credit-invariants.unit.test.ts`. Grant cron skips (logs) when Stripe billing email has no `account_id` — no email-only double-grant path.
+
+## Ask Mindy checks its own recommendation before you see it (coming, flag off), 2026-11-24
+
+**What:** Ask "what open opportunities are there for janitorial services in Florida?" and Mindy now decides before it answers.
+- **Checks every candidate** against its record: the right state (even when the record's state field disagrees with its own description), the right kind of work, whether a nonprofit holds it under a mandatory-source program, whether the set-aside fits you, and whether the deadline or capture window has passed.
+- **Ranks what's left:** the best pursuits, why each one, what stands in the way, and the move to make this week.
+- **Gets reviewed by a separate AI** against a fixed standard (relevant, pursuable, reasoned, actionable, clear) before anything is shown or published. If the answer fails, Mindy fixes it once or tells you plainly what it could not verify.
+
+**Why:** A report full of correct numbers can still leave you guessing. In a Florida janitorial check, 4 of the 7 contracts a standard report listed were in Mississippi or DC, held by a mandatory-source nonprofit, or for different work. Mindy now catches that and tells you which 3 to chase.
+
+**SEO:** federal contract opportunities near me, janitorial government contracts Florida, which government contracts should I bid on, federal recompete opportunities.
+
+**Proof:** Live run 2026-11-24 (USASpending award records via the Mindy warehouse, SAM.gov open notices via find_opportunities). Florida janitorial: 7 coming-back contracts checked, 3 pursuable. 4 open notices checked, none for cleaning, matching Claude + the Mindy MCP the same day. The reviewer passed 5/5; a polished metrics-only answer failed 3 of 5. Source: `src/lib/ask-mindy/intelligence-gate.ts`, fixture `src/lib/ask-mindy/__fixtures__/fl-janitorial-recompetes-2026-11-24.json`. Behind `ASK_MINDY_INTELLIGENCE_GATE` (off).
