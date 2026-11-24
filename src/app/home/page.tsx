@@ -28,6 +28,7 @@ import { siteShareImages } from '@/lib/seo/share-image';
 import PublicHeader from '@/components/public-site/PublicHeader';
 import { PRO_TRIAL_MONTHLY } from '@/components/public-site/pricing/app-plan-links';
 import HomeTrialClicks from './HomeTrialClicks';
+import FirstRunGuide from './FirstRunGuide';
 
 // Re-render hourly so the event banner disappears after Nov 28 without a deploy.
 export const revalidate = 3600;
@@ -62,6 +63,8 @@ export default function HomePage() {
     <div className="hp">
       <style dangerouslySetInnerHTML={{ __html: CSS }} />
       <PublicHeader />
+      {/* Signed-in only: the 3-step "Start here" (save a search · what's new · ask Mindy). */}
+      <FirstRunGuide />
       <div dangerouslySetInnerHTML={{ __html: BODY }} />
       <HomeTrialClicks />
     </div>
