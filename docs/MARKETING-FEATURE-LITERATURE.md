@@ -7804,3 +7804,14 @@ the notices. Test: `federal-events-ranking.unit.test.ts`.
 **Honest scope.** Host DocModel + pathway supplements + map/preview chip dedupe. Competitor "where it leads" geography still depends on contractor tool fields when present.
 
 **Proof.** `buildFmpPathwaySupplementalCalls` (Clara Barton / GWMP forecasts + `lookup_solicitation` for gold sols); `enrichPathwayTitle` + open-RFQ cap; `fmpDefenseBuyersAppearFromEvidence`; `cleanFiles` / preview sibling dedupe; `fmp-writeup-grounding.unit.test.ts`.
+
+
+## Stable account identity — MCP credits survive email change (2026-09-14)
+
+**What.** Mindy adopts Supabase `auth.users.id` as the canonical `account_id` for MCP prepaid credits. Monthly Pro grants and Stripe top-ups dual-write `account_id` and use exactly-once keys `pro:acct:<uuid>:<YYYY-MM>` (plus legacy email keys in the same set). Verified change-email updates the email attribute without orphaning balances; consolidation merges two signups onto one account_id.
+
+**Why.** Email-as-primary-key stranded balances when a customer bought on one inbox and signed in on another, or changed email after a grant. Customer-specific billing remaps are banned — ownership follows the stable account, not a support alias table.
+
+**SEO.** GovCon MCP credits / change Mindy account email / prepaid API credits survive email update.
+
+**Proof.** Migration `20260914_account_id_mcp_credits.sql` (hand-run). Unit: `src/lib/identity/pro-monthly-keys.unit.test.ts`, `src/lib/identity/account-credit-invariants.unit.test.ts`. Grant cron skips (logs) when Stripe billing email has no `account_id` — no email-only double-grant path.
