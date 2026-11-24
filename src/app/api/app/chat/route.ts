@@ -30,7 +30,7 @@
 import { NextRequest } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verifyUserOwnsEmail } from '@/lib/api-auth';
-import { hasProAccess } from '@/lib/access/resolve-access';
+import { canUseAskMindy } from '@/lib/access/chat-access';
 // RAG corpus removed 2026-08-02 (Eric: "not just the podcast the 8 year corpus training —
 // anything not related to the data core we should remove. No one wants to learn here").
 // Ask Mindy now answers ONLY from the live federal Data Core tools; the teaching-chunk +
@@ -510,7 +510,7 @@ export async function POST(request: NextRequest) {
   // Pro gate: Mindy Chat retrieves from the proprietary knowledge base, so it's a
   // paid feature. Enforced server-side (hiding the sidebar item isn't enough — a
   // free user could call this API directly). 403 → the UI shows the upgrade prompt.
-  const chatPro = await hasProAccess(auth.email);
+  const chatPro = await canUseAskMindy(auth.email);
   shadowEntitlement({ route: 'app/chat POST', capability: 'chat.ask', email: auth.email, identityVerified: true, currentAllow: chatPro });
 
   // ── Selected listing (Eric 2026-11-16: it attaches to THIS main chat; see src/lib/chat/selected-notice.ts) ──
