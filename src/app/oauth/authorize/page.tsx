@@ -219,6 +219,12 @@ export default function AuthorizePage() {
               Forgot password?
             </a>
             <p className="mt-3 text-[12px] text-slate-500">Waiting for sign-in…</p>
+            {/* The sign-in is detected in THIS browser only. An emailed sign-in link opened in another
+                browser or app (a phone mail app, a different default browser) signs in THERE, and this
+                tab keeps waiting — the Mindy Day "only the password worked" report. */}
+            <p className="mt-2 text-[12px] text-slate-500">
+              Using an emailed sign-in link? Open it in this same browser, or sign in with your password instead.
+            </p>
           </>
         )}
 

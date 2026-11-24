@@ -25,6 +25,7 @@ import { sendAppEngagement } from '@/components/app/track';
 import { getStoredPartnerRef } from '@/lib/mindy/partner-referral-client';
 import { signInWithGoogle, signInWithMicrosoft } from '@/lib/supabase/auth';
 import { parseAppDeepLink } from '@/lib/app/deep-link-params';
+import { magicLinkErrorMessage } from '@/lib/mindy/magic-link-error';
 import { MAP_SHELL_HOME_EVENT, isMapShellPanel } from '@/lib/app/map-shell';
 import { KNOWN_PANELS } from '@/lib/app/known-panels';
 import { homePanel, isTodayHomeEnabled, isTodayPanelParam } from '@/lib/app/today-home';
@@ -970,6 +971,17 @@ function AppDashboard() {
       setPanelContext((prev) => ({ ...(prev || {}), ...deepLink }));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // A one-time sign-in link that was already used / superseded / expired lands here with an error
+  // hash and no session. Say so (and point to a new link or the password) instead of silently
+  // showing the form; strip the hash so a refresh does not repeat it. Display only — no auth change.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const linkError = magicLinkErrorMessage(window.location.hash);
+    if (!linkError) return;
+    setAuthError(linkError);
+    window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
   }, []);
 
   // Load user profile on mount
