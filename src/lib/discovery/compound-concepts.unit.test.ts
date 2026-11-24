@@ -63,7 +63,7 @@ describe('RBA: "bridge and highway heavy civil construction" (VA, MD, DC)', () =
   it('admits road work whatever word the agency used (road, roadway, pavement, paving, bridge, highway)', () => {
     for (const t of [
       'GWMP Bridge Rehabilitation, Fort Myer',
-      'Highway lane widening',
+      'Highway widening, lane addition',
       'Road repaving at Joint Base Andrews',
       'Roadway resurfacing and striping',
       'Airfield pavement repair',
@@ -79,6 +79,29 @@ describe('RBA: "bridge and highway heavy civil construction" (VA, MD, DC)', () =
       'ZAMBIA- Consultant Services for the Feasibility Study, Concept Designs, Environmental and Social Impact Assessment and Construction Monitoring Services for the Improvement of the T5 and D274/R185a Roads',
       'Pavement condition sensors',
     ]) expect(matchesText(p.matcher, [t]), t).toBe(false);
+  });
+
+  it('DESCRIPTIONS: a passing bridge/highway/road mention never admits (Agent 4 trace 2026-11-24, item 2)', () => {
+    // The Open DIRECT check reads [title, description, department, solicitation_number] (find-opportunities.ts).
+    const rows: Array<[string, string]> = [
+      ['Residential Reentry Services and Home Confinement Services located within the Hampton Roads, Virginia Metro Area',
+        'Facility must be within reasonable distance of the Hampton Roads Bridge-Tunnel and Interstate highway access, Norfolk.'],
+      ['Norfolk Harbor Inner Channel to Newport News Maintenance Dredging located in Hampton Roads, Virginia',
+        'Dredged material placed at Craney Island; work near the Hampton Roads Bridge-Tunnel and Monitor-Merrimac bridges.'],
+      ['ZAMBIA- Consultant Services for the Feasibility Study, Concept Designs, Environmental and Social Impact Assessment and Construction Monitoring Services for the Improvement of the T5 and D274/R185a Roads',
+        'MCC consultant study: highway corridor feasibility, bridge crossings and road alignment options in Zambia.'],
+      ['Janitorial services, Building 400', 'Building is located off the highway near the bridge.'],
+      ['Bridge loan servicing support', 'Financial services; bridge financing for program office.'],
+    ];
+    for (const [t, d] of rows) expect(matchesText(p.matcher, [t, d]), t).toBe(false);
+  });
+
+  it('DESCRIPTIONS: real bridge/highway work in a description is still admitted', () => {
+    for (const [t, d] of [
+      ['Z--GWMP project', 'Bridge rehabilitation of the Spout Run structure, George Washington Memorial Parkway.'],
+      ['FHWA EFL solicitation', 'Highway reconstruction and resurfacing, 3.2 miles.'],
+      ['Y1LB project 12', 'Bridge replacement over Difficult Run.'],
+    ]) expect(matchesText(p.matcher, [t, d]), t).toBe(true);
   });
 
   it('real road work is still admitted through road-work phrases', () => {

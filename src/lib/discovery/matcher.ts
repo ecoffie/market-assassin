@@ -198,11 +198,20 @@ export const CONCEPTS: ReadonlyArray<{ id: string; forms: string[]; acronyms?: s
    * inside a road-WORK phrase (construction / repair / rehabilitation / improvement / maintenance / resurfacing /
    * widening / paving, "access road"), and pavement only as pavement repair/rehabilitation/preservation/…;
    * "roadway", "paving", "repaving" and "resurfacing" are work words on their own.
+   * ⚠️ The same holds for "bridge" and "highway" (Agent 4, 2026-11-24): bridge/highway WORK phrases only, because
+   * the Open DIRECT check reads descriptions too ("Hampton Roads Bridge-Tunnel", "located off Interstate highway").
    */
   {
     id: 'highway and bridge',
     forms: [
-      'highway', 'bridge', 'roadway',
+      // Bare "bridge"/"highway" are NOT forms (Agent 4 trace 2026-11-24, #2377 item 2): the Open DIRECT check reads
+      // descriptions, so "Hampton Roads Bridge-Tunnel" or a passing "near the highway" admitted. Only work phrases.
+      'bridge construction', 'bridge reconstruction', 'bridge repair', 'bridge rehabilitation', 'bridge replacement',
+      'bridge maintenance', 'bridge inspection', 'bridge painting', 'bridge improvement', 'bridge widening', 'bridge deck',
+      'bridge preservation', 'bridge demolition', 'bridge scour', 'bridge rail',
+      'highway construction', 'highway reconstruction', 'highway repair', 'highway rehabilitation', 'highway improvement',
+      'highway maintenance', 'highway resurfacing', 'highway widening', 'highway paving', 'highway safety improvement',
+      'roadway',
       'road construction', 'road reconstruction', 'road repair', 'road rehabilitation', 'road improvement',
       'road maintenance', 'road resurfacing', 'road widening', 'road paving', 'access road',
       'pavement repair', 'pavement rehabilitation', 'pavement preservation', 'pavement replacement',
