@@ -10,6 +10,9 @@ import { authedFetch } from '../authHeaders';
 import { formatMindyCurrency } from '@/lib/mindy/formatters';
 import { mapLinkForCompany } from '@/lib/maps/map-links';
 import MindyLoader from '@/components/app/MindyLoader';
+import TabAskBox from '@/components/app/TabAskBox';
+import { isTabAskEnabled, type TabAskCount } from '@/lib/app/tab-ask';
+import { contractorsAskAdapter, type ContractorsAskParams } from '@/lib/app/tab-ask-adapters/contractors';
 
 const US_STATES = ['AL','AK','AZ','AR','CA','CO','CT','DE','DC','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY'];
 
@@ -158,7 +161,10 @@ export default function ContractorsPanel({ email, tier }: ContractorsPanelProps)
     sort: 'contract_value' | 'company' | 'contract_count',
     pageNum: number,
     stateArg?: string
-  ) => {
+  ): Promise<TabAskCount> => {
+    // Resolves to the rows the list now shows, or null when the count is unknown (load failed or
+    // BigQuery unavailable) — never reported as 0. The filter form and Ask Mindy both go through it.
+    let count: TabAskCount = null;
     setSearching(true);
     setError(null);
 
@@ -184,6 +190,13 @@ export default function ContractorsPanel({ email, tier }: ContractorsPanelProps)
         setContractors(data.contractors);
         setTotalCount(data.totalCount || 0);
         setFilteredCount(data.filteredCount || 0);
+        if (typeof data.filteredCount === 'number') {
+          // coverage_incomplete (the legacy national top-50 rollup) is a FLOOR, so it always reads "N+".
+          count = {
+            shown: data.contractors.length,
+            more: data.filteredCount > data.contractors.length || data.status === 'coverage_incomplete',
+          };
+        }
       } else if (data.error) {
         setError(data.error);
         setContractors([]);
@@ -196,6 +209,7 @@ export default function ContractorsPanel({ email, tier }: ContractorsPanelProps)
       setSearching(false);
       setLoading(false);
     }
+    return count;
   }, [stateFilter]);
 
   // Load stats on mount
@@ -284,6 +298,47 @@ export default function ContractorsPanel({ email, tier }: ContractorsPanelProps)
     searchContractors('', profileNaics, profileAgencies, contactFilter, sortBy, 0);
   };
 
+  // ── Ask Mindy on this tab (OFF unless NEXT_PUBLIC_TAB_ASK=on) ────────────────────────────────
+  // The question becomes THIS tab's filters (company name · NAICS · state) and reloads THIS tab's list
+  // through /api/contractors/search-bq; Clear puts back exactly what was on screen before the first
+  // question (filters + rows + page), without another request.
+  const tabAskOn = isTabAskEnabled();
+  const [askSnapshot, setAskSnapshot] = useState<null | {
+    search: string; naics: string; state: string; agency: string; page: number; usingProfile: boolean;
+    rows: Contractor[]; totalCount: number; filteredCount: number;
+  }>(null);
+
+  const handleTabAsk = async (p: ContractorsAskParams): Promise<TabAskCount> => {
+    if (!askSnapshot) {
+      setAskSnapshot({
+        search: searchQuery, naics: naicsFilter, state: stateFilter, agency: profileAgencyFilter, page,
+        usingProfile: usingProfileDefaults, rows: contractors, totalCount, filteredCount,
+      });
+    }
+    setUsingProfileDefaults(false);
+    setProfileAgencyFilter('');
+    setSearchQuery(p.search);
+    setNaicsFilter(p.naics);
+    setStateFilter(p.state);
+    setPage(0);
+    return searchContractors(p.search, p.naics, '', contactFilter, sortBy, 0, p.state);
+  };
+
+  const clearTabAsk = () => {
+    if (!askSnapshot) return;
+    setSearchQuery(askSnapshot.search);
+    setNaicsFilter(askSnapshot.naics);
+    setStateFilter(askSnapshot.state);
+    setProfileAgencyFilter(askSnapshot.agency);
+    setPage(askSnapshot.page);
+    setUsingProfileDefaults(askSnapshot.usingProfile);
+    setContractors(askSnapshot.rows);
+    setTotalCount(askSnapshot.totalCount);
+    setFilteredCount(askSnapshot.filteredCount);
+    setError(null);
+    setAskSnapshot(null);
+  };
+
   const totalPages = Math.ceil(filteredCount / limit);
 
   // Profile sub-view — full-page contractor profile inside the panel
@@ -347,6 +402,10 @@ export default function ContractorsPanel({ email, tier }: ContractorsPanelProps)
           </button>
         )}
       </div>
+
+      {tabAskOn && (
+        <TabAskBox adapter={contractorsAskAdapter} onAsk={handleTabAsk} onClear={clearTabAsk} />
+      )}
 
       {/* Search & Filters */}
       <div className="bg-ground border border-surface rounded-xl p-5">
