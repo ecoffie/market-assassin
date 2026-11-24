@@ -46,15 +46,22 @@ export function applyOpenPlan(query: any, plan: DiscoveryPlan): any {
  */
 export function placeOfPerformanceWinsExpr(codes: string[]): string | null {
   if (!codes.length) return null;
-  return `pop_state.is.null,pop_state.in.(${codes.join(',')})`;
+  // The buying office stands in for an empty place of performance ONLY when the work is not stated to be
+  // abroad (Agent 4, 2026-11-24): an MCC Zambia road study bought by a DC office passed a VA/MD/DC filter.
+  // pop_country is ISO3 ('USA' = domestic, as the map's country filter uses); null = not stated → still kept.
+  return `pop_state.in.(${codes.join(',')}),and(pop_state.is.null,or(pop_country.is.null,pop_country.eq.USA))`;
 }
 
 /** Post-fetch guard with the same rule, for every horizon: a row whose place-of-performance state is
- *  known and not one of the asked states is out of scope. Unknown location is kept (not guessed). */
-export function performedOutsideRegion(popState: unknown, states: string[]): boolean {
+ *  known and not one of the asked states is out of scope. Unknown location is kept (not guessed) — unless
+ *  the row states a FOREIGN place-of-performance country (popCountry given, not null/USA): work stated to
+ *  be abroad is never in a US state region, whatever the buying office. */
+export function performedOutsideRegion(popState: unknown, states: string[], popCountry?: unknown): boolean {
   if (!states.length) return false;
   const st = String(popState ?? '').trim().toUpperCase();
-  return st !== '' && !states.includes(st);
+  if (st !== '') return !states.includes(st);
+  const country = String(popCountry ?? '').trim().toUpperCase();
+  return country !== '' && country !== 'USA';
 }
 
 export function applyRecompetePlan(query: any, plan: DiscoveryPlan): any {
