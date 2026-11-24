@@ -7815,3 +7815,13 @@ the notices. Test: `federal-events-ranking.unit.test.ts`.
 **SEO.** GovCon MCP credits / change Mindy account email / prepaid API credits survive email update.
 
 **Proof.** Migration `20260914_account_id_mcp_credits.sql` (hand-run). Unit: `src/lib/identity/pro-monthly-keys.unit.test.ts`, `src/lib/identity/account-credit-invariants.unit.test.ts`. Grant cron skips (logs) when Stripe billing email has no `account_id` — no email-only double-grant path.
+
+## Connect your Google Workspace or Microsoft 365 account to Ask Mindy (coming, flag off), 2026-11-24
+
+**What:** Connect a business Google or Microsoft account once. Ask Mindy will be able to use a file you choose (like your capability statement), prepare a buyer email as a draft in your own Gmail or Outlook, and add a follow-up to your calendar, each only after you approve it. First step built: secure account connection with least-privilege permissions, scoped to your workspace, with disconnect anytime.
+
+**Why:** After Mindy finds a contract worth pursuing, the work still happens in five other apps. Connecting the tools you already use turns intelligence into action without copy and paste.
+
+**SEO:** government contracting outreach email, capability statement outreach, federal BD follow-up, Gmail Outlook government contracts assistant.
+
+**Proof:** Not yet customer-visible. Permissions are limited by design: Mindy only sees files you pick (Google `drive.file`), drafts are never sent, and no send permission is requested from Microsoft. Source: `src/lib/connected-apps/`, spec `docs/connected-apps/CONNECTED-APPS-SPEC-2026-11-24.md`. Behind `CONNECTED_APPS` (off).
