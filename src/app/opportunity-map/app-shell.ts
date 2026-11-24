@@ -21,6 +21,7 @@ import {
   MAP_SHELL_NAV_MESSAGE,
   MAP_SHELL_SELECTED_OPP_MESSAGE,
   MAP_SHELL_URL_MESSAGE,
+  MAP_VIEW_PARAM,
   SHELL_PARAM,
   SHELL_VALUE,
 } from '@/lib/app/map-shell';
@@ -140,3 +141,42 @@ export function applyAppShell(html: string, css: string): string {
     .replace('</head>', () => css + '</head>')
     .replace(/<\/body>(?![\s\S]*<\/body>)/, () => APP_SHELL_JS + '</body>');
 }
+
+/**
+ * A SIGNED-IN customer who opens the standalone map (an old `/opportunity-map` bookmark, an alert
+ * link) is sent to the same view inside the app (`/app?panel=map&…`), the signed-in product since
+ * 2026-11-16. Before this, that bookmark kept showing the map with its own top bar and icon rail and
+ * no app sidebar, so it read as an older version (call 2026-11-23: the rep had to tell a paying
+ * customer to change the URL to /app). Signed-out visitors, crawlers, `?embed=` and `?shell=app`
+ * (the app's own frame) are never redirected.
+ *
+ * The script is the SAME bytes for every standalone request (FROZEN Share Truth: the served page may
+ * not vary with `src`/`sh`). It builds the /app address in the browser exactly as appUrlForMapUrl
+ * does (map params kept verbatim, minus shell/embed/panel/mview — parity is unit-tested), and only
+ * when it is the top window holding a live (decodable, unexpired) MI token — the same check the
+ * map's own __tokenExpired makes. It reads the token; it never writes or clears it.
+ */
+export const SIGNED_IN_APP_REDIRECT_JS = '<script id="mp-app-redirect">(function(){try{'
+  + 'if(window.top!==window.self)return;'
+  + 'var t=localStorage.getItem("mi_beta_auth_token");if(!t)return;'
+  + 'var s=String(t).split(".")[0].replace(/-/g,"+").replace(/_/g,"/");while(s.length%4)s+="=";'
+  + 'var p=JSON.parse(atob(s));if(!p||typeof p!=="object")return;'
+  + 'if(p.exp&&Number(p.exp)<Date.now())return;'
+  + 'var drop={"' + SHELL_PARAM + '":1,embed:1,panel:1,' + MAP_VIEW_PARAM + ':1};'
+  + 'var q=String(location.search||"").replace(/^\\?/,"").split("&").filter(function(x){'
+  +   'if(!x)return false;var k=x.split("=")[0];try{k=decodeURIComponent(k.replace(/\\+/g," "));}catch(e){}'
+  +   'return !drop.hasOwnProperty(k);});'
+  + 'location.replace("/app?panel=map"+(q.length?"&"+q.join("&"):"")+(location.hash||""));'
+  + '}catch(e){}})();</script>';
+
+/** True when this map request is the standalone page (not the app's frame, not the static hero). */
+export function isStandaloneMapRequest(url: URL): boolean {
+  return !url.searchParams.has('embed') && !isAppShellRequest(url);
+}
+
+/** Put the redirect first in <head>, so a signed-in visitor leaves before the map boots. Unchanged page for shell/embed. */
+export function applySignedInAppRedirect(html: string, url: URL): string {
+  if (!isStandaloneMapRequest(url)) return html;
+  return html.replace(/<head(\s[^>]*)?>/, (m) => m + SIGNED_IN_APP_REDIRECT_JS);
+}
+
