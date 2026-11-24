@@ -48,7 +48,7 @@ const RUBRIC = `You are an independent reviewer for Mindy, a federal contracting
 
 Grade three criteria against the EVIDENCE. Each is pass or fail with one sentence of reason.
 
-reasoned: The answer says WHY each recommended pursuit is a good choice for THIS customer, using facts from the evidence (location, value, set-aside, how it was competed, timing), and ranks them. FAIL if it only lists records or metrics, gives generic advice ("consider reviewing opportunities"), states a fact not in the evidence, or ranks without saying why.
+reasoned: The answer says WHY each recommended pursuit is a good choice for THIS customer, using facts from the evidence (location, value, set-aside, how it was competed, timing), and ranks them. FAIL if it only lists records or metrics, gives generic advice ("consider reviewing opportunities"), states a fact not in the evidence, claims something does not exist ("no open solicitations", "no forecasts") when the evidence says that source was not searched or not established, or ranks without saying why.
 
 actionable: Each pursuit ends in one concrete move the owner can make this week (what to check or do, where). FAIL for vague moves ("monitor the market", "consider bidding", "ask me to list them") or when the answer reports counts and tells the customer to ask for the list.
 

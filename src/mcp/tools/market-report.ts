@@ -294,6 +294,8 @@ export interface MarketReportBasis {
 }
 
 export interface MarketReportResult {
+  /** Ask Mindy's checked decision (intelligence gate). Saved with the payload so the hosted report leads with it. */
+  decision?: import('@/lib/market/market-report-html').ReportDecision | null;
   subject: string;
   generated_for: string | null;
   summary: MarketReportSummary;

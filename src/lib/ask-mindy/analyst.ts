@@ -23,6 +23,8 @@ export interface AnalystInput {
     topCompetitors: string[];
     /** e.g. "0 agency forecasts matched; forecast coverage for this market is not established". */
     forecastsLine: string;
+    /** What is known about OPEN solicitations. Default: not searched (never imply none exist). */
+    openNowLine?: string;
   };
   records: CandidateRecord[];
   checks: RecordCheck[];
@@ -74,7 +76,7 @@ export const ANALYST_SCHEMA = {
 const ANALYST_SYSTEM = `You are Mindy's federal market analyst. A customer asked a question; software has already gathered the evidence and checked every candidate record for relevance and pursuability. Your job is the decision: which of the PASSING records this customer should pursue first, why, what stands in the way, and the next move.
 
 Rules:
-- Use only facts in the evidence. Never add an agency, contract, date, dollar amount, person or requirement that is not there.
+- Use only facts in the evidence. Never add an agency, contract, date, dollar amount, person or requirement that is not there. Never say something does not exist (no open bids, no forecasts, no competitors) unless the evidence establishes it; if a source was not searched, say so.
 - A pursuit must be one of the PASSING records, cited by its exact contract_id. Rank them: strongest first. Recommend at most 3.
 - "why" is 1 to 3 short reasons drawn from the record (location, value, set-aside, how it was competed, timing).
 - "barrier" is the biggest obstacle from that record's barriers, in plain words, or null if none.
@@ -128,6 +130,7 @@ export function buildAnalystPrompt(input: AnalystInput): string {
     `TOP BUYING AGENCIES: ${input.market.topAgencies.join('; ') || 'none returned'}`,
     `TOP COMPETITORS: ${input.market.topCompetitors.join('; ') || 'none returned'}`,
     `FORECASTS: ${input.market.forecastsLine}`,
+    `OPEN SOLICITATIONS: ${input.market.openNowLine || 'NOT searched for this answer. Do not say whether any are open; list checking SAM.gov for open bids as a gap.'}`,
     '',
     `PASSING RECORDS (contracts coming back that this customer could pursue):`,
     passingText,

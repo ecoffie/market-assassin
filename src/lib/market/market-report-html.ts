@@ -81,7 +81,31 @@ export function prettyRange(rangeText: unknown, valueMax: unknown, valueMin: unk
 }
 
 /** Minimal report shape (kept loose to avoid a type import cycle with the tool). */
+/** Ask Mindy's checked decision (intelligence gate). When present, the report leads with it. */
+export interface ReportDecision {
+  headline: string;
+  pursuits: Array<{ contract_id: string; title: string; why: string[]; barrier: string | null; next_move: string }>;
+  ruled_out: string;
+  gaps: string[];
+}
+
+/** The executive brief: the decision first, the market figures after it. */
+export function renderDecisionBrief(d: ReportDecision): string {
+  const pursuits = d.pursuits.length
+    ? `<ol class="brief-pursuits">${d.pursuits.map((p) => `<li><h3>${esc(p.title)}</h3>
+        <ul>${p.why.map((w) => `<li>${esc(w)}</li>`).join('')}</ul>
+        ${p.barrier ? `<p class="note"><b>What stands in the way:</b> ${esc(p.barrier)}</p>` : ''}
+        <p><b>Next move:</b> ${esc(p.next_move)}</p></li>`).join('')}</ol>`
+    : '<p class="note">No contract in this market is a pursuit you can act on yet. See what would change that below.</p>';
+  return `<section class="sec brief"><h2>What to pursue</h2><p class="lead">${esc(d.headline)}</p>${pursuits}
+    ${d.ruled_out ? `<p class="sub"><b>Ruled out:</b> ${esc(d.ruled_out)}</p>` : ''}
+    ${d.gaps.length ? `<p class="sub"><b>Not yet established:</b></p><ul>${d.gaps.map((g) => `<li>${esc(g)}</li>`).join('')}</ul>` : ''}
+  </section>`;
+}
+
 interface ReportLike {
+  /** Ask Mindy's checked decision; the brief renders first when present. */
+  decision?: ReportDecision | null;
   subject: string;
   generated_for: string | null;
   basis?: {
@@ -540,6 +564,8 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
     : '';
 
   const body = [
+    // Executive brief: the decision first (Ask Mindy intelligence gate). Absent = unchanged report.
+    report.decision ? renderDecisionBrief(report.decision) : '',
     // Summary band
     `<section class="summary">
       ${statCard(
