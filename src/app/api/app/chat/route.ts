@@ -105,6 +105,7 @@ import {
 } from '@/lib/chat/fmp-writeup-validate';
 import {
   accumulateFmpEvidence,
+  fmpFirmDoesConstruction,
   buildFmpCreateDocumentAnswerNote,
   buildFmpWriteupGroundingNote,
   FMP_DOC_TOOL_ROUND_MAX_TOKENS,
@@ -1636,23 +1637,19 @@ export async function POST(request: NextRequest) {
                     tool: String(tc.function?.name || ''),
                     args: String(tc.function?.arguments ?? ''),
                   }));
-                // The defense construction-oversight (PAE) section is for construction firms. On a
-                // strategy turn it applies only when the company's own work is construction (award or profile NAICS 23x).
-                const strategyDefenseSectionApplies = (evidence: FmpWriteupEvidence): boolean => {
-                  if (!strategyPlanAsk) return true;
-                  const awardNaics = (evidence as { dominantNaics?: string | null }).dominantNaics ?? '';
-                  return String(awardNaics).startsWith('23') || String(strategyCompany?.naics ?? '').startsWith('23');
-                };
+                // The defense construction-oversight (PAE) section is for construction firms only, on every FMP and
+                // strategy turn: the firm's award NAICS, else its saved profile NAICS, else the customer's words. An Army
+                // buyer in a janitorial firm's evidence never adds it.
+                const defenseSectionApplies = (evidence: FmpWriteupEvidence, customerFmp: string): boolean =>
+                  fmpFirmDoesConstruction(evidence, customerFmp, strategyCompany?.naics ?? null);
                 const ensureFmpEvidence = (customerFmp: string): FmpWriteupEvidence => {
                   fmpEvidence = accumulateFmpEvidence(fmpToolContents, customerFmp);
                   if (fmpWriteupCtx) {
                     fmpWriteupCtx.requiredSnippets = requiredSnippetsForWriteup(fmpEvidence);
-                    // Name-only asks omit "defense"/"PAE"; flip on once pathway buyers show DoD.
-                    if (!fmpWriteupCtx.defenseBuyersAppear
-                      && strategyDefenseSectionApplies(fmpEvidence)
-                      && fmpDefenseBuyersAppearFromEvidence(fmpEvidence)) {
-                      fmpWriteupCtx.defenseBuyersAppear = true;
-                    }
+                    // Required only for a construction firm whose ask or pathway buyers show DoD (name-only asks omit
+                    // "defense"/"PAE"). Recomputed from the evidence, so a non-construction firm is never held to it.
+                    fmpWriteupCtx.defenseBuyersAppear = defenseSectionApplies(fmpEvidence, customerFmp)
+                      && (fmpDefenseBuyersAppear(customerFmp) || fmpDefenseBuyersAppearFromEvidence(fmpEvidence));
                   }
                   return fmpEvidence;
                 };
@@ -1662,18 +1659,17 @@ export async function POST(request: NextRequest) {
                   const evidence = ensureFmpEvidence(customerFmp);
                   const resolved = resolveFmpCreateDocumentArgs(plannerArgs, evidence, {
                     customerText: customerFmp,
-                    // Strategy plan: the fallback document is THIS company's plan, not the RBA benchmark shape.
+                    // Strategy plan: the fallback document is THIS company's plan, built from its own profile.
                     strategy: strategyPlanAsk
                       ? {
                         ...(strategyCompany?.legalName ? { companyName: strategyCompany.legalName } : {}),
-                        construction: strategyDefenseSectionApplies(evidence),
+                        construction: defenseSectionApplies(evidence, customerFmp),
                         is8a: !!(strategyProfile?.profile?.certifications ?? []).some((c) => /8\s*\(\s*a\s*\)/i.test(c.name)),
                         workTerms: strategyProfile?.profile?.keywords?.slice(0, 8) ?? [],
                       }
                       : null,
-                    defenseBuyersAppear: !!(fmpWriteupCtx?.defenseBuyersAppear)
-                      || fmpDefenseBuyersAppear(customerFmp)
-                      || (strategyDefenseSectionApplies(evidence) && fmpDefenseBuyersAppearFromEvidence(evidence)),
+                    defenseBuyersAppear: defenseSectionApplies(evidence, customerFmp)
+                      && (fmpDefenseBuyersAppear(customerFmp) || fmpDefenseBuyersAppearFromEvidence(evidence)),
                     requiredSnippets: fmpWriteupCtx?.requiredSnippets,
                   });
                   turnTrace.notices.push(resolved.notice);
