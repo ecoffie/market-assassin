@@ -25,6 +25,7 @@ import {
   PRO_ANNUAL_USD, PRO_MONTHLY_USD, PRO_TRIAL_ANNUAL, PRO_TRIAL_MONTHLY, SALES_URL,
   TEAM_ANNUAL_PER_MONTH, TEAM_ANNUAL_USD, TEAM_MONTHLY_USD, TEAM_TRIAL_ANNUAL, TEAM_TRIAL_MONTHLY, pctOff,
 } from './app-plan-links';
+import { TEAM_SEAT_COUNTS, TEAM_SEAT_PRICING_ON, teamSeatPlan, type TeamSeatCount } from '@/lib/billing/team-seat-plans';
 
 type Feature = [title: string, detail: React.ReactNode];
 type Plan = {
@@ -161,6 +162,9 @@ export default function SimplePricing({ proCredits, teamCredits, forecastsLabel,
   creditPlans?: CreditPlan[];
 }) {
   const [annual, setAnnual] = useState(false);
+  // Team by seats (held behind NEXT_PUBLIC_TEAM_SEAT_PRICING until Eric approves).
+  const [teamSeats, setTeamSeats] = useState<TeamSeatCount>(2);
+  const seatPlan = TEAM_SEAT_PRICING_ON ? teamSeatPlan(teamSeats) : null;
   // Same token every Mindy page sends; /api/app/me verifies it server-side. Any failure leaves the
   // public page as is (never guesses a plan).
   const [me, setMe] = useState<MePlan | null>(null);
@@ -239,7 +243,22 @@ export default function SimplePricing({ proCredits, teamCredits, forecastsLabel,
     },
   ];
 
-  const plans = applyCurrentPlan(basePlans, me);
+  // Team by seats: the chosen size sets the Team card's price, button, users line and credits.
+  const withSeats = (p: Plan): Plan => (p.name !== 'Team' || !seatPlan ? p : {
+    ...p,
+    price: `$${fmt(annual ? seatPlan.annualPerMonthUsd : seatPlan.monthlyUsd)}`,
+    was: undefined,
+    per: annual ? '/ mo, billed annually. Add seats any time.' : '/ mo, billed monthly. Add seats any time.',
+    cta: `Start with ${seatPlan.seats} seats`,
+    href: `/api/checkout/team-seats?seats=${seatPlan.seats}&billing=${annual ? 'annual' : 'monthly'}`,
+    features: [
+      [`${seatPlan.seats} users included`, seatPlan.seats < 5 ? 'Add up to 5 as the team grows, at any time.' : 'Room for the whole team on one plan.'],
+      ['Everyone gets their own alerts', 'Saved searches and a daily briefing per person, not one shared inbox.'],
+      ...p.features.slice(1),
+    ],
+    usage: ['Monthly usage included', `${fmt(seatPlan.credits)} credits / month, shared by the team`],
+  });
+  const plans = applyCurrentPlan(basePlans.map(withSeats), me);
   const byName = Object.fromEntries(plans.map((p) => [p.name, p]));
 
   // Full breakdown (Fyxer's "A plan to suit every need"). Same claims as the cards above and the
@@ -308,6 +327,13 @@ export default function SimplePricing({ proCredits, teamCredits, forecastsLabel,
           <article key={p.name} className={`card ${p.featured ? 'featured' : ''} ${p.current ? 'current' : ''}`}>
             <h2>{p.name}{p.current ? <span className="mine">Your plan</span> : p.featured && <span className="pop">Most popular</span>}</h2>
             <p className="tag">{p.tag}</p>
+            {p.name === 'Team' && seatPlan && !p.current && (
+              <div className="seat-pick" role="group" aria-label="Team size">
+                {TEAM_SEAT_COUNTS.map((n) => (
+                  <button key={n} type="button" aria-pressed={teamSeats === n} className={teamSeats === n ? 'on' : ''} onClick={() => setTeamSeats(n)}>{n} users</button>
+                ))}
+              </div>
+            )}
             {p.price ? (
               <div className="price"><span className="now">{p.price}</span>{p.was && <span className="was">{p.was}</span>}</div>
             ) : (
@@ -461,6 +487,10 @@ const CSS = `
 .sp .cdd-price span{color:var(--mp-muted);font-size:13px}
 .sp .cdd-cr{margin:4px 0 0;font-size:14px;font-weight:600}
 .sp .cdd-card .cta{margin:14px 0 4px}
+.sp .seat-pick{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;padding:4px;margin:0 0 14px;border-radius:12px;background:var(--mp-wash)}
+.sp .seat-pick button{min-height:44px;border:0;border-radius:9px;background:transparent;font:inherit;font-size:14px;font-weight:600;color:var(--mp-muted);cursor:pointer}
+.sp .seat-pick button.on{background:var(--mp-surface);color:var(--mp-ink);box-shadow:0 1px 3px rgba(18,16,14,.12)}
+.sp .seat-pick button:focus-visible{outline:3px solid var(--mp-navy);outline-offset:2px}
 .sp .cdd-fine{margin:0;padding:8px 20px 18px;text-align:center;font-size:13px;color:var(--mp-muted)}
 .sp .cdd-fine a{color:var(--mp-navy)}
 .sp .cmp{margin:80px 0 0}
