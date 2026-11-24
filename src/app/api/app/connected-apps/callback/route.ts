@@ -4,20 +4,25 @@
  * provider's own identity for the grant, and returns to the conversation. Errors are sanitized codes.
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { connectedAppsEnabledFor } from '@/lib/connected-apps/config';
-import { exchangeCode, fetchIdentity, OAuthError, verifyState } from '@/lib/connected-apps/oauth';
+import { connectedAppsEnabledFor, connectedAppsSecrets } from '@/lib/connected-apps/config';
+import { BINDING_COOKIE, BINDING_COOKIE_PATH, exchangeCode, fetchIdentity, OAuthError, verifyState } from '@/lib/connected-apps/oauth';
 import { saveConnection } from '@/lib/connected-apps/store';
 
 function back(request: NextRequest, path: string, params: Record<string, string>): NextResponse {
   const u = new URL(path, request.nextUrl.origin);
   for (const [k, v] of Object.entries(params)) u.searchParams.set(k, v);
-  return NextResponse.redirect(u, 303);
+  const res = NextResponse.redirect(u, 303);
+  // One use: the binding cookie is cleared on every outcome.
+  res.cookies.set(BINDING_COOKIE, '', { httpOnly: true, secure: true, sameSite: 'lax', path: BINDING_COOKIE_PATH, maxAge: 0 });
+  return res;
 }
 
 export async function GET(request: NextRequest) {
   const q = request.nextUrl.searchParams;
-  const verified = verifyState(q.get('state') || '');
-  if (!verified) return back(request, '/app', { connect: 'error', reason: 'invalid_state' });
+  if (!connectedAppsSecrets()) return back(request, '/app', { connect: 'error', reason: 'not_configured' });
+  // Signature, expiry AND browser binding: a consent link opened in a different browser changes nothing.
+  const verified = verifyState(q.get('state') || '', request.cookies.get(BINDING_COOKIE)?.value);
+  if (!verified.ok) return back(request, '/app', { connect: 'error', reason: verified.reason });
   const { payload, verifier } = verified;
   if (!connectedAppsEnabledFor(payload.ownerEmail)) return back(request, payload.returnTo, { connect: 'error', reason: 'not_enabled' });
   // The customer cancelled or the tenant refused (e.g. admin consent required): say so, change nothing.

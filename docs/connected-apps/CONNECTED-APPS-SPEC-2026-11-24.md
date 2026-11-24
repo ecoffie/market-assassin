@@ -119,7 +119,7 @@ Implement standard authorization-code flow with PKCE where supported, validated 
 | Step | Google scope(s) to evaluate | Microsoft Graph delegated scope(s) to evaluate |
 |---|---|---|
 | Connection / account identity | `openid`, `email`, `profile` | `openid`, `profile`, `email`, `User.Read`, `offline_access` as required |
-| User-selected file | `https://www.googleapis.com/auth/drive.file` with Google Picker | `Files.Read` for the signed-in user's OneDrive; broader SharePoint access not assumed |
+| User-selected file | `https://www.googleapis.com/auth/drive.file` with Google Picker (grant limited to picked files) | `Files.Read`: the grant covers **all** of the signed-in user's OneDrive files, not only picked ones; Mindy reads only the picked file, and the customer is told before consent. Broader SharePoint access not assumed |
 | Save email draft | `https://www.googleapis.com/auth/gmail.compose` | `Mail.ReadWrite` (no `Mail.Send`) |
 | Personal calendar follow-up | `https://www.googleapis.com/auth/calendar.events.owned` where sufficient; otherwise `calendar.events` | `Calendars.ReadWrite` |
 
@@ -128,7 +128,7 @@ Implement standard authorization-code flow with PKCE where supported, validated 
 - Google `drive.file` supports user-selected files rather than unrestricted Drive search. Do not promise to search the entire Drive with this grant. Google `drive.readonly` is a **restricted** scope; avoid it in v1.
 - Google `gmail.compose` permits both **drafting and sending** at the OAuth level. Application policy must strictly prohibit sending, with the provider send operation unavailable in the v1 executor. Scope classification/verification must be checked in the actual Google Cloud console before public activation.
 - Microsoft `Mail.ReadWrite` permits mail read/write operations beyond draft creation, although it does **not** confer sending permission. The app must expose only draft creation and never broader mailbox operations in v1.
-- `Files.Read` covers the user's OneDrive files; accessing shared SharePoint sites may require broader or selected-resource grants plus explicit resource assignments. Do not silently request broad permissions. Some tenant policies require administrator approval even for normally user-consentable delegated scopes.
+- **`Files.Read` is not selection-limited.** It lets the app read every file in the user's OneDrive. Microsoft offers no delegated per-picked-file permission for self-service consent, so the selection limit is an application rule, not a provider rule. The pre-consent note must say so plainly (`ACCESS_DISCLOSURE` in `src/lib/connected-apps/config.ts`). Never describe Microsoft file access as "only files you pick". Also: accessing shared SharePoint sites may require broader or selected-resource grants plus explicit resource assignments. Do not silently request broad permissions. Some tenant policies require administrator approval even for normally user-consentable delegated scopes.
 - Google scope verification and possibly security assessment depend on actual scopes and data handling. Keep launch readiness separate per provider: one approved adapter can launch without waiting for the other.
 - No workspace-wide or domain-wide delegation; no automatic access to colleagues' mailboxes; no background scanning.
 

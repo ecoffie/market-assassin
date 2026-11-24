@@ -13,7 +13,14 @@ import crypto from 'node:crypto';
 
 const SALT = 'mindy-secretbox-v1';
 
-function deriveKey(): Buffer {
+/** A caller-supplied dedicated key (with its own salt) bypasses the shared fallback chain entirely. */
+export interface SecretKey { secret: string; salt: string }
+
+function deriveKey(key?: SecretKey): Buffer {
+  if (key) {
+    if (!key.secret) throw new Error('secretbox: dedicated key is empty');
+    return crypto.scryptSync(key.secret, key.salt, 32);
+  }
   const secret =
     process.env.CRM_TOKEN_ENC_KEY || process.env.MCP_OAUTH_SIGNING_SECRET || process.env.ADMIN_PASSWORD;
   if (!secret) {
@@ -23,20 +30,20 @@ function deriveKey(): Buffer {
 }
 
 /** Encrypt a UTF-8 string → `v1:<iv>:<tag>:<ciphertext>` (all base64). */
-export function encryptSecret(plain: string): string {
+export function encryptSecret(plain: string, key?: SecretKey): string {
   const iv = crypto.randomBytes(12);
-  const cipher = crypto.createCipheriv('aes-256-gcm', deriveKey(), iv);
+  const cipher = crypto.createCipheriv('aes-256-gcm', deriveKey(key), iv);
   const enc = Buffer.concat([cipher.update(plain, 'utf8'), cipher.final()]);
   const tag = cipher.getAuthTag();
   return `v1:${iv.toString('base64')}:${tag.toString('base64')}:${enc.toString('base64')}`;
 }
 
 /** Decrypt a blob produced by encryptSecret. Throws on tamper / wrong key / bad format. */
-export function decryptSecret(blob: string): string {
+export function decryptSecret(blob: string, key?: SecretKey): string {
   const parts = (blob || '').split(':');
   if (parts.length !== 4 || parts[0] !== 'v1') throw new Error('secretbox: unrecognized ciphertext format');
   const [, ivB, tagB, dataB] = parts;
-  const decipher = crypto.createDecipheriv('aes-256-gcm', deriveKey(), Buffer.from(ivB, 'base64'));
+  const decipher = crypto.createDecipheriv('aes-256-gcm', deriveKey(key), Buffer.from(ivB, 'base64'));
   decipher.setAuthTag(Buffer.from(tagB, 'base64'));
   return Buffer.concat([decipher.update(Buffer.from(dataB, 'base64')), decipher.final()]).toString('utf8');
 }

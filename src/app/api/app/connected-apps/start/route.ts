@@ -6,11 +6,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyUserOwnsEmail } from '@/lib/api-auth';
 import { resolveChatActingScope } from '@/lib/chat/chat-acting-scope';
-import { clientCreds, connectedAppsEnabledFor, type Capability, type Provider } from '@/lib/connected-apps/config';
-import { authorizeUrl, pkcePair, safeReturnTo, signState } from '@/lib/connected-apps/oauth';
+import { ACCESS_DISCLOSURE, clientCreds, connectedAppsEnabledFor, connectedAppsSecrets, type Capability, type Provider } from '@/lib/connected-apps/config';
+import { authorizeUrl, BINDING_COOKIE, BINDING_COOKIE_PATH, newBrowserBinding, pkcePair, safeReturnTo, signState, STATE_TTL_SEC } from '@/lib/connected-apps/oauth';
 import { scopeKeyFor } from '@/lib/connected-apps/store';
 
-const CAPS: readonly Capability[] = ['file', 'draft', 'calendar'];
+// This slice requests only file access. Draft and calendar are added with the tools that use them.
+const CAPS: readonly Capability[] = ['file'];
 
 export async function POST(request: NextRequest) {
   const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
@@ -23,6 +24,8 @@ export async function POST(request: NextRequest) {
   const provider = body.provider as Provider;
   if (provider !== 'google' && provider !== 'microsoft') return NextResponse.json({ error: 'provider must be google or microsoft' }, { status: 400 });
   if (!clientCreds(provider)) return NextResponse.json({ error: 'provider_not_configured' }, { status: 503 });
+  // Dedicated signing + encryption secrets are required; refuse rather than fall back to a shared secret.
+  if (!connectedAppsSecrets()) return NextResponse.json({ error: 'not_configured' }, { status: 503 });
 
   const scope = await resolveChatActingScope(auth.email!, request);
   const scopeKey = scopeKeyFor(scope);
@@ -30,7 +33,17 @@ export async function POST(request: NextRequest) {
 
   // Least privilege: only the capabilities this step needs (identity is always included).
   const caps = (Array.isArray(body.capabilities) ? body.capabilities : ['file']).filter((c): c is Capability => CAPS.includes(c as Capability));
+  if (!caps.length) return NextResponse.json({ error: 'unsupported_capability' }, { status: 400 });
   const { verifier, challenge } = pkcePair();
-  const state = signState({ provider, ownerEmail: auth.email!, scopeKey, caps, returnTo: safeReturnTo(body.returnTo) }, verifier);
-  return NextResponse.json({ authorize_url: authorizeUrl(provider, state, challenge, caps) });
+  // Tie the flow to THIS browser: the callback refuses unless the same browser returns this cookie.
+  const binding = newBrowserBinding();
+  const state = signState({ provider, ownerEmail: auth.email!, scopeKey, caps, returnTo: safeReturnTo(body.returnTo) }, verifier, binding.hash);
+  const res = NextResponse.json({
+    authorize_url: authorizeUrl(provider, state, challenge, caps),
+    // Shown before the customer leaves for consent: what the provider grant allows, in plain words.
+    access_note: caps.map((c) => ACCESS_DISCLOSURE[provider][c as Exclude<Capability, 'identity'>]).join(' '),
+  });
+  // SameSite=Lax: sent on the provider's top-level GET redirect back to the callback, never on cross-site subrequests.
+  res.cookies.set(BINDING_COOKIE, binding.cookie, { httpOnly: true, secure: true, sameSite: 'lax', path: BINDING_COOKIE_PATH, maxAge: STATE_TTL_SEC });
+  return res;
 }

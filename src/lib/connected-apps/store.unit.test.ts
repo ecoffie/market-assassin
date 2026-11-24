@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { accessTokenFor, disconnect, listConnections, saveConnection, scopeKeyFor } from './store';
 import { OAuthError } from './oauth';
-import { decryptSecret } from '@/lib/crypto/secretbox';
+import { decryptSecret as decrypt } from '@/lib/crypto/secretbox';
 
 /** Minimal in-memory stand-in for the PostgREST chains the store uses. */
 function fakeDb() {
@@ -39,7 +39,13 @@ function fakeDb() {
   return { rows, db: { from: () => make() } as unknown as SupabaseClient };
 }
 
-beforeEach(() => { process.env.CRM_TOKEN_ENC_KEY = 'enc-key-test'; });
+const KEY = 'token-key-test-0123456789abcdef01234567';
+beforeEach(() => {
+  process.env.CONNECTED_APPS_STATE_SECRET = 'state-secret-test-0123456789abcdef0123';
+  process.env.CONNECTED_APPS_TOKEN_ENC_KEY = KEY;
+  process.env.CRM_TOKEN_ENC_KEY = 'shared-crm-key-test';
+});
+const decryptSecret = (v: string) => decrypt(v, { secret: KEY, salt: 'mindy-connected-apps-v1' });
 
 const tokens = (o: Partial<{ accessToken: string; refreshToken: string | null; expiresAt: number }> = {}) => ({ accessToken: 'at-1', refreshToken: 'rt-1', expiresAt: Date.now() + 3600_000, grantedScopes: ['openid'], ...o });
 const conn = (scopeKey: string, accountId = 'g-1') => ({ scopeKey, ownerEmail: 'a@b.com', provider: 'google' as const, accountId, email: 'owner@acme.com', name: 'Owner', tokens: tokens() });
@@ -60,6 +66,15 @@ describe('connected accounts store', () => {
     expect(String(rows[0].refresh_token_enc)).toMatch(/^v1:/);
     expect(decryptSecret(String(rows[0].refresh_token_enc))).toBe('rt-1');
     expect(JSON.stringify(rows[0])).not.toContain('rt-1');
+    // Not readable with the shared CRM fallback key: the dedicated key is the only one.
+    expect(() => decrypt(String(rows[0].refresh_token_enc))).toThrow();
+  });
+
+  it('refuses to store tokens without the dedicated key', async () => {
+    delete process.env.CONNECTED_APPS_TOKEN_ENC_KEY;
+    const { db, rows } = fakeDb();
+    await expect(saveConnection(conn('own:a@b.com'), db)).rejects.toThrow(/dedicated secrets/);
+    expect(rows).toHaveLength(0);
   });
 
   it('isolation: another scope can neither list nor use the connection', async () => {

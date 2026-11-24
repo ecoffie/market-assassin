@@ -1,14 +1,14 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { authorizeUrl, exchangeCode, fetchIdentity, OAuthError, pkcePair, safeReturnTo, signState, verifyState, STATE_TTL_SEC } from './oauth';
-import { connectedAppsEnabledFor, scopesFor } from './config';
+import { authorizeUrl, exchangeCode, fetchIdentity, newBrowserBinding, OAuthError, pkcePair, safeReturnTo, signState, verifyState, STATE_TTL_SEC } from './oauth';
+import { ACCESS_DISCLOSURE, connectedAppsEnabledFor, connectedAppsSecrets, SCOPES, scopesFor } from './config';
 import crypto from 'node:crypto';
 
-const ENV = ['CONNECTED_APPS_STATE_SECRET', 'CRM_TOKEN_ENC_KEY', 'CONNECTED_APPS_GOOGLE_CLIENT_ID', 'CONNECTED_APPS_GOOGLE_CLIENT_SECRET', 'CONNECTED_APPS_MICROSOFT_CLIENT_ID', 'CONNECTED_APPS_MICROSOFT_CLIENT_SECRET', 'CONNECTED_APPS_REDIRECT_BASE'] as const;
+const ENV = ['CONNECTED_APPS_STATE_SECRET', 'CONNECTED_APPS_TOKEN_ENC_KEY', 'CRM_TOKEN_ENC_KEY', 'MCP_OAUTH_SIGNING_SECRET', 'ADMIN_PASSWORD', 'CONNECTED_APPS_GOOGLE_CLIENT_ID', 'CONNECTED_APPS_GOOGLE_CLIENT_SECRET', 'CONNECTED_APPS_MICROSOFT_CLIENT_ID', 'CONNECTED_APPS_MICROSOFT_CLIENT_SECRET', 'CONNECTED_APPS_REDIRECT_BASE'] as const;
 const saved: Record<string, string | undefined> = {};
 beforeEach(() => {
   for (const k of ENV) saved[k] = process.env[k];
-  process.env.CONNECTED_APPS_STATE_SECRET = 'state-secret-test';
-  process.env.CRM_TOKEN_ENC_KEY = 'enc-key-test';
+  process.env.CONNECTED_APPS_STATE_SECRET = 'state-secret-test-0123456789abcdef0123';
+  process.env.CONNECTED_APPS_TOKEN_ENC_KEY = 'token-key-test-0123456789abcdef01234567';
   process.env.CONNECTED_APPS_GOOGLE_CLIENT_ID = 'g-id';
   process.env.CONNECTED_APPS_GOOGLE_CLIENT_SECRET = 'g-secret';
   process.env.CONNECTED_APPS_MICROSOFT_CLIENT_ID = 'm-id';
@@ -19,33 +19,71 @@ afterEach(() => { for (const k of ENV) { if (saved[k] === undefined) delete proc
 
 const base = { provider: 'google' as const, ownerEmail: 'a@b.com', scopeKey: 'own:a@b.com', caps: ['file' as const], returnTo: '/app?panel=map' };
 
+const bind = newBrowserBinding();
+const sign = (verifier = 'v', now?: number) => signState(base, verifier, bind.hash, now);
+const ok = (r: ReturnType<typeof verifyState>) => (r.ok ? r : null);
+
 describe('signed state', () => {
   it('round-trips the verified user, scope and PKCE verifier', () => {
     const { verifier } = pkcePair();
-    const v = verifyState(signState(base, verifier));
+    const v = ok(verifyState(sign(verifier), bind.cookie));
     expect(v?.payload).toMatchObject({ ownerEmail: 'a@b.com', scopeKey: 'own:a@b.com', caps: ['file'], returnTo: '/app?panel=map' });
     expect(v?.verifier).toBe(verifier);
   });
-  it('does not carry the verifier in clear', () => {
+  it('does not carry the verifier or the binding cookie in clear', () => {
     const { verifier } = pkcePair();
-    const s = signState(base, verifier);
-    expect(Buffer.from(s.split('.')[0].replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString()).not.toContain(verifier);
+    const decoded = Buffer.from(sign(verifier).split('.')[0].replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString();
+    expect(decoded).not.toContain(verifier);
+    expect(decoded).not.toContain(bind.cookie);
   });
   it('rejects a tampered state (another user or scope)', () => {
-    const s = signState(base, 'v');
-    const [body, sig] = s.split('.');
+    const [body, sig] = sign().split('.');
     const forged = Buffer.from(JSON.stringify({ ...JSON.parse(Buffer.from(body.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString()), scopeKey: 'ws:victim' })).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-    expect(verifyState(`${forged}.${sig}`)).toBeNull();
+    expect(verifyState(`${forged}.${sig}`, bind.cookie)).toEqual({ ok: false, reason: 'invalid_state' });
   });
   it('expires', () => {
     const now = Math.floor(Date.now() / 1000);
-    const s = signState(base, 'v', now);
-    expect(verifyState(s, now + STATE_TTL_SEC - 1)).not.toBeNull();
-    expect(verifyState(s, now + STATE_TTL_SEC + 1)).toBeNull();
+    const s = sign('v', now);
+    expect(verifyState(s, bind.cookie, now + STATE_TTL_SEC - 1).ok).toBe(true);
+    expect(verifyState(s, bind.cookie, now + STATE_TTL_SEC + 1).ok).toBe(false);
   });
   it('garbage is rejected', () => {
-    expect(verifyState('')).toBeNull();
-    expect(verifyState('a.b')).toBeNull();
+    expect(verifyState('', bind.cookie).ok).toBe(false);
+    expect(verifyState('a.b', bind.cookie).ok).toBe(false);
+  });
+});
+
+describe('browser binding (a forwarded consent link changes nothing)', () => {
+  it('no binding cookie on the callback → browser_mismatch', () => {
+    expect(verifyState(sign(), undefined)).toEqual({ ok: false, reason: 'browser_mismatch' });
+    expect(verifyState(sign(), '')).toEqual({ ok: false, reason: 'browser_mismatch' });
+  });
+  it("another browser's cookie → browser_mismatch", () => {
+    expect(verifyState(sign(), newBrowserBinding().cookie)).toEqual({ ok: false, reason: 'browser_mismatch' });
+  });
+  it('the state carries only the hash, so the state alone cannot be replayed', () => {
+    const decoded = JSON.parse(Buffer.from(sign().split('.')[0].replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString());
+    expect(decoded.b).toBe(bind.hash);
+    expect(verifyState(sign(), bind.hash)).toEqual({ ok: false, reason: 'browser_mismatch' });
+  });
+  it('signing without a binding is refused', () => {
+    expect(() => signState(base, 'v', '')).toThrow(/binding/);
+  });
+});
+
+describe('dedicated secrets (no shared fallback)', () => {
+  it('ADMIN_PASSWORD / MCP_OAUTH_SIGNING_SECRET / CRM_TOKEN_ENC_KEY never stand in', () => {
+    const env = { ADMIN_PASSWORD: 'x'.repeat(40), MCP_OAUTH_SIGNING_SECRET: 'y'.repeat(40), CRM_TOKEN_ENC_KEY: 'z'.repeat(40) };
+    expect(connectedAppsSecrets(env)).toBeNull();
+    delete process.env.CONNECTED_APPS_STATE_SECRET;
+    Object.assign(process.env, env);
+    expect(() => sign()).toThrow(/dedicated secrets/);
+  });
+  it('requires both, at least 32 characters, and different from each other', () => {
+    expect(connectedAppsSecrets({ CONNECTED_APPS_STATE_SECRET: 'a'.repeat(40) })).toBeNull();
+    expect(connectedAppsSecrets({ CONNECTED_APPS_STATE_SECRET: 'short', CONNECTED_APPS_TOKEN_ENC_KEY: 'b'.repeat(40) })).toBeNull();
+    expect(connectedAppsSecrets({ CONNECTED_APPS_STATE_SECRET: 'a'.repeat(40), CONNECTED_APPS_TOKEN_ENC_KEY: 'a'.repeat(40) })).toBeNull();
+    expect(connectedAppsSecrets({ CONNECTED_APPS_STATE_SECRET: 'a'.repeat(40), CONNECTED_APPS_TOKEN_ENC_KEY: 'b'.repeat(40) })).not.toBeNull();
   });
 });
 
@@ -66,8 +104,19 @@ describe('authorizeUrl: PKCE, account chooser, least privilege', () => {
     expect(u.searchParams.get('prompt')).toContain('select_account');
     expect(u.searchParams.get('redirect_uri')).toBe('https://getmindy.ai/api/app/connected-apps/callback');
   });
+  it('this slice defines file access only: no mail or calendar scopes are requestable yet', () => {
+    expect(Object.keys(SCOPES.google).sort()).toEqual(['file', 'identity']);
+    expect(Object.keys(SCOPES.microsoft).sort()).toEqual(['file', 'identity']);
+    const all = [...scopesFor('google', ['file']), ...scopesFor('microsoft', ['file'])].join(' ');
+    expect(all).not.toMatch(/gmail|calendar|Mail\.|Calendars\./i);
+  });
+  it('the access note describes the grant honestly: Microsoft Files.Read covers all OneDrive files', () => {
+    expect(ACCESS_DISCLOSURE.microsoft.file).toMatch(/all of the files in your OneDrive/);
+    expect(ACCESS_DISCLOSURE.microsoft.file).toMatch(/not only the ones you pick/);
+    expect(ACCESS_DISCLOSURE.google.file).toMatch(/only the files you pick/);
+  });
   it('never requests restricted or send scopes', () => {
-    const all = [...scopesFor('google', ['file', 'draft', 'calendar']), ...scopesFor('microsoft', ['file', 'draft', 'calendar'])];
+    const all = [...scopesFor('google', ['file']), ...scopesFor('microsoft', ['file'])];
     expect(all).not.toContain('https://www.googleapis.com/auth/drive.readonly');
     expect(all).not.toContain('https://www.googleapis.com/auth/drive');
     expect(all).not.toContain('https://www.googleapis.com/auth/gmail.send');

@@ -19,11 +19,15 @@ Spec: [CONNECTED-APPS-SPEC-2026-11-24.md](./CONNECTED-APPS-SPEC-2026-11-24.md). 
 
 - `src/lib/connected-apps/config.ts`
   - Providers, endpoints, and least-privilege scopes per capability (from the spec's table).
+  - **This slice defines file access only.** Mail and calendar scopes are not in the code; they arrive, and get reviewed, with the slice that ships the tool that uses them.
   - Never `drive.readonly`, `drive`, `gmail.send`, `Mail.Send`, `Sites.*` or `*.All`. This is asserted by a test.
+  - **Honest access note (`ACCESS_DISCLOSURE`).** `/start` returns `access_note`, which the UI shows before sending the customer to consent. Google `drive.file` is limited to picked files. Microsoft `Files.Read` covers **all** of the user's OneDrive files; Mindy reads only the picked file, and the note says the grant is broader.
   - Flag: `CONNECTED_APPS` + `CONNECTED_APPS_ALLOWLIST`.
 - `src/lib/connected-apps/oauth.ts`
   - Authorization code flow with PKCE S256.
   - An HMAC-signed, 10-minute state that binds the verified user, the acting scope, the capabilities and a same-origin return path. The PKCE verifier is encrypted inside it.
+  - **Browser binding.** `/start` sets a random `mindy_ca_bind` cookie (HttpOnly, Secure, SameSite=Lax, path = the callback, 10 minutes) and puts its SHA-256 in the state. The callback refuses with `browser_mismatch` unless the same browser presents the matching cookie, and clears it on every outcome. A consent link forwarded to someone else therefore connects nothing.
+  - **Dedicated secrets, required.** `CONNECTED_APPS_STATE_SECRET` signs; `CONNECTED_APPS_TOKEN_ENC_KEY` encrypts (own salt). Both at least 32 characters and different. There is no fallback to `ADMIN_PASSWORD`, `MCP_OAUTH_SIGNING_SECRET` or `CRM_TOKEN_ENC_KEY`; without them the routes answer 503 `not_configured` and the store refuses to write.
   - Server-side code exchange.
   - Provider identity: Google `sub`, Graph `id`.
   - Refresh, and revoke where the provider supports it (Google yes; Microsoft has no per-grant revoke, so disconnect discards our token).
@@ -63,18 +67,16 @@ Tests cover:
    - Create an OAuth 2.0 **Web** client for connectors, separate from Supabase sign-in.
    - Register the redirect URIs `https://getmindy.ai/api/app/connected-apps/callback` and the preview equivalents.
    - Enable the **Drive API, Google Picker API, Gmail API and Calendar API**.
-   - Add the scopes `drive.file`, `gmail.compose` and `calendar.events.owned` to the consent screen.
+   - Add the scope `drive.file` to the consent screen. (`gmail.compose` and `calendar.events.owned` are added later, with the slices that use them.)
    - Create a **browser API key** restricted to the Picker API, and note the **project number** (the Picker `appId`).
-   - Check `gmail.compose` verification requirements in the console before any public activation (spec §5).
 2. **Microsoft Entra ID**:
    - Create an app registration, multi-tenant with personal accounts as decided, with the same redirect URI and a client secret.
-   - Add the delegated permissions `openid profile email offline_access User.Read Files.Read Mail.ReadWrite Calendars.ReadWrite`. **No `Mail.Send`.**
+   - Add the delegated permissions `openid profile email offline_access User.Read Files.Read`. **No `Mail.Send`.** (`Mail.ReadWrite` and `Calendars.ReadWrite` are added later, with the slices that use them.) Note `Files.Read` covers all of the user's OneDrive files.
    - Some customer tenants will require admin consent. The callback reports the tenant's refusal code to the customer.
 3. **Environment variables** (production changes need Eric plus Agent 4):
    - `CONNECTED_APPS_GOOGLE_CLIENT_ID`, `CONNECTED_APPS_GOOGLE_CLIENT_SECRET`
    - `CONNECTED_APPS_MICROSOFT_CLIENT_ID`, `CONNECTED_APPS_MICROSOFT_CLIENT_SECRET`, optional `CONNECTED_APPS_MICROSOFT_TENANT`
-   - `CONNECTED_APPS_STATE_SECRET`
-   - **a dedicated `CRM_TOKEN_ENC_KEY`.** `secretbox` falls back to `MCP_OAUTH_SIGNING_SECRET` / `ADMIN_PASSWORD`. If one of those were rotated, every stored token would become unreadable, so set a dedicated key before storing customer refresh tokens.
+   - `CONNECTED_APPS_STATE_SECRET` and `CONNECTED_APPS_TOKEN_ENC_KEY`: **required**, 32+ random characters each, different from each other. Without them the feature refuses to run. Rotating `CONNECTED_APPS_TOKEN_ENC_KEY` makes stored connections unreadable (customers reconnect), so treat it as long-lived.
    - Picker: `NEXT_PUBLIC_CONNECTED_APPS_GOOGLE_PICKER_KEY` and `NEXT_PUBLIC_CONNECTED_APPS_GOOGLE_APP_ID`.
    - `CONNECTED_APPS` + `CONNECTED_APPS_ALLOWLIST`.
 4. **Migration:** `npm run migrate -- --go --only 20261124_connected_accounts.sql`, after Agent 4 review and Eric's approval.
@@ -85,12 +87,12 @@ Tests cover:
   - It reads only the selected file and extracts bounded text with `extract.ts`.
   - The output carries `provider`, `connected_account`, `source_id`, `source_url` and `retrieved_at` provenance, separate from federal-record provenance.
   - Prompt-injection guard on file content.
-- **Slice B:** `create_outreach_draft`.
+- **Slice B:** `create_outreach_draft`. Adds the `draft` capability and its scopes (Gmail `gmail.compose`, Graph `Mail.ReadWrite`) for review in that PR.
   - Server-validated approval of the exact payload (action id plus payload hash).
   - Gmail `users.drafts.create` or Graph `POST /me/messages`. Never send.
   - No invented recipients.
   - A `connected_actions` table for idempotency.
-- **Slice C:** `create_followup_event`: a personal event with no attendees, deduplicated by action id.
+- **Slice C:** `create_followup_event` (adds the `calendar` capability and scopes): a personal event with no attendees, deduplicated by action id.
 - **Slice D:** in-chat status and links, History restore, reconnect UX, a controlled test-account rollout.
 
 ## 5. Notes for review

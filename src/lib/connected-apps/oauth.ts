@@ -4,10 +4,15 @@
  * The callback carries no Mindy session header (it is a provider redirect), so WHO is connecting and FOR WHICH
  * workspace is bound at /start, after verifyUserOwnsEmail + the acting-scope resolver, into an HMAC-signed,
  * short-lived state. The PKCE verifier travels inside that state encrypted (secretbox), never in clear.
+ *
+ * Browser binding: a signed state alone is a bearer credential. Anyone who starts a flow could forward the
+ * consent link to someone else, and that person's account would land in the starter's workspace. So /start also
+ * sets a random HttpOnly cookie on the starting browser and puts its SHA-256 in the state; the callback refuses
+ * unless the same browser presents the matching cookie.
  */
 import crypto from 'node:crypto';
 import { encryptSecret, decryptSecret } from '@/lib/crypto/secretbox';
-import { clientCreds, endpoints, redirectUri, scopesFor, type Capability, type Provider } from './config';
+import { clientCreds, connectedAppsSecrets, endpoints, redirectUri, scopesFor, type Capability, type Provider } from './config';
 
 export const STATE_TTL_SEC = 600;
 
@@ -24,13 +29,25 @@ export interface StatePayload {
   nonce: string;
 }
 
+/** HttpOnly cookie that ties a flow to the browser that started it. Scoped to the callback path only. */
+export const BINDING_COOKIE = 'mindy_ca_bind';
+export const BINDING_COOKIE_PATH = '/api/app/connected-apps/callback';
+
 const b64u = (b: Buffer) => b.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 const unb64u = (s: string) => Buffer.from(s.replace(/-/g, '+').replace(/_/g, '/'), 'base64');
 
-function stateKey(env: Record<string, string | undefined> = process.env): string {
-  const k = env.CONNECTED_APPS_STATE_SECRET || env.MCP_OAUTH_SIGNING_SECRET || env.ADMIN_PASSWORD;
-  if (!k) throw new Error('connected-apps: no state signing secret');
-  return k;
+function secrets() {
+  const s = connectedAppsSecrets();
+  if (!s) throw new Error('connected-apps: dedicated secrets not configured');
+  return s;
+}
+
+const sha256 = (v: string) => b64u(crypto.createHash('sha256').update(v).digest());
+
+/** A fresh browser binding: the cookie value for the browser and the hash that goes in the signed state. */
+export function newBrowserBinding(): { cookie: string; hash: string } {
+  const cookie = b64u(crypto.randomBytes(32));
+  return { cookie, hash: sha256(cookie) };
 }
 
 /** Only a same-origin absolute path may be a return target (no open redirect). */
@@ -45,27 +62,49 @@ export function pkcePair(): { verifier: string; challenge: string } {
   return { verifier, challenge };
 }
 
-export function signState(p: Omit<StatePayload, 'exp' | 'nonce'>, verifier: string, nowSec = Math.floor(Date.now() / 1000)): string {
-  const payload: StatePayload & { v: string } = { ...p, exp: nowSec + STATE_TTL_SEC, nonce: b64u(crypto.randomBytes(12)), v: encryptSecret(verifier) };
+export function signState(p: Omit<StatePayload, 'exp' | 'nonce'>, verifier: string, bindingHash: string, nowSec = Math.floor(Date.now() / 1000)): string {
+  if (!bindingHash) throw new Error('connected-apps: a browser binding is required');
+  const { stateSecret, tokenKey } = secrets();
+  const payload: StatePayload & { v: string; b: string } = { ...p, exp: nowSec + STATE_TTL_SEC, nonce: b64u(crypto.randomBytes(12)), v: encryptSecret(verifier, tokenKey), b: bindingHash };
   const body = b64u(Buffer.from(JSON.stringify(payload), 'utf8'));
-  const sig = b64u(crypto.createHmac('sha256', stateKey()).update(body).digest());
+  const sig = b64u(crypto.createHmac('sha256', stateSecret).update(body).digest());
   return `${body}.${sig}`;
 }
 
-export function verifyState(state: string, nowSec = Math.floor(Date.now() / 1000)): { payload: StatePayload; verifier: string } | null {
+const eq = (x: string, y: string) => {
+  const a = Buffer.from(x);
+  const b = Buffer.from(y);
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+};
+
+export type VerifiedState =
+  | { ok: true; payload: StatePayload; verifier: string }
+  | { ok: false; reason: 'invalid_state' | 'browser_mismatch' };
+
+/**
+ * Verify signature, expiry AND the browser binding. `bindingCookie` is the BINDING_COOKIE value the callback
+ * request carried; missing or different = browser_mismatch (the link was opened somewhere other than where the
+ * flow started). The payload is only returned when every check passes.
+ */
+export function verifyState(state: string, bindingCookie: string | null | undefined, nowSec = Math.floor(Date.now() / 1000)): VerifiedState {
+  const bad = { ok: false as const, reason: 'invalid_state' as const };
   const [body, sig] = String(state || '').split('.');
-  if (!body || !sig) return null;
-  const expected = b64u(crypto.createHmac('sha256', stateKey()).update(body).digest());
-  const a = Buffer.from(sig);
-  const b = Buffer.from(expected);
-  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return null;
+  if (!body || !sig) return bad;
+  const { stateSecret, tokenKey } = secrets();
+  if (!eq(sig, b64u(crypto.createHmac('sha256', stateSecret).update(body).digest()))) return bad;
+  let p: StatePayload & { v: string; b: string };
   try {
-    const p = JSON.parse(unb64u(body).toString('utf8')) as StatePayload & { v: string };
-    if (!p.exp || p.exp < nowSec) return null;
-    if (p.provider !== 'google' && p.provider !== 'microsoft') return null;
-    return { payload: { provider: p.provider, ownerEmail: p.ownerEmail, scopeKey: p.scopeKey, caps: p.caps, returnTo: safeReturnTo(p.returnTo), exp: p.exp, nonce: p.nonce }, verifier: decryptSecret(p.v) };
+    p = JSON.parse(unb64u(body).toString('utf8'));
   } catch {
-    return null;
+    return bad;
+  }
+  if (!p.exp || p.exp < nowSec) return bad;
+  if (p.provider !== 'google' && p.provider !== 'microsoft') return bad;
+  if (!p.b || !bindingCookie || !eq(p.b, sha256(bindingCookie))) return { ok: false, reason: 'browser_mismatch' };
+  try {
+    return { ok: true, payload: { provider: p.provider, ownerEmail: p.ownerEmail, scopeKey: p.scopeKey, caps: p.caps, returnTo: safeReturnTo(p.returnTo), exp: p.exp, nonce: p.nonce }, verifier: decryptSecret(p.v, tokenKey) };
+  } catch {
+    return bad;
   }
 }
 

@@ -6,26 +6,40 @@
  * Graph. Each connected account gets its own delegated OAuth grant, requested only for the capability in use.
  */
 export type Provider = 'google' | 'microsoft';
-export type Capability = 'identity' | 'file' | 'draft' | 'calendar';
+/**
+ * Only the capabilities this slice uses. Draft (Gmail/Outlook) and calendar scopes are added, and reviewed, in
+ * the slice that ships the tool that uses them; never requested ahead of time.
+ */
+export type Capability = 'identity' | 'file';
 
 export const PROVIDERS: readonly Provider[] = ['google', 'microsoft'];
 
-/** Least privilege, incremental. No send scope beyond what drafting requires; no domain-wide or restricted Drive scopes. */
+/** Least privilege, incremental. No domain-wide or restricted Drive scopes. */
 export const SCOPES: Record<Provider, Record<Capability, string[]>> = {
   google: {
     identity: ['openid', 'email', 'profile'],
-    // drive.file = only files the user picks (Google Picker). Never drive.readonly (restricted) in v1.
+    // drive.file = the app can open only files the user picks in Google Picker (or that the app created).
     file: ['https://www.googleapis.com/auth/drive.file'],
-    // gmail.compose allows sending at the OAuth level; the v1 executor exposes draft creation only.
-    draft: ['https://www.googleapis.com/auth/gmail.compose'],
-    calendar: ['https://www.googleapis.com/auth/calendar.events.owned'],
   },
   microsoft: {
     identity: ['openid', 'profile', 'email', 'offline_access', 'User.Read'],
+    // Files.Read is NOT selection-limited: it lets the app read ALL of the signed-in user's OneDrive files.
+    // Microsoft has no delegated per-picked-file scope for personal consent. Mindy reads only the file the
+    // customer picks, but the GRANT is broader, and ACCESS_DISCLOSURE says so before consent.
     file: ['Files.Read'],
-    // Mail.ReadWrite (never Mail.Send); the v1 executor exposes draft creation only.
-    draft: ['Mail.ReadWrite'],
-    calendar: ['Calendars.ReadWrite'],
+  },
+};
+
+/**
+ * What the provider grant actually allows, shown to the customer BEFORE they are sent to consent. Must describe
+ * the grant, not Mindy's intended use, where the two differ.
+ */
+export const ACCESS_DISCLOSURE: Record<Provider, Record<Exclude<Capability, 'identity'>, string>> = {
+  google: {
+    file: 'Google will let Mindy open only the files you pick. Mindy cannot see the rest of your Drive.',
+  },
+  microsoft: {
+    file: 'Microsoft will let Mindy read all of the files in your OneDrive, not only the ones you pick. Mindy opens only a file you choose, and you can disconnect at any time.',
   },
 };
 
@@ -70,6 +84,20 @@ export function clientCreds(provider: Provider, env: Env = process.env): ClientC
 export function redirectUri(env: Env = process.env): string {
   const base = (env.CONNECTED_APPS_REDIRECT_BASE || env.NEXT_PUBLIC_SITE_URL || 'https://getmindy.ai').replace(/\/$/, '');
   return `${base}/api/app/connected-apps/callback`;
+}
+
+/**
+ * Dedicated secrets, required. There is deliberately no fallback to ADMIN_PASSWORD / MCP_OAUTH_SIGNING_SECRET:
+ * rotating an unrelated secret must never invalidate every stored connection or let states signed under one
+ * purpose verify under another. null = refuse to run (routes answer 503 not_configured).
+ */
+export interface ConnectedAppsSecrets { stateSecret: string; tokenKey: { secret: string; salt: string } }
+const MIN_SECRET_LEN = 32;
+export function connectedAppsSecrets(env: Env = process.env): ConnectedAppsSecrets | null {
+  const state = env.CONNECTED_APPS_STATE_SECRET || '';
+  const enc = env.CONNECTED_APPS_TOKEN_ENC_KEY || '';
+  if (state.length < MIN_SECRET_LEN || enc.length < MIN_SECRET_LEN || state === enc) return null;
+  return { stateSecret: state, tokenKey: { secret: enc, salt: 'mindy-connected-apps-v1' } };
 }
 
 /** Off unless CONNECTED_APPS=true and the user is on CONNECTED_APPS_ALLOWLIST (comma-separated, or `*`). */

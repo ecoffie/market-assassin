@@ -7824,4 +7824,4 @@ the notices. Test: `federal-events-ranking.unit.test.ts`.
 
 **SEO:** government contracting outreach email, capability statement outreach, federal BD follow-up, Gmail Outlook government contracts assistant.
 
-**Proof:** Not yet customer-visible. Permissions are limited by design: Mindy only sees files you pick (Google `drive.file`), drafts are never sent, and no send permission is requested from Microsoft. Source: `src/lib/connected-apps/`, spec `docs/connected-apps/CONNECTED-APPS-SPEC-2026-11-24.md`. Behind `CONNECTED_APPS` (off).
+**Proof:** Not yet customer-visible. Permissions are stated honestly before consent: with Google, Mindy can open only the files you pick (`drive.file`); with Microsoft, the `Files.Read` permission covers all of your OneDrive files, and Mindy opens only the one you choose. This part asks for file access only; mail and calendar permissions come later, with the features that use them, and Mindy never asks for permission to send mail. A consent link only works in the browser that started it. Source: `src/lib/connected-apps/`, spec `docs/connected-apps/CONNECTED-APPS-SPEC-2026-11-24.md`. Behind `CONNECTED_APPS` (off).

@@ -8,9 +8,18 @@ import { getWriteClient } from '@/lib/supabase/server-clients';
 import { encryptSecret, decryptSecret } from '@/lib/crypto/secretbox';
 import type { ChatActingScope } from '@/lib/chat/chat-acting-scope';
 import { OAuthError, refreshTokens, revokeAtProvider, type TokenSet } from './oauth';
-import type { Provider } from './config';
+import { connectedAppsSecrets, type Provider } from './config';
 
 export const TABLE = 'connected_accounts';
+
+/** Tokens are encrypted ONLY with the dedicated connected-apps key; never the shared secretbox fallback chain. */
+function tokenKey() {
+  const s = connectedAppsSecrets();
+  if (!s) throw new Error('connected-apps: dedicated secrets not configured');
+  return s.tokenKey;
+}
+const enc = (v: string) => encryptSecret(v, tokenKey());
+const dec = (v: string) => decryptSecret(v, tokenKey());
 
 /** The acting scope a connection belongs to. null = workspace unconfirmed → refuse. */
 export function scopeKeyFor(scope: ChatActingScope): string | null {
@@ -58,13 +67,13 @@ export async function saveConnection(
     owner_email: a.ownerEmail.toLowerCase(),
     scope_key: a.scopeKey,
     granted_scopes: a.tokens.grantedScopes,
-    access_token_enc: encryptSecret(a.tokens.accessToken),
+    access_token_enc: enc(a.tokens.accessToken),
     access_expires_at: new Date(a.tokens.expiresAt).toISOString(),
     status: 'connected',
     updated_at: now,
   };
   // A re-consent without a new refresh token (Google omits it when already granted) keeps the stored one.
-  if (a.tokens.refreshToken) row.refresh_token_enc = encryptSecret(a.tokens.refreshToken);
+  if (a.tokens.refreshToken) row.refresh_token_enc = enc(a.tokens.refreshToken);
   const { data, error } = await db
     .from(TABLE)
     // truncation-ok: one row upserted on a unique key; the payload is that row (the saved connection), never a write count.
@@ -104,16 +113,16 @@ export async function accessTokenFor(
   if (row.status === 'reauth_needed') return { ok: false, reason: 'reauth_needed' };
   const exp = row.access_expires_at ? Date.parse(row.access_expires_at) : 0;
   if (row.access_token_enc && exp - now > 60_000) {
-    return { ok: true, token: decryptSecret(row.access_token_enc), provider: row.provider, connection: view(row) };
+    return { ok: true, token: dec(row.access_token_enc), provider: row.provider, connection: view(row) };
   }
   if (!row.refresh_token_enc) {
     await db.from(TABLE).update({ status: 'reauth_needed', updated_at: new Date(now).toISOString() }).eq('id', row.id).eq('scope_key', scopeKey);
     return { ok: false, reason: 'reauth_needed' };
   }
   try {
-    const t = await (deps.refresh ?? refreshTokens)(row.provider, decryptSecret(row.refresh_token_enc));
-    const patch: Record<string, unknown> = { access_token_enc: encryptSecret(t.accessToken), access_expires_at: new Date(t.expiresAt).toISOString(), updated_at: new Date(now).toISOString() };
-    if (t.refreshToken) patch.refresh_token_enc = encryptSecret(t.refreshToken);
+    const t = await (deps.refresh ?? refreshTokens)(row.provider, dec(row.refresh_token_enc));
+    const patch: Record<string, unknown> = { access_token_enc: enc(t.accessToken), access_expires_at: new Date(t.expiresAt).toISOString(), updated_at: new Date(now).toISOString() };
+    if (t.refreshToken) patch.refresh_token_enc = enc(t.refreshToken);
     await db.from(TABLE).update(patch).eq('id', row.id).eq('scope_key', scopeKey);
     return { ok: true, token: t.accessToken, provider: row.provider, connection: view(row) };
   } catch (err) {
@@ -130,7 +139,7 @@ export async function disconnect(scopeKey: string, id: string, deps: { db?: Supa
   const db = deps.db ?? getWriteClient();
   const row = await loadRow(scopeKey, id, db);
   if (!row) return 'not_found';
-  const token = row.refresh_token_enc ? decryptSecret(row.refresh_token_enc) : row.access_token_enc ? decryptSecret(row.access_token_enc) : null;
+  const token = row.refresh_token_enc ? dec(row.refresh_token_enc) : row.access_token_enc ? dec(row.access_token_enc) : null;
   if (token) await (deps.revoke ?? revokeAtProvider)(row.provider, token).catch(() => 'failed');
   await db
     .from(TABLE)
