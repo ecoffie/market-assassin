@@ -58,3 +58,36 @@ describe('decideSavedSearchAlert', () => {
     expect(decideSavedSearchAlert({ lastAlertedAt: null, lastSeenIds: null, records: [rec('A')] }).action).toBe('baseline');
   });
 });
+
+describe('decideSavedSearchAlert — Open engine change re-baselines (2026-11-14)', () => {
+  // The legacy engine stored only its newest-200 slice of an 8,880-row result ("Show me DOJ opportunities");
+  // the canonical engine's 260 real DOJ matches were never in that slice. Without the transition rule every
+  // one would be emailed as "new" on the first canonical run.
+  it('engine change → baseline (current ∪ prior seen), no send, even with many unseen records', () => {
+    const d = decideSavedSearchAlert({
+      lastAlertedAt: '2026-11-13T12:00:00Z',
+      lastSeenIds: ['OLD1', 'OLD2'],
+      records: [rec('N1'), rec('N2'), rec('OLD1')],
+      engineTransition: true,
+    });
+    expect(d).toEqual({ action: 'baseline', nextSeen: ['N1', 'N2', 'OLD1', 'OLD2'] });
+  });
+
+  it('rollback (canonical → legacy) is the same rule: the legacy broad set is not emailed', () => {
+    const many = Array.from({ length: 200 }, (_, i) => rec(`L${i}`));
+    const d = decideSavedSearchAlert({ lastAlertedAt: '2026-11-13T12:00:00Z', lastSeenIds: ['C1'], records: many, engineTransition: true });
+    expect(d.action).toBe('baseline');
+  });
+
+  it('re-baseline respects the seen cap', () => {
+    const many = Array.from({ length: SAVED_SEARCH_SEEN_CAP + 50 }, (_, i) => rec(`X${i}`));
+    const d = decideSavedSearchAlert({ lastAlertedAt: '2026-11-13T12:00:00Z', lastSeenIds: ['P'], records: many, engineTransition: true });
+    if (d.action !== 'baseline') throw new Error('expected baseline');
+    expect(d.nextSeen.length).toBe(SAVED_SEARCH_SEEN_CAP);
+  });
+
+  it('no engine change → existing rules unchanged (new record still alerts)', () => {
+    const d = decideSavedSearchAlert({ lastAlertedAt: '2026-11-13T12:00:00Z', lastSeenIds: ['A'], records: [rec('A'), rec('B')], engineTransition: false });
+    expect(d.action).toBe('send');
+  });
+});

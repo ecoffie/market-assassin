@@ -17,6 +17,7 @@ const state = {
   forecastError: null as { message: string } | null,
   snapshot: '2026-09-24T11:00:00.000Z' as string | null,
   columns: 'present' as 'present' | 'absent' | 'unknown',
+  openEngineColumn: 'present' as 'present' | 'absent',
   rpcCalls: 0,
   selects: [] as string[],
   updates: [] as Array<{ id: unknown; payload: Row }>,
@@ -80,6 +81,12 @@ function builder(table: string) {
         if (state.columns === 'unknown') return Promise.resolve({ data: null, error: { code: '57014', message: 'canceling statement due to statement timeout' } }).then(resolve, reject);
         return Promise.resolve({ data: [], error: null }).then(resolve, reject);
       }
+      // The once-per-invocation Open-engine column probe (open-evaluator / 20261114 migration). Must not be
+      // mistaken for the due-row fetch, or it would consume an injected stale row.
+      if (sel === 'open_engine') {
+        if (state.openEngineColumn === 'absent') return Promise.resolve({ data: null, error: { code: '42703', message: 'column saved_searches.open_engine does not exist' } }).then(resolve, reject);
+        return Promise.resolve({ data: [], error: null }).then(resolve, reject);
+      }
       const excluded = ops.some((o) => o[0] === 'not' && o[1][0] === 'id');
       // A stale read models an overlapping execution that loaded the row before another run changed it.
       const due = state.staleRow ?? state.search; state.staleRow = null;
@@ -141,7 +148,7 @@ const forecastEmails = () => state.sends.filter((m) => /Forecast/.test(m.html));
 
 beforeEach(() => {
   Object.assign(state, {
-    search: null, open: [], forecasts: [], forecastError: null, snapshot: '2026-09-24T11:00:00.000Z', columns: 'present',
+    search: null, open: [], forecasts: [], forecastError: null, snapshot: '2026-09-24T11:00:00.000Z', columns: 'present', openEngineColumn: 'present',
     rpcCalls: 0, selects: [], updates: [], forecastQueries: [], sends: [], claims: [], updateError: null, saveFails: 0, staleRow: null, sendGate: null,
     floors: ['DOE', 'DHS', 'VA', 'HHS'].map((s) => ({ source_agency: s, state: 'active', alertable_after: '2026-09-01T00:00:00.000Z' })),
   });
@@ -517,5 +524,86 @@ describe('F2 — a Forecast-only watch never receives Open listings', () => {
     state.open = [{ notice_id: 'OPEN-OLD', title: 'o' }, { notice_id: 'OPEN-NEW', title: 'Open listing' }];
     await run();
     expect(state.sends[0].html).toContain('Open listing');
+  });
+});
+
+
+describe('Open engine switch (Agent 3 alert parity, 2026-11-14)', () => {
+  afterEach(() => { delete process.env.SAVED_SEARCH_OPEN_CANONICAL; });
+  const OPEN_ONLY = { q: 'janitorial services' };
+
+  it('legacy (default): unchanged — selects open_engine once the column exists, alerts the new notice, never stamps canonical', async () => {
+    state.search = search(OPEN_ONLY);
+    state.open = [{ notice_id: 'OPEN-OLD', title: 'o' }, { notice_id: 'OPEN-NEW', title: 'n' }];
+    const { body } = await run();
+    expect(body.sent).toBe(1);
+    expect(state.selects.some((x) => x.includes('open_engine'))).toBe(true);
+    expect(state.updates.at(-1)!.payload.open_engine).toBe('legacy');
+  });
+
+  it('first canonical run after the switch: re-baselines (no email), seen = current ∪ prior, stamps canonical', async () => {
+    process.env.SAVED_SEARCH_OPEN_CANONICAL = 'true';
+    state.search = search(OPEN_ONLY);   // open_engine NULL = only ever legacy
+    state.open = [{ notice_id: 'OPEN-OLD', title: 'o' }, { notice_id: 'WEEKS-OLD-1', title: 'a' }, { notice_id: 'WEEKS-OLD-2', title: 'b' }];
+    const { body } = await run();
+    expect(state.sends).toHaveLength(0);
+    expect(body.sent).toBe(0);
+    const p = state.updates.at(-1)!.payload;
+    expect(p.open_engine).toBe('canonical');
+    expect(p.last_seen_notice_ids).toEqual(['OPEN-OLD', 'WEEKS-OLD-1', 'WEEKS-OLD-2']);
+    // Next run on the same engine: a genuinely new notice alerts.
+    persist();
+    state.open = [...state.open, { notice_id: 'TRULY-NEW', title: 'n' }];
+    expect((await run()).body.sent).toBe(1);
+    expect(state.sends).toHaveLength(1);
+  });
+
+  it('rollback (canonical → legacy) re-baselines too: the legacy broad set is never emailed', async () => {
+    state.search = search(OPEN_ONLY, { open_engine: 'canonical' });
+    state.open = Array.from({ length: 50 }, (_, i) => ({ notice_id: `BROAD-${i}`, title: 't' }));
+    const { body } = await run();
+    expect(body.sent).toBe(0);
+    expect(state.updates.at(-1)!.payload.open_engine).toBe('legacy');
+  });
+
+  it('a refused canonical plan is reported by id and writes NOTHING (never stamped as a quiet zero)', async () => {
+    process.env.SAVED_SEARCH_OPEN_CANONICAL = 'true';
+    state.search = search({ q: '-computers' }, { id: 'EXCL-ONLY', open_engine: 'canonical' });
+    state.open = [{ notice_id: 'X', title: 'x' }];
+    const { body } = await run();
+    expect(body.failedSearches).toEqual([{ id: 'EXCL-ONLY', failureClass: 'search_needs_refinement' }]);
+    expect(state.updates).toHaveLength(0);
+    expect(state.sends).toHaveLength(0);
+  });
+
+  it('canonical without the open_engine column refuses the whole run (cannot re-baseline safely)', async () => {
+    process.env.SAVED_SEARCH_OPEN_CANONICAL = 'true';
+    state.openEngineColumn = 'absent';
+    state.search = search(OPEN_ONLY);
+    state.open = [{ notice_id: 'OPEN-NEW', title: 'n' }];
+    const r = await run();
+    expect(r.status).toBe(500);
+    expect(state.sends).toHaveLength(0);
+    expect(state.updates).toHaveLength(0);
+  });
+
+  it('legacy without the column runs exactly as before (deploy-before-migration is safe)', async () => {
+    state.openEngineColumn = 'absent';
+    state.search = search(OPEN_ONLY);
+    state.open = [{ notice_id: 'OPEN-OLD', title: 'o' }, { notice_id: 'OPEN-NEW', title: 'n' }];
+    expect((await run()).body.sent).toBe(1);
+    // The due-row fetch must not select a column that does not exist (the probe itself always runs).
+    expect(state.selects.filter((x) => x.includes('last_seen_notice_ids')).some((x) => x.includes('open_engine'))).toBe(false);
+    expect('open_engine' in state.updates.at(-1)!.payload).toBe(false);
+  });
+
+  it('preview may opt into canonical per request and writes nothing', async () => {
+    state.openEngineColumn = 'absent';
+    state.search = search(OPEN_ONLY);
+    state.open = [{ notice_id: 'OPEN-NEW', title: 'n' }];
+    const { body } = await run('?mode=preview&openEngine=canonical');
+    expect(state.updates).toHaveLength(0);
+    expect(state.sends).toHaveLength(0);
+    expect(JSON.stringify(body)).toContain('"openEngine":"canonical"');
   });
 });

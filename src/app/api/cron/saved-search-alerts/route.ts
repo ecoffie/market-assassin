@@ -41,7 +41,8 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { applyMapFilters, multiVal, parseMapFilters } from '@/lib/opportunities/map-filters';
+import { multiVal } from '@/lib/opportunities/map-filters';
+import { openEngineChanged, resolveOpenEngine, savedSearchOpenEvaluation, type SavedSearchOpenEngine } from '@/lib/saved-searches/open-evaluator';
 import { sendEmail } from '@/lib/send-email';
 import { savedSearchWantsOpen } from '@/lib/saved-searches/alert-scope';
 import type { SavedSearchMode } from '@/lib/saved-searches/constants';
@@ -99,6 +100,12 @@ const DUE_SELECT =
 // The watermark columns exist only after 20260924_saved_search_forecast_watermark.sql; the legacy engine
 // never selects them, so deploying this code before the migration cannot break the legacy cron.
 const DUE_SELECT_CANONICAL = `${DUE_SELECT}, forecast_seen_through, forecast_gap_since, forecast_pending, forecast_alert_claim_until`;
+/**
+ * Open-engine state (20261114_saved_search_open_engine.sql). Selected only when the column exists, so this
+ * code can deploy before the migration: the legacy Open engine runs exactly as before without it.
+ */
+const OPEN_ENGINE_COL = 'open_engine';
+type OpenEngineColumn = 'present' | 'absent' | 'unknown';
 
 /**
  * EMERGENCY-ROLLBACK SAFETY. Whether the watermark columns exist decides what the LEGACY engine may do:
@@ -183,6 +190,10 @@ type PreviewRow = {
   coverageNotices?: string[];
   openNewCount?: number;
   forecastNewCount?: number;
+  /** Open evaluator that produced this row's matches, and whether this run re-baselines on an engine change. */
+  openEngine?: SavedSearchOpenEngine;
+  openEngineTransition?: boolean;
+  openMatches?: number;
   forecastWatermarkBefore?: string | null;
   forecastWatermarkAfter?: string | null;
   forecastInProgress?: number;
@@ -259,6 +270,8 @@ async function evaluateSavedSearch(
   previewRows: PreviewRow[],
   forecastEngine: ForecastEngine = 'legacy',
   watermarkColumns: WatermarkColumns = 'absent',
+  openEngine: SavedSearchOpenEngine = 'legacy',
+  openEngineColumn: OpenEngineColumn = 'absent',
 ): Promise<SavedSearchAlertEvalCounts> {
   if (!isSavedSearchDueAt(s.alert_frequency, now)) return { skippedNotDue: 1 };
 
@@ -326,16 +339,22 @@ async function evaluateSavedSearch(
     // A stored filter the parser cannot read (sapBuyer saved as `true`, 2026-10-01) is THIS search's
     // failure, reported by id — never an anonymous unexpected_schedule_error, and nothing is stamped, so
     // the search's missed interval is preserved for an explicit recovery instead of silently baselined.
-    let f: ReturnType<typeof parseMapFilters>;
+    // ONE MEANING (open-evaluator.ts): under the canonical engine this is the Map's own adapter
+    // (mapsOpenRequest + applyMapsOpenFilters); legacy is kept only as the env rollback.
+    let ev: ReturnType<typeof savedSearchOpenEvaluation>;
     try {
-      f = parseMapFilters((k) => savedFilters[k] ?? null, profileOpts);
+      ev = savedSearchOpenEvaluation(savedFilters, profileOpts, openEngine);
     } catch (e) {
       console.error(`[saved-search-alerts] ${s.id}: stored filters cannot be evaluated:`, (e as Error)?.message);
       return { failureClass: 'invalid_saved_filters' };
     }
-    f.postedDays = f.postedDays || 30;
-    let q = db.from('sam_opportunities').select(PIN_COLS).limit(200);
-    q = applyMapFilters(q, f);
+    // A refused plan is the owner's to refine. Never run it (it would be `notice_id IS NULL` → a clean zero)
+    // and write nothing, so the search's interval is preserved for the corrected search.
+    if (!ev.ok) {
+      console.warn(`[saved-search-alerts] ${s.id}: canonical plan ${ev.status} — not evaluated`);
+      return { failureClass: 'search_needs_refinement' };
+    }
+    const q = ev.apply(db.from('sam_opportunities').select(PIN_COLS).limit(200));
     const { data, error: qErr } = await q.order('posted_date', { ascending: false });
     if (qErr) return { failureClass: 'opportunity_query_failed' };
     opps = data || [];
@@ -343,8 +362,16 @@ async function evaluateSavedSearch(
 
   // CANONICAL engine: the Forecast horizon runs on the created_at watermark, and last_seen_notice_ids
   // becomes Open-only state. See evaluateCanonicalForecast.
+  // Engine-change re-baseline (alert-decision.ts engineTransition). Only meaningful when Open ran and the
+  // stored engine is readable; a missing column means every search has only ever seen legacy.
+  const storedEngine = openEngineColumn === 'present' ? s.open_engine : null;
+  const engineTransition = doOpen && openEngineChanged(storedEngine, openEngine);
+  // Stamp the engine on every successful write once the column exists, so the NEXT change is detectable.
+  const engineStamp: Record<string, unknown> = doOpen && openEngineColumn === 'present' ? { [OPEN_ENGINE_COL]: openEngine } : {};
+  const openPreview = { openEngine, openEngineTransition: engineTransition, openMatches: opps.length };
+
   if (doForecast && forecastEngine === 'canonical') {
-    return evaluateCanonicalForecast(db, s, opps, preview, previewRows);
+    return evaluateCanonicalForecast(db, s, opps, preview, previewRows, { engineTransition, engineStamp, openPreview });
   }
 
   // Rollback guard (see WatermarkColumns): legacy must never deliver Forecasts for a search the canonical
@@ -372,13 +399,16 @@ async function evaluateSavedSearch(
     lastAlertedAt: s.last_alerted_at,
     lastSeenIds: s.last_seen_notice_ids,
     records: opps || [],
+    engineTransition,
   });
 
   const paused = legacyForecastPaused ? { forecastCoverage: 'rollback_paused' as const } : {};
   if (decision.action === 'baseline') {
+    if (preview) previewRows.push({ email: s.user_email, name: s.name, newCount: 0, ...openPreview });
     if (!preview) {
       const stamped = await stampSearchEvaluation(db, s.id, {
         last_seen_notice_ids: decision.nextSeen,
+        ...engineStamp,
       });
       if (!stamped) return { failureClass: 'state_update_failed', ...paused };
     }
@@ -386,8 +416,9 @@ async function evaluateSavedSearch(
   }
 
   if (decision.action === 'no_new') {
+    if (preview) previewRows.push({ email: s.user_email, name: s.name, newCount: 0, ...openPreview });
     if (!preview) {
-      const stamped = await stampSearchEvaluation(db, s.id, {});
+      const stamped = await stampSearchEvaluation(db, s.id, { ...engineStamp });
       if (!stamped) return { failureClass: 'state_update_failed', ...paused };
     }
     return { noMatches: 1, ...paused };
@@ -396,7 +427,7 @@ async function evaluateSavedSearch(
   const fresh = decision.fresh;
 
   if (preview) {
-    previewRows.push({ email: s.user_email, name: s.name, newCount: fresh.length });
+    previewRows.push({ email: s.user_email, name: s.name, newCount: fresh.length, ...openPreview });
     return { matched: 1, ...paused };
   }
 
@@ -419,6 +450,7 @@ async function evaluateSavedSearch(
   const stamped = await stampSearchEvaluation(db, s.id, {
     last_seen_notice_ids: cappedSeen,
     total_alerts_sent: (s.total_alerts_sent || 0) + 1,
+    ...engineStamp,
   });
   if (!stamped) return { matched: 1, sendAttempts: 1, failureClass: 'state_update_failed', ...paused };
   return { matched: 1, sendAttempts: 1, sent: 1, ...paused };
@@ -444,6 +476,7 @@ async function evaluateCanonicalForecast(
   openRows: any[],
   preview: boolean,
   previewRows: PreviewRow[],
+  open: { engineTransition: boolean; engineStamp: Record<string, unknown>; openPreview: Partial<PreviewRow> } = { engineTransition: false, engineStamp: {}, openPreview: {} },
 ): Promise<SavedSearchAlertEvalCounts> {
   // ONE immutable snapshot, taken at the start of the Forecast evaluation (DB clock, lagged).
   const snap = await readForecastSnapshot(db);
@@ -471,10 +504,13 @@ async function evaluateCanonicalForecast(
   // keyset progress (forecast_pending). Unavailable / refused → untouched.
   const forecastState = fo.kind === 'measured' || fo.kind === 'baseline' || fo.kind === 'in_progress' ? stateToColumns(fo.nextState) : {};
 
-  const openDecision = decideSavedSearchAlert({ lastAlertedAt: s.last_alerted_at, lastSeenIds: s.last_seen_notice_ids, records: openRows });
+  const openDecision = decideSavedSearchAlert({ lastAlertedAt: s.last_alerted_at, lastSeenIds: s.last_seen_notice_ids, records: openRows, engineTransition: open.engineTransition });
   const openFresh = openDecision.action === 'send' ? openDecision.fresh : [];
-  const openSeen = openDecision.action === 'baseline' ? { last_seen_notice_ids: openDecision.nextSeen }
-    : openDecision.action === 'send' ? { last_seen_notice_ids: openDecision.nextSeenAfterSend } : {};
+  const openSeen = {
+    ...(openDecision.action === 'baseline' ? { last_seen_notice_ids: openDecision.nextSeen }
+      : openDecision.action === 'send' ? { last_seen_notice_ids: openDecision.nextSeenAfterSend } : {}),
+    ...open.engineStamp,
+  };
   // PRESENTATION: the email carries the interval's full COUNT but only its evidence rows (the template renders 3).
   const forecastEvidence = fo.kind === 'measured' ? fo.evidence.map((r) => toAlertRow(r, MINDY_URL)) : [];
   const forecastCount = fo.kind === 'measured' ? fo.count : 0;
@@ -484,7 +520,7 @@ async function evaluateCanonicalForecast(
   if (preview) {
     previewRows.push({
       email: s.user_email, name: s.name, newCount: total, forecastEngine: 'canonical', forecastCoverage,
-      coverageNotices, openNewCount: openFresh.length, forecastNewCount: forecastCount,
+      coverageNotices, openNewCount: openFresh.length, forecastNewCount: forecastCount, ...open.openPreview,
       ...(fo.kind === 'in_progress' ? { forecastInProgress: fo.processed } : {}),
       forecastWatermarkBefore: before.seenThrough, forecastWatermarkAfter: fo.kind === 'measured' || fo.kind === 'baseline' ? fo.nextState.seenThrough : before.seenThrough,
     });
@@ -558,6 +594,25 @@ export async function GET(request: NextRequest) {
     request.nextUrl.searchParams.get('forecastEngine'),
   );
 
+  const openEngine = resolveOpenEngine(
+    process.env.SAVED_SEARCH_OPEN_CANONICAL,
+    preview,
+    request.nextUrl.searchParams.get('openEngine'),
+  );
+  let openEngineColumn: OpenEngineColumn = 'present';
+  {
+    const { error: probeErr } = await db.from('saved_searches').select(OPEN_ENGINE_COL).limit(1);
+    if (probeErr) {
+      const msg = `${probeErr.code ?? ''} ${probeErr.message ?? ''}`;
+      openEngineColumn = /42703|PGRST204|open_engine|does not exist|schema cache/i.test(msg) ? 'absent' : 'unknown';
+    }
+  }
+  // Without its state column the canonical Open engine cannot re-baseline on the switch, and the first run
+  // would email weeks-old matches as new. Refuse loudly (preview writes nothing, so it may still run).
+  if (openEngine === 'canonical' && openEngineColumn !== 'present' && !preview) {
+    return NextResponse.json({ success: false, outcome: 'error', openEngine, openEngineColumn, note: 'canonical Open engine requires migration 20261114_saved_search_open_engine.sql' }, { status: 500 });
+  }
+
   // Probe once per invocation whether the watermark columns exist (see WatermarkColumns).
   let watermarkColumns: WatermarkColumns = 'present';
   {
@@ -579,7 +634,8 @@ export async function GET(request: NextRequest) {
     timeBudgetMs: SAVED_SEARCH_ALERT_TIME_BUDGET_MS,
     fetchDueBatch: async ({ limit, excludeIds }) => {
       const { data, error } = await fetchDueSavedSearchBatch(
-        db, dueFrequencies, excludeIds, limit, watermarkColumns === 'present' ? DUE_SELECT_CANONICAL : DUE_SELECT,
+        db, dueFrequencies, excludeIds, limit,
+        `${watermarkColumns === 'present' ? DUE_SELECT_CANONICAL : DUE_SELECT}${openEngineColumn === 'present' ? `, ${OPEN_ENGINE_COL}` : ''}`,
       );
       return { rows: (data || []) as SavedSearch[], error };
     },
@@ -589,7 +645,7 @@ export async function GET(request: NextRequest) {
       return count;
     },
     evaluate: async (row) => {
-      const counts = await evaluateSavedSearch(db, row, now, preview, previewRows, forecastEngine, watermarkColumns);
+      const counts = await evaluateSavedSearch(db, row, now, preview, previewRows, forecastEngine, watermarkColumns, openEngine, openEngineColumn);
       // A filter forecasts cannot represent (Marine Corps) is reported, never run unfiltered (#1840).
       const withCoverage = wantsForecasts(row) && forecastFilterUnsupported(row) && !counts.forecastCoverage
         ? { ...counts, forecastCoverage: 'unsupported_filter' as const }

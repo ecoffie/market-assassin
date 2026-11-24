@@ -120,7 +120,7 @@ export const SUPPRESSION_CLASSES = new Set(['recipient_suppressed']);
  * invalid_saved_filters: that class means a value the write path should have refused reached the
  * cron, which is a defect for Mindy to investigate, not a customer choice.
  */
-export const CONFIG_ACTION_CLASSES = new Set(['invalid_saved_naics']);
+export const CONFIG_ACTION_CLASSES = new Set(['invalid_saved_naics', 'search_needs_refinement']);
 /** Volatile metrics carried in summaries but excluded from identity and impact. */
 const VOLATILE_CLASSES = new Set(['backlog']);
 /** UTC hour from which the first watchdog pass posts the daily summary. */

@@ -23,6 +23,8 @@
  */
 import { getAppSupabase } from '@/lib/app/workspace';
 import { applyMapFilters, parseMapFilters } from '@/lib/opportunities/map-filters';
+import { applyMapsOpenFilters, mapsOpenRequest } from '@/lib/opportunities/maps-open-discovery';
+import { resolveOpenEngine, savedFilterGetter } from './open-evaluator';
 import { hierarchyFilterLimitations, type FilterLimitation, type MapHorizon } from '@/lib/opportunities/hierarchy-sub-agency';
 import { isSavedSearchDueAt } from './cadence';
 import type { SavedSearchDeliveryReadiness } from './delivery-readiness';
@@ -265,28 +267,44 @@ function filterGetter(filters: Record<string, unknown>) {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function anyRow(supabase: any, f: ReturnType<typeof parseMapFilters>): Promise<boolean | null> {
-  const { data, error } = await applyMapFilters(supabase.from('sam_opportunities').select('notice_id').limit(1), f);
+async function anyRow(supabase: any, apply: (q: any) => any): Promise<boolean | null> {
+  const { data, error } = await apply(supabase.from('sam_opportunities').select('notice_id').limit(1));
   if (error) return null;
   return !!data?.length;
 }
 
 /**
- * Probe whether the saved filters reach any SAM notice — open now, else ever — through the SAME
- * parseMapFilters/applyMapFilters the Map and the alert cron use. Profile-scoped searches resolve
- * against the owner's profile at send time, so they are not probed.
+ * Probe whether the saved filters reach any SAM notice — open now, else ever — through the SAME Open
+ * evaluator the alert cron runs (SAVED_SEARCH_OPEN_CANONICAL → the Map's canonical adapter; otherwise the
+ * legacy parseMapFilters/applyMapFilters). Reach must describe the search that is actually emailed.
+ * Profile-scoped searches resolve against the owner's profile at send time, so they are not probed.
  */
 export async function probeFilterReach(filters: Record<string, unknown>): Promise<FilterReachResult> {
   if (filters.scope === 'profile') return { reach: 'unknown', detail: 'profile-scoped search' };
   if (valueShapeError(filters)) return { reach: 'unknown', detail: 'stored filters cannot be evaluated' };
   const supabase = getAppSupabase();
+  const canonical = resolveOpenEngine(process.env.SAVED_SEARCH_OPEN_CANONICAL, false, null) === 'canonical';
   try {
-    const open = await anyRow(supabase, parseMapFilters(filterGetter(filters)));
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let openApply: (q: any) => any, everApply: (q: any) => any;
+    if (canonical) {
+      const req = mapsOpenRequest(savedFilterGetter(filters));
+      // A refused plan is not "no matches" — the cron will not run it either.
+      if (req.plan.status !== 'ok') return { reach: 'unknown', detail: `search needs refinement: ${req.plan.refinement ?? req.plan.status}` };
+      const ever = { ...req, filters: { ...req.filters, status: 'all' as const } };
+      openApply = (q) => applyMapsOpenFilters(q, req);
+      everApply = (q) => applyMapsOpenFilters(q, ever);
+    } else {
+      const open = parseMapFilters(filterGetter(filters));
+      const all = parseMapFilters(filterGetter(filters));
+      all.status = 'all';
+      openApply = (q) => applyMapFilters(q, open);
+      everApply = (q) => applyMapFilters(q, all);
+    }
+    const open = await anyRow(supabase, openApply);
     if (open === null) return { reach: 'unknown', detail: null };
     if (open) return { reach: 'matches_open_now', detail: null };
-    const all = parseMapFilters(filterGetter(filters));
-    all.status = 'all';
-    const ever = await anyRow(supabase, all);
+    const ever = await anyRow(supabase, everApply);
     if (ever === null) return { reach: 'unknown', detail: null };
     return ever ? { reach: 'matched_historically', detail: null } : { reach: 'no_matches_in_available_data', detail: null };
   } catch {
