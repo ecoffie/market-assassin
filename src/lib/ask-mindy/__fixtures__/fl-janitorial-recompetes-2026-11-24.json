@@ -1,5 +1,5 @@
 {
-  "_source": "gatherMarketEvidence {keyword:\"janitorial services\", state:\"FL\"} recompetes + USASpending award competition facts, 2026-11-24 (public data)",
+  "_source": "gatherMarketEvidence {keyword:\"janitorial services\", state:\"FL\"} recompetes + USASpending award competition facts, 2026-11-24 (public data); contacts: office codes from the report, names and emails replaced with placeholders",
   "scope": {
     "state": "FL",
     "pscShares": [
@@ -161,7 +161,9 @@
       "period_of_performance_current_end": "2026-11-30",
       "capture_start_passed": true,
       "awarding_sub_agency": "Animal and Plant Health Inspection Service",
-      "total_obligation": 217316.58
+      "total_obligation": 217316.58,
+      "piid": "12639522C0010",
+      "awarding_agency": "Department of Agriculture"
     },
     {
       "contract_id": "CONT_AWD_140D0426C9408_1406_-NONE-_-NONE-",
@@ -174,7 +176,9 @@
       "period_of_performance_current_end": "2026-11-30",
       "capture_start_passed": true,
       "awarding_sub_agency": "Departmental Offices",
-      "total_obligation": 9579353.19
+      "total_obligation": 9579353.19,
+      "piid": "140D0426C9408",
+      "awarding_agency": "Department of the Interior"
     },
     {
       "contract_id": "CONT_AWD_697DCK22C00334_6920_-NONE-_-NONE-",
@@ -187,7 +191,9 @@
       "period_of_performance_current_end": "2026-11-30",
       "capture_start_passed": true,
       "awarding_sub_agency": "Federal Aviation Administration",
-      "total_obligation": 763312.84
+      "total_obligation": 763312.84,
+      "piid": "697DCK22C00334",
+      "awarding_agency": "Department of Transportation"
     },
     {
       "contract_id": "CONT_AWD_140R4024P0007_1425_-NONE-_-NONE-",
@@ -200,7 +206,9 @@
       "period_of_performance_current_end": "2026-12-10",
       "capture_start_passed": true,
       "awarding_sub_agency": "Bureau of Reclamation",
-      "total_obligation": 138572.76
+      "total_obligation": 138572.76,
+      "piid": "140R4024P0007",
+      "awarding_agency": "Department of the Interior"
     },
     {
       "contract_id": "CONT_AWD_FA481924C0010_9700_-NONE-_-NONE-",
@@ -213,7 +221,9 @@
       "period_of_performance_current_end": "2026-12-13",
       "capture_start_passed": true,
       "awarding_sub_agency": "Department of the Air Force",
-      "total_obligation": 33025628.06
+      "total_obligation": 33025628.06,
+      "piid": "FA481924C0010",
+      "awarding_agency": "Department of Defense"
     },
     {
       "contract_id": "CONT_AWD_W91QEX25C0003_9700_-NONE-_-NONE-",
@@ -226,7 +236,9 @@
       "period_of_performance_current_end": "2026-12-16",
       "capture_start_passed": true,
       "awarding_sub_agency": "Department of the Army",
-      "total_obligation": 2069560.49
+      "total_obligation": 2069560.49,
+      "piid": "W91QEX25C0003",
+      "awarding_agency": "Department of Defense"
     },
     {
       "contract_id": "CONT_AWD_140D0426C9407_1406_-NONE-_-NONE-",
@@ -239,13 +251,15 @@
       "period_of_performance_current_end": "2026-12-31",
       "capture_start_passed": true,
       "awarding_sub_agency": "Departmental Offices",
-      "total_obligation": 7576925.15
+      "total_obligation": 7576925.15,
+      "piid": "140D0426C9407",
+      "awarding_agency": "Department of the Interior"
     }
   ],
   "competition": {
     "CONT_AWD_140D0426C9408_1406_-NONE-_-NONE-": {
       "class": "not_competed",
-      "label": "Not competed · AbilityOne",
+      "label": "Not competed \u00b7 AbilityOne",
       "detail": "The current award was not competed (Not available for competition). Stated reason: Authorized by statute (far 6.302-5(a)(2)(i)). The holder is an AbilityOne Program participant.",
       "extent_competed": "NOT AVAILABLE FOR COMPETITION",
       "set_aside": null,
@@ -256,7 +270,7 @@
     },
     "CONT_AWD_697DCK22C00334_6920_-NONE-_-NONE-": {
       "class": "competed",
-      "label": "Competed · SB set-aside",
+      "label": "Competed \u00b7 SB set-aside",
       "detail": "The current award was competed as a Small business set aside - total. 11 offers were received.",
       "extent_competed": "FULL AND OPEN COMPETITION AFTER EXCLUSION OF SOURCES",
       "set_aside": "SMALL BUSINESS SET ASIDE - TOTAL",
@@ -267,7 +281,7 @@
     },
     "CONT_AWD_FA481924C0010_9700_-NONE-_-NONE-": {
       "class": "competed",
-      "label": "Competed · 8(a)",
+      "label": "Competed \u00b7 8(a)",
       "detail": "The current award was competed as a 8a competed. 5 offers were received.",
       "extent_competed": "FULL AND OPEN COMPETITION AFTER EXCLUSION OF SOURCES",
       "set_aside": "8A COMPETED",
@@ -278,7 +292,7 @@
     },
     "CONT_AWD_W91QEX25C0003_9700_-NONE-_-NONE-": {
       "class": "competed",
-      "label": "Competed · 8(a)",
+      "label": "Competed \u00b7 8(a)",
       "detail": "The current award was competed as a 8a competed. 10 offers were received.",
       "extent_competed": "COMPETED UNDER SAP",
       "set_aside": "8A COMPETED",
@@ -300,7 +314,7 @@
     },
     "CONT_AWD_140D0426C9407_1406_-NONE-_-NONE-": {
       "class": "not_competed",
-      "label": "Not competed · AbilityOne",
+      "label": "Not competed \u00b7 AbilityOne",
       "detail": "The current award was not competed (Not available for competition). Stated reason: Authorized by statute (far 6.302-5(a)(2)(i)). The holder is an AbilityOne Program participant.",
       "extent_competed": "NOT AVAILABLE FOR COMPETITION",
       "set_aside": null,
@@ -311,7 +325,7 @@
     },
     "CONT_AWD_140R4024P0007_1425_-NONE-_-NONE-": {
       "class": "competed",
-      "label": "Competed · SB set-aside",
+      "label": "Competed \u00b7 SB set-aside",
       "detail": "The current award was competed as a Small business set aside - total. 17 offers were received.",
       "extent_competed": "COMPETED UNDER SAP",
       "set_aside": "SMALL BUSINESS SET ASIDE - TOTAL",
@@ -320,5 +334,53 @@
       "abilityone_holder": false,
       "source": "usaspending_award"
     }
+  },
+  "contacts": {
+    "basis": "market_awarding_offices",
+    "agency": "Department of Veterans Affairs",
+    "office": "IBC ACQ SVCS DIRECTORATE (00004) (140D04)",
+    "office_codes": [
+      "140D04",
+      "140R40",
+      "697DCK"
+    ],
+    "people": [
+      {
+        "name": "Contracting officer 1",
+        "role": "Contracting",
+        "office": "IBC ACQ SVCS DIRECTORATE (00004) (140D04)",
+        "office_code": "140D04"
+      },
+      {
+        "name": "Contracting officer 2",
+        "role": "Contracting",
+        "office": "REGIONAL ACQUISITIONS SVCS (697DCK)",
+        "office_code": "697DCK"
+      },
+      {
+        "name": "Contracting officer 3",
+        "role": "Contracting",
+        "office": "IBC ACQ SVCS DIRECTORATE (00004) (140D04)",
+        "office_code": "140D04"
+      },
+      {
+        "name": "Contracting officer 4",
+        "role": "Contracting",
+        "office": "IBC ACQ SVCS DIRECTORATE (00004) (140D04)",
+        "office_code": "140D04"
+      },
+      {
+        "name": "Contracting officer 5",
+        "role": "Contracting",
+        "office": "IBC ACQ SVCS DIRECTORATE (00004) (140D04)",
+        "office_code": "140D04"
+      },
+      {
+        "name": "Contracting officer 6",
+        "role": "Contracting",
+        "office": "IBC ACQ SVCS DIRECTORATE (00004) (140D04)",
+        "office_code": "140D04"
+      }
+    ]
   }
 }

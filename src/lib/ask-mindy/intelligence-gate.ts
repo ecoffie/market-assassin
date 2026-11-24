@@ -10,6 +10,8 @@ import { findOpportunities, type FindOpportunitiesResult } from '@/lib/opportuni
 import { checkRecords, type CandidateRecord, type CustomerEligibility, type RecordCheck } from './evidence-checks';
 import { runAnalyst, buildAnalystPrompt, type AnalystDecision, type AnalystInput } from './analyst';
 import { evaluateDecision, type Evaluation } from './evaluator';
+import { cleanReportForPublish, reportIntegrity, type IntegrityFinding } from './report-integrity';
+import { renderMarketReportHtml } from '@/lib/market/market-report-html';
 
 type Env = Record<string, string | undefined>;
 
@@ -30,6 +32,9 @@ export interface GateResult {
   report: MarketReportResult;
   /** Chat answer rendered from the decision (same facts as the report brief). */
   answer: string;
+  /** Hard checks on the report itself; any failure blocks publication. */
+  integrity: IntegrityFinding[];
+  removed: { recompetes: number; contacts: number };
   cost: { analystIn: number; analystOut: number; evalIn: number; evalOut: number };
 }
 
@@ -139,7 +144,7 @@ export async function runIntelligenceGate(args: {
   ]);
   if (ev._meta.publication_state === 'measurement_failure') {
     return {
-      status: 'measurement_failure', decision: null, evaluation: null, attempts: 0, checks: [], report: ev, cost,
+      status: 'measurement_failure', decision: null, evaluation: null, attempts: 0, checks: [], report: ev, cost, integrity: [], removed: { recompetes: 0, contacts: 0 },
       answer: `I could not measure this market right now (the data source did not respond), so I can't recommend anything yet. This is not a sign the market is small. Please try again in a few minutes.`,
     };
   }
@@ -184,13 +189,21 @@ export async function runIntelligenceGate(args: {
     feedback = e.fix;
   }
 
-  const status: GateStatus = evaluation?.pass ? 'complete' : 'disclosed';
   ev.decision = decision ? { headline: decision.headline, pursuits: decision.pursuits, ruled_out: decision.ruled_out, gaps: decision.gaps } : null;
-  // Only a decision that passed the gate leads a published, shareable report.
-  const report = status === 'complete' ? await publish(ev, args.reportInput) : ev;
-  const disclosed = status === 'disclosed' ? (evaluation?.results || []).filter((r) => !r.pass).map((r) => r.reason) : undefined;
+  // The report must agree with the checks: ruled-out records and contacts tied only to them come out, then the
+  // report itself is verified BEFORE anything is saved or shared.
+  const { report: cleaned, removed } = cleanReportForPublish(ev, checks);
+  const integrity = evaluation?.pass
+    ? reportIntegrity(cleaned, checks, { requestedState: scope.state, html: renderMarketReportHtml(cleaned) })
+    : [];
+  const status: GateStatus = evaluation?.pass && integrity.every((f) => f.pass) ? 'complete' : 'disclosed';
+  // Only a decision that passed review AND a report that passed integrity is published as a shareable report.
+  const report = status === 'complete' ? await publish(cleaned, args.reportInput) : cleaned;
+  const disclosed = status === 'disclosed'
+    ? [...(evaluation?.results || []).filter((r) => !r.pass).map((r) => r.reason), ...integrity.filter((f) => !f.pass).map((f) => f.reason)]
+    : undefined;
   return {
-    status, decision, evaluation, attempts, checks, report, cost,
+    status, decision, evaluation, attempts, checks, report, cost, integrity, removed,
     answer: decision ? renderDecisionAnswer(decision, { reportUrl: report.deliverable?.url, disclosed }) : 'I could not produce a recommendation from this evidence.',
   };
 }

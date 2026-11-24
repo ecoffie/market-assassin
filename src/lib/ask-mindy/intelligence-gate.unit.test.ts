@@ -7,7 +7,7 @@ const pass = (c: string) => ({ criterion: c, pass: true, reason: 'ok' });
 const fail = (c: string) => ({ criterion: c, pass: false, reason: `${c} failed` });
 const evidence = (state: 'publish' | 'measurement_failure' = 'publish') => ({
   subject: 'janitorial services', generated_for: null,
-  summary: { total_market: 426e6, total_market_basis: { window: 'FY2026', state_scoped: false } },
+  summary: { total_market: 426e6, total_market_basis: { window: 'FY2026', state_scoped: false, requested_state: 'FL' } },
   basis: null, reconciliation: null,
   sections: {
     market_size: { topPscList: fixture.scope.pscShares }, top_agencies: [], top_agencies_total: 0,
