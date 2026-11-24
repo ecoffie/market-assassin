@@ -100,3 +100,16 @@ describe('eligibility from the profile', () => {
     });
   });
 });
+
+describe('work check by NAICS (forecasts carry no PSC)', () => {
+  const scope = { naicsShares: [{ code: '561720', pct: 0.8 }, { code: '561210', pct: 0.14 }, { code: '812320', pct: 0.001 }] };
+  it('a dry-cleaning forecast that says "janitorial" is not janitorial work', () => {
+    expect(checkRecord({ contract_id: 'f', kind: 'forecast', naics_code: '812320' }, scope, undefined, undefined).exclusions.map((e) => e.code)).toEqual(['work_mismatch']);
+  });
+  it('a janitorial-NAICS forecast passes', () => {
+    expect(checkRecord({ contract_id: 'f', kind: 'forecast', naics_code: '561720' }, scope, undefined, undefined).verdict).toBe('pursue');
+  });
+  it('PSC wins when both are present', () => {
+    expect(checkRecord({ contract_id: 'r', psc_code: 'S201', naics_code: '812320' }, { ...scope, pscShares: [{ code: 'S201', pct: 0.9 }] }, undefined, undefined).verdict).toBe('pursue');
+  });
+});

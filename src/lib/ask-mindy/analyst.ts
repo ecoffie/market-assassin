@@ -102,7 +102,19 @@ export function buildAnalystPrompt(input: AnalystInput): string {
   const passing = input.checks.filter((c) => c.verdict === 'pursue');
   const excluded = input.checks.filter((c) => c.verdict !== 'pursue');
   const line = (r: CandidateRecord & Record<string, unknown>) =>
-    r.kind === 'open'
+    r.kind === 'forecast'
+      ? [
+          'COMING SOON (agency forecast, not yet a bid)',
+          String(r.awarding_sub_agency || 'agency not stated'),
+          String(r.title || '').slice(0, 140),
+          `location ${r.location_label || r.place_of_performance_state || 'not stated'}`,
+          `estimated value ${r.value_label || 'not stated'}`,
+          `timing ${[r.anticipated_quarter, r.fiscal_year ? `FY${r.fiscal_year}` : '', r.solicitation_date ? `solicitation ${String(r.solicitation_date).slice(0, 10)}` : ''].filter(Boolean).join(' ') || 'not stated'}`,
+          `set-aside ${r.set_aside_type || 'not stated'}`,
+          r.incumbent_name ? `incumbent ${r.incumbent_name}` : '',
+          r.source_url ? `link ${r.source_url}` : '',
+        ].filter(Boolean).join(' · ')
+      : r.kind === 'open'
       ? [
           'OPEN NOW',
           String(r.awarding_sub_agency || r.incumbent_name || 'buyer not stated'),
@@ -141,11 +153,13 @@ export function buildAnalystPrompt(input: AnalystInput): string {
     return `- ${what}: ${c.exclusions.map((e) => e.detail).join(' ')}`;
   };
   const exOpen = excluded.filter((c) => byId.get(c.contract_id)?.kind === 'open');
-  const exBack = excluded.filter((c) => byId.get(c.contract_id)?.kind !== 'open');
+  const exSoon = excluded.filter((c) => byId.get(c.contract_id)?.kind === 'forecast');
+  const exBack = excluded.filter((c) => { const k = byId.get(c.contract_id)?.kind; return k !== 'open' && k !== 'forecast'; });
   const excludedText = excluded.length
     ? [
         exOpen.length ? `Open now, ${exOpen.length} excluded:\n${exOpen.map(excludedLine).join('\n')}` : '',
         exBack.length ? `Coming back, ${exBack.length} excluded:\n${exBack.map(excludedLine).join('\n')}` : '',
+        exSoon.length ? `Coming soon, ${exSoon.length} excluded:\n${exSoon.map(excludedLine).join('\n')}` : '',
       ].filter(Boolean).join('\n')
     : '(none)';
   return [
@@ -157,7 +171,7 @@ export function buildAnalystPrompt(input: AnalystInput): string {
     `FORECASTS: ${input.market.forecastsLine}`,
     `OPEN SOLICITATIONS: ${input.market.openNowLine || 'NOT searched for this answer. Do not say whether any are open; list checking SAM.gov for open bids as a gap.'}`,
     '',
-    `PASSING RECORDS (OPEN NOW = live bids or notices on SAM.gov; COMING BACK = current contracts ending soon):`,
+    `PASSING RECORDS (OPEN NOW = live bids or notices on SAM.gov; COMING BACK = current contracts ending soon; COMING SOON = agency forecasts of planned purchases):`,
     passingText,
     '',
     `EXCLUDED RECORDS (do not recommend):`,

@@ -97,6 +97,62 @@ export function openNoticesAsRecords(items: Array<Record<string, unknown>>): Can
     } as CandidateRecord));
 }
 
+/** Agency forecasts (coming soon) as checkable records. */
+export function forecastsAsRecords(items: Array<Record<string, unknown>>): CandidateRecord[] {
+  const seen = new Set<string>();
+  return items
+    .filter((it) => it && (it.forecast_id || (it.identity as { id?: string } | undefined)?.id))
+    .filter((it) => {
+      const key = String(it.forecast_id || (it.identity as { id?: string }).id);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .map((it) => ({
+      kind: 'forecast' as const,
+      contract_id: `forecast:${String(it.forecast_id || (it.identity as { id?: string }).id)}`,
+      title: (it.title as string) ?? null,
+      description: (it.title as string) ?? null,
+      awarding_sub_agency: (it.contracting_office as string) ?? (it.buyer as string) ?? null,
+      incumbent_name: (it.incumbent_name as string) ?? null,
+      place_of_performance_state: (it.place_of_performance_state as string) ?? null,
+      location_label: (it.location_label as string) ?? null,
+      set_aside_type: (it.set_aside_type as string) ?? null,
+      naics_code: (it.naics_code as string) ?? null,
+      value_label: (it.value_label as string) ?? null,
+      fiscal_year: it.fiscal_year ?? null,
+      anticipated_quarter: it.anticipated_quarter ?? null,
+      solicitation_date: (it.solicitation_date as string) ?? null,
+      source_url: (it.source_url as string) ?? null,
+    } as CandidateRecord));
+}
+
+/**
+ * What is known about agency forecasts, stated so "none" is never confused with "not covered".
+ * Empty in the requested state gets ONE bounded widening: the same search nationwide, count only.
+ */
+export async function forecastsLine(a: {
+  horizon: { status?: string; matched_count?: number | null } | undefined;
+  shown: number;
+  state: string | null;
+  query: string;
+  national: (q: { query: string }) => Promise<FindOpportunitiesResult | null>;
+}): Promise<string> {
+  const h = a.horizon;
+  if (!h || h.status === 'unavailable') return 'forecast coverage for this buyer or market is not available; forecasts are UNKNOWN, not zero';
+  if (h.status === 'grounded' || h.status === 'partial') {
+    const matched = h.matched_count ?? a.shown;
+    return `${matched} agency forecast(s) matched${a.state ? ` in ${a.state}` : ''}; the ${a.shown} shown here were checked`;
+  }
+  if (!a.state) return 'agency forecasts were searched nationwide (current and future fiscal years); none matched';
+  const nat = await a.national({ query: a.query }).catch(() => null);
+  const n = nat?.horizons?.coming_soon;
+  if (n?.status === 'grounded' || n?.status === 'partial') {
+    return `agency forecasts were searched: none in ${a.state}; the same search nationwide finds ${n.matched_count ?? 'some'} (current and future fiscal years), so forecast coverage exists for this work, just not in ${a.state}`;
+  }
+  return `agency forecasts were searched: none in ${a.state}, and none nationwide either`;
+}
+
 /** The chat answer: a deterministic rendering of the decision (no second model, no new facts). */
 export function renderDecisionAnswer(d: AnalystDecision, opts: { reportUrl?: string | null; disclosed?: string[] } = {}): string {
   const parts: string[] = [d.headline, ''];
@@ -127,6 +183,7 @@ export async function runIntelligenceGate(args: {
     analyst?: typeof runAnalyst;
     evaluate?: typeof evaluateDecision;
     findOpen?: (q: { query: string; state: string | null }) => Promise<FindOpportunitiesResult | null>;
+    findNationalForecasts?: (q: { query: string }) => Promise<FindOpportunitiesResult | null>;
   };
 }): Promise<GateResult> {
   const gather = args.deps?.gather ?? gatherMarketEvidence;
@@ -137,7 +194,9 @@ export async function runIntelligenceGate(args: {
 
   const query = String(args.reportInput.keyword || args.reportInput.naics || '').trim();
   const findOpen = args.deps?.findOpen ?? (async (q: { query: string; state: string | null }) =>
-    findOpportunities({ query: q.query, location: q.state, horizons: { open_now: true, coming_back: false, coming_soon: false }, limit_per_horizon: 25 }, { competitionLookup: null }));
+    findOpportunities({ query: q.query, location: q.state, horizons: { open_now: true, coming_back: false, coming_soon: true }, limit_per_horizon: 25 }, { competitionLookup: null }));
+  const findNationalForecasts = args.deps?.findNationalForecasts ?? (async (q: { query: string }) =>
+    findOpportunities({ query: q.query, horizons: { open_now: false, coming_back: false, coming_soon: true }, limit_per_horizon: 1 }, { competitionLookup: null }));
   const [ev, open] = await Promise.all([
     gather(args.reportInput),
     query ? findOpen({ query, state: args.reportInput.state || null }).catch(() => null) : Promise.resolve(null),
@@ -152,9 +211,16 @@ export async function runIntelligenceGate(args: {
   const recompetes = ((ev.sections.recompetes?.contracts as unknown[]) || []) as CandidateRecord[];
   const openH = open?.horizons?.open_now;
   const openRecs = openNoticesAsRecords(openH?.items || []);
-  const recs = [...openRecs, ...recompetes];
+  const soonH = open?.horizons?.coming_soon;
+  const soonRecs = forecastsAsRecords(soonH?.items || []);
+  const recs = [...openRecs, ...soonRecs, ...recompetes];
   const ms = ev.sections.market_size as { topPscList?: Array<{ code: string; pct: number }> } | null;
-  const scope = { state: args.reportInput.state || null, pscShares: (ms?.topPscList || []).map((p) => ({ code: p.code, pct: p.pct })) };
+  const msN = ev.sections.market_size as { allNaics?: Array<{ code: string; pct: number }> } | null;
+  const scope = {
+    state: args.reportInput.state || null,
+    pscShares: (ms?.topPscList || []).map((p) => ({ code: p.code, pct: p.pct })),
+    naicsShares: (msN?.allNaics || []).map((n) => ({ code: n.code, pct: n.pct })),
+  };
   const comp = await competitionFactsFor(recompetes.map((r) => r.contract_id), args.competitionLookup, { budgetMs: 8000 });
   const checks = checkRecords(recs, scope, args.eligibility, comp);
 
@@ -167,6 +233,7 @@ export async function runIntelligenceGate(args: {
         const dupes = items - openRecs.length;
         return `${matched} open SAM.gov notice(s) matched the search${dupes > 0 ? `; ${dupes} were repeat postings of the same solicitation, leaving ${openRecs.length} distinct bid(s)` : ''}${matched > items ? `; the top ${items} were returned and ${matched - items} were not` : `; all were checked`}`;
       })();
+  market.forecastsLine = await forecastsLine({ horizon: soonH, shown: soonRecs.length, state: scope.state, query, national: findNationalForecasts });
   const input: AnalystInput = { question: args.question, profile: args.profile, market, records: recs, checks };
   const evidence = buildAnalystPrompt(input);
 

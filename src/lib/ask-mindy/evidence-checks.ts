@@ -60,8 +60,8 @@ export interface CandidateRecord {
   place_of_performance_state?: string | null;
   period_of_performance_current_end?: string | null;
   capture_start_passed?: boolean | string | null;
-  /** 'open' = a live SAM notice (open now); default = a contract coming back. */
-  kind?: 'open' | 'recompete';
+  /** 'open' = a live SAM notice; 'forecast' = an agency's planned purchase; default = a contract coming back. */
+  kind?: 'open' | 'recompete' | 'forecast';
   title?: string | null;
   /** Open notices: "City, ST" (place of performance, else the buying office). */
   location_label?: string | null;
@@ -76,6 +76,8 @@ export interface MarketScope {
   state?: string | null;
   /** What the market actually buys: PSC codes with their share of market dollars (0..1). */
   pscShares?: Array<{ code: string; pct: number }>;
+  /** What the market buys by NAICS share (0..1). Used for the work check only when a record has no PSC. */
+  naicsShares?: Array<{ code: string; pct: number }>;
 }
 
 export interface CustomerEligibility {
@@ -159,6 +161,15 @@ export function checkRecord(
         code: 'work_mismatch',
         detail: `It buys PSC ${rec.psc_code}; this market's work is ${[...workCodes].join(', ')}.`,
       });
+    }
+  }
+
+  // 1. Relevant: the work, by NAICS, only when there is no PSC (agency forecasts carry NAICS, not PSC).
+  const nShares = scope.naicsShares || [];
+  if (!rec.psc_code && rec.naics_code && nShares.length) {
+    const workNaics = new Set(nShares.filter((s) => s.pct >= WORK_PSC_MIN_SHARE).map((s) => String(s.code)));
+    if (workNaics.size && !workNaics.has(String(rec.naics_code))) {
+      exclusions.push({ code: 'work_mismatch', detail: `It is classified NAICS ${rec.naics_code}; this market's work is ${[...workNaics].join(', ')}.` });
     }
   }
 
