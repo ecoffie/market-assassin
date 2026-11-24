@@ -52,7 +52,7 @@ reasoned: The answer says WHY each recommended pursuit is a good choice for THIS
 
 actionable: Each pursuit ends in one concrete move the owner can make this week (what to check or do, where). FAIL for vague moves ("monitor the market", "consider bidding", "ask me to list them") or when the answer reports counts and tells the customer to ask for the list.
 
-clear: An owner with no federal background can act on it without reading tables. It leads with the decision, explains any acronym, and keeps technical figures out of the way. FAIL if it leads with market size, codes or methodology, or needs interpretation.
+clear: Judge the LEAD (headline and pursuits): an owner with no federal background can act on it without reading tables. It leads with the decision, explains any acronym or federal term it uses, and keeps technical figures out of the way. FAIL if the lead opens with market size, codes or methodology, or needs interpretation. The supporting sections (also_consider, ruled_out, gaps) may be denser; fail them only if they contradict the lead. When you cite a confusing word, quote it exactly as it appears in the ANSWER (not the evidence).
 
 An answer that honestly says no record is pursuable can pass if it explains why and what would change that. Polished writing does not pass a criterion on its own.`;
 
@@ -67,6 +67,14 @@ const EVAL_SCHEMA = {
     fix: { type: 'array', items: { type: 'string' } },
   },
 } as const;
+
+/** Quoted terms in a reviewer reason vs the answer text: are any of them actually there? */
+export function verifyQuotedTerms(reason: string, decision: AnalystDecision): 'no_quotes' | 'none_present' | 'some_present' {
+  const quoted = [...String(reason).matchAll(/['"\u2018\u201c]([^'"\u2019\u201d]{2,40})['"\u2019\u201d]/g)].map((m) => m[1].trim().toLowerCase()).filter((t) => t && !/^(also_consider|ruled_out|gaps|headline|pursuits)$/.test(t));
+  if (!quoted.length) return 'no_quotes';
+  const text = JSON.stringify(decision).toLowerCase();
+  return quoted.some((t) => text.includes(t)) ? 'some_present' : 'none_present';
+}
 
 export async function evaluateDecision(
   args: { question: string; evidence: string; decision: AnalystDecision; checks: RecordCheck[] },
@@ -89,6 +97,16 @@ export async function evaluateDecision(
   const text = msg.content.filter((b) => b.type === 'text').map((b) => (b as Anthropic.TextBlock).text).join('');
   const j = JSON.parse(text) as Record<'reasoned' | 'actionable' | 'clear', { pass: boolean; reason: string }> & { fix: string[] };
   const judged: CriterionResult[] = (['reasoned', 'actionable', 'clear'] as const).map((c) => ({ criterion: c, pass: !!j[c].pass, reason: j[c].reason }));
+  // The reviewer must be right about the text it grades: a clarity failure that only cites words the answer does
+  // not contain is not supported (2026-11-24: it cited 'set-aside', 'follow-on' that were only in the evidence).
+  const clear = judged.find((r) => r.criterion === 'clear');
+  if (clear && !clear.pass) {
+    const verdict = verifyQuotedTerms(clear.reason, args.decision);
+    if (verdict === 'none_present') {
+      clear.pass = true;
+      clear.reason = `Reviewer's clarity objection cited only words that are not in the answer; not supported. (${clear.reason})`;
+    }
+  }
   const results = [...software, ...judged];
   const pass = results.every((r) => r.pass);
   const fix = pass ? [] : [...results.filter((r) => !r.pass).map((r) => `${r.criterion}: ${r.reason}`), ...(j.fix || [])];

@@ -28,6 +28,8 @@ export interface AnalystInput {
   };
   records: CandidateRecord[];
   checks: RecordCheck[];
+  /** Customer UEI from the profile, for the 'YOUR COMPANY (UEI match)' marker. */
+  customerUei?: string | null;
 }
 
 export interface Pursuit {
@@ -41,6 +43,8 @@ export interface Pursuit {
 export interface AnalystDecision {
   headline: string;
   pursuits: Pursuit[];
+  /** Up to 4 one-line leads worth a look beyond the top pursuits (each from a passing record). */
+  also_consider: string[];
   ruled_out: string;
   gaps: string[];
   next_question: string;
@@ -49,7 +53,7 @@ export interface AnalystDecision {
 export const ANALYST_SCHEMA = {
   type: 'object',
   additionalProperties: false,
-  required: ['headline', 'pursuits', 'ruled_out', 'gaps', 'next_question'],
+  required: ['headline', 'pursuits', 'also_consider', 'ruled_out', 'gaps', 'next_question'],
   properties: {
     headline: { type: 'string' },
     pursuits: {
@@ -67,6 +71,7 @@ export const ANALYST_SCHEMA = {
         },
       },
     },
+    also_consider: { type: 'array', items: { type: 'string' } },
     ruled_out: { type: 'string' },
     gaps: { type: 'array', items: { type: 'string' } },
     next_question: { type: 'string' },
@@ -79,15 +84,20 @@ Rules:
 - Use only facts in the evidence. Never add an agency, contract, date, dollar amount, person or requirement that is not there. Never say something does not exist (no open bids, no forecasts, no competitors) unless the evidence establishes it; if a source was not searched, say so.
 - A pursuit must be one of the PASSING records, cited by its exact contract_id. Rank them: strongest first. Recommend at most 3.
 - "why" is 1 to 3 short reasons drawn from the record (location, value, set-aside, how it was competed, timing).
-- An OPEN NOW bid with a near deadline usually beats a contract coming back; a market-research notice (sources sought, presolicitation) is a chance to shape the bid, so say so.
+- Rank by fit to the work the customer described first. A contract the customer holds (YOUR COMPANY) and core work come before loosely related work. A live OPEN NOW bid outranks a contract coming back only when it is core work for this customer; loosely related open bids go in "also_consider". A market-research notice (sources sought, presolicitation) is a chance to shape the bid, so say so.
+- The headline must match the pursuits you list (same items, same count).
 - "barrier" is the biggest obstacle from that record's barriers, in plain words, or null if none.
 - "next_move" is one concrete action the customer can take this week. If the record says the capture window has passed, the move is to check SAM.gov for the follow-on solicitation now.
 - "ruled_out" says in one or two plain sentences what was excluded and why (wrong state, different work, mandatory nonprofit source), with counts.
-- "gaps" lists what the evidence could not establish that would change the decision (for example forecast coverage, the customer's set-aside status). Short phrases.
+- "also_consider": up to 4 leads from OTHER passing records, each under 20 words: what it is, where, and why, with at most one date or dollar figure. Never put leads in "gaps".
+- "gaps": at most 5 short phrases (under 15 words each) naming what the evidence could not establish that would change the decision (for example forecast coverage, the customer's size status). No dates, values or codes in gaps.
+- Identity: say the customer holds or is the incumbent on a contract ONLY when its record says "YOUR COMPANY (UEI match)". If an incumbent's name merely resembles the customer's company, write "held by <exact incumbent name>" and add "confirm whether this is your company" to gaps.
+- Use the GROUP COUNTS exactly as given; never recount.
 - "headline" is one sentence a busy owner can act on.
 - "next_question" is one plain-English question that would most improve the recommendation.
 - Never describe the process: no "review", "passed", "checks", "records", "evidence" or "excluded". Talk about bids and contracts ("none of the 5 open bids is cleaning work: they are base support, cylinder rental and fuel storage").
 - "ruled_out": open bids and contracts coming back are separate groups; give each group's count and the plain reason, and name what the open ones actually were.
+- Explain federal terms in plain words the first time: say "reserved for small businesses" (not "set-aside"), "the next contract for this work" (not "follow-on" or "recompete"), "awarded so far" (not "obligated"; obligated money is committed, not spent). No codes (NAICS, PSC, UEI) in the answer.
 - Write for a small-business owner, not a contracting officer. No acronyms without saying what they mean. No em dashes.
 - If no record passed, say so plainly in the headline, return an empty pursuits list, and explain in gaps what would be needed.`;
 
@@ -98,7 +108,8 @@ function money(v: unknown): string {
 }
 
 export function buildAnalystPrompt(input: AnalystInput): string {
-  const byId = new Map(input.records.map((r) => [r.contract_id, r]));
+  const uei = input.customerUei ? String(input.customerUei).toUpperCase() : null;
+  const byId = new Map(input.records.map((r) => [r.contract_id, { ...r, __yours: !!uei && String(r.incumbent_uei || '').toUpperCase() === uei } as CandidateRecord & { __yours?: boolean }]));
   const passing = input.checks.filter((c) => c.verdict === 'pursue');
   const excluded = input.checks.filter((c) => c.verdict !== 'pursue');
   const line = (r: CandidateRecord & Record<string, unknown>) =>
@@ -133,7 +144,7 @@ export function buildAnalystPrompt(input: AnalystInput): string {
       `obligated ${money(r.total_obligation)}`,
       `current period ends ${r.period_of_performance_current_end || 'not stated'}`,
       `set-aside ${r.set_aside_type || 'not stated'}`,
-      `incumbent ${r.incumbent_name || 'not stated'}`,
+      r.__yours ? 'incumbent YOUR COMPANY (UEI match)' : `incumbent ${r.incumbent_name || 'not stated'}`,
         ].join(' · ');
   const passingText = passing.length
     ? passing
@@ -147,20 +158,31 @@ export function buildAnalystPrompt(input: AnalystInput): string {
         })
         .join('\n')
     : '(none)';
-  const excludedLine = (c: RecordCheck) => {
-    const r = byId.get(c.contract_id) as (CandidateRecord & Record<string, unknown>) | undefined;
-    const what = String(r?.title || r?.description || 'untitled').slice(0, 90);
-    return `- ${what}: ${c.exclusions.map((e) => e.detail).join(' ')}`;
-  };
-  const exOpen = excluded.filter((c) => byId.get(c.contract_id)?.kind === 'open');
-  const exSoon = excluded.filter((c) => byId.get(c.contract_id)?.kind === 'forecast');
-  const exBack = excluded.filter((c) => { const k = byId.get(c.contract_id)?.kind; return k !== 'open' && k !== 'forecast'; });
+  const kindOf = (id: string) => byId.get(id)?.kind ?? 'recompete';
+  const groupName: Record<string, string> = { open: 'Open now', recompete: 'Coming back', forecast: 'Coming soon' };
+  const counts = (['open', 'recompete', 'forecast'] as const).map((k) => {
+    const all = input.checks.filter((c) => kindOf(c.contract_id) === k);
+    return all.length ? `${groupName[k]}: ${all.length} checked, ${all.filter((c) => c.verdict === 'pursue').length} passing, ${all.filter((c) => c.verdict !== 'pursue').length} excluded` : '';
+  }).filter(Boolean);
+  // Excluded items grouped by kind and reason, with up to 4 named examples each (keeps the prompt small).
   const excludedText = excluded.length
-    ? [
-        exOpen.length ? `Open now, ${exOpen.length} excluded:\n${exOpen.map(excludedLine).join('\n')}` : '',
-        exBack.length ? `Coming back, ${exBack.length} excluded:\n${exBack.map(excludedLine).join('\n')}` : '',
-        exSoon.length ? `Coming soon, ${exSoon.length} excluded:\n${exSoon.map(excludedLine).join('\n')}` : '',
-      ].filter(Boolean).join('\n')
+    ? (['open', 'recompete', 'forecast'] as const).map((k) => {
+        const inKind = excluded.filter((c) => kindOf(c.contract_id) === k);
+        if (!inKind.length) return '';
+        const byReason = new Map<string, RecordCheck[]>();
+        for (const c of inKind) {
+          const code = c.exclusions[0]?.code || 'other';
+          byReason.set(code, [...(byReason.get(code) || []), c]);
+        }
+        const lines = [...byReason.entries()].map(([code, cs]) => {
+          const ex = cs.slice(0, 4).map((c) => {
+            const r = byId.get(c.contract_id) as (CandidateRecord & Record<string, unknown>) | undefined;
+            return `"${String(r?.title || r?.description || 'untitled').slice(0, 70)}" (${c.exclusions[0]?.detail.slice(0, 110) || ''})`;
+          });
+          return `  ${cs.length} ${code.replace(/_/g, ' ')}: ${ex.join('; ')}${cs.length > 4 ? '; ...' : ''}`;
+        });
+        return `${groupName[k]}, ${inKind.length} excluded:\n${lines.join('\n')}`;
+      }).filter(Boolean).join('\n')
     : '(none)';
   return [
     `CUSTOMER QUESTION: ${input.question}`,
@@ -170,6 +192,8 @@ export function buildAnalystPrompt(input: AnalystInput): string {
     `TOP COMPETITORS: ${input.market.topCompetitors.join('; ') || 'none returned'}`,
     `FORECASTS: ${input.market.forecastsLine}`,
     `OPEN SOLICITATIONS: ${input.market.openNowLine || 'NOT searched for this answer. Do not say whether any are open; list checking SAM.gov for open bids as a gap.'}`,
+    '',
+    `GROUP COUNTS (use exactly): ${counts.join('; ') || 'none'}`,
     '',
     `PASSING RECORDS (OPEN NOW = live bids or notices on SAM.gov; COMING BACK = current contracts ending soon; COMING SOON = agency forecasts of planned purchases):`,
     passingText,
@@ -188,7 +212,7 @@ export function enforceDecision(decision: AnalystDecision, checks: RecordCheck[]
     dropped.push(p.contract_id);
     return false;
   });
-  return { decision: { ...decision, pursuits: pursuits.slice(0, 3) }, dropped };
+  return { decision: { ...decision, pursuits: pursuits.slice(0, 3), also_consider: (decision.also_consider || []).slice(0, 4), gaps: (decision.gaps || []).slice(0, 5) }, dropped };
 }
 
 export async function runAnalyst(

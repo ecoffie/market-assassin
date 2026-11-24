@@ -107,7 +107,7 @@ describe('intelligence gate in the chat route', () => {
     const arg = h.runGate.mock.calls[0][0];
     expect(arg.reportInput).toMatchObject({ keyword: 'janitorial services', state: 'FL' });
     expect(arg.profile).toContain('Acme Clean');
-    expect(arg.eligibility).toEqual({ certifications: ['WOSB'] });
+    expect(arg.eligibility).toEqual({ certifications: ['WOSB'], uei: null });
     expect(text(ev)).toBe(gateResult.answer);
     const mr = ev.find((e) => e.type === 'market_report') as Record<string, unknown> | undefined;
     expect(mr).toMatchObject({ report_id: 'r1', url: 'https://getmindy.ai/reports/r1', title: 'janitorial services', html: '<html>brief</html>' });
@@ -120,7 +120,7 @@ describe('intelligence gate in the chat route', () => {
     await ask(FL_Q);
     await new Promise((r) => setTimeout(r, 20));
     const assistant = h.inserts.find((r) => r.role === 'assistant') as { trace?: Record<string, unknown> } | undefined;
-    expect(assistant?.trace).toMatchObject({ engine: 'intelligence_gate', gate_status: 'complete', work: 'janitorial services', state: 'FL', market_report: { report_id: 'r1', html: '' } });
+    expect(assistant?.trace).toMatchObject({ engine: 'intelligence_gate', gate_status: 'complete', work: 'janitorial services', states: ['FL'], market_report: { report_id: 'r1', html: '' } });
   });
 
   it('flag on: a non-market question takes the existing path', async () => {

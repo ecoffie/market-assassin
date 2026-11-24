@@ -50,3 +50,18 @@ describe('enforceDecision', () => {
     expect(enforceDecision({ ...base, pursuits: many }, checks).decision.pursuits).toHaveLength(3);
   });
 });
+
+describe('identity marker and group counts in the analyst prompt', () => {
+  const rec = { contract_id: 'A', incumbent_name: 'RBA ENGINEERING INTERNATIONAL, PLLC', incumbent_uei: 'C9K6EE9JVDK7', description: 'Bridge' };
+  const chk = [{ contract_id: 'A', verdict: 'pursue' as const, exclusions: [], barriers: [], actions: [] }];
+  const base = { question: 'q', profile: null, market: { subject: 's', sizeLine: null, topAgencies: [], topCompetitors: [], forecastsLine: 'f' }, records: [rec], checks: chk };
+  it('marks YOUR COMPANY only on a UEI match', () => {
+    expect(buildAnalystPrompt({ ...base, customerUei: 'C9K6EE9JVDK7' })).toContain('YOUR COMPANY (UEI match)');
+    const noUei = buildAnalystPrompt(base);
+    expect(noUei).not.toContain('YOUR COMPANY');
+    expect(noUei).toContain('incumbent RBA ENGINEERING INTERNATIONAL, PLLC');
+  });
+  it('gives exact group counts', () => {
+    expect(buildAnalystPrompt(base)).toContain('GROUP COUNTS (use exactly): Coming back: 1 checked, 1 passing, 0 excluded');
+  });
+});

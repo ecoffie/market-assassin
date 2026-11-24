@@ -85,6 +85,7 @@ export function prettyRange(rangeText: unknown, valueMax: unknown, valueMin: unk
 export interface ReportDecision {
   headline: string;
   pursuits: Array<{ contract_id: string; title: string; why: string[]; barrier: string | null; next_move: string }>;
+  also_consider?: string[];
   ruled_out: string;
   gaps: string[];
 }
@@ -98,6 +99,7 @@ export function renderDecisionBrief(d: ReportDecision): string {
         <p><b>Next move:</b> ${esc(p.next_move)}</p></li>`).join('')}</ol>`
     : '<p class="note">No contract in this market is a pursuit you can act on yet. See what would change that below.</p>';
   return `<section class="sec brief"><h2>What to pursue</h2><p class="lead">${esc(d.headline)}</p>${pursuits}
+    ${d.also_consider?.length ? `<p class="sub"><b>Also worth a look:</b></p><ul>${d.also_consider.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}
     ${d.ruled_out ? `<p class="sub"><b>Ruled out:</b> ${esc(d.ruled_out)}</p>` : ''}
     ${d.gaps.length ? `<p class="sub"><b>Not yet established:</b></p><ul>${d.gaps.map((g) => `<li>${esc(g)}</li>`).join('')}</ul>` : ''}
   </section>`;

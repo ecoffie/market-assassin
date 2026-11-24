@@ -719,6 +719,7 @@ export async function POST(request: NextRequest) {
               gate = await runIntelligenceGate({
                 question: ask,
                 reportInput: { keyword: work, state: eligible.state ?? undefined, userEmail: profileEmail || undefined } as Parameters<typeof runIntelligenceGate>[0]['reportInput'],
+                states: eligible.states,
                 profile: gateProfile.text,
                 eligibility: gateProfile.eligibility,
               });
@@ -751,7 +752,7 @@ export async function POST(request: NextRequest) {
                   gate_status: gate.status,
                   attempts: gate.attempts,
                   work,
-                  state: eligible.state,
+                  states: eligible.states,
                   checks: gate.checks.map((c) => ({ id: c.contract_id, verdict: c.verdict, codes: [...c.exclusions, ...c.barriers, ...c.actions].map((x) => x.code) })),
                   evaluation: gate.evaluation?.results.map((r) => ({ c: r.criterion, pass: r.pass })),
                   ...(gateReport ? { market_report: { report_id: gateReport.report_id, url: gateReport.url, title: gateReport.title, html: '' } } : {}),

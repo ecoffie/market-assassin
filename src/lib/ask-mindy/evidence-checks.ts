@@ -24,6 +24,10 @@ export type CheckCode =
   | 'set_aside_8a_not_held'
   | 'set_aside_8a_unconfirmed'
   | 'set_aside_small_business_unconfirmed'
+  | 'set_aside_not_small'
+  | 'set_aside_cert_not_held'
+  | 'set_aside_cert_unconfirmed'
+  | 'customer_is_incumbent'
   | 'last_award_not_competed'
   | 'capture_window_passed'
   | 'deadline_passed'
@@ -69,15 +73,53 @@ export interface CandidateRecord {
   notice_type?: string | null;
   /** find_opportunities evidence class: DIRECT_MATCH, RELATED_MARKET_CANDIDATE, HOLDER_SIGNAL. */
   evidence_class?: string | null;
+  incumbent_uei?: string | null;
 }
 
 export interface MarketScope {
   /** Requested two-letter state, when the customer named one. */
   state?: string | null;
+  /** Several requested states ("VA, MD and DC"). Takes precedence over `state`. */
+  states?: string[] | null;
   /** What the market actually buys: PSC codes with their share of market dollars (0..1). */
   pscShares?: Array<{ code: string; pct: number }>;
-  /** What the market buys by NAICS share (0..1). Used for the work check only when a record has no PSC. */
+  /** What the market buys by NAICS share (0..1). */
   naicsShares?: Array<{ code: string; pct: number }>;
+  /** The customer's work as codes (resolveWorkCodes). When set, these define the work instead of share. */
+  workPsc?: string[];
+  workNaics?: string[];
+}
+
+const GENERIC_WORK_WORDS = new Set(['and', 'or', 'of', 'the', 'for', 'to', 'in', 'a', 'an', 'services', 'service', 'construction', 'support', 'management', 'general', 'other', 'heavy', 'civil', 'work', 'works', 'solutions', 'products', 'product', 'contracts', 'contract', 'federal', 'government', 'misc', 'miscellaneous', 'facilities', 'facility']);
+const stem = (w: string) => w.toLowerCase().replace(/[^a-z0-9]/g, '').replace(/(ies)$/, 'y').replace(/(es|s)$/, '');
+
+/** Distinctive words of the customer's work phrase ("bridge and highway heavy civil construction" -> bridge, highway). */
+export function distinctiveWords(phrase: string): string[] {
+  return [...new Set(String(phrase || '').split(/[^A-Za-z0-9]+/).map((w) => w.toLowerCase()).filter((w) => w.length >= 3 && !GENERIC_WORK_WORDS.has(w)).map(stem))];
+}
+
+/**
+ * The customer's work as codes. A market code counts when its official NAME contains a distinctive word the
+ * customer used (Y1LB "CONSTRUCTION OF HIGHWAYS, ROADS, STREETS, BRIDGES" for "bridge and highway ..."). Share is
+ * only the fallback when no name matches: a long phrase's market sprawls (66% commercial building for the
+ * bridge-and-highway phrase), so share alone excluded the customer's real work.
+ */
+export function resolveWorkCodes(
+  work: string,
+  psc: Array<{ code: string; name?: string; pct: number }>,
+  naics: Array<{ code: string; name?: string; pct: number }>,
+): { psc: string[]; naics: string[]; basis: 'name' | 'share' } {
+  const words = distinctiveWords(work);
+  const byName = (list: Array<{ code: string; name?: string }>) =>
+    list.filter((c) => {
+      const nameWords = new Set(String(c.name || '').split(/[^A-Za-z0-9]+/).map(stem));
+      return words.some((w) => nameWords.has(w));
+    }).map((c) => String(c.code).toUpperCase());
+  const p = byName(psc);
+  const n = byName(naics);
+  if (p.length || n.length) return { psc: p, naics: n, basis: 'name' };
+  const share = (list: Array<{ code: string; pct: number }>) => list.filter((c) => c.pct >= WORK_PSC_MIN_SHARE).map((c) => String(c.code).toUpperCase());
+  return { psc: share(psc), naics: share(naics), basis: 'share' };
 }
 
 export interface CustomerEligibility {
@@ -85,6 +127,10 @@ export interface CustomerEligibility {
   certifications?: string[] | null;
   /** Small-business status from the profile. null/undefined = not known. */
   smallBusiness?: boolean | null;
+  /** The customer's SAM UEI (from the Vault profile). Identity is established ONLY by UEI, never by name. */
+  uei?: string | null;
+  /** SAM self-represented size per NAICS: Y small, N not small, E exception. Absent = not established. */
+  sizeByNaics?: Record<string, 'Y' | 'N' | 'E'> | null;
 }
 
 /** A PSC counts as this market's work when it carries at least this share of market dollars. */
@@ -125,6 +171,31 @@ function holds(elig: CustomerEligibility | undefined, cert: RegExp): boolean | n
   return list.some((c) => cert.test(String(c)));
 }
 
+type SetAsideKind = '8a' | 'edwosb' | 'wosb' | 'sdvosb' | 'vosb' | 'hubzone' | 'indian' | 'sb';
+const CERT_KINDS: Record<Exclude<SetAsideKind, '8a' | 'sb'>, { label: string; match: RegExp }> = {
+  edwosb: { label: 'economically disadvantaged women-owned (EDWOSB)', match: /edwosb|economically disadvantaged wom/i },
+  wosb: { label: 'women-owned (WOSB)', match: /wosb|women[- ]owned/i },
+  sdvosb: { label: 'service-disabled veteran-owned (SDVOSB)', match: /sdvosb|service[- ]disabled/i },
+  vosb: { label: 'veteran-owned (VOSB)', match: /\bvosb\b|sdvosb|veteran[- ]owned|service[- ]disabled/i },
+  hubzone: { label: 'HUBZone', match: /hub\s*zone/i },
+  indian: { label: 'Indian-owned (ISBEE / Buy Indian)', match: /indian|isbee|tribal|native american/i },
+};
+
+/** One kind per set-aside, from recompete codes or SAM notice wording. Order matters (EDWOSB before WOSB, SDVOSB before VOSB). */
+export function setAsideKind(raw: string | null | undefined): SetAsideKind | null {
+  const s = String(raw || '');
+  if (!s.trim() || /full\s*(&|and)\s*open|unrestricted|no set[- ]aside|^none$/i.test(s)) return null;
+  if (/8\s*\(\s*a\s*\)|\b8A[NS]?\b/i.test(s)) return '8a';
+  if (/edwosb|economically disadvantaged wom/i.test(s)) return 'edwosb';
+  if (/wosb|women[- ]owned/i.test(s)) return 'wosb';
+  if (/sdvosb|service[- ]disabled/i.test(s)) return 'sdvosb';
+  if (/\bvosb\b|veteran[- ]owned/i.test(s)) return 'vosb';
+  if (/hub\s*zone|\bHZ[CS]\b/i.test(s)) return 'hubzone';
+  if (/indian|isbee|buy indian/i.test(s)) return 'indian';
+  if (/\bSB(-total|-partial|A|P)?\b|small business|total small/i.test(s)) return 'sb';
+  return null;
+}
+
 export function checkRecord(
   rec: CandidateRecord,
   scope: MarketScope,
@@ -135,14 +206,15 @@ export function checkRecord(
   const exclusions: CheckReason[] = [];
   const barriers: CheckReason[] = [];
   const actions: CheckReason[] = [];
-  const want = scope.state ? scope.state.toUpperCase() : null;
+  const wantSet = new Set((scope.states?.length ? scope.states : scope.state ? [scope.state] : []).map((x) => x.toUpperCase()));
+  const want = wantSet.size ? [...wantSet].join(', ') : null;
   const desc = String(rec.description || '').trim();
 
   // 1. Relevant: location.
   if (want) {
     const recState = rec.place_of_performance_state ? String(rec.place_of_performance_state).toUpperCase() : null;
-    const named = [...new Set([...statesNamedInDescription(desc), ...statesNamedInDescription(rec.location_label)])].filter((s) => s !== want);
-    if (recState && recState !== want) {
+    const named = [...new Set([...statesNamedInDescription(desc), ...statesNamedInDescription(rec.location_label)])].filter((s) => !wantSet.has(s));
+    if (recState && !wantSet.has(recState)) {
       exclusions.push({ code: 'out_of_state', detail: `Place of performance is ${recState}, not ${want}.` });
     } else if (named.length) {
       exclusions.push({
@@ -152,25 +224,18 @@ export function checkRecord(
     }
   }
 
-  // 1. Relevant: the work. PSC = what was bought.
-  const shares = scope.pscShares || [];
-  if (rec.psc_code && shares.length) {
-    const workCodes = new Set(shares.filter((s) => s.pct >= WORK_PSC_MIN_SHARE).map((s) => s.code.toUpperCase()));
-    if (workCodes.size && !workCodes.has(String(rec.psc_code).toUpperCase())) {
-      exclusions.push({
-        code: 'work_mismatch',
-        detail: `It buys PSC ${rec.psc_code}; this market's work is ${[...workCodes].join(', ')}.`,
-      });
-    }
-  }
-
-  // 1. Relevant: the work, by NAICS, only when there is no PSC (agency forecasts carry NAICS, not PSC).
-  const nShares = scope.naicsShares || [];
-  if (!rec.psc_code && rec.naics_code && nShares.length) {
-    const workNaics = new Set(nShares.filter((s) => s.pct >= WORK_PSC_MIN_SHARE).map((s) => String(s.code)));
-    if (workNaics.size && !workNaics.has(String(rec.naics_code))) {
-      exclusions.push({ code: 'work_mismatch', detail: `It is classified NAICS ${rec.naics_code}; this market's work is ${[...workNaics].join(', ')}.` });
-    }
+  // 1. Relevant: the work. Either code establishes it (PSC = what was bought, NAICS = the industry): "Access Road
+  // Repair" is PSC Z2LB but NAICS 237310. Excluded only when the record carries a code and neither matches.
+  const workPsc = new Set((scope.workPsc ?? (scope.pscShares || []).filter((x) => x.pct >= WORK_PSC_MIN_SHARE).map((x) => x.code)).map((c) => String(c).toUpperCase()));
+  const workNaics = new Set((scope.workNaics ?? (scope.naicsShares || []).filter((x) => x.pct >= WORK_PSC_MIN_SHARE).map((x) => x.code)).map((c) => String(c)));
+  const recPsc = rec.psc_code ? String(rec.psc_code).toUpperCase() : null;
+  const recNaics = rec.naics_code ? String(rec.naics_code) : null;
+  const pscKnown = !!recPsc && workPsc.size > 0;
+  const naicsKnown = !!recNaics && workNaics.size > 0;
+  if ((pscKnown || naicsKnown) && !(pscKnown && workPsc.has(recPsc!)) && !(naicsKnown && workNaics.has(recNaics!))) {
+    const theirs = [recPsc ? `PSC ${recPsc}` : '', recNaics ? `NAICS ${recNaics}` : ''].filter(Boolean).join(', ');
+    const ours = [workPsc.size ? `PSC ${[...workPsc].join('/')}` : '', workNaics.size ? `NAICS ${[...workNaics].join('/')}` : ''].filter(Boolean).join(' or ');
+    exclusions.push({ code: 'work_mismatch', detail: `It is ${theirs}; this work is ${ours}.` });
   }
 
   // 2. Pursuable: mandatory source. AbilityOne Procurement List buys are NOT competed (FAR subpart 8.7), so the
@@ -188,14 +253,37 @@ export function checkRecord(
     });
   }
 
-  // 2. Pursuable: set-aside versus what the customer holds.
+  // 2. Pursuable: set-aside versus what the customer holds. Recompete codes (SB-Total, SDVOSB, Indian-SB...) and SAM
+  // notice wording ("Service-Disabled Veteran-Owned Small Business (SDVOSB) Set Aside") both map to one kind.
   const sa = String(rec.set_aside_type || '');
-  if (/8\s*\(\s*a\s*\)/i.test(sa)) {
+  const kind = setAsideKind(sa);
+  if (kind === '8a') {
     const has8a = holds(elig, /8\s*\(?\s*a\s*\)?/i);
     if (has8a === false) exclusions.push({ code: 'set_aside_8a_not_held', detail: 'The last award was set aside for 8(a) firms, and your profile does not list 8(a).' });
     else if (has8a === null) barriers.push({ code: 'set_aside_8a_unconfirmed', detail: 'The last award was set aside for 8(a) firms. 8(a) certification is not established in your profile.' });
-  } else if (/\bSB\b|small business|total small/i.test(sa)) {
-    if (elig?.smallBusiness == null) barriers.push({ code: 'set_aside_small_business_unconfirmed', detail: 'The last award was a small-business set-aside. Your small-business status for this NAICS is not established in your profile.' });
+  } else if (kind && kind !== 'sb') {
+    const cert = CERT_KINDS[kind];
+    const has = holds(elig, cert.match);
+    if (has === false) exclusions.push({ code: 'set_aside_cert_not_held', detail: `The last award was set aside for ${cert.label} firms, and your profile does not list ${cert.label}.` });
+    else if (has === null) barriers.push({ code: 'set_aside_cert_unconfirmed', detail: `The last award was set aside for ${cert.label} firms. That certification is not established in your profile.` });
+  } else if (kind === 'sb') {
+    const naics = rec.naics_code ? String(rec.naics_code) : '';
+    const size = naics && elig?.sizeByNaics ? elig.sizeByNaics[naics] : undefined;
+    if (size === 'N') {
+      exclusions.push({ code: 'set_aside_not_small', detail: `It was set aside for small businesses, and your SAM registration says you are not small under NAICS ${naics}.` });
+    } else if (size !== 'Y' && elig?.smallBusiness !== true) {
+      barriers.push({
+        code: 'set_aside_small_business_unconfirmed',
+        detail: elig?.sizeByNaics
+          ? `The last award was a small-business set-aside. Your SAM registration does not state your size under NAICS ${naics || '(not stated)'}.`
+          : 'The last award was a small-business set-aside. Your small-business status for this NAICS is not established in your profile.',
+      });
+    }
+  }
+
+  // Identity by UEI only: the customer holds this contract now.
+  if (elig?.uei && rec.incumbent_uei && String(elig.uei).toUpperCase() === String(rec.incumbent_uei).toUpperCase()) {
+    actions.push({ code: 'customer_is_incumbent', detail: `Your company (UEI ${String(elig.uei).toUpperCase()}) holds this contract now. Defending it is usually your strongest move: talk to the contracting officer about the follow-on before it is written.` });
   }
 
   if (competition?.class === 'not_competed' && competition.abilityone_holder !== true) {

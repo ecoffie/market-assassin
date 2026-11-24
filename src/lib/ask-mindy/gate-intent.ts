@@ -15,19 +15,21 @@ export const WORK_EXTRACT_MODEL = 'claude-haiku-5-5';
 export interface GateTurn {
   /** Exact customer words naming the work, verified to appear in the question. */
   work: string;
-  /** One two-letter state the customer named, or null for nationwide. */
-  state: string | null;
+  /** Two-letter states the customer named; empty = nationwide. */
+  states: string[];
 }
 
-/** Turns the gate answers: a current find or a market research ask, one state at most (v1). */
-export function gateEligible(ask: string): { ok: true; state: string | null } | { ok: false; reason: string } {
+/** Turns the gate answers: a current find or a market research ask, up to GATE_MAX_STATES named states. */
+export const GATE_MAX_STATES = 6;
+
+export function gateEligible(ask: string): { ok: true; state: string | null; states: string[] } | { ok: false; reason: string } {
   if (isFederalMarketProfileRequest(ask)) return { ok: false, reason: 'federal_market_profile' };
   if (isStrategyPlanRequest(ask)) return { ok: false, reason: 'strategy_plan' };
   const find = classifyFindIntent(ask) === 'CURRENT_FIND';
   if (!find && !isMarketResearchRequest(ask)) return { ok: false, reason: 'not_market_question' };
   const states = compileIntent(ask).explicitStates;
-  if (states.length > 1) return { ok: false, reason: 'multi_state' };
-  return { ok: true, state: states[0] ?? null };
+  if (states.length > GATE_MAX_STATES) return { ok: false, reason: 'too_many_states' };
+  return { ok: true, state: states.length === 1 ? states[0] : null, states };
 }
 
 /** Software check: the phrase must be the customer's own words (case-insensitive, whitespace-normalized). */
@@ -62,6 +64,7 @@ export function profileForGate(p: CompanyProfile | null | undefined): { text: st
   if (!p) return { text: null, eligibility: {} };
   const parts = [
     p.companyName ? `Company: ${p.companyName}` : '',
+    p.uei ? `SAM UEI: ${String(p.uei).toUpperCase()}` : '',
     p.naicsCodes?.length ? `NAICS codes: ${p.naicsCodes.join(', ')}` : '',
     p.states?.length ? `Works in: ${p.states.join(', ')}` : '',
     p.certifications?.length ? `Certifications (self-reported): ${p.certifications.map((c) => c.name).join(', ')}` : 'Certifications: none listed',
@@ -72,5 +75,5 @@ export function profileForGate(p: CompanyProfile | null | undefined): { text: st
   // Certifications: an empty list from a successfully read profile means "none listed", which is still not
   // proof they hold none, so only a non-empty list is used to decide eligibility.
   const certs = p.certifications?.length ? p.certifications.map((c) => c.name) : null;
-  return { text: parts.length ? parts.join('\n') : null, eligibility: { certifications: certs } };
+  return { text: parts.length ? parts.join('\n') : null, eligibility: { certifications: certs, uei: p.uei ? String(p.uei).toUpperCase() : null } };
 }

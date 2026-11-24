@@ -29,3 +29,19 @@ describe('softwareChecks (gate checks 1 and 2)', () => {
     expect(byName(softwareChecks(dec(['A'], '  '), checks)).pursuable).toBe(false);
   });
 });
+
+describe('verifyQuotedTerms (the reviewer must be right about the text)', () => {
+  const d = { headline: 'Protect your three bridge contracts', pursuits: [{ contract_id: 'A', title: 'Joyce Road', why: ['reserved for small businesses'], barrier: null, next_move: 'call the contracting officer' }], also_consider: ['USDA design-build parking lot security'], ruled_out: 'r', gaps: [], next_question: 'q' } as never;
+  it('none of the quoted words are in the answer', async () => {
+    const { verifyQuotedTerms } = await import('./evaluator');
+    expect(verifyQuotedTerms("uses 'set-aside' and 'follow-on' without explanation", d)).toBe('none_present');
+  });
+  it('some are', async () => {
+    const { verifyQuotedTerms } = await import('./evaluator');
+    expect(verifyQuotedTerms("drops 'set-aside' and 'design-build' unexplained", d)).toBe('some_present');
+  });
+  it('no quotes', async () => {
+    const { verifyQuotedTerms } = await import('./evaluator');
+    expect(verifyQuotedTerms('the lead is dense', d)).toBe('no_quotes');
+  });
+});

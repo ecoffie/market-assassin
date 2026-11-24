@@ -113,3 +113,88 @@ describe('work check by NAICS (forecasts carry no PSC)', () => {
     expect(checkRecord({ contract_id: 'r', psc_code: 'S201', naics_code: '812320' }, { ...scope, pscShares: [{ code: 'S201', pct: 0.9 }] }, undefined, undefined).verdict).toBe('pursue');
   });
 });
+
+describe('several requested states', () => {
+  const scope = { states: ['VA', 'MD', 'DC'] };
+  it('a record in any requested state is in scope', () => {
+    expect(checkRecord({ contract_id: 'a', place_of_performance_state: 'MD' }, scope, undefined, undefined).verdict).toBe('pursue');
+    expect(checkRecord({ contract_id: 'b', place_of_performance_state: 'DC', description: 'CUSTODIAL SERVICES FOR THE WASHINGTON DC CAMPUS' }, scope, undefined, undefined).verdict).toBe('pursue');
+  });
+  it('a record outside them is out of scope, and so is one whose description names another state', () => {
+    expect(checkRecord({ contract_id: 'c', place_of_performance_state: 'NY' }, scope, undefined, undefined).exclusions.map((e) => e.code)).toEqual(['out_of_state']);
+    expect(checkRecord({ contract_id: 'd', place_of_performance_state: 'VA', description: 'ROAD STUDY, LUSAKA ZAMBIA AND RALEIGH, NC' }, scope, undefined, undefined).exclusions.map((e) => e.code)).toEqual(['location_conflict']);
+  });
+});
+
+describe('work codes come from the customer\'s words (share only as fallback)', () => {
+  // Live market lists for "bridge and highway heavy civil construction" (VA, 2026-11-24): commercial building dominates.
+  const psc = [
+    { code: 'Y1NZ', name: 'CONSTRUCTION OF OTHER UTILITIES', pct: 0.414 },
+    { code: 'Y1LB', name: 'CONSTRUCTION OF HIGHWAYS, ROADS, STREETS, BRIDGES, AND RAILWAYS', pct: 0.093 },
+    { code: 'Z2AA', name: 'REPAIR OR ALTERATION OF OFFICE BUILDINGS', pct: 0.027 },
+  ];
+  const naics = [
+    { code: '236220', name: 'COMMERCIAL AND INSTITUTIONAL BUILDING CONSTRUCTION', pct: 0.665 },
+    { code: '237310', name: 'HIGHWAY, STREET, AND BRIDGE CONSTRUCTION', pct: 0.106 },
+  ];
+  it('distinctive words drop generic ones', async () => {
+    const { distinctiveWords } = await import('./evidence-checks');
+    expect(distinctiveWords('bridge and highway heavy civil construction')).toEqual(['bridge', 'highway']);
+  });
+  it('bridge and highway resolves to Y1LB and 237310 by name, not the 66% building code', async () => {
+    const { resolveWorkCodes } = await import('./evidence-checks');
+    expect(resolveWorkCodes('bridge and highway heavy civil construction', psc, naics)).toEqual({ psc: ['Y1LB'], naics: ['237310'], basis: 'name' });
+  });
+  it('no name match falls back to share', async () => {
+    const { resolveWorkCodes } = await import('./evidence-checks');
+    expect(resolveWorkCodes('quantum widgets', psc, naics)).toEqual({ psc: ['Y1NZ'], naics: ['236220', '237310'], basis: 'share' });
+  });
+  it('either code establishes the work: Access Road Repair is PSC Z2LB but NAICS 237310', () => {
+    const scope = { workPsc: ['Y1LB'], workNaics: ['237310'] };
+    expect(checkRecord({ contract_id: 'n', psc_code: 'Z2LB', naics_code: '237310' }, scope, undefined, undefined).verdict).toBe('pursue');
+    expect(checkRecord({ contract_id: 'r', psc_code: 'Z2AA', naics_code: '236220' }, scope, undefined, undefined).exclusions.map((e) => e.code)).toEqual(['work_mismatch']);
+  });
+  it('a ship RFI the keyword search called a direct match is not bridge work', () => {
+    expect(checkRecord({ contract_id: 's', kind: 'open', evidence_class: 'DIRECT_MATCH', psc_code: 'J999', naics_code: '336611' }, { workPsc: ['Y1LB'], workNaics: ['237310'] }, undefined, undefined).exclusions.map((e) => e.code)).toEqual(['work_mismatch']);
+  });
+});
+
+describe('identity by UEI only, and SAM size per NAICS', () => {
+  const sb: CandidateRecord = { contract_id: 'x', set_aside_type: 'SBA', naics_code: '237310', incumbent_name: 'RBA ENGINEERING INTERNATIONAL, PLLC', incumbent_uei: 'C9K6EE9JVDK7' };
+  it('a UEI match says the customer holds the contract', () => {
+    expect(checkRecord(sb, {}, { uei: 'c9k6ee9jvdk7' }, undefined).actions.map((a) => a.code)).toContain('customer_is_incumbent');
+  });
+  it('a name alone never does', () => {
+    expect(checkRecord(sb, {}, { uei: 'ZZZZZZZZZZZZ' }, undefined).actions.map((a) => a.code)).not.toContain('customer_is_incumbent');
+    expect(checkRecord(sb, {}, undefined, undefined).actions.map((a) => a.code)).not.toContain('customer_is_incumbent');
+  });
+  it('SAM small under the NAICS clears the small-business barrier', () => {
+    const c = checkRecord(sb, {}, { sizeByNaics: { '237310': 'Y' } }, undefined);
+    expect(c.barriers).toEqual([]);
+    expect(c.verdict).toBe('pursue');
+  });
+  it('SAM not small under the NAICS excludes a small-business set-aside', () => {
+    expect(checkRecord(sb, {}, { sizeByNaics: { '237310': 'N' } }, undefined).exclusions.map((e) => e.code)).toEqual(['set_aside_not_small']);
+  });
+  it('no SAM size for that NAICS stays a barrier', () => {
+    expect(checkRecord(sb, {}, { sizeByNaics: { '541330': 'Y' } }, undefined).barriers.map((b) => b.code)).toEqual(['set_aside_small_business_unconfirmed']);
+  });
+});
+
+describe('setAsideKind covers every live code and SAM wording', () => {
+  it.each([
+    ['Full & Open', null], ['SB-Total', 'sb'], ['SB-Partial', 'sb'], ['SBA', 'sb'], ['Small Business Set Aside - Total', 'sb'],
+    ['8(a)', '8a'], ['8(a) Set-Aside (FAR 19.8)', '8a'], ['SDVOSB', 'sdvosb'], ['Service-Disabled Veteran-Owned Small Business (SDVOSB) Set Aside', 'sdvosb'],
+    ['VOSB', 'vosb'], ['WOSB', 'wosb'], ['EDWOSB', 'edwosb'], ['Women-Owned Small Business (WOSB) Program Set-Aside', 'wosb'],
+    ['HUBZone', 'hubzone'], ['HUBZone Set-Aside (FAR 19.13)', 'hubzone'], ['Indian-SB', 'indian'],
+  ])('%s -> %s', async (raw, kind) => {
+    const { setAsideKind } = await import('./evidence-checks');
+    expect(setAsideKind(raw)).toBe(kind);
+  });
+  it('an SDVOSB set-aside is a barrier when unknown and an exclusion when the profile lacks it', () => {
+    const r: CandidateRecord = { contract_id: 'v', set_aside_type: 'SDVOSB' };
+    expect(checkRecord(r, {}, undefined, undefined).barriers.map((b) => b.code)).toEqual(['set_aside_cert_unconfirmed']);
+    expect(checkRecord(r, {}, { certifications: ['WOSB'] }, undefined).exclusions.map((e) => e.code)).toEqual(['set_aside_cert_not_held']);
+    expect(checkRecord(r, {}, { certifications: ['SDVOSB'] }, undefined).verdict).toBe('pursue');
+  });
+});

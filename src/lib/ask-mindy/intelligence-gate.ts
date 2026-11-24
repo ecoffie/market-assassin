@@ -7,11 +7,13 @@
 import { gatherMarketEvidence, publishMarketReport, type MarketReportInput, type MarketReportResult } from '@/mcp/tools/market-report';
 import { competitionFactsFor, type CompetitionLookup } from '@/lib/opportunities/competition-facts';
 import { findOpportunities, type FindOpportunitiesResult } from '@/lib/opportunities/find-opportunities';
-import { checkRecords, type CandidateRecord, type CustomerEligibility, type RecordCheck } from './evidence-checks';
+import { checkRecords, resolveWorkCodes, type CandidateRecord, type CustomerEligibility, type RecordCheck } from './evidence-checks';
 import { runAnalyst, buildAnalystPrompt, type AnalystDecision, type AnalystInput } from './analyst';
 import { evaluateDecision, type Evaluation } from './evaluator';
 import { cleanReportForPublish, reportIntegrity, type IntegrityFinding } from './report-integrity';
 import { renderMarketReportHtml } from '@/lib/market/market-report-html';
+import { mergeStateEvidence } from './evidence-merge';
+import { resolveCompanyAnchor, type EntityLookup } from '@/lib/opportunities/company-anchor';
 
 type Env = Record<string, string | undefined>;
 
@@ -97,6 +99,31 @@ export function openNoticesAsRecords(items: Array<Record<string, unknown>>): Can
     } as CandidateRecord));
 }
 
+/** A find_opportunities coming-back item as a report recompete row (same field names the report and checks read). */
+export function findRecompeteRow(it: Record<string, unknown>): Record<string, unknown> & CandidateRecord {
+  const capture = it.capture_start_date ? Date.parse(String(it.capture_start_date)) : NaN;
+  return {
+    contract_id: String(it.contract_id || ''),
+    piid: (it.piid as string) ?? null,
+    description: (it.description as string) ?? (it.title as string) ?? null,
+    incumbent_name: (it.incumbent_name as string) ?? null,
+    incumbent_uei: (it.incumbent_uei as string) ?? null,
+    awarding_agency: (it.buyer as string) ?? null,
+    awarding_sub_agency: (it.awarding_sub_agency as string) ?? null,
+    psc_code: (it.psc_code as string) ?? null,
+    naics_code: (it.naics_code as string) ?? null,
+    set_aside_type: (it.set_aside_type as string) ?? null,
+    place_of_performance_state: (it.place_of_performance_state as string) ?? null,
+    period_of_performance_current_end: (it.current_end as string) ?? null,
+    total_obligation: it.total_obligation ?? null,
+    potential_total_value: it.potential_total_value ?? null,
+    capture_start_date: (it.capture_start_date as string) ?? null,
+    capture_start_passed: Number.isFinite(capture) ? capture < Date.now() : null,
+    recompete_likelihood: it.recompete_likelihood ?? null,
+    provenance: { source_label: 'USASpending award record', source_url: it.source_url ?? null },
+  };
+}
+
 /** Agency forecasts (coming soon) as checkable records. */
 export function forecastsAsRecords(items: Array<Record<string, unknown>>): CandidateRecord[] {
   const seen = new Set<string>();
@@ -162,6 +189,7 @@ export function renderDecisionAnswer(d: AnalystDecision, opts: { reportUrl?: str
     if (p.barrier) parts.push(`- What stands in the way: ${p.barrier}`);
     parts.push(`- Next move: ${p.next_move}`, '');
   });
+  if (d.also_consider?.length) parts.push('**Also worth a look:**', ...d.also_consider.map((x) => `- ${x}`), '');
   if (d.ruled_out) parts.push(`**Ruled out:** ${d.ruled_out}`, '');
   if (d.gaps.length) parts.push('**Not yet established:**', ...d.gaps.map((g) => `- ${g}`), '');
   if (opts.disclosed?.length) parts.push('**I could not fully verify this answer:**', ...opts.disclosed.map((x) => `- ${x}`), '');
@@ -173,6 +201,8 @@ export function renderDecisionAnswer(d: AnalystDecision, opts: { reportUrl?: str
 export async function runIntelligenceGate(args: {
   question: string;
   reportInput: MarketReportInput;
+  /** Several requested states: evidence is gathered per state and merged. */
+  states?: string[];
   profile: string | null;
   eligibility?: CustomerEligibility;
   competitionLookup?: CompetitionLookup;
@@ -182,8 +212,10 @@ export async function runIntelligenceGate(args: {
     publish?: typeof publishMarketReport;
     analyst?: typeof runAnalyst;
     evaluate?: typeof evaluateDecision;
-    findOpen?: (q: { query: string; state: string | null }) => Promise<FindOpportunitiesResult | null>;
+    findOpen?: (q: { query: string; state: string | null; states?: string[] }) => Promise<FindOpportunitiesResult | null>;
     findNationalForecasts?: (q: { query: string }) => Promise<FindOpportunitiesResult | null>;
+    findTargeted?: (q: { query: string; naics: string; state: string | null; states: string[] }) => Promise<FindOpportunitiesResult | null>;
+    entityLookup?: EntityLookup;
   };
 }): Promise<GateResult> {
   const gather = args.deps?.gather ?? gatherMarketEvidence;
@@ -193,13 +225,29 @@ export async function runIntelligenceGate(args: {
   const cost = { analystIn: 0, analystOut: 0, evalIn: 0, evalOut: 0 };
 
   const query = String(args.reportInput.keyword || args.reportInput.naics || '').trim();
-  const findOpen = args.deps?.findOpen ?? (async (q: { query: string; state: string | null }) =>
-    findOpportunities({ query: q.query, location: q.state, horizons: { open_now: true, coming_back: false, coming_soon: true }, limit_per_horizon: 25 }, { competitionLookup: null }));
+  const states = (args.states?.length ? args.states : args.reportInput.state ? [args.reportInput.state] : []).map((x) => x.toUpperCase());
+  const findOpen = args.deps?.findOpen ?? (async (q: { query: string; state: string | null; states?: string[] }) =>
+    findOpportunities({
+      query: q.query,
+      ...(q.states && q.states.length > 1 ? { states: q.states } : { location: q.state }),
+      horizons: { open_now: true, coming_back: false, coming_soon: true },
+      limit_per_horizon: 25,
+    }, { competitionLookup: null }));
+  const findTargeted = args.deps?.findTargeted ?? (async (q: { query: string; naics: string; state: string | null; states: string[] }) =>
+    findOpportunities({
+      query: q.query,
+      ...(q.states.length > 1 ? { states: q.states } : { location: q.state }),
+      horizons: { open_now: true, coming_back: true, coming_soon: false },
+      limit_per_horizon: 25,
+      advanced: { naics: q.naics },
+    }, { competitionLookup: null }));
   const findNationalForecasts = args.deps?.findNationalForecasts ?? (async (q: { query: string }) =>
     findOpportunities({ query: q.query, horizons: { open_now: false, coming_back: false, coming_soon: true }, limit_per_horizon: 1 }, { competitionLookup: null }));
   const [ev, open] = await Promise.all([
-    gather(args.reportInput),
-    query ? findOpen({ query, state: args.reportInput.state || null }).catch(() => null) : Promise.resolve(null),
+    states.length > 1
+      ? Promise.all(states.map((st) => gather({ ...args.reportInput, state: st }))).then((rs) => mergeStateEvidence(rs, states))
+      : gather(args.reportInput),
+    query ? findOpen({ query, state: states.length === 1 ? states[0] : null, states }).catch(() => null) : Promise.resolve(null),
   ]);
   if (ev._meta.publication_state === 'measurement_failure') {
     return {
@@ -208,21 +256,48 @@ export async function runIntelligenceGate(args: {
     };
   }
 
+  // The customer's work as codes, from their own words (share only as fallback).
+  const msAll = ev.sections.market_size as { topPscList?: Array<{ code: string; name?: string; pct: number }>; allNaics?: Array<{ code: string; name?: string; pct: number }> } | null;
+  const work = resolveWorkCodes(query, msAll?.topPscList || [], msAll?.allNaics || []);
+  // One targeted search on the customer's own industry code: a long phrase's keyword search sprawls (RBA: the top
+  // 25 of 206 open notices, a coming-back list of building repairs) while the real work sits under its NAICS.
+  const targetNaics = work.basis === 'name' ? work.naics[0] : undefined;
+  const targeted = targetNaics && query
+    ? await findTargeted({ query, naics: targetNaics, state: states.length === 1 ? states[0] : null, states }).catch(() => null)
+    : null;
+  const targetedBack = ((targeted?.horizons?.coming_back?.items as Array<Record<string, unknown>>) || []).map(findRecompeteRow);
+  if (targetedBack.length) {
+    const have = new Set((((ev.sections.recompetes?.contracts as Array<{ contract_id?: string }>) || [])).map((r) => String(r.contract_id)));
+    const add = targetedBack.filter((r) => r.contract_id && !have.has(String(r.contract_id)));
+    ev.sections.recompetes = { ...ev.sections.recompetes, contracts: [...(((ev.sections.recompetes?.contracts as unknown[]) || [])), ...add], count: (((ev.sections.recompetes?.contracts as unknown[]) || []).length) + add.length };
+  }
   const recompetes = ((ev.sections.recompetes?.contracts as unknown[]) || []) as CandidateRecord[];
   const openH = open?.horizons?.open_now;
-  const openRecs = openNoticesAsRecords(openH?.items || []);
+  const targetedOpen = (targeted?.horizons?.open_now?.items as Array<Record<string, unknown>>) || [];
+  const openRecs = openNoticesAsRecords([...targetedOpen, ...(openH?.items || [])]);
   const soonH = open?.horizons?.coming_soon;
   const soonRecs = forecastsAsRecords(soonH?.items || []);
   const recs = [...openRecs, ...soonRecs, ...recompetes];
   const ms = ev.sections.market_size as { topPscList?: Array<{ code: string; pct: number }> } | null;
   const msN = ev.sections.market_size as { allNaics?: Array<{ code: string; pct: number }> } | null;
   const scope = {
-    state: args.reportInput.state || null,
+    state: states.length ? states.join(', ') : null,
+    states,
     pscShares: (ms?.topPscList || []).map((p) => ({ code: p.code, pct: p.pct })),
     naicsShares: (msN?.allNaics || []).map((n) => ({ code: n.code, pct: n.pct })),
+    workPsc: work.psc,
+    workNaics: work.naics,
   };
+  // The customer's SAM size per NAICS, when the profile carries a UEI (self-represented in SAM; unknown stays unknown).
+  const eligibility: CustomerEligibility = { ...(args.eligibility || {}) };
+  if (eligibility.uei) {
+    const res = await resolveCompanyAnchor(eligibility.uei, args.deps?.entityLookup).catch(() => null);
+    if (res?.status === 'resolved' && res.anchor && res.anchor.size_source !== 'unavailable') {
+      eligibility.sizeByNaics = res.anchor.size_by_naics as Record<string, 'Y' | 'N' | 'E'>;
+    }
+  }
   const comp = await competitionFactsFor(recompetes.map((r) => r.contract_id), args.competitionLookup, { budgetMs: 8000 });
-  const checks = checkRecords(recs, scope, args.eligibility, comp);
+  const checks = checkRecords(recs, scope, eligibility, comp);
 
   const market = marketContext(ev, scope.state);
   market.openNowLine = !openH || openH.status === 'unavailable'
@@ -234,7 +309,7 @@ export async function runIntelligenceGate(args: {
         return `${matched} open SAM.gov notice(s) matched the search${dupes > 0 ? `; ${dupes} were repeat postings of the same solicitation, leaving ${openRecs.length} distinct bid(s)` : ''}${matched > items ? `; the top ${items} were returned and ${matched - items} were not` : `; all were checked`}`;
       })();
   market.forecastsLine = await forecastsLine({ horizon: soonH, shown: soonRecs.length, state: scope.state, query, national: findNationalForecasts });
-  const input: AnalystInput = { question: args.question, profile: args.profile, market, records: recs, checks };
+  const input: AnalystInput = { question: args.question, profile: args.profile, market, records: recs, checks, customerUei: eligibility.uei ?? null };
   const evidence = buildAnalystPrompt(input);
 
   let decision: AnalystDecision | null = null;
@@ -256,7 +331,7 @@ export async function runIntelligenceGate(args: {
     feedback = e.fix;
   }
 
-  ev.decision = decision ? { headline: decision.headline, pursuits: decision.pursuits, ruled_out: decision.ruled_out, gaps: decision.gaps } : null;
+  ev.decision = decision ? { headline: decision.headline, pursuits: decision.pursuits, also_consider: decision.also_consider || [], ruled_out: decision.ruled_out, gaps: decision.gaps } : null;
   // The report must agree with the checks: ruled-out records and contacts tied only to them come out, then the
   // report itself is verified BEFORE anything is saved or shared.
   const { report: cleaned, removed } = cleanReportForPublish(ev, checks);
@@ -266,11 +341,14 @@ export async function runIntelligenceGate(args: {
   const status: GateStatus = evaluation?.pass && integrity.every((f) => f.pass) ? 'complete' : 'disclosed';
   // Only a decision that passed review AND a report that passed integrity is published as a shareable report.
   const report = status === 'complete' ? await publish(cleaned, args.reportInput) : cleaned;
+  // The customer is told what could not be VERIFIED (facts, relevance, report data). Style judgments (clear,
+  // actionable) still block the "complete" label and the shareable report, but live in the trace for review.
+  const FACTUAL = new Set(['relevant', 'pursuable', 'reasoned']);
   const disclosed = status === 'disclosed'
-    ? [...(evaluation?.results || []).filter((r) => !r.pass).map((r) => r.reason), ...integrity.filter((f) => !f.pass).map((f) => f.reason)]
+    ? [...(evaluation?.results || []).filter((r) => !r.pass && FACTUAL.has(r.criterion)).map((r) => r.reason), ...integrity.filter((f) => !f.pass).map((f) => f.reason)]
     : undefined;
   return {
     status, decision, evaluation, attempts, checks, report, cost, integrity, removed,
-    answer: decision ? renderDecisionAnswer(decision, { reportUrl: report.deliverable?.url, disclosed }) : 'I could not produce a recommendation from this evidence.',
+    answer: decision ? renderDecisionAnswer(decision, { reportUrl: report.deliverable?.url, disclosed: disclosed?.length ? disclosed : undefined }) : 'I could not produce a recommendation from this evidence.',
   };
 }
