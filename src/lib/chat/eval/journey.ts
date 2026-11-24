@@ -191,18 +191,23 @@ export function observeFlags(turns: readonly TurnCapture[]): Record<FlagKey, { s
 export type RunLabel = 'BEFORE' | 'AFTER' | 'UNCONFIRMED';
 
 /**
- * BEFORE needs no flag on (an expected-off flag observed on makes it UNCONFIRMED). AFTER needs EVERY expected
- * flag observed on; anything else is UNCONFIRMED, never silently AFTER.
+ * The run's flag state must be EXACTLY what the operator expected: every `expected` flag observed on, and no other
+ * flag observed on. Anything else is UNCONFIRMED, never silently BEFORE or AFTER.
+ *
+ *   - AFTER always needs at least one expected flag.
+ *   - BEFORE with no expected flags is the product as customers had it (every flag off). BEFORE with expected flags
+ *     is option (A) of the benchmark plan: the same flags as AFTER, so the comparison isolates the code change.
  */
 export function labelRun(intent: 'before' | 'after', expected: readonly FlagKey[], observed: ReturnType<typeof observeFlags>): { label: RunLabel; reasons: string[] } {
   const reasons: string[] = [];
-  if (intent === 'after') {
-    for (const k of expected) if (observed[k].state !== 'on') reasons.push(`${k} expected on, observed ${observed[k].state}`);
-    if (!expected.length) reasons.push('no expected flags were given for an AFTER run');
-    return { label: reasons.length ? 'UNCONFIRMED' : 'AFTER', reasons };
+  const want = new Set(expected);
+  if (intent === 'after' && !want.size) reasons.push('no expected flags were given for an AFTER run');
+  for (const k of want) if (observed[k].state !== 'on') reasons.push(`${k} expected on, observed ${observed[k].state}`);
+  const runName = intent === 'after' ? 'an AFTER' : 'a BEFORE';
+  for (const k of Object.keys(observed) as FlagKey[]) {
+    if (!want.has(k) && observed[k].state === 'on') reasons.push(`${k} observed on in ${runName} run that did not expect it`);
   }
-  for (const k of Object.keys(observed) as FlagKey[]) if (observed[k].state === 'on') reasons.push(`${k} observed on in a BEFORE run`);
-  return { label: reasons.length ? 'UNCONFIRMED' : 'BEFORE', reasons };
+  return { label: reasons.length ? 'UNCONFIRMED' : intent === 'after' ? 'AFTER' : 'BEFORE', reasons };
 }
 
 /** Missing evidence the operator should know about (no trace means the preview was not started with trace on). */
@@ -218,4 +223,52 @@ export function runWarnings(turns: readonly TurnCapture[]): string[] {
     if (t.error) w.push(`turn ${t.turn}: ${t.error}`);
   }
   return w;
+}
+
+// ── Saved conversation reopen (Track A: the journey ends with a conversation the customer can come back to) ─────
+
+export interface ReopenedMessage { role: string; content: string; cited_sources?: unknown; deliverables?: { files?: Deliverable[] } }
+export interface ReopenCapture { httpStatus: number | null; title: string | null; messages: ReopenedMessage[]; error: string | null }
+
+/** Reopen the conversation exactly as History does: GET /api/app/chat-sessions?email=&sessionId=. */
+export async function reopenConversation(opts: { host: string; email: string; token: string; sessionId: string; fetchImpl?: typeof fetch }): Promise<ReopenCapture> {
+  const f = opts.fetchImpl ?? fetch;
+  const q = new URLSearchParams({ email: opts.email, sessionId: opts.sessionId });
+  try {
+    const r = await f(`${opts.host.replace(/\/$/, '')}/api/app/chat-sessions?${q}`, { headers: { 'x-mi-auth-token': opts.token } });
+    if (!r.ok) return { httpStatus: r.status, title: null, messages: [], error: `HTTP ${r.status}: ${(await r.text().catch(() => '')).slice(0, 200)}` };
+    const j = await r.json() as { session?: { title?: string | null }; messages?: ReopenedMessage[] };
+    return { httpStatus: r.status, title: j.session?.title ?? null, messages: Array.isArray(j.messages) ? j.messages : [], error: null };
+  } catch (e) {
+    return { httpStatus: null, title: null, messages: [], error: (e as Error).message };
+  }
+}
+
+/**
+ * Continuity facts, not a quality grade: did the saved conversation keep every turn, in order, with the same
+ * question, the same answer text, its citations and its document chips? Each difference is listed plainly.
+ */
+export function reopenContinuity(turns: readonly TurnCapture[], reopened: ReopenCapture): { ok: boolean; differences: string[] } {
+  const d: string[] = [];
+  if (reopened.error) return { ok: false, differences: [`reopen failed: ${reopened.error}`] };
+  const norm = (s: string) => s.replace(/\s+/g, ' ').trim();
+  const users = reopened.messages.filter((m) => m.role === 'user');
+  const assistants = reopened.messages.filter((m) => m.role === 'assistant');
+  const answered = turns.filter((t) => !t.error);
+  if (users.length !== answered.length) d.push(`saved ${users.length} question(s), the journey asked ${answered.length}`);
+  if (assistants.length !== answered.length) d.push(`saved ${assistants.length} answer(s), the journey received ${answered.length}`);
+  answered.forEach((t, i) => {
+    const u = users[i];
+    const a = assistants[i];
+    if (u && !norm(u.content).endsWith(norm(t.prompt))) d.push(`turn ${t.turn}: saved question differs from the one asked`);
+    if (!a) return;
+    if (norm(a.content) !== norm(t.answer)) d.push(`turn ${t.turn}: saved answer differs from the streamed answer (${norm(a.content).length} vs ${norm(t.answer).length} chars)`);
+    const streamedCites = Array.isArray(t.citations) ? t.citations.length : 0;
+    const savedCites = Array.isArray(a.cited_sources) ? a.cited_sources.length : 0;
+    if (streamedCites !== savedCites) d.push(`turn ${t.turn}: ${streamedCites} citation(s) streamed, ${savedCites} saved`);
+    const streamedDocs = t.deliverables.map((x) => x.document_id).sort().join(',');
+    const savedDocs = (a.deliverables?.files ?? []).map((x) => x.document_id).sort().join(',');
+    if (streamedDocs !== savedDocs) d.push(`turn ${t.turn}: document chips streamed [${streamedDocs}] but saved [${savedDocs}]`);
+  });
+  return { ok: d.length === 0, differences: d };
 }

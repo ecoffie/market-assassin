@@ -11,6 +11,7 @@
  *   · say "Playbook" (the library is the Tutorial Library).
  */
 import { mpRawBodyClose, mpRawBodyOpen, mpRawHeadHtml } from '@/lib/public-site/html';
+import { shareImageMetaTags } from '@/lib/seo/share-image';
 import { ACTION_PLAN, ACTION_PLAN_STEPS, actionPlanStep } from './action-plan';
 import { signInHref } from '@/lib/mindy/sign-in-return';
 import { ACCESS_LABEL, MISSIONS, OUTSIDE_STEPS, STAGES, missionById, type Mission, type StageKey } from './missions';
@@ -108,6 +109,7 @@ function page(opts: { title: string; description: string; path: string; body: st
 <meta property="og:title" content="${esc(opts.title)}">
 <meta property="og:description" content="${esc(opts.description)}">
 <meta property="og:url" content="${url}">
+${shareImageMetaTags()}
 ${mpRawHeadHtml()}
 <style>${LEARN_CSS}</style>
 </head><body>

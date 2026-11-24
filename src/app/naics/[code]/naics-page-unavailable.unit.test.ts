@@ -56,6 +56,8 @@ describe('/naics/[code] outside the top 100', () => {
     const el = await NaicsCodePage(params('236210'));
     expect(el).toBeTruthy();
     const meta = await generateMetadata(params('236210'));
-    expect(String(meta.title)).toContain('NAICS 236210: Industrial Building Construction');
+    // <title> is shortened to fit search results (seo-title-clip); og:title keeps the full name.
+    expect(String(meta.title)).toBe('NAICS 236210: Industrial Building… — Federal Contracts | Mindy');
+    expect((meta.openGraph as { title?: string }).title).toContain('NAICS 236210: Industrial Building Construction');
   });
 });

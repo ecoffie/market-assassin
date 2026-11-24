@@ -63,10 +63,10 @@ export async function generateMetadata(
 function fallbackMeta(base: string): Metadata {
   return {
     title: 'A federal opportunity shared via Mindy',
-    description: 'See your fit on this federal opportunity and find more like it — Mindy scores 24,000+ daily.',
+    description: 'See your fit on this federal opportunity and find more like it — Mindy scores federal opportunities daily.',
     openGraph: {
       title: 'A federal opportunity shared via Mindy',
-      description: 'See your fit and find more like it — Mindy scores 24,000+ federal opportunities daily.',
+      description: 'See your fit and find more like it — Mindy scores federal opportunities daily.',
       url: `${base}`,
       siteName: 'Mindy',
       images: [{ url: `${base}/opengraph-image`, width: 1200, height: 630 }],

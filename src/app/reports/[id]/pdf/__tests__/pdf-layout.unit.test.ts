@@ -89,7 +89,9 @@ describe.runIf(!!CHROME)('market report PDF: tables and summary text are never c
   it.runIf(!!PDFTOTEXT)('the real PDF contains the full long values from the wide tables', async () => {
     const { pdf, error } = await htmlToPdf(wideReport(), PDF_OPTIONS, { lockdown: true, launch });
     expect(error).toBeNull();
-    const text = execFileSync(PDFTOTEXT!, ['-enc', 'UTF-8', '-', '-'], { input: pdf!, encoding: 'utf8' });
+    // -raw reads text in the order Chromium drew it, so a wrapped table cell stays in one piece (the default
+    // reading-order mode can interleave a cell's second line with the next column).
+    const text = execFileSync(PDFTOTEXT!, ['-enc', 'UTF-8', '-raw', '-', '-'], { input: pdf!, encoding: 'utf8' });
     // pdftotext drops a hyphen where a wrapped line broke at it ("veteran-\nowned" → "veteranowned"),
     // which is itself the wrapping this test is about; compare without whitespace and hyphens.
     const squash = (s: string) => s.replace(/[\s-]+/g, '').toLowerCase();

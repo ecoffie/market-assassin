@@ -2,7 +2,7 @@
  * Shared harness for the market-report regression tests (Design & Output, 2026-11-22).
  *
  * Every render goes through the PRODUCTION path: renderStoredReportHtml → htmlToPdf (lockdown) with the
- * route's own PDF_OPTIONS, in a real headless Chromium. Nothing here re-implements the report.
+ * route's own pdfOptions(), in a real headless Chromium. Nothing here re-implements the report.
  *
  * Chromium: PUPPETEER_EXECUTABLE_PATH, the cloud sessions' Playwright Chromium, or the Google Chrome that
  * GitHub's ubuntu runners ship. Suites using this harness skip (and say so) when none exists.
@@ -15,7 +15,10 @@ export const CHROME = [process.env.PUPPETEER_EXECUTABLE_PATH, '/opt/pw-browsers/
   .filter((p): p is string => !!p)
   .find((p) => existsSync(p));
 
-/** poppler reads the text layer faithfully; pdf.js (pdf-parse) drops some tabular digits. */
+/**
+ * poppler reads the text layer faithfully; pdf.js (pdf-parse) drops some tabular digits. The suites call it with -raw
+ * (drawing order), so a wrapped table cell stays in one piece instead of interleaving with the next column.
+ */
 export const PDFTOTEXT = process.env.HARNESS_NO_PDFTOTEXT ? undefined : ['/usr/bin/pdftotext', '/usr/local/bin/pdftotext'].find((p) => existsSync(p));
 
 export async function launch(): Promise<LaunchedBrowser> {
@@ -44,7 +47,7 @@ export async function pdfPages(pdf: Buffer): Promise<string[]> {
   if (PDFTOTEXT) {
     const n = (await pdfPageCount(pdf));
     return Array.from({ length: n }, (_, i) =>
-      execFileSync(PDFTOTEXT, ['-f', String(i + 1), '-l', String(i + 1), '-enc', 'UTF-8', '-', '-'], { input: pdf, encoding: 'utf8' }));
+      execFileSync(PDFTOTEXT, ['-f', String(i + 1), '-l', String(i + 1), '-enc', 'UTF-8', '-raw', '-', '-'], { input: pdf, encoding: 'utf8' }));
   }
   const { PDFParse } = await import('pdf-parse');
   const parser = new PDFParse({ data: new Uint8Array(pdf) });
@@ -65,14 +68,19 @@ export async function pdfPageCount(pdf: Buffer): Promise<number> {
   }
 }
 
-/** Visible text of the report HTML, one normalised line per block (the print-hidden button excluded). */
+/**
+ * Visible text of a report or document HTML, one normalised line per block (the print-hidden button, SVG
+ * titles and style/script excluded). Shared by the market-report and the Vault-document parity suites.
+ */
 export function htmlLines(html: string): string[] {
   const body = html
     .replace(/<head>[\s\S]*?<\/head>/, '')
     .replace(/<(button|a) class="pdfbtn"[\s\S]*?<\/\1>/g, '')
-    .replace(/<\/(p|div|h1|h2|h3|td|th|li|header|footer)>|(?=<(?:div|td|th)[\s>])|<br\s*\/?>/g, '\n')
+    .replace(/<(title|desc|style|script)[^>]*>[\s\S]*?<\/\1>/g, '')
+    .replace(/<\/(p|div|h1|h2|h3|h4|h5|td|th|li|header|footer|section|caption|figcaption|dt|dd|text|tspan)>|(?=<(?:div|td|th)[\s>])|<br\s*\/?>/g, '\n')
     .replace(/<[^>]+>/g, '')
     .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'")
+    .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(Number(n))).replace(/&nbsp;/g, ' ')
     .replace(/&ldquo;|&rdquo;/g, '"');
   return body.split('\n').map((l) => l.replace(/\s+/g, ' ').trim()).filter((l) => l.length > 2);
 }

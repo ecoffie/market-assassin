@@ -1,5 +1,12 @@
+import type { Metadata } from 'next';
 import PublicShell from '@/components/public-site/PublicShell';
 import McpConsole from './mcp-console';
+
+// Own canonical: without it the route inherits the root layout's '/' and claims to be a copy
+// of the homepage.
+export const metadata: Metadata = {
+  alternates: { canonical: '/mcp' },
+};
 
 /**
  * getmindy.ai/mcp — the connect page, inside the public shell. The page itself is the client

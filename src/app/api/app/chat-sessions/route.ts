@@ -17,6 +17,8 @@ import { verifyUserOwnsEmail } from '@/lib/api-auth';
 import { hasProAccess } from '@/lib/access/resolve-access';
 import { shadowEntitlement } from '@/lib/entitlements/shadow';
 import { isViewPreambleTitle, sessionTitleFrom } from '@/lib/chat/view-preamble';
+import { ledgerFromTrace } from '@/lib/chat/ledger-persistence';
+import { askMindyRecipesEnabledFor } from '@/lib/ask-mindy/flags';
 
 /** Same shape as a stored market report id (src/app/reports/[id]/pdf/route.ts ID_RE). */
 const REPORT_ID_RE = /^[A-Za-z0-9_-]{16,64}$/;
@@ -83,7 +85,9 @@ export async function GET(request: NextRequest) {
     // Older Map conversations were titled from the Map view preamble; show the customer's first question.
     const firstUser = (messages || []).find((m: { role: string }) => m.role === 'user') as { content?: string } | undefined;
     const title = isViewPreambleTitle(session.title) ? (sessionTitleFrom(firstUser?.content || '') || null) : session.title;
-    // Project only deliverable ids from trace — never return the rest of the planner/tool trace.
+    // Project only deliverable ids (and, under ASK_MINDY_RECIPES, the signed source ledger) from trace — never the
+    // rest of the planner/tool trace. Ownership was checked above, so a ledger is only ever returned to its owner.
+    const withLedger = askMindyRecipesEnabledFor(auth.email);
     const projected = (messages || []).map((m: {
       id: string; role: string; content: string; cited_sources?: unknown; created_at: string;
       trace?: { deliverables?: { files?: unknown; pdf_note?: string }; market_report?: { report_id?: unknown; title?: unknown } } | null;
@@ -100,9 +104,11 @@ export async function GET(request: NextRequest) {
             !!f && typeof f === 'object' && typeof (f as { document_id?: unknown }).document_id === 'string'
             && typeof (f as { format?: unknown }).format === 'string')
         : null;
+      const ledger = withLedger && m.role === 'assistant' ? ledgerFromTrace(m.trace) : null;
       const { trace: _omit, ...rest } = m;
       return {
         ...rest,
+        ...(ledger ? { sources: ledger } : {}),
         ...(files && files.length
           ? { deliverables: { files, ...(typeof raw?.pdf_note === 'string' ? { pdf_note: raw.pdf_note } : {}) } }
           : {}),

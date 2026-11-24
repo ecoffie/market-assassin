@@ -81,9 +81,10 @@ const esc = (s: string) => s.replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '
 export function compareIndexHtml(runs: Array<{ name: string; dir: string; relDir: string }>): string {
   const manifests = runs.map((r) => JSON.parse(readFileSync(join(r.dir, 'manifest.json'), 'utf8')) as {
     label: string; target: { host: string; served_sha: string | null }; flags: Record<string, { state: string }>; turns: Array<{ turn: number; prompt: string }>; artifacts: ArtifactRecord[];
+    reopen?: { ok: boolean; differences: string[] };
   });
   const maxTurns = Math.max(...manifests.map((m) => m.turns.length));
-  const head = runs.map((r, i) => `<th>${esc(r.name)}<br><small>${esc(manifests[i].label)} · ${esc(manifests[i].target.host)} · ${esc(manifests[i].target.served_sha ?? 'sha unknown')}<br>flags: ${esc(Object.entries(manifests[i].flags).map(([k, v]) => `${k}=${v.state}`).join(', '))}</small></th>`).join('');
+  const head = runs.map((r, i) => `<th>${esc(r.name)}<br><small>${esc(manifests[i].label)} · ${esc(manifests[i].target.host)} · ${esc(manifests[i].target.served_sha ?? 'sha unknown')}<br>flags: ${esc(Object.entries(manifests[i].flags).map(([k, v]) => `${k}=${v.state}`).join(', '))}<br>saved conversation: ${esc(manifests[i].reopen ? (manifests[i].reopen!.ok ? 'every turn kept' : manifests[i].reopen!.differences.join('; ')) : 'not checked')}</small></th>`).join('');
   const rows: string[] = [];
   for (let t = 1; t <= maxTurns; t++) {
     const prompt = manifests.find((m) => m.turns[t - 1])?.turns[t - 1]?.prompt ?? '';

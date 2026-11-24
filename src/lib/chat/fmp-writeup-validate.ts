@@ -6,11 +6,11 @@
  * Hard: pathways-first, who-to-talk-to, buyer pain, DSBS checklist, conditional PAE,
  * Mid CTA phrases, narrow grading phrases.
  *
- * Synonyms/bans live in `RBA_WRITEUP` (single source with tests).
+ * Synonyms/bans live in `WRITEUP_DOCTRINE` (single source with tests).
  */
 
 import type { Block, DocModel, DocSection } from '@/lib/documents/model';
-import { RBA_WRITEUP } from './__fixtures__/rba-federal-market-profile';
+import { WRITEUP_DOCTRINE } from './writeup-doctrine';
 
 export interface FmpWriteupContext {
   /** When true, a PAE / defense-oversight section is required. */
@@ -45,9 +45,9 @@ const EM_DASH_RE = /[—–]/g;
 
 export function fmpDefenseBuyersAppear(text: string): boolean {
   const t = text || '';
-  if (RBA_WRITEUP.defenseBuyerSignals.some((re) => re.test(t))) return true;
+  if (WRITEUP_DOCTRINE.defenseBuyerSignals.some((re) => re.test(t))) return true;
   // Live SAM buyer strings (name-only Ask) — not in the prompt-oriented fixture list.
-  return /\bDEPT(?:ARTMENT)? OF (?:THE )?(?:DEFENSE|ARMY|NAVY|AIR FORCE)\b|\bUSACE\b|\bJBAB\b|\bNAV FAC\b|\bAir Force\b/i.test(t);
+  return /\bDEPT(?:ARTMENT)? OF (?:THE )?(?:DEFENSE|ARMY|NAVY|AIR FORCE)\b|\bUSACE\b|\bNAV FAC\b|\bAir Force\b/i.test(t);
 }
 
 /** PAE / defense section from pathway + award buyers when the customer text is name-only. */
@@ -168,7 +168,7 @@ function sectionBodyText(s: DocSection): string {
 }
 
 function isSkippedHeading(heading: string): boolean {
-  return RBA_WRITEUP.skipHeadingsForPathwaysFirst.some((re) => re.test(heading));
+  return WRITEUP_DOCTRINE.skipHeadingsForPathwaysFirst.some((re) => re.test(heading));
 }
 
 function firstSubstantiveSection(sections: readonly DocSection[]): DocSection | null {
@@ -197,7 +197,7 @@ function hasWhoToTalkTable(sections: readonly DocSection[]): boolean {
       if (b.type !== 'table') continue;
       const labels = b.columns.map((c) => c.label);
       const hits = labels.filter((lab) =>
-        RBA_WRITEUP.whoToTalkTableColumnHints.some((re) => re.test(lab)),
+        WRITEUP_DOCTRINE.whoToTalkTableColumnHints.some((re) => re.test(lab)),
       ).length;
       // Need contact-ish + question-ish signal (at least 2 hint hits across columns).
       if (hits >= 2) return true;
@@ -210,7 +210,7 @@ const PAE_GLOSS_BAN = /\bPerformance\s+Assessment\s+Evaluation\b/i;
 
 function collectBanIssues(flat: string): FmpWriteupIssue[] {
   const issues: FmpWriteupIssue[] = [];
-  for (const re of RBA_WRITEUP.gradingBanPhrases) {
+  for (const re of WRITEUP_DOCTRINE.gradingBanPhrases) {
     if (re.test(flat)) {
       issues.push({
         code: 'grading_ban',
@@ -220,12 +220,12 @@ function collectBanIssues(flat: string): FmpWriteupIssue[] {
       break;
     }
   }
-  for (const re of RBA_WRITEUP.midCtaBanPhrases) {
+  for (const re of WRITEUP_DOCTRINE.midCtaBanPhrases) {
     if (re.test(flat)) {
       issues.push({
         code: 'mid_cta_ban',
         severity: 'error',
-        message: 'Omit Mid plan / pricing CTAs from this profile (accidental in the Claude benchmark). Keep market dollar figures.',
+        message: 'Omit pricing CTAs from this profile (no Mindy pricing in research deliverables). Keep market dollar figures.',
       });
       break;
     }
@@ -237,7 +237,7 @@ function collectBanIssues(flat: string): FmpWriteupIssue[] {
       message: 'Do not expand PAE as "Performance Assessment Evaluation". Use defense construction oversight / Navy PAE.',
     });
   }
-  for (const re of RBA_WRITEUP.openBidSoftWarn) {
+  for (const re of WRITEUP_DOCTRINE.openBidSoftWarn) {
     if (re.test(flat)) {
       issues.push({
         code: 'open_bid_frame',
@@ -253,7 +253,7 @@ function collectBanIssues(flat: string): FmpWriteupIssue[] {
 function structureIssues(sections: readonly DocSection[], ctx: FmpWriteupContext): FmpWriteupIssue[] {
   const issues: FmpWriteupIssue[] = [];
   const first = firstSubstantiveSection(sections);
-  if (!first || !headingMatches(first.heading, RBA_WRITEUP.pathwayHeadingSynonyms)) {
+  if (!first || !headingMatches(first.heading, WRITEUP_DOCTRINE.pathwayHeadingSynonyms)) {
     issues.push({
       code: 'pathways_first',
       severity: 'error',
@@ -261,7 +261,7 @@ function structureIssues(sections: readonly DocSection[], ctx: FmpWriteupContext
     });
   }
 
-  const whoHeading = findSection(sections, RBA_WRITEUP.whoToTalkHeadingSynonyms);
+  const whoHeading = findSection(sections, WRITEUP_DOCTRINE.whoToTalkHeadingSynonyms);
   if (!whoHeading && !hasWhoToTalkTable(sections)) {
     issues.push({
       code: 'who_to_talk',
@@ -270,7 +270,7 @@ function structureIssues(sections: readonly DocSection[], ctx: FmpWriteupContext
     });
   }
 
-  if (!findSection(sections, RBA_WRITEUP.buyerPainHeadingSynonyms)) {
+  if (!findSection(sections, WRITEUP_DOCTRINE.buyerPainHeadingSynonyms)) {
     issues.push({
       code: 'buyer_pain',
       severity: 'error',
@@ -278,7 +278,7 @@ function structureIssues(sections: readonly DocSection[], ctx: FmpWriteupContext
     });
   }
 
-  const checklist = findSection(sections, RBA_WRITEUP.checklistHeadingSynonyms);
+  const checklist = findSection(sections, WRITEUP_DOCTRINE.checklistHeadingSynonyms);
   const whole = sections.map(sectionBodyText).join('\n');
   const checklistText = checklist ? sectionBodyText(checklist) : '';
   const hasDsbs = /\bDSBS\b/i.test(checklistText) || (checklist != null && /\bDSBS\b/i.test(whole));
@@ -296,7 +296,7 @@ function structureIssues(sections: readonly DocSection[], ctx: FmpWriteupContext
     });
   }
 
-  if (ctx.defenseBuyersAppear && !findSection(sections, RBA_WRITEUP.paeHeadingSynonyms)) {
+  if (ctx.defenseBuyersAppear && !findSection(sections, WRITEUP_DOCTRINE.paeHeadingSynonyms)) {
     issues.push({
       code: 'pae',
       severity: 'error',
@@ -364,7 +364,7 @@ export function validateFmpWriteupMarkdown(text: string, ctx: FmpWriteupContext)
       message: 'Remove em dashes (use commas, periods, or hyphens).',
     });
   }
-  if (!RBA_WRITEUP.pathwayHeadingSynonyms.some((re) => re.test(cleaned))) {
+  if (!WRITEUP_DOCTRINE.pathwayHeadingSynonyms.some((re) => re.test(cleaned))) {
     issues.push({
       code: 'pathways_first',
       severity: 'error',
@@ -372,7 +372,7 @@ export function validateFmpWriteupMarkdown(text: string, ctx: FmpWriteupContext)
     });
   }
   if (
-    !RBA_WRITEUP.whoToTalkHeadingSynonyms.some((re) => re.test(cleaned))
+    !WRITEUP_DOCTRINE.whoToTalkHeadingSynonyms.some((re) => re.test(cleaned))
     && !/\bquestion to ask\b/i.test(cleaned)
   ) {
     issues.push({
@@ -381,7 +381,7 @@ export function validateFmpWriteupMarkdown(text: string, ctx: FmpWriteupContext)
       message: 'Include who to talk to and what to say (named contact + question).',
     });
   }
-  if (!RBA_WRITEUP.buyerPainHeadingSynonyms.some((re) => re.test(cleaned))) {
+  if (!WRITEUP_DOCTRINE.buyerPainHeadingSynonyms.some((re) => re.test(cleaned))) {
     issues.push({
       code: 'buyer_pain',
       severity: 'error',
@@ -395,7 +395,7 @@ export function validateFmpWriteupMarkdown(text: string, ctx: FmpWriteupContext)
       message: 'Include DSBS keywords in the readiness checklist.',
     });
   }
-  if (ctx.defenseBuyersAppear && !RBA_WRITEUP.paeHeadingSynonyms.some((re) => re.test(cleaned))) {
+  if (ctx.defenseBuyersAppear && !WRITEUP_DOCTRINE.paeHeadingSynonyms.some((re) => re.test(cleaned))) {
     issues.push({
       code: 'pae',
       severity: 'error',

@@ -1926,6 +1926,7 @@ interface PrefillResponse {
   summary?: {
     sam_registration_status?: string;
     sam_active?: boolean;
+    sam_registration_purpose?: { contract_awards?: 'registered' | 'not_registered' | 'unknown'; warning?: string };
     contracts_found?: number;
     capabilities_drafted?: number;
     sample_pp_drafted?: number;
@@ -2091,6 +2092,12 @@ function AutoFillModal({ email, onClose, onApplied }: { email: string; onClose: 
                 </span>
               )}
             </div>
+
+            {summary?.sam_registration_purpose?.warning && (
+              <p role="alert" className="text-xs rounded px-3 py-2 bg-amber-900/40 text-amber-200 border border-amber-800">
+                {summary.sam_registration_purpose.warning}
+              </p>
+            )}
 
             {/* Identity */}
             {preview.identity && (

@@ -14,7 +14,7 @@ import { existsSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { htmlToPdf, type LaunchedBrowser } from '@/lib/pdf/launch-browser';
 import { renderStoredReportHtml } from '@/lib/market/stored-report-html';
-import { PDF_OPTIONS, isPdf } from '../route';
+import { pdfOptions, isPdf } from '../route';
 import { REPORT } from './fixture';
 
 const CHROME = [process.env.PUPPETEER_EXECUTABLE_PATH, '/opt/pw-browsers/chromium', '/usr/bin/google-chrome', '/usr/bin/chromium']
@@ -44,7 +44,8 @@ function htmlLines(html: string): string[] {
   return body.split('\n').map((l) => l.replace(/\s+/g, ' ').trim()).filter((l) => l.length > 2);
 }
 
-const squash = (s: string) => s.replace(/\s+/g, '').toLowerCase();
+// Letters and digits only: text extraction drops a hyphen where a line wraps ("period-of-|performance").
+const squash = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
 
 describe.runIf(!!CHROME)('market report PDF: a valid file that matches the report', () => {
   let html = '';
@@ -52,7 +53,7 @@ describe.runIf(!!CHROME)('market report PDF: a valid file that matches the repor
 
   it('renders a valid PDF that a PDF library can open', async () => {
     html = renderStoredReportHtml(REPORT as never);
-    const out = await htmlToPdf(html, PDF_OPTIONS, { lockdown: true, launch });
+    const out = await htmlToPdf(html, pdfOptions(REPORT.subject), { lockdown: true, launch });
     expect(out.error).toBeNull();
     pdf = out.pdf;
     expect(isPdf(pdf)).toBe(true);

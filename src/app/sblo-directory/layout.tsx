@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import PublicShell from '@/components/public-site/PublicShell';
 
 export const metadata: Metadata = {
+  alternates: { canonical: '/sblo-directory' },
   title: 'SBLO Contact Directory | Mindy',
   description: '225 Small Business Liaison Officers across 76+ federal agencies with direct contact info.',
 };
