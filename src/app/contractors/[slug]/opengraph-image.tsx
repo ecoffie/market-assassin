@@ -19,7 +19,11 @@ export default async function Image({ params }: { params: Promise<{ slug: string
   let stats = '';
 
   try {
-    const r = (await getRollupBySlug(slug)) ?? (await getRollupOrSingleBySlug(slug, true));
+    // CACHE-ONLY (Agent 4 / Data Core, 2026-11-24). The fallback used liveBq=true: on a KV miss every crawler fetch
+    // of this card ran one or two FULL scans of recipients_rollup_merged / recipients (slug computed per row) with
+    // no cold budget and no maximumBytesBilled — unbudgeted BigQuery spend that competes with the pages' own quota.
+    // A miss now renders the generic card, exactly as the catch block below already does.
+    const r = (await getRollupBySlug(slug)) ?? (await getRollupOrSingleBySlug(slug));
     if (r) {
       name = fmtCompanyName(r.rollup_name).slice(0, 64);
       const tot = Number(r.total_obligated || 0);
