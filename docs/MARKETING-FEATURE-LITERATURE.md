@@ -7815,3 +7815,13 @@ the notices. Test: `federal-events-ranking.unit.test.ts`.
 **SEO.** GovCon MCP credits / change Mindy account email / prepaid API credits survive email update.
 
 **Proof.** Migration `20260914_account_id_mcp_credits.sql` (hand-run). Unit: `src/lib/identity/pro-monthly-keys.unit.test.ts`, `src/lib/identity/account-credit-invariants.unit.test.ts`. Grant cron skips (logs) when Stripe billing email has no `account_id` — no email-only double-grant path.
+
+## Ask Mindy answers like Claude + Mindy MCP (coming, flag off) — 2026-11-24
+
+**What:** Ask Mindy, on the Map home screen, can answer through the same engine customers use in claude.ai with the Mindy connector: Claude, the live Mindy MCP server, the same tools and the server's own instructions. One question gets one right tool call: current opportunities go to the three-horizon search (Open now, Coming back, Coming soon), a solicitation number or a past bid goes to solicitation lookup, and a bill question goes to legislation status.
+
+**Why:** Customers compared Ask Mindy with Claude + MCP and Claude's answers were better. Ask Mindy ran a different model with its own prompts and tool list. Now both run the same thing, so the answer is the same wherever the customer asks.
+
+**SEO:** federal contract opportunities AI assistant, ask AI about government contracts, Claude federal contracting connector.
+
+**Proof:** 6-question parity set, 2026-11-24, run through the new path against the live MCP server: 6 of 6 routed to the correct tool with one call each (find_opportunities ×3, lookup_solicitation ×2, get_legislation_status ×1). Source: `src/lib/chat/claude-mcp-parity-questions.ts`, `scripts/ask-mindy-claude-mcp-probe.mts`. Behind `ASK_MINDY_CLAUDE_MCP` (off).

@@ -130,6 +130,7 @@ import { capabilityPlannerNote, interpretCapabilityNaics } from '@/lib/market/ca
 import { guardUnstatedStates, guardUnstatedCities } from '@/lib/chat/stated-filters';
 import { parseDisplayHint, displayHintNote } from '@/lib/chat/display-hint';
 import { compileIntent, enforceIntent, dedupeToolCalls, isMapScopeNote, splitViewPreamble } from '@/lib/chat/intent-compiler';
+import { claudeMcpEnabledFor, runClaudeMcpAnswer, claudeMcpPromptTokenEquivalent, type ClaudeMcpResult } from '@/lib/chat/claude-mcp-host';
 import { sessionTitleFrom } from '@/lib/chat/view-preamble';
 import { prepareChatToolArgs, renderExpiringRecords, renderStatusChecks, renderBuyingOffices, renderPricing, renderKeywords, renderVehicleMix, renderSbloContact, lintAnalysis, deterministicNextSteps, crossCheckOffices, checkSummaryAgainstRecords, EXPIRING_TOOL, PAST_CONTRACTS_TOOL, BUYING_OFFICES_TOOL, PRICING_TOOL, KEYWORDS_TOOL, VEHICLE_MIX_TOOL, SBLO_TOOL, type RenderedRecords } from '@/lib/chat/record-render';
 import { recordProviderEvent } from '@/lib/chat/provider-events';
@@ -668,6 +669,71 @@ export async function POST(request: NextRequest) {
       try {
         // Tell client which session this exchange belongs to right away
         send({ type: 'session', sessionId });
+
+        // Claude + Mindy MCP host (ASK_MINDY_CLAUDE_MCP, default off; src/lib/chat/claude-mcp-host.ts).
+        // Same model family, MCP server, tools and server instructions as claude.ai + MCP. Card turns keep
+        // their own billed path. The Map view preamble is dropped: Ask Mindy does not drive the Map (Phase 3).
+        if (!cardCtx && claudeMcpEnabledFor(auth.email)) {
+          const question = splitViewPreamble(message).rest || message;
+          const priorTurns = (Array.isArray(body.history) ? body.history.slice(-HISTORY_LIMIT) : []).map((t) => ({
+            role: t.role,
+            content: splitViewPreamble(String(t.content || '')).rest || String(t.content || ''),
+          }));
+          const abort = new AbortController();
+          answerAbort = abort;
+          let result: ClaudeMcpResult | null = null;
+          let failed = false;
+          try {
+            result = await runClaudeMcpAnswer({
+              email: auth.email!,
+              history: priorTurns,
+              question,
+              signal: abort.signal,
+              onText: (delta) => {
+                if (clientGone) { abort.abort(); return; }
+                send({ type: 'token', content: delta });
+              },
+            });
+          } catch (err) {
+            failed = true;
+            console.error('[chat] claude-mcp answer failed:', (err as Error)?.message);
+          }
+          const answer = result?.text || '';
+          if (failed || !answer.trim()) {
+            send({ type: 'error', code: 'stream_failed', message: customerErrorMessage('stream_failed') });
+          }
+          send({ type: 'citations', sources: [] });
+          send({ type: 'done' });
+          closeStream();
+          if (result) {
+            void recordLlmUsage({
+              userEmail: auth.email,
+              tool: 'chat',
+              job: 'claude_mcp',
+              provider: 'anthropic',
+              model: result.model,
+              usage: { prompt_tokens: claudeMcpPromptTokenEquivalent(result.usage), completion_tokens: result.usage.output },
+            });
+          }
+          if (answer.trim()) {
+            persistExchange({
+              email: auth.email!,
+              sessionId,
+              userMessage: message,
+              assistantMessage: answer,
+              citedSources: [],
+              tokensUsed: result ? result.usage.input + result.usage.output : null,
+              latencyMs: Date.now() - startedAt,
+              trace: {
+                engine: 'claude_mcp',
+                model: result?.model,
+                stop_reason: result?.stopReason,
+                tools: (result?.toolCalls || []).map((c) => ({ name: c.name, error: c.isError })),
+              },
+            }).catch((err) => console.error('[chat] persist failed:', err));
+          }
+          return;
+        }
 
         // Load ONLY the bidder profile for context. The ENTIRE RAG corpus — the 8-year
         // teaching/curriculum chunks AND the podcast episodes — was REMOVED (Eric 2026-08-02:
