@@ -341,8 +341,8 @@ export async function runIntelligenceGate(args: {
   const status: GateStatus = evaluation?.pass && integrity.every((f) => f.pass) ? 'complete' : 'disclosed';
   // Only a decision that passed review AND a report that passed integrity is published as a shareable report.
   const report = status === 'complete' ? await publish(cleaned, args.reportInput) : cleaned;
-  // The customer is told what could not be VERIFIED (facts, relevance, report data). Style judgments (clear,
-  // actionable) still block the "complete" label and the shareable report, but live in the trace for review.
+  // The customer is told what could not be VERIFIED (facts, relevance, report data). An actionability failure blocks
+  // the shareable report but is not a verification claim; clarity is advisory and only recorded in the trace.
   const FACTUAL = new Set(['relevant', 'pursuable', 'reasoned']);
   const disclosed = status === 'disclosed'
     ? [...(evaluation?.results || []).filter((r) => !r.pass && FACTUAL.has(r.criterion)).map((r) => r.reason), ...integrity.filter((f) => !f.pass).map((f) => f.reason)]

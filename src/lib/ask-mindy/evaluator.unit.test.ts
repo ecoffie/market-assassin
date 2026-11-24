@@ -45,3 +45,11 @@ describe('verifyQuotedTerms (the reviewer must be right about the text)', () => 
     expect(verifyQuotedTerms('the lead is dense', d)).toBe('no_quotes');
   });
 });
+
+describe('blocking vs advisory criteria (Eric 2026-11-24)', () => {
+  it('clarity is advisory; facts and actionability block', async () => {
+    const { BLOCKING } = await import('./evaluator');
+    expect([...BLOCKING].sort()).toEqual(['actionable', 'pursuable', 'reasoned', 'relevant']);
+    expect(BLOCKING.has('clear')).toBe(false);
+  });
+});

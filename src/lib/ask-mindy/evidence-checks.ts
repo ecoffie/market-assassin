@@ -293,7 +293,8 @@ export function checkRecord(
   // Open notices: the find engine's own evidence class, the deadline, and what kind of notice it is.
   if (rec.kind === 'open') {
     if (rec.evidence_class && rec.evidence_class !== 'DIRECT_MATCH') {
-      exclusions.push({ code: 'related_market_unconfirmed', detail: `The search matched it as related market work (${rec.evidence_class}), not confirmed demand for this work.` });
+      // Uncertain, not a confirmed mismatch (Eric 2026-11-24): a barrier with its reason, never an exclusion.
+      barriers.push({ code: 'related_market_unconfirmed', detail: `The search matched it as related market work (${rec.evidence_class}), not confirmed demand for this work. Read the notice before deciding.` });
     }
     const due = rec.response_deadline ? Date.parse(rec.response_deadline) : NaN;
     if (Number.isFinite(due) && due < nowMs) {
@@ -314,7 +315,7 @@ export function checkRecord(
     });
   }
 
-  const verdict: Verdict = exclusions.some((e) => e.code === 'out_of_state' || e.code === 'location_conflict' || e.code === 'work_mismatch' || e.code === 'related_market_unconfirmed')
+  const verdict: Verdict = exclusions.some((e) => e.code === 'out_of_state' || e.code === 'location_conflict' || e.code === 'work_mismatch')
     ? 'out_of_scope'
     : exclusions.length
       ? 'blocked'

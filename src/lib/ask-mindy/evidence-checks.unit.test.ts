@@ -198,3 +198,16 @@ describe('setAsideKind covers every live code and SAM wording', () => {
     expect(checkRecord(r, {}, { certifications: ['SDVOSB'] }, undefined).verdict).toBe('pursue');
   });
 });
+
+describe('confirmed mismatch excludes; uncertainty is a barrier (Eric 2026-11-24)', () => {
+  it('a related-market open notice with matching work codes stays pursuable with a barrier', () => {
+    const c = checkRecord({ contract_id: 'n', kind: 'open', evidence_class: 'RELATED_MARKET_CANDIDATE', psc_code: 'S201' }, { workPsc: ['S201'] }, undefined, undefined);
+    expect(c.verdict).toBe('pursue');
+    expect(c.barriers.map((b) => b.code)).toContain('related_market_unconfirmed');
+  });
+  it('a related-market notice that is confirmed different work is still excluded, for the work', () => {
+    const c = checkRecord({ contract_id: 'n', kind: 'open', evidence_class: 'RELATED_MARKET_CANDIDATE', psc_code: 'S216', naics_code: '561210' }, { workPsc: ['S201'], workNaics: ['561720'] }, undefined, undefined);
+    expect(c.verdict).toBe('out_of_scope');
+    expect(c.exclusions.map((e) => e.code)).toEqual(['work_mismatch']);
+  });
+});

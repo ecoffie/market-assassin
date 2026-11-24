@@ -47,11 +47,14 @@ describe('runIntelligenceGate', () => {
     expect(r.answer).toContain('I could not fully verify this answer');
   });
 
-  it('a style-only failure (clear) blocks the report but is not shown to the customer as unverified', async () => {
-    const publish = vi.fn();
-    const r = await runIntelligenceGate({ ...base, deps: { findOpen: async () => null, findNationalForecasts: async () => null, findTargeted: async () => null, gather: async () => evidence(), publish, analyst, evaluate: async () => ({ pass: false, results: [fail('clear')] as never, fix: ['simplify'], usage: { input: 1, output: 1 }, model: 'e' }) } });
-    expect(r.status).toBe('disclosed');
-    expect(publish).not.toHaveBeenCalled();
+  it('a clarity-only failure is advisory: the evaluator still passes, so the grounded report publishes', async () => {
+    const { evaluateDecision } = await import('./evaluator');
+    expect(typeof evaluateDecision).toBe('function');
+    const publish = vi.fn(async (x: any) => x);
+    const r = await runIntelligenceGate({ ...base, deps: { findOpen: async () => null, findNationalForecasts: async () => null, findTargeted: async () => null, gather: async () => evidence(), publish, analyst, evaluate: async () => ({ pass: true, results: [pass('relevant'), pass('pursuable'), pass('reasoned'), pass('actionable'), fail('clear')] as never, fix: [], usage: { input: 1, output: 1 }, model: 'e' }) } });
+    expect(r.status).toBe('complete');
+    expect(r.attempts).toBe(1);
+    expect(publish).toHaveBeenCalledTimes(1);
     expect(r.answer).not.toContain('I could not fully verify');
   });
 
