@@ -8,11 +8,14 @@
  */
 
 import MindyLoader from '@/components/app/MindyLoader';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Star, Contact, Check, Plus } from 'lucide-react';
 import type { AppTier } from '../UnifiedSidebar';
 import { authedFetch } from '../authHeaders';
 import { mapLinkForBuyer } from '@/lib/maps/map-links';
+import TabAskBox from '@/components/app/TabAskBox';
+import { isTabAskEnabled, type TabAskCount } from '@/lib/app/tab-ask';
+import { decisionMakersAskAdapter, type DecisionMakersAskParams } from '@/lib/app/tab-ask-adapters/decision-makers';
 
 interface Props {
   email: string | null;
@@ -63,6 +66,12 @@ export default function GovDecisionMakersPanel({ email }: Props) {
   // agencies"). 'targets' scope filters contacts to any target agency.
   const [targetAgencies, setTargetAgencies] = useState<string[]>([]);
   const [scope, setScope] = useState<'targets' | 'all'>('all');
+  // Ask Mindy (OFF unless NEXT_PUBLIC_TAB_ASK=on). Both refs stay unset when the feature is off.
+  // skipAutoLoad: the ask/clear already loaded (or restored) the list, so the agency/scope effect
+  // must not fire a second request. keepSubAgency: a restored sub-agency must survive the agency
+  // effect's reset.
+  const skipAutoLoad = useRef(false);
+  const keepSubAgency = useRef<string | null>(null);
 
   useEffect(() => {
     if (!email) return;
@@ -126,7 +135,9 @@ export default function GovDecisionMakersPanel({ email }: Props) {
   // don't carry office, so we can't filter the rows by office).
   useEffect(() => {
     setOfficeDetail([]);
-    setSubAgency('');
+    const kept = keepSubAgency.current;
+    keepSubAgency.current = null;
+    setSubAgency(kept ?? '');
     setSubAgencies([]);
     setOfficeRosters([]);
     setOpenRoster(null);
@@ -166,23 +177,31 @@ export default function GovDecisionMakersPanel({ email }: Props) {
     }
   }, [email, agency, openRoster]);
 
-  const load = useCallback(async () => {
-    if (!email) return;
+  // The tab's ONE list load (GET /api/app/federal-contacts) for explicit filters. Resolves to the rows
+  // it showed, or null when the load failed (unknown — never reported as 0). The search box, the
+  // dropdowns and Ask Mindy all go through it.
+  const fetchContacts = useCallback(async (f: { search: string; agency: string; subAgency: string; scope: 'targets' | 'all' }): Promise<TabAskCount> => {
+    if (!email) return null;
+    let count: TabAskCount = null;
     setLoading(true); setError(null);
     try {
       const p = new URLSearchParams({ email });
-      if (search.trim()) p.set('search', search.trim());
-      if (agency) p.set('agency', agency);
-      if (subAgency) p.set('subAgency', subAgency);
+      if (f.search.trim()) p.set('search', f.search.trim());
+      if (f.agency) p.set('agency', f.agency);
+      if (f.subAgency) p.set('subAgency', f.subAgency);
       // In 'targets' scope we filter client-side across the user's agencies, so
       // pull a wider window to ensure all targets are represented.
-      p.set('limit', scope === 'targets' && !agency ? '400' : '100');
+      p.set('limit', f.scope === 'targets' && !f.agency ? '400' : '100');
       const res = await authedFetch(`/api/app/federal-contacts?${p}`, email);
       const d = await res.json();
       if (d.success) {
-        setContacts(d.contacts || []);
+        const rows: Contact[] = d.contacts || [];
+        setContacts(rows);
         setTotal(d.total || 0);
         setEmailableTotal(typeof d.emailableTotal === 'number' ? d.emailableTotal : null);
+        // `total` is the route's people count (exact when it fetched everything, else approximate);
+        // a missing total is unknown, so it never claims the page is the whole list.
+        count = { shown: rows.length, more: typeof d.total !== 'number' || d.total > rows.length };
       } else {
         setError(d.error || 'Search failed');
         setContacts([]);
@@ -192,10 +211,61 @@ export default function GovDecisionMakersPanel({ email }: Props) {
       setContacts([]);
     }
     setLoading(false);
-  }, [email, search, agency, subAgency, scope]);
+    return count;
+  }, [email]);
+
+  const load = useCallback(
+    () => fetchContacts({ search, agency, subAgency, scope }),
+    [fetchContacts, search, agency, subAgency, scope],
+  );
 
   // Initial load + reload when agency / sub-agency / scope changes.
-  useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [agency, subAgency, scope]);
+  useEffect(() => {
+    if (skipAutoLoad.current) { skipAutoLoad.current = false; return; }
+    load();
+    /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  }, [agency, subAgency, scope]);
+
+  // ── Ask Mindy on this tab (OFF unless NEXT_PUBLIC_TAB_ASK=on) ────────────────────────────────
+  // The question becomes THIS tab's agency + search filters and reloads THIS tab's table; Clear puts
+  // back exactly what was on screen before the first question (filters + rows), without a request.
+  const tabAskOn = isTabAskEnabled();
+  const [askSnapshot, setAskSnapshot] = useState<null | {
+    search: string; agency: string; subAgency: string; scope: 'targets' | 'all';
+    rows: Contact[]; total: number; emailableTotal: number | null;
+  }>(null);
+
+  const handleTabAsk = async (p: DecisionMakersAskParams): Promise<TabAskCount> => {
+    if (!askSnapshot) {
+      setAskSnapshot({ search, agency, subAgency, scope, rows: contacts, total, emailableTotal });
+    }
+    // Answers cover every agency the question names (or all agencies), not only My Targets, so the
+    // count Mindy reports is the rows the table shows.
+    const next = { search: p.search, agency: p.agency, subAgency: '', scope: 'all' as const };
+    // The effect would reload on these changes; this ask loads once, below.
+    if (next.agency !== agency || subAgency !== '' || scope !== 'all') skipAutoLoad.current = true;
+    setSearch(next.search);
+    setAgency(next.agency);
+    setSubAgency('');
+    setScope('all');
+    return fetchContacts(next);
+  };
+
+  const clearTabAsk = () => {
+    if (!askSnapshot) return;
+    const s = askSnapshot;
+    if (s.agency !== agency || s.subAgency !== subAgency || s.scope !== scope) skipAutoLoad.current = true;
+    if (s.agency !== agency && s.subAgency) keepSubAgency.current = s.subAgency;
+    setSearch(s.search);
+    setAgency(s.agency);
+    setSubAgency(s.subAgency);
+    setScope(s.scope);
+    setContacts(s.rows);
+    setTotal(s.total);
+    setEmailableTotal(s.emailableTotal);
+    setError(null);
+    setAskSnapshot(null);
+  };
 
   // Scope to the user's target agencies (My Target List) when 'targets' is on
   // and no single agency is explicitly selected. Normalized match so "DEPT OF
@@ -215,6 +285,10 @@ export default function GovDecisionMakersPanel({ email }: Props) {
           <span className="text-faint ml-2 text-sm">Filter by agency &amp; office.</span>
         </p>
       </div>
+
+      {tabAskOn && (
+        <TabAskBox adapter={decisionMakersAskAdapter} onAsk={handleTabAsk} onClear={clearTabAsk} />
+      )}
 
       {/* Search + filters */}
       <div className="space-y-4">
@@ -267,6 +341,11 @@ export default function GovDecisionMakersPanel({ email }: Props) {
             className="px-3 py-2 bg-surface border border-hairline rounded-lg text-white text-sm focus:border-emerald-500 outline-none max-w-xs"
           >
             <option value="">All agencies</option>
+            {/* An agency Mindy asked for that is not spelled like a directory value still shows as the
+                selected filter (the request carries it either way). Only reachable with Ask Mindy on. */}
+            {tabAskOn && agency && !agencies.some(a => a.name === agency) && (
+              <option value={agency}>{agency}</option>
+            )}
             {agencies.map(a => (
               <option key={a.name} value={a.name}>
                 {a.name}{a.count ? ` (${a.count.toLocaleString()})` : ''}
