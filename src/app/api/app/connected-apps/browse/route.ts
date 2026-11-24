@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
   const folderId = body.folder_id ? String(body.folder_id).slice(0, 300) : null;
   const q = body.q ? String(body.q).slice(0, 100) : null;
 
-  const tok = await accessTokenFor(g.scopeKey, connectionId);
+  const tok = await accessTokenFor(g.scopeKey, g.email, connectionId);
   if (!tok.ok) return NextResponse.json({ error: tok.reason }, { status: tok.reason === 'not_found' ? 404 : tok.reason === 'refresh_failed' ? 502 : 409 });
   if (tok.provider !== 'microsoft') return NextResponse.json({ error: 'not_supported' }, { status: 400 });
   try {

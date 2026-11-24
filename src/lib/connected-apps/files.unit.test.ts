@@ -7,31 +7,36 @@ beforeEach(() => {
   process.env.CONNECTED_APPS_TOKEN_ENC_KEY = 'token-key-test-0123456789abcdef01234567';
 });
 
-const base = { scopeKey: 'own:a@b.com', connectionId: 'conn-1', provider: 'microsoft' as const, fileId: 'item-1', name: 'Cap Statement.pdf' };
+const base = { scopeKey: 'own:a@b.com', ownerEmail: 'a@b.com', connectionId: 'conn-1', provider: 'microsoft' as const, fileId: 'item-1', name: 'Cap Statement.pdf' };
 
 describe('file handle', () => {
   it('round-trips for the same acting scope', () => {
-    const v = verifyFileHandle(signFileHandle(base), 'own:a@b.com');
+    const v = verifyFileHandle(signFileHandle(base), 'own:a@b.com', 'a@b.com');
     expect(v).toEqual({ ok: true, handle: expect.objectContaining(base) });
   });
   it('a handle from another workspace is refused', () => {
-    expect(verifyFileHandle(signFileHandle(base), 'ws:other')).toEqual({ ok: false, reason: 'other_workspace' });
+    expect(verifyFileHandle(signFileHandle(base), 'ws:other', 'a@b.com')).toEqual({ ok: false, reason: 'other_workspace' });
+  });
+  it('a colleague in the same workspace cannot use another person\'s pick', () => {
+    const h = signFileHandle({ ...base, scopeKey: 'ws:w-9', ownerEmail: 'Coach-A@x.com' });
+    expect(verifyFileHandle(h, 'ws:w-9', 'coach-b@x.com')).toEqual({ ok: false, reason: 'other_user' });
+    expect(verifyFileHandle(h, 'ws:w-9', 'coach-a@x.com').ok).toBe(true);
   });
   it('tampering with the file id breaks the signature', () => {
     const [v, body, sig] = signFileHandle(base).split('.');
     const forged = Buffer.from(JSON.stringify({ ...JSON.parse(Buffer.from(body.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString()), fileId: 'someone-elses-file' })).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-    expect(verifyFileHandle(`${v}.${forged}.${sig}`, 'own:a@b.com')).toEqual({ ok: false, reason: 'invalid_handle' });
+    expect(verifyFileHandle(`${v}.${forged}.${sig}`, 'own:a@b.com', 'a@b.com')).toEqual({ ok: false, reason: 'invalid_handle' });
   });
   it('expires after 24 hours', () => {
     const now = Math.floor(Date.now() / 1000);
     const h = signFileHandle(base, now);
-    expect(verifyFileHandle(h, 'own:a@b.com', now + FILE_HANDLE_TTL_SEC - 1).ok).toBe(true);
-    expect(verifyFileHandle(h, 'own:a@b.com', now + FILE_HANDLE_TTL_SEC + 1)).toEqual({ ok: false, reason: 'expired' });
+    expect(verifyFileHandle(h, 'own:a@b.com', 'a@b.com', now + FILE_HANDLE_TTL_SEC - 1).ok).toBe(true);
+    expect(verifyFileHandle(h, 'own:a@b.com', 'a@b.com', now + FILE_HANDLE_TTL_SEC + 1)).toEqual({ ok: false, reason: 'expired' });
   });
   it('a raw file id or an OAuth state never verifies as a handle (domain separation)', () => {
-    expect(verifyFileHandle('item-1', 'own:a@b.com').ok).toBe(false);
+    expect(verifyFileHandle('item-1', 'own:a@b.com', 'a@b.com').ok).toBe(false);
     const state = signState({ provider: 'google', ownerEmail: 'a@b.com', scopeKey: 'own:a@b.com', caps: ['file'], returnTo: '/app' }, 'v', newBrowserBinding().hash);
-    expect(verifyFileHandle(`fh1.${state}`, 'own:a@b.com').ok).toBe(false);
+    expect(verifyFileHandle(`fh1.${state}`, 'own:a@b.com', 'a@b.com').ok).toBe(false);
   });
   it('refuses to sign without the dedicated secrets', () => {
     delete process.env.CONNECTED_APPS_STATE_SECRET;

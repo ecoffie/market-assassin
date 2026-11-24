@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
   if ('error' in g) return g.error;
   const connectionId = String(body.connection_id || '');
   if (!connectionId) return NextResponse.json({ error: 'connection_id required' }, { status: 400 });
-  const tok = await accessTokenFor(g.scopeKey, connectionId);
+  const tok = await accessTokenFor(g.scopeKey, g.email, connectionId);
   if (!tok.ok) return NextResponse.json({ error: tok.reason }, { status: tok.reason === 'not_found' ? 404 : tok.reason === 'refresh_failed' ? 502 : 409 });
   if (tok.provider !== 'google') return NextResponse.json({ error: 'not_supported' }, { status: 400 });
   const google = { developer_key: process.env.NEXT_PUBLIC_CONNECTED_APPS_GOOGLE_PICKER_KEY || null, app_id: process.env.NEXT_PUBLIC_CONNECTED_APPS_GOOGLE_APP_ID || null };

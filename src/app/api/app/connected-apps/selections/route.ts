@@ -19,12 +19,12 @@ export async function POST(request: NextRequest) {
   const fileId = String(body.file_id || '');
   if (!connectionId || !fileId || fileId.length > 300) return NextResponse.json({ error: 'connection_id and file_id required' }, { status: 400 });
 
-  const tok = await accessTokenFor(g.scopeKey, connectionId);
+  const tok = await accessTokenFor(g.scopeKey, g.email, connectionId);
   if (!tok.ok) return NextResponse.json({ error: tok.reason }, { status: tok.reason === 'not_found' ? 404 : tok.reason === 'refresh_failed' ? 502 : 409 });
   try {
     const meta = await fetchFileMeta(tok.provider, tok.token, fileId);
     assertReadable(meta);
-    const handle = signFileHandle({ scopeKey: g.scopeKey, connectionId, provider: tok.provider, fileId: meta.id, name: meta.name });
+    const handle = signFileHandle({ scopeKey: g.scopeKey, ownerEmail: g.email, connectionId, provider: tok.provider, fileId: meta.id, name: meta.name });
     return NextResponse.json({
       file_handle: handle,
       expires_in: FILE_HANDLE_TTL_SEC,
