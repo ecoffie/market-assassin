@@ -24,6 +24,28 @@ export const OTHER_ASSISTANTS = {
 export const CLAUDE_COMPUTER_NOTE =
   'Add the connector on a computer, at claude.ai in a browser or in the Claude desktop app. You cannot add it from the phone app.';
 
+/** One piece of a setup step's copy: plain text, a *bold* UI target, or a [label](href) link. */
+export type StepBodyPart =
+  | { kind: 'text'; text: string }
+  | { kind: 'bold'; text: string }
+  | { kind: 'link'; text: string; href: string };
+
+/**
+ * Split step copy into parts. `*Settings*` → bold; `[getmindy.ai/pricing](/pricing)` → link.
+ * A link exists so an address the copy tells people to visit is clickable, not just text.
+ */
+export function stepBodyParts(body: string): StepBodyPart[] {
+  const parts: StepBodyPart[] = [];
+  for (const piece of body.split(/(\*[^*]+\*|\[[^\]]+\]\([^)\s]+\))/g)) {
+    if (!piece) continue;
+    const link = piece.match(/^\[([^\]]+)\]\(([^)\s]+)\)$/);
+    if (link) parts.push({ kind: 'link', text: link[1], href: link[2] });
+    else if (piece.length > 2 && piece.startsWith('*') && piece.endsWith('*')) parts.push({ kind: 'bold', text: piece.slice(1, -1) });
+    else parts.push({ kind: 'text', text: piece });
+  }
+  return parts;
+}
+
 /**
  * "Which AI do you use?" chooser at the top of /mcp/setup. A rep demoed in Claude to a
  * Copilot user who could not follow along: the page showed every assistant's steps in one
