@@ -2790,7 +2790,8 @@ async function dispatchMcpTool(
 
   if (name === 'save_past_performance') {
     // Owner comes from the VERIFIED caller — never from args.
-    const result = (await savePastPerformance({ ...args, userEmail: ctx.userEmail, vaultEmail: ctx.vaultEmail })) as unknown as Record<string, unknown>;
+    // Writes only to the caller's own record — never a coach's client workspace (ctx.vaultEmail).
+    const result = (await savePastPerformance({ ...args, userEmail: ctx.userEmail, vaultEmail: undefined })) as unknown as Record<string, unknown>;
     return { result, credits };
   }
 

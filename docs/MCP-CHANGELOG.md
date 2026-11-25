@@ -25,11 +25,9 @@ already reads the Vault, but an MCP user could neither see nor fill it.
   section whose read failed is in `unavailable` with a null count, never 0.
 - **`save_past_performance`** (free, additive) — adds ONE real project (federal, state/local,
   commercial or subcontract) to the caller's Vault, the same row the app's Vault page writes
-  (`source='mcp'`), then embeds it for requirement matching. `confirm_real=true` is required;
-  owner is always the verified caller, never an arg.
-
-Also fixed: a past-performance section with nothing saved is no longer sent to the model. It
-returns a fill-in template (`meta.pastPerformanceGap`) instead of invented past work.
+  (`source='mcp'`), then embeds it for requirement matching. `confirm_real=true` is required.
+  It writes ONLY to the verified caller's own record: never a coach's client workspace, never an
+  email from args.
 
 ### Docs kept in sync
 

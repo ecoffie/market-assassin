@@ -59,9 +59,9 @@ describe('save_past_performance', () => {
     expect(embedVaultRow).toHaveBeenCalled();
   });
 
-  it('coach workspace: writes to the authorized vault owner', async () => {
+  it('coach workspace: never writes into the client\'s record, only the caller\'s own', async () => {
     await savePastPerformance({ ...REAL, userEmail: 'coach@x.com', vaultEmail: 'client@clients.getmindy.ai' });
-    expect(inserted[0].user_email).toBe('client@clients.getmindy.ai');
+    expect(inserted[0].user_email).toBe('coach@x.com');
   });
 });
 

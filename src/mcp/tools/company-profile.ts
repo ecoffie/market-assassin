@@ -14,8 +14,10 @@
  *                                             own Vault (same row the app's Vault page
  *                                             writes; source='mcp').
  *
- * Owner is ALWAYS the verified caller (ctx.vaultEmail for an authorized coach
- * workspace, else ctx.userEmail) — never an email from args.
+ * Reads: the verified caller's record, or an authorized coach workspace's (ctx.vaultEmail),
+ * the same read scope drafting already uses. Writes: ONLY the verified caller's own record
+ * (ctx.userEmail) — a coach acting in a client workspace cannot write the client's Vault
+ * through MCP (Agent 4 review, PR #2401). Never an email from args.
  */
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { loadVaultContext, loadBidderProfileResult } from '@/lib/proposal/loaders';
@@ -227,7 +229,8 @@ export async function savePastPerformance(input: SavePastPerformanceInput): Prom
   if (!built.ok) {
     return { saved: false, error: built.error, ...(built.missing_fields ? { missing_fields: built.missing_fields } : {}), _meta: { grounded: false, degraded: false } };
   }
-  const owner = input.vaultEmail || input.userEmail;
+  // Writes go to the caller's OWN record only, never a coach's client workspace (vaultEmail is ignored).
+  const owner = input.userEmail;
   const client = sb();
   const { data, error } = await client
     .from('user_past_performance')
