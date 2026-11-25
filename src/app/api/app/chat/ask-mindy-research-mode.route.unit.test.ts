@@ -106,7 +106,7 @@ describe('research mode in the chat route', () => {
     expect(first.system).toContain('IDENTITY FIRST');
     const names = first.tools.map((t) => t.name);
     expect(names).toEqual(expect.arrayContaining(['find_opportunities', 'search_contractors', 'search_web']));
-    for (const live of ['lookup_sam_entity', 'get_contractor_award_history', 'get_solicitation_incumbent', 'get_solicitation_documents']) expect(names).not.toContain(live);
+    for (const t of ['lookup_sam_entity', 'get_contractor_award_history', 'get_solicitation_incumbent', 'get_solicitation_documents', 'get_buying_offices']) expect(names).toContain(t);
     expect(h.runMcpTool.mock.calls.map((c) => c[0])).toEqual(expect.arrayContaining(['find_opportunities', 'search_contractors']));
     expect(text(ev)).toBe('Start with the Navy recruiting campaign ($1.2M awarded so far).');
     expect(ev.filter((e) => e.type === 'progress').length).toBeGreaterThanOrEqual(2);
@@ -157,15 +157,29 @@ describe('research mode in the chat route', () => {
     expect(openaiCalls).toHaveLength(0);
   });
 
-  it('find_opportunities with a uei runs without it (its company anchor would call live SAM), and the trace says so', async () => {
+  it('every tool call on a research turn runs with samCacheOnly (FIND with a uei keeps its uei); ordinary turns never set it', async () => {
     flagOn();
     let step = 0;
     h.create.mockImplementation(async () => (++step === 1
-      ? reply([{ type: 'tool_use', id: 'tu1', name: 'find_opportunities', input: { query: 'digital marketing', uei: 'ABC123DEF456' } }], 'tool_use')
+      ? reply([
+          { type: 'tool_use', id: 'a', name: 'find_opportunities', input: { query: 'digital marketing', uei: 'ABC123DEF456' } },
+          { type: 'tool_use', id: 'b', name: 'lookup_sam_entity', input: { name: 'Ridgeline Digital' } },
+          { type: 'tool_use', id: 'c', name: 'get_contractor_award_history', input: { uei: 'ABC123DEF456' } },
+          { type: 'tool_use', id: 'd', name: 'get_solicitation_incumbent', input: { solicitation_number: 'W912PL26Q0042' } },
+          { type: 'tool_use', id: 'e', name: 'get_solicitation_documents', input: { notice_id: 'n1' } },
+        ], 'tool_use')
       : reply([{ type: 'text', text: 'Done.' }], 'end_turn')));
     await ask(Q);
-    const call = h.runMcpTool.mock.calls.find((c) => c[0] === 'find_opportunities');
-    expect(JSON.stringify(call)).not.toContain('ABC123DEF456');
-    expect(await savedTrace()).toMatchObject({ live_sam_args_dropped: ['find_opportunities:uei'] });
+    const calls = h.runMcpTool.mock.calls as Array<[string, Record<string, unknown>, Record<string, unknown>]>;
+    expect(calls.map((c) => c[0]).sort()).toEqual(['find_opportunities', 'get_contractor_award_history', 'get_solicitation_documents', 'get_solicitation_incumbent', 'lookup_sam_entity']);
+    for (const c of calls) expect(c[2], c[0]).toMatchObject({ samCacheOnly: true });
+    expect(calls.find((c) => c[0] === 'find_opportunities')![1]).toMatchObject({ uei: 'ABC123DEF456' });
+    expect(await savedTrace()).toMatchObject({ sam_cache_only: true });
+  });
+
+  it('an ordinary (flag-off) turn never sets samCacheOnly', async () => {
+    h.runMcpTool.mockClear();
+    await ask(Q);
+    for (const c of h.runMcpTool.mock.calls as Array<[string, unknown, Record<string, unknown>]>) expect(c[2]?.samCacheOnly).toBeUndefined();
   });
 });

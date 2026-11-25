@@ -37,32 +37,18 @@ const STEP_MAX_TOKENS = 16_000;
 export const RESULT_CEILING_CHARS = 120_000;
 
 /**
- * Catalog tools withheld from research mode until they read from Mindy's caches only (Eric: zero live SAM calls).
- * Data Core's code trace (2026-11-25) found these reach live SAM. Each comes back when it has a cache-only mode
- * (RM-2 starts with lookup_sam_entity).
+ * Catalog tools withheld from research mode. Empty since research turns pass McpToolContext.samCacheOnly (#2458):
+ * every SAM-backed tool (lookup_sam_entity, the find_opportunities company anchor, get_solicitation_incumbent,
+ * get_solicitation_documents) reads Mindy's caches only, and get_contractor_award_history and
+ * match_company_to_pathways never call live SAM. Kept as the place to withhold a tool if one ever regresses.
  */
-export const RESEARCH_WITHHELD_TOOLS: ReadonlySet<string> = new Set([
-  'lookup_sam_entity', // live legal + DBA search first
-  'get_contractor_award_history', // resolve-uei calls live getEntityByUEI
-  'get_solicitation_incumbent', // live SAM opportunities search
-  'get_solicitation_documents', // live notice descriptions and attachments
-  'match_company_to_pathways', // recipient certifications can call live SAM
-]);
+export const RESEARCH_WITHHELD_TOOLS: ReadonlySet<string> = new Set<string>();
 
 /**
- * Arguments dropped on research turns because they switch a tool onto a live SAM path (find_opportunities `uei`
- * runs the company anchor through live lookup_sam_entity). The tool still runs without them.
+ * Registry tools outside the public MCP catalog that research mode offers anyway: approved, listed parity exceptions
+ * (Agent 4). get_buying_offices: awarding/funding offices from the award warehouse (no live SAM), Mindy Day 11/28.
  */
-export const RESEARCH_LIVE_SAM_ARGS: Readonly<Record<string, readonly string[]>> = { find_opportunities: ['uei'] };
-
-export function stripLiveSamArgs(name: string, input: Record<string, unknown>): { input: Record<string, unknown>; dropped: string[] } {
-  const keys = RESEARCH_LIVE_SAM_ARGS[name] ?? [];
-  const dropped = keys.filter((k) => input[k] !== undefined && input[k] !== null && input[k] !== '');
-  if (!dropped.length) return { input, dropped };
-  const out = { ...input };
-  for (const k of dropped) delete out[k];
-  return { input: out, dropped };
-}
+export const RESEARCH_EXTRA_TOOLS: ReadonlySet<string> = new Set(['get_buying_offices']);
 
 /**
  * The research spec (how Eric's Claude + Mindy MCP session produced the reference reports) and the output standard.
@@ -88,6 +74,8 @@ export const RESEARCH_INSTRUCTIONS = [
   '- Stop when every part is cited or explicitly unknown and the next call would not change a recommendation. Drop thin leads.',
   '',
   '4. WEB vs MINDY. Mindy first for everything it holds. Use the open web only for the company\'s own documents, GAO / IG / CRS reports when Mindy\'s agency intelligence is unsourced, event pages, and agency staff pages. Every fact carries its source; never blend sources into one number. When they disagree, say so; SAM wins on registration facts.',
+  "- When a fact you need is not in the Mindy tools, get it from the official public source with search_web and read_web_page (for example USASpending or Census pages), cite the URL and label it open web. Only to fill a gap the Mindy tools leave.",
+  "- Mandatory sources: when it would change a recommendation whether work is on the AbilityOne Procurement List, check abilityone.gov yourself (search_web, then read_web_page) and state what you found with the URL. Never tell the customer to check it.",
   '',
   '5. FOLLOW THE TOOL HINTS: grounded / result_state ("unavailable is not zero": re-run a failed search, never report zero), lag notes, "capture start is not a recompete date", provenance labels (drop unsourced or legacy pain points; find a cited source instead), ELIGIBLE / NOT_ELIGIBLE / UNKNOWN (a not-eligible item can become a teaming route), claim hygiene (never sum horizon counts), and every do_not.',
   '- The first-turn rule (value before qualification) applies to broad market questions. It does NOT apply when the customer asks for a full assessment or report on a NAMED company: go straight to identity and the full package.',
@@ -128,7 +116,7 @@ export function researchToolDefs<T extends OpenAiToolDef>(offered: T[], privateN
   const pub = new Set(listPublicMcpTools().map((d) => String((d as { function: { name: string } }).function.name)));
   return offered.filter((d) => {
     const n = String(d.function?.name ?? '');
-    return !RESEARCH_WITHHELD_TOOLS.has(n) && (pub.has(n) || privateNames.has(n));
+    return !RESEARCH_WITHHELD_TOOLS.has(n) && (pub.has(n) || privateNames.has(n) || RESEARCH_EXTRA_TOOLS.has(n));
   });
 }
 export interface AnthropicToolDef { name: string; description: string; input_schema: Record<string, unknown> }
