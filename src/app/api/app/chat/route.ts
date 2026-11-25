@@ -124,7 +124,7 @@ import { intelligenceGateEnabledFor, runIntelligenceGate, type GateResult } from
 import Anthropic from '@anthropic-ai/sdk';
 import {
   researchModeEnabledFor, researchModel, researchSystemPrompt, toAnthropicTools, runResearchLoop, groundAnswer, progressLine,
-  RESEARCH_TURN_MS, RESEARCH_DEADLINE_MS, RESEARCH_NO_ANSWER, researchToolDefs, billedInputTokens, type ResearchCall,
+  RESEARCH_TURN_MS, RESEARCH_DEADLINE_MS, RESEARCH_NO_ANSWER, researchToolDefs, billedInputTokens, RESEARCH_SYSTEM_STATIC, researchSystemDynamic, type ResearchCall,
 } from '@/lib/ask-mindy/research-mode';
 import { toolLabel } from '@/lib/chat/context-sources';
 import { researchCapDecision } from '@/lib/ask-mindy/research-caps';
@@ -1330,7 +1330,9 @@ export async function POST(request: NextRequest) {
             try {
               const loop = await runResearchLoop({
                 client, model,
-                system: researchSystemPrompt({ today, profileBlock: userProfileBlock }),
+                // Fixed prompt first (cached across steps and turns), then today's date and the profile after the breakpoint.
+                system: RESEARCH_SYSTEM_STATIC,
+                systemDynamic: researchSystemDynamic({ today, profileBlock: userProfileBlock }),
                 conversation,
                 tools: rmTools,
                 effort: process.env.ASK_MINDY_RESEARCH_EFFORT || 'high',

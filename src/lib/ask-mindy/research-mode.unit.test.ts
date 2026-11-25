@@ -4,7 +4,7 @@
  */
 import { describe, it, expect, vi } from 'vitest';
 import {
-  researchModeEnabledFor, toAnthropicTools, runResearchLoop, billedInputTokens, groundAnswer, fullResult, progressLine, researchSystemPrompt,
+  researchModeEnabledFor, toAnthropicTools, runResearchLoop, billedInputTokens, RESEARCH_SYSTEM_STATIC, researchSystemDynamic, groundAnswer, fullResult, progressLine, researchSystemPrompt,
   RESEARCH_INSTRUCTIONS, RESEARCH_WITHHELD_TOOLS, RESEARCH_EXTRA_TOOLS, RESULT_CEILING_CHARS, FINAL_RESERVE_MS, researchToolDefs,
 } from './research-mode';
 import { MCP_CONNECTOR_INSTRUCTIONS } from '@/lib/mcp/schedule-discovery';
@@ -223,5 +223,20 @@ describe('prompt caching (766K input tokens on one answer)', () => {
       prefix = prompt;
     }
     expect(after / before).toBeLessThan(0.25);
+  });
+});
+
+describe('the cached prefix is stable (any byte change invalidates it)', () => {
+  it('the fixed system prompt is cached; today and the profile come after the breakpoint; the prefix is byte-identical every step', async () => {
+    const { client, create } = scripted([msg([toolUse('t1', 'find_opportunities')], 'tool_use'), msg([text('Done.')], 'end_turn')]);
+    await runResearchLoop({ ...base, system: RESEARCH_SYSTEM_STATIC, systemDynamic: researchSystemDynamic({ today: '2026-11-25', profileBlock: 'Company: Ridgeline Digital' }), client, execute: async (cs) => cs.map((c) => ({ id: c.id, content: 'r' })) });
+    const bodies = create.mock.calls.map((c) => (c as never[])[0] as { system: Array<{ text: string; cache_control?: unknown }>; tools: unknown[] });
+    for (const b of bodies) {
+      expect(b.system[0]).toMatchObject({ text: RESEARCH_SYSTEM_STATIC, cache_control: { type: 'ephemeral' } });
+      expect(b.system[1].cache_control).toBeUndefined();
+      expect(b.system[1].text).toContain('Today is 2026-11-25.');
+    }
+    expect(JSON.stringify([bodies[0].tools, bodies[0].system[0]])).toBe(JSON.stringify([bodies[1].tools, bodies[1].system[0]]));
+    expect(RESEARCH_SYSTEM_STATIC).not.toMatch(/Today is|SAVED COMPANY PROFILE/);
   });
 });
