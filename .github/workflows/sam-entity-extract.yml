@@ -1,0 +1,149 @@
+# Monthly SAM entity registration refresh (sam_entities) from SAM's PUBLIC monthly extract.
+#
+# Why: the mirror behind lookup_sam_entity / Ask Mindy research identity had synced_at 2026-08-25 and nothing
+# refreshed it (Eric approved the fix 2026-11-25). The monthly extract is the whole registry in ONE download — no
+# per-entity API quota. Same pattern as bq-awards-ingest.yml.
+#
+# Safety:
+#   - Always a DRY RUN first (scripts/import-sam-entity-extract.mjs --dry: zero writes). Any reconciliation
+#     MISMATCH, dead-lettered row or failed probe aborts before a single row is written.
+#   - The real run only happens on workflow_dispatch mode=apply, or on the schedule when the repo variable
+#     SAM_EXTRACT_AUTO_APPLY is 'on' (default: plan only, until Eric approves the first dry run).
+#   - The SAM key travels in the download URL's query string: it is masked, never echoed, and the importer reports
+#     download failures as status only (#2482).
+#   - Blank extract fields never overwrite other writers' values (#2482 NULL-SAFETY).
+#
+# Secrets: SAM_API_KEY (download), NEXT_PUBLIC_SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY (probe + upsert),
+#          SAM_ARCHIVER_SA_JSON (base64 service account; real run only — archives the ZIP to GCS before any write).
+name: SAM entity extract (monthly)
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: plan = dry run only (zero writes); apply = dry run, then the real import if it balances
+        type: choice
+        required: true
+        default: plan
+        options: [plan, apply]
+      extract_file:
+        description: Optional exact file name (e.g. SAM_PUBLIC_MONTHLY_V2_20261101.ZIP). Default = newest first-Sunday file.
+        type: string
+        required: false
+        default: ''
+  schedule:
+    # Every Monday 15:00 UTC; the job proceeds only on the Monday after the month's first Sunday (day 2-8).
+    - cron: '0 15 * * 1'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sam-entity-extract
+  cancel-in-progress: false
+
+jobs:
+  extract:
+    name: SAM entity extract
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    env:
+      MODE: ${{ github.event_name == 'schedule' && (vars.SAM_EXTRACT_AUTO_APPLY == 'on' && 'apply' || 'plan') || inputs.mode }}
+    steps:
+      - name: Schedule gate (first week of the month only)
+        id: gate
+        run: |
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            d=$(date -u +%-d)
+            if [ "$d" -lt 2 ] || [ "$d" -gt 8 ]; then echo "run=no" >> "$GITHUB_OUTPUT"; echo "Not the Monday after the first Sunday (day $d) — skipping."; exit 0; fi
+          fi
+          echo "run=yes" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        if: steps.gate.outputs.run == 'yes'
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        if: steps.gate.outputs.run == 'yes'
+        with:
+          node-version: '24'
+          cache: npm
+
+      - run: npm ci
+        if: steps.gate.outputs.run == 'yes'
+
+      - name: Check secrets are present (names only)
+        if: steps.gate.outputs.run == 'yes'
+        env:
+          HAS_SAM_KEY: ${{ secrets.SAM_API_KEY != '' }}
+          HAS_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL != '' }}
+          HAS_SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY != '' }}
+          HAS_ARCHIVER: ${{ secrets.SAM_ARCHIVER_SA_JSON != '' }}
+        run: |
+          missing=""
+          [ "$HAS_SAM_KEY" = "true" ] || missing="$missing SAM_API_KEY"
+          [ "$HAS_SUPABASE_URL" = "true" ] || missing="$missing NEXT_PUBLIC_SUPABASE_URL"
+          [ "$HAS_SUPABASE_KEY" = "true" ] || missing="$missing SUPABASE_SERVICE_ROLE_KEY"
+          if [ "$MODE" = "apply" ] && [ "$HAS_ARCHIVER" != "true" ]; then missing="$missing SAM_ARCHIVER_SA_JSON"; fi
+          if [ -n "$missing" ]; then echo "::error::Missing secrets:$missing"; exit 1; fi
+
+      - name: Resolve the extract file name
+        if: steps.gate.outputs.run == 'yes'
+        id: file
+        env:
+          OVERRIDE: ${{ inputs.extract_file }}
+        run: |
+          if [ -n "$OVERRIDE" ]; then
+            if ! echo "$OVERRIDE" | grep -Eq '^SAM_PUBLIC_MONTHLY_V2_[0-9]{8}\.ZIP$'; then echo "::error::extract_file must look like SAM_PUBLIC_MONTHLY_V2_YYYYMMDD.ZIP"; exit 1; fi
+            name="$OVERRIDE"
+          else
+            name=$(node scripts/sam-extract-file-name.mjs)
+          fi
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+          echo "Extract file: $name"
+
+      - name: Dry run (zero writes)
+        if: steps.gate.outputs.run == 'yes'
+        env:
+          SAM_API_KEY: ${{ secrets.SAM_API_KEY }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SAM_EXTRACT_FILE: ${{ steps.file.outputs.name }}
+        run: |
+          set +x
+          set -o pipefail
+          echo "::add-mask::$SAM_API_KEY"
+          mkdir -p "$RUNNER_TEMP/sam"
+          node scripts/import-sam-entity-extract.mjs --file "$RUNNER_TEMP/sam/$SAM_EXTRACT_FILE" --all-naics --dry 2>&1 | tee "$RUNNER_TEMP/sam/dry-run.log"
+
+      - name: Gate on the dry-run reconciliation
+        if: steps.gate.outputs.run == 'yes'
+        run: node scripts/sam-extract-dry-run-gate.mjs "$RUNNER_TEMP/sam/dry-run.log"
+
+      - name: Real import (archive to GCS, then upsert)
+        if: steps.gate.outputs.run == 'yes' && env.MODE == 'apply'
+        env:
+          SAM_API_KEY: ${{ secrets.SAM_API_KEY }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SAM_ARCHIVER_SA_JSON: ${{ secrets.SAM_ARCHIVER_SA_JSON }}
+          SAM_EXTRACT_FILE: ${{ steps.file.outputs.name }}
+        run: |
+          set +x
+          set -o pipefail
+          echo "::add-mask::$SAM_API_KEY"
+          node scripts/import-sam-entity-extract.mjs --file "$RUNNER_TEMP/sam/$SAM_EXTRACT_FILE" --all-naics 2>&1 | tee "$RUNNER_TEMP/sam/apply.log"
+          node scripts/sam-extract-dry-run-gate.mjs "$RUNNER_TEMP/sam/apply.log" --real
+
+      - name: Upload logs (no ZIP)
+        if: always() && steps.gate.outputs.run == 'yes'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: sam-entity-extract-logs
+          path: |
+            ${{ runner.temp }}/sam/*.log
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Cleanup
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/sam" 2>/dev/null || true
