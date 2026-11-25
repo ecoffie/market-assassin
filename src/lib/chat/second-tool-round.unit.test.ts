@@ -266,7 +266,7 @@ describe('second round: recovery and decision questions (2026-11-25)', () => {
     expect(decideSecondToolRound([
       { tool: 'get_solicitation_incumbent', status: 'success', empty: true },
       { tool: 'lookup_solicitation', status: 'success', empty: true },
-    ], { customerText: 'Should my company pursue the VA janitorial contract 36C24823P1623 when it comes back?' })).toEqual({ offer: true });
+    ], { customerText: 'Should my company pursue the VA janitorial contract 36C24823P1623 when it comes back?' })).toEqual({ offer: true, recovery: true });
   });
   it('a decision question after a successful seed gets the follow-on round', () => {
     expect(decideSecondToolRound([{ tool: 'search_past_contracts', status: 'success' }], { customerText: 'Is this worth pursuing for us?' })).toEqual({ offer: true });

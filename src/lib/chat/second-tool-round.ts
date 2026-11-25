@@ -72,7 +72,7 @@ export type SecondRoundSkipReason =
   | 'documents_already_fetched';
 
 export type SecondRoundDecision =
-  | { offer: true }
+  | { offer: true; recovery?: boolean }
   | { offer: false; reason: SecondRoundSkipReason };
 
 const DOCUMENT_HOP_CUE =
@@ -100,7 +100,7 @@ export function decideSecondToolRound(
   // Recovery: a seed lookup that found nothing (wrong identifier type, typo) gets one more planner pass, so the
   // planner can try the right tool (an award number → get_award_detail) instead of asking the customer to.
   if (success.some((r) => SECOND_ROUND_SEED_TOOLS.has(r.tool) && r.empty) && !success.some((r) => SECOND_ROUND_SEED_TOOLS.has(r.tool) && !r.empty)) {
-    return { offer: true };
+    return { offer: true, recovery: true };
   }
   if (!success.some((r) => SECOND_ROUND_SEED_TOOLS.has(r.tool))) {
     // A decision question whose round 1 found facts still gets the follow-on hop (incumbent, competitors, contacts).
@@ -127,6 +127,13 @@ export function decideSecondToolRound(
  * True when round 1 produced at least one successful seed tool, the question still
  * needs a hop, and R1 did not already complete that hop.
  */
+/** Round-2 note for a recovery pass: the identifier was looked up with the wrong tool, so name the right ones. */
+export const SECOND_ROUND_RECOVERY_NOTE =
+  'RECOVERY: the lookups above found NOTHING for what the customer named. Do not repeat them. Try the tool that fits '
+  + 'the identifier instead: a contract / award number (PIID, e.g. 36C24823P1623, W912DY24C0012) -> get_award_detail; '
+  + 'a description of past work -> search_past_contracts; a company name or UEI -> lookup_sam_entity. Call no tool only if '
+  + 'none of these fit.';
+
 export function shouldOfferSecondToolRound(
   round1: ReadonlyArray<SecondRoundSeed>,
   opts: {

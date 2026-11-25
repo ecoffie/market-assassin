@@ -28,6 +28,9 @@ const text = (c: unknown): string => {
   return c == null ? '' : String(c);
 };
 
+export const ANSWER_STEP_RULE = 'ANSWER STEP: you have no tools in this step and must not write tool calls, XML tags such as <invoke> or <function_calls>, or JSON tool requests. Write the reply to the customer now, from the tool results above. If a fact is missing, say what is missing and what you would look up next, in plain words.';
+
+
 export function toAnthropicMessages(msgs: OaMsg[]): { system: string; messages: Array<{ role: 'user' | 'assistant'; content: string }> } {
   const system: string[] = [];
   const toolNames = new Map<string, string>();
@@ -61,12 +64,44 @@ export function toAnthropicMessages(msgs: OaMsg[]): { system: string; messages: 
   if (!out.length || out[0].role !== 'user') out.unshift({ role: 'user', content: '(conversation start)' });
   // The answer is the assistant's next turn: the last message must be the user's.
   if (out[out.length - 1].role !== 'user') out.push({ role: 'user', content: 'Answer my last question using the results above.' });
+  // This is the ANSWER step: no tools are attached. Without this line Claude imitated the tool turns above and
+  // printed tool-call markup as the reply (preview, 2026-11-25).
+  system.push(ANSWER_STEP_RULE);
   return { system: system.join('\n\n'), messages: out };
 }
 
 /** Claude models that take adaptive thinking (the current families). Older models get no thinking parameter. */
 export function supportsAdaptiveThinking(model: string): boolean {
   return /(opus-5|sonnet-5|fable-5|mythos-5|opus-4-[678])/i.test(model);
+}
+
+const MARKUP_OPEN = ['<function_calls', '<invoke', '<parameter'];
+const MARKUP_CLOSE: Record<string, string> = { '<function_calls': '</function_calls>', '<invoke': '</invoke>', '<parameter': '</parameter>' };
+
+/**
+ * Streaming filter: text passes through as it arrives, except tool-call markup, which is held from its first '<'
+ * only until it can be told apart from ordinary text, then dropped through its closing tag.
+ */
+export function createMarkupFilter(): { push(t: string): string; end(): string } {
+  let held = '';
+  const drain = (final: boolean): string => {
+    let out = '';
+    for (;;) {
+      const i = held.indexOf('<');
+      if (i === -1) { out += held; held = ''; return out; }
+      out += held.slice(0, i); held = held.slice(i);
+      const tag = MARKUP_OPEN.find((t) => held.startsWith(t));
+      if (tag) {
+        const close = held.indexOf(MARKUP_CLOSE[tag]);
+        if (close === -1) { if (final) held = ''; return out; } // wait for the close (or drop an unclosed tail)
+        held = held.slice(close + MARKUP_CLOSE[tag].length);
+        continue;
+      }
+      if (!final && MARKUP_OPEN.some((t) => t.startsWith(held))) return out; // could still become markup
+      out += '<'; held = held.slice(1);
+    }
+  };
+  return { push: (t: string) => { held += t; return drain(false); }, end: () => drain(true) };
 }
 
 const enc = new TextEncoder();
@@ -105,13 +140,14 @@ export async function anthropicAnswerResponse(opts: {
     async start(ctrl) {
       try {
         let r: IteratorResult<unknown> = first;
+        const filter = createMarkupFilter();
+        const emit = (t: string) => { if (t) ctrl.enqueue(frame({ choices: [{ index: 0, delta: { content: t }, finish_reason: null }] })); };
         while (!r.done) {
           const ev = r.value as { type?: string; delta?: { type?: string; text?: string } };
-          if (ev?.type === 'content_block_delta' && ev.delta?.type === 'text_delta' && ev.delta.text) {
-            ctrl.enqueue(frame({ choices: [{ index: 0, delta: { content: ev.delta.text }, finish_reason: null }] }));
-          }
+          if (ev?.type === 'content_block_delta' && ev.delta?.type === 'text_delta' && ev.delta.text) emit(filter.push(ev.delta.text));
           r = await iter.next();
         }
+        emit(filter.end());
         const final = await stream.finalMessage();
         const stop = final.stop_reason === 'max_tokens' ? 'length' : 'stop';
         ctrl.enqueue(frame({ choices: [{ index: 0, delta: {}, finish_reason: stop }] }));
