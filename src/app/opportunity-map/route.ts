@@ -11494,6 +11494,34 @@ const ASK_MINDY_JS = `<script>(function(){
       else if(/^mailto:/i.test(href)){ try{ window.location.href=href; }catch(e){} }
     },true);
   }
+  // Keyboard reading. A click inside the report moves focus INTO the frame, whose document is sized to its
+  // content and does not scroll, so Page Down / End / arrows did nothing (Claude Local, production retest
+  // 2026-11-25). The frame is same-origin, so the PARENT listens on its document and scrolls the pane body,
+  // the real scroller. No script runs in the frame; the sandbox is unchanged.
+  var REP_LINE_PX=40;
+  function repKeys(E,body){
+    var d=null; try{ d=E.f.contentDocument; }catch(e){ d=null; }
+    if(!d||d.__amkKeys) return; d.__amkKeys=1;
+    d.addEventListener('keydown',function(ev){
+      if(!E.f.classList.contains('fit')) return; // not fitted: the frame's own document scrolls natively
+      if(ev.defaultPrevented||ev.ctrlKey||ev.metaKey||ev.altKey) return;
+      var t=ev.target, tag=t&&t.tagName?String(t.tagName).toLowerCase():'';
+      if(tag==='input'||tag==='textarea'||tag==='select'||(t&&t.isContentEditable)) return;
+      var page=Math.max(REP_LINE_PX,Math.round(body.clientHeight*0.875)), max=body.scrollHeight-body.clientHeight, to=null;
+      switch(ev.key){
+        case 'ArrowDown': to=body.scrollTop+REP_LINE_PX; break;
+        case 'ArrowUp': to=body.scrollTop-REP_LINE_PX; break;
+        case 'PageDown': to=body.scrollTop+page; break;
+        case 'PageUp': to=body.scrollTop-page; break;
+        case ' ': case 'Spacebar': to=body.scrollTop+(ev.shiftKey?-page:page); break;
+        case 'Home': to=0; break;
+        case 'End': to=max; break;
+      }
+      if(to===null) return;
+      ev.preventDefault();
+      body.scrollTop=Math.max(0,Math.min(max,to));
+    },true);
+  }
   function repFit(E){
     var d=null; try{ d=E.f.contentDocument; }catch(e){ d=null; }
     if(!d||!d.documentElement||!d.body||!d.body.firstChild) return false;
@@ -11519,7 +11547,7 @@ const ASK_MINDY_JS = `<script>(function(){
     var body=el.querySelector('.amk-rep-body'); repEls.body=body;
     repEls.f.addEventListener('load',function(){
       if(repEls.f.style.visibility!=='visible') return;
-      var fitted=repFit(repEls); repLinks(repEls); body.scrollTop=0;
+      var fitted=repFit(repEls); repLinks(repEls); repKeys(repEls,body); body.scrollTop=0;
       if(repIsOpen()){ try{ (fitted?body:repEls.f).focus(); }catch(e){} }
     });
     // A width change reflows the report, so its height is measured again.
