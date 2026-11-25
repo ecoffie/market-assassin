@@ -18,6 +18,7 @@ const h = vi.hoisted(() => ({
   sam: vi.fn(),
   answerSystems: [] as string[][],
   plannerSystems: [] as string[][],
+  plannerTools: [] as string[][],
   inserts: [] as Array<Record<string, unknown>>,
 }));
 
@@ -61,7 +62,7 @@ beforeEach(() => {
   process.env.OPENAI_API_KEY = 'sk-test';
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'srk-test';
   for (const k of ENV_KEYS.slice(2)) delete process.env[k];
-  calls.length = 0; h.inserts.length = 0; h.answerSystems.length = 0; h.plannerSystems.length = 0;
+  calls.length = 0; h.inserts.length = 0; h.answerSystems.length = 0; h.plannerSystems.length = 0; h.plannerTools.length = 0;
   h.runMcpTool.mockReset(); h.runMcpTool.mockImplementation(async () => ({ result: { ok: true }, credits: 0 }));
   h.runGate.mockReset(); h.extract.mockReset(); h.extract.mockImplementation(async () => null);
   h.clues.mockReset(); h.clues.mockImplementation(async () => clue(['Ridgeline Digital']));
@@ -72,6 +73,7 @@ beforeEach(() => {
     calls.push({ kind });
     const sys = (body.messages || []).filter((m) => m.role === 'system').map((m) => String(m.content));
     (kind === 'planner' ? h.plannerSystems : h.answerSystems).push(sys);
+    if (kind === 'planner') h.plannerTools.push((((body as { tools?: Array<{ function?: { name?: string } }> }).tools) || []).map((t) => String(t.function?.name)));
     return kind === 'planner' ? plannerResponse([]) : answerStream(['Existing path answer.']);
   }));
   vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -161,5 +163,15 @@ describe('company research in the chat route', () => {
     h.extract.mockImplementation(async () => 'digital services');
     await ask('What open opportunities are there for Ridgeline Digital in Virginia?');
     expect(h.runGate).not.toHaveBeenCalled();
+  });
+
+  it('read_web_page is offered only with the flag on (company research)', async () => {
+    await ask(Q);
+    expect(h.plannerTools.flat()).not.toContain('read_web_page');
+    expect(h.plannerTools.flat()).toContain('search_web');
+    h.plannerTools.length = 0;
+    flagOn();
+    await ask(Q);
+    expect(h.plannerTools.flat()).toContain('read_web_page');
   });
 });

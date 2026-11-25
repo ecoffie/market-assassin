@@ -80,6 +80,10 @@ const CHAT_OVERRIDES: Readonly<Record<string, ChatToolPolicy>> = {
     decision: 'allowed_read',
     reason: 'Open-web search via Serper for public facts Ask does not store (CRS, bills, GAO, PAE press, 8(a) coverage).',
   },
+  read_web_page: {
+    decision: 'allowed_read',
+    reason: 'Reads one public page (https, SSRF-guarded, pinned, 3/turn) whose URL came from this turn\'s search results or the customer; company research only (ASK_MINDY_COMPANY_RESEARCH).',
+  },
 
   // ── Chat-specific exceptions ──
   verify_m_scale: {
