@@ -226,9 +226,19 @@ export async function forecastsLine(a: {
   return `agency forecasts were searched: none in ${a.state}, and none nationwide either`;
 }
 
-/** The chat answer: a deterministic rendering of the decision (no second model, no new facts). */
+/** The lead line of a disclosed answer: before the headline, so an unchecked recommendation never reads as a final one. */
+export const DISCLOSED_LEAD = 'I could not fully verify this answer, so treat it as a starting point, not a final recommendation:';
+/** Said when the review found the next moves too vague (an actionability failure is not a factual one). */
+export const NOT_ACTIONABLE_NOTE = 'The next steps below are not specific enough yet.';
+
+/**
+ * The chat answer: a deterministic rendering of the decision (no second model, no new facts).
+ * `disclosed` (a disclosed answer, even with no listed points) puts the lead line and the unverified points FIRST.
+ */
 export function renderDecisionAnswer(d: AnalystDecision, opts: { reportUrl?: string | null; disclosed?: string[] } = {}): string {
-  const parts: string[] = [d.headline, ''];
+  const parts: string[] = [];
+  if (opts.disclosed) parts.push(DISCLOSED_LEAD, ...opts.disclosed.map((x) => `- ${x}`), '');
+  parts.push(d.headline, '');
   d.pursuits.forEach((p, i) => {
     parts.push(`**${i + 1}. ${p.title}**`);
     for (const w of p.why) parts.push(`- ${w}`);
@@ -238,7 +248,6 @@ export function renderDecisionAnswer(d: AnalystDecision, opts: { reportUrl?: str
   if (d.also_consider?.length) parts.push('**Also worth a look:**', ...d.also_consider.map((x) => `- ${x}`), '');
   if (d.ruled_out) parts.push(`**Ruled out:** ${d.ruled_out}`, '');
   if (d.gaps.length) parts.push('**Not yet established:**', ...d.gaps.map((g) => `- ${g}`), '');
-  if (opts.disclosed?.length) parts.push('**I could not fully verify this answer:**', ...opts.disclosed.map((x) => `- ${x}`), '');
   if (opts.reportUrl) parts.push(`Full report: ${opts.reportUrl}`, '');
   parts.push(d.next_question);
   return parts.join('\n').trim();
@@ -446,11 +455,12 @@ export async function runIntelligenceGate(args: {
         ...(unreviewed ? ['I ran out of time before double-checking this recommendation.'] : []),
         ...(evaluation?.results || []).filter((r) => !r.pass && FACTUAL.has(r.criterion)).map((r) => r.reason),
         ...integrity.filter((f) => !f.pass).map((f) => f.reason),
+        ...((evaluation?.results || []).some((r) => !r.pass && r.criterion === 'actionable') ? [NOT_ACTIONABLE_NOTE] : []),
       ]
     : undefined;
   timings.total = now() - t0;
   return {
     status, decision, evaluation, attempts, checks, report, cost, integrity, removed, timings, deadlineHit,
-    answer: decision ? renderDecisionAnswer(decision, { reportUrl: report.deliverable?.url, disclosed: disclosed?.length ? disclosed : undefined }) : 'I could not produce a recommendation from this evidence.',
+    answer: decision ? renderDecisionAnswer(decision, { reportUrl: report.deliverable?.url, disclosed }) : 'I could not produce a recommendation from this evidence.',
   };
 }
