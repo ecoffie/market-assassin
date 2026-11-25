@@ -21,6 +21,11 @@ const MODEL_PRICES: Array<{ match: RegExp; in: number; out: number }> = [
   { match: /gpt-oss-120b/i,              in: 0.15, out: 0.60 },
   { match: /gpt-4o-mini|gpt-4\.1-mini/i, in: 0.15, out: 0.60 },
   { match: /gpt-4o|gpt-4\.1\b/i,         in: 2.50, out: 10.0 },
+  // Current Claude list prices (Claude API models reference, checked 2026-11-25). Specific families first:
+  // the old catch-alls priced Opus 5.5 at 3.75x and Sonnet 5.x at 1.5x, which overstated Claude turns.
+  { match: /claude-opus-5-5/i,           in: 4.00, out: 20.0 },
+  { match: /claude-opus-5\b/i,           in: 5.00, out: 25.0 },
+  { match: /claude-sonnet-5/i,           in: 2.00, out: 10.0 },
   { match: /claude.*opus/i,              in: 15.0, out: 75.0 },
   { match: /claude.*sonnet/i,            in: 3.00, out: 15.0 },
   { match: /claude.*haiku/i,             in: 0.80, out: 4.00 },
