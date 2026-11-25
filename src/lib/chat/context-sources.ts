@@ -180,10 +180,17 @@ export function sourceDateLabel(tool: string | undefined, parsed: Record<string,
   if (!parsed) return null;
   const meta = (parsed._meta && typeof parsed._meta === 'object' ? parsed._meta : {}) as Record<string, unknown>;
   const winObj = (meta.window && typeof meta.window === 'object' ? meta.window : {}) as Record<string, unknown>;
-  const windowLabel = typeof meta.window === 'string' ? meta.window : typeof winObj.label === 'string' ? winObj.label : null;
+  // Short fiscal-year window ("FY2024–FY2026") from the numbers when the tool gives them; else its own label.
+  const fyFrom = Number(winObj.fy_from), fyTo = Number(winObj.fy_to);
+  const windowLabel = Number.isInteger(fyFrom) && Number.isInteger(fyTo) && fyFrom > 0 && fyTo > 0
+    ? (fyFrom === fyTo ? `FY${fyTo}` : `FY${fyFrom}–FY${fyTo}`)
+    : typeof meta.window === 'string' ? meta.window : typeof winObj.label === 'string' ? winObj.label : null;
   const out = (s: string) => s.slice(0, SOURCE_DATE_MAX);
   const through = day(meta.data_current_through);
   if (through) return out(`${windowLabel ? `${windowLabel} · ` : ''}data through ${through}`);
+  // The tool reports freshness separately but could not read it this time: its as_of is window-bounded (not
+  // freshness), so show the window alone rather than a date that would mislead.
+  if ('data_current_through' in meta) return windowLabel ? out(windowLabel) : null;
   const asOf = day(meta.as_of ?? winObj.as_of ?? parsed.as_of);
   if (tool === 'lookup_sam_entity' && asOf) return out(`SAM registration record from ${asOf}`);
   const dataAsOf = day(meta.data_as_of);

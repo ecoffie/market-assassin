@@ -22,6 +22,11 @@ describe('sourceFromToolResult', () => {
     expect(s).toMatchObject({ id: 'src:get_buying_offices:c1', kind: 'federal_record', owner: null, status: 'ok', rendered: true, asOf: 'source dated 2026-11-01' });
     expect(s.items).toEqual([{ n: 21, key: 'W912PL', label: '' }, { n: 22, key: 'W912BV', label: '' }]);
   });
+  it('the source chip shows data_current_through over a window-bounded as_of (buying offices: FY end vs warehouse)', () => {
+    const content = JSON.stringify({ ok: true, _meta: { as_of: '2026-09-30', data_current_through: '2026-11-20', window: { fy_from: 2024, fy_to: 2026 } } });
+    const s = sourceFromToolResult({ tool: 'get_buying_offices', toolCallId: 'c9', status: 'success', content, rendered: rendered(['W912PL'], 1), owner, retrievedAt: at });
+    expect(s.asOf).toBe('FY2024–FY2026 · data through 2026-11-20');
+  });
   it('an unrendered result lists keyed records WITHOUT numbers (the model wrote that list)', () => {
     const s = sourceFromToolResult({ tool: 'find_opportunities', toolCallId: 'c2', status: 'success', content: JSON.stringify({ horizons: { open_now: { items: [{ notice_id: 'abcdef0123456789abcdef0123456789', title: 'JANITORIAL SERVICES' }] } } }), owner, retrievedAt: at });
     expect(s.items).toEqual([{ key: 'abcdef0123456789abcdef0123456789', label: 'Janitorial Services' }]);
@@ -175,6 +180,11 @@ describe('source dates say what they mean (never a bare "as of")', () => {
   it('data_current_through -> "data through", with the window', () => {
     expect(sourceDateLabel('get_buying_offices', { _meta: { as_of: '2026-09-30', data_current_through: '2026-11-20', window: 'FY2024–FY2026' } })).toBe('FY2024–FY2026 · data through 2026-11-20');
     expect(sourceDateLabel('get_buying_offices', { _meta: { data_current_through: '2026-11-20T03:00:00Z', window: { label: 'FY2024–FY2026' } } })).toBe('FY2024–FY2026 · data through 2026-11-20');
+    // get_buying_offices' real shape (#2479): fy numbers win over the long label.
+    expect(sourceDateLabel('get_buying_offices', { _meta: { as_of: '2026-09-30', data_current_through: '2026-11-20', window: { fy_from: 2024, fy_to: 2026, label: 'FY2024-FY2026 (federal fiscal years, Oct 1 - Sep 30)' } } })).toBe('FY2024–FY2026 · data through 2026-11-20');
+    expect(sourceDateLabel('get_buying_offices', { _meta: { data_current_through: '2026-11-20', window: { fy_from: 2026, fy_to: 2026 } } })).toBe('FY2026 · data through 2026-11-20');
+    // An unreadable warehouse clock (null): the window alone, never the window-bounded as_of passed off as freshness.
+    expect(sourceDateLabel('get_buying_offices', { _meta: { as_of: '2026-09-30', data_current_through: null, window: { fy_from: 2024, fy_to: 2026 } } })).toBe('FY2024–FY2026');
   });
   it('lookup_sam_entity -> "SAM registration record from"', () => {
     expect(sourceDateLabel('lookup_sam_entity', { _meta: { source: 'local_registry', as_of: '2026-08-25T10:00:00Z' } })).toBe('SAM registration record from 2026-08-25');
