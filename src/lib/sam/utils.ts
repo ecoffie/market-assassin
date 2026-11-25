@@ -622,15 +622,15 @@ export async function cleanExpiredCache(): Promise<number> {
   if (!supabase) return 0;
 
   try {
-    const { data, error } = await supabase
+    // count: 'exact' — a RETURNING payload is capped at 1,000 rows and would under-report a large cleanup (INT-005).
+    const { count: deleted, error } = await supabase
       .from('sam_api_cache')
-      .delete()
-      .lt('expires_at', new Date().toISOString())
-      .select('id');
+      .delete({ count: 'exact' })
+      .lt('expires_at', new Date().toISOString());
 
     if (error) throw error;
 
-    const count = data?.length || 0;
+    const count = deleted ?? 0;
     console.log(`[SAM Cache Cleanup] Removed ${count} expired entries`);
     return count;
   } catch (err) {
