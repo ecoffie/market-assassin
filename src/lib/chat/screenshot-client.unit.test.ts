@@ -5,7 +5,7 @@
  */
 import { describe, it, expect, vi } from 'vitest';
 import {
-  fitWithin, prepareScreenshot, screenshotsField, screenshotMarker, imageFilesFrom, screenshotRefusalNote, SCREENSHOT_MESSAGES,
+  fitWithin, prepareScreenshot, screenshotsField, screenshotMarker, imageFilesFrom, screenshotRefusalNote, SCREENSHOT_MESSAGES, screenshotsFit, SCREENSHOT_TARGET_BYTES, SCREENSHOT_TOTAL_B64,
   SCREENSHOT_MAX_BYTES, type PrepareDeps, type PreparedScreenshot,
 } from './screenshot-client';
 
@@ -94,5 +94,33 @@ describe('screenshot-client', () => {
     expect(screenshotRefusalNote(null)).toBe(SCREENSHOT_MESSAGES.server);
     expect(screenshotRefusalNote({ message: 42 })).toBe(SCREENSHOT_MESSAGES.server);
     expect(screenshotRefusalNote({ message: 'x'.repeat(301) })).toBe(SCREENSHOT_MESSAGES.server);
+  });
+
+  it('steps JPEG quality down, then the edge, until an image fits the per-image target', async () => {
+    const qs: Array<[string, number | undefined, number]> = [];
+    const canvas = { width: 0, height: 0, getContext: () => ({ drawImage: () => {} }) } as unknown as HTMLCanvasElement;
+    const d: PrepareDeps = {
+      decode: async () => ({ width: 3000, height: 2000, source: {} as CanvasImageSource }),
+      makeCanvas: () => canvas,
+      previewUrl: () => 'blob:x',
+      encode: async (c, type, q) => {
+        qs.push([type, q, c.width]);
+        // Only JPEG 0.62 at the 1280 edge fits.
+        const fits = type === 'image/jpeg' && q === 0.62 && c.width === 1280;
+        return new Blob([new Uint8Array(fits ? 100 : SCREENSHOT_TARGET_BYTES + 1)], { type });
+      },
+    };
+    const r = await prepareScreenshot(new File([new Uint8Array([1])], 'a.png', { type: 'image/png' }), d);
+    expect(r.ok && r.shot.media_type).toBe('image/jpeg');
+    expect(qs.slice(0, 5)).toEqual([['image/png', undefined, 1568], ['image/jpeg', 0.82, 1568], ['image/jpeg', 0.72, 1568], ['image/jpeg', 0.62, 1568], ['image/jpeg', 0.52, 1568]]);
+    expect(qs[qs.length - 1]).toEqual(['image/jpeg', 0.62, 1280]);
+  });
+
+  it('three images at the per-image target fit the route total; more than the total does not', () => {
+    const b64PerImage = Math.ceil(SCREENSHOT_TARGET_BYTES / 3) * 4;
+    expect(3 * b64PerImage).toBeLessThanOrEqual(SCREENSHOT_TOTAL_B64);
+    expect(SCREENSHOT_TOTAL_B64).toBeLessThan(4 * 1024 * 1024); // under the route's ~4 MB cap (Vercel ~4.5 MB body)
+    expect(screenshotsFit([{ data: 'x'.repeat(b64PerImage) }, { data: 'x'.repeat(b64PerImage) }, { data: 'x'.repeat(b64PerImage) }])).toBe(true);
+    expect(screenshotsFit([{ data: 'x'.repeat(SCREENSHOT_TOTAL_B64 + 1) }])).toBe(false);
   });
 });

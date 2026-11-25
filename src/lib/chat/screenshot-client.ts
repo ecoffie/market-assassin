@@ -13,7 +13,17 @@
 
 export const SCREENSHOT_MAX_COUNT = 3;
 export const SCREENSHOT_MAX_BYTES = 3.5 * 1024 * 1024;
+/**
+ * Vercel caps a request body at ~4.5 MB and the chat route caps the images' base64 at ~4 MB in total (Agent 4 /
+ * Agent 1, 2026-11-25). So each image aims for ≤ 900 KB (1.2 MB of base64): three typical screenshots stay well under
+ * the total, and the send-time check below refuses plainly if they still would not.
+ */
+export const SCREENSHOT_TARGET_BYTES = 900 * 1024;
+export const SCREENSHOT_TOTAL_B64 = 3_800_000;
+/** Tried in order until one fits the target: PNG (sharp text) for a PNG source, then JPEG at falling quality. */
+const SHOT_QUALITIES = [0.82, 0.72, 0.62, 0.52];
 export const SCREENSHOT_LONG_EDGE = 1568;
+const SHOT_EDGES = [SCREENSHOT_LONG_EDGE, 1280, 1024];
 export const SCREENSHOT_TYPES = ['image/png', 'image/jpeg', 'image/webp'] as const;
 export type ScreenshotMediaType = (typeof SCREENSHOT_TYPES)[number];
 
@@ -25,10 +35,11 @@ export type PreparedScreenshot = ScreenshotPayload & { id: string; previewUrl: s
 export type ScreenshotRefusal = 'type' | 'count' | 'size' | 'unreadable';
 
 /** Plain-English messages — never a code, a byte count or a MIME type. */
-export const SCREENSHOT_MESSAGES: Record<ScreenshotRefusal | 'server', string> = {
+export const SCREENSHOT_MESSAGES: Record<ScreenshotRefusal | 'server' | 'total', string> = {
   type: 'Mindy can read PNG, JPEG or WebP screenshots. That file isn’t one.',
   count: 'You can attach up to 3 screenshots to one message.',
   size: 'That screenshot is too large to send. Try a smaller capture.',
+  total: 'These screenshots are too large to send together. Remove one, or try smaller captures.',
   unreadable: 'Mindy couldn’t open that image. Try taking the screenshot again.',
   server: 'Mindy couldn’t read that screenshot. Your message is still here — remove the screenshot or try another one.',
 };
@@ -80,8 +91,9 @@ export type PrepareDeps = {
 };
 
 /**
- * Decode → redraw (≤ 1568 px) → re-encode. PNG stays PNG (screenshots are text; JPEG blurs it) unless it is
- * still over the size limit, then JPEG 0.85. A canvas encode never carries the source file's metadata.
+ * Decode → redraw (≤ 1568 px) → re-encode until it fits SCREENSHOT_TARGET_BYTES: PNG first for a PNG source
+ * (screenshots are text; JPEG blurs it), then JPEG at 0.82 → 0.52, then a smaller edge (1280, 1024). A canvas encode
+ * never carries the source file's metadata.
  */
 export async function prepareScreenshot(file: File, deps: PrepareDeps = {}): Promise<{ ok: true; shot: PreparedScreenshot } | { ok: false; reason: ScreenshotRefusal }> {
   if (!isScreenshotType(file.type)) return { ok: false, reason: 'type' };
@@ -97,23 +109,30 @@ export async function prepareScreenshot(file: File, deps: PrepareDeps = {}): Pro
   try { img = await decode(file); } catch { return { ok: false, reason: 'unreadable' }; }
   try {
     if (!img.width || !img.height) return { ok: false, reason: 'unreadable' };
-    const { w, h } = fitWithin(img.width, img.height);
     const canvas = makeCanvas();
-    canvas.width = w;
-    canvas.height = h;
     const ctx = canvas.getContext('2d');
     if (!ctx) return { ok: false, reason: 'unreadable' };
-    ctx.drawImage(img.source, 0, 0, w, h);
-
-    const firstType: ScreenshotMediaType = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
-    let type: ScreenshotMediaType = firstType;
-    let blob = await encode(canvas, type, type === 'image/jpeg' ? 0.9 : undefined);
-    if (blob && blob.size > SCREENSHOT_MAX_BYTES && type === 'image/png') {
-      type = 'image/jpeg';
-      blob = await encode(canvas, type, 0.85);
+    let blob: Blob | null = null;
+    let type: ScreenshotMediaType = 'image/jpeg';
+    let encodedAny = false;
+    search: for (const edge of SHOT_EDGES) {
+      const { w, h } = fitWithin(img.width, img.height, edge);
+      canvas.width = w;
+      canvas.height = h;
+      ctx.drawImage(img.source, 0, 0, w, h);
+      const tries: Array<[ScreenshotMediaType, number | undefined]> = [
+        ...(file.type === 'image/png' ? [['image/png', undefined] as [ScreenshotMediaType, undefined]] : []),
+        ...SHOT_QUALITIES.map((q) => ['image/jpeg', q] as [ScreenshotMediaType, number]),
+      ];
+      for (const [t, q] of tries) {
+        const b = await encode(canvas, t, q);
+        if (!b) continue;
+        encodedAny = true;
+        if (b.size <= SCREENSHOT_TARGET_BYTES) { blob = b; type = t; break search; }
+      }
+      if (Math.max(img.width, img.height) <= edge) break; // a smaller edge would not shrink it further
     }
-    if (!blob) return { ok: false, reason: 'unreadable' };
-    if (blob.size > SCREENSHOT_MAX_BYTES) return { ok: false, reason: 'size' };
+    if (!blob) return { ok: false, reason: encodedAny ? 'size' : 'unreadable' };
     const bytes = new Uint8Array(await blob.arrayBuffer());
     return {
       ok: true,
@@ -134,6 +153,11 @@ export async function prepareScreenshot(file: File, deps: PrepareDeps = {}): Pro
 export function screenshotsField(shots: PreparedScreenshot[]): { images?: ScreenshotPayload[] } {
   if (!shots.length) return {};
   return { images: shots.slice(0, SCREENSHOT_MAX_COUNT).map((s) => ({ media_type: s.media_type, data: s.data })) };
+}
+
+/** The send-time total check: all images' base64 together must fit the route's budget. */
+export function screenshotsFit(shots: Array<{ data: string }>): boolean {
+  return shots.reduce((n, s) => n + s.data.length, 0) <= SCREENSHOT_TOTAL_B64;
 }
 
 /** What the transcript shows for the customer's turn (no bytes; mirrors the server's stored marker). */

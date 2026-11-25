@@ -22,7 +22,7 @@ function token(email: string): string {
   return Buffer.from(JSON.stringify({ email, exp: Date.now() + 3_600_000 })).toString('base64').replace(/=+$/, '') + '.sig';
 }
 
-function boot(opts: { caps: boolean; chatStatus?: number; refusal?: unknown }) {
+function boot(opts: { caps: boolean; chatStatus?: number; refusal?: unknown; bigUntil?: { type: string; q?: number; width: number } }) {
   const dom = new JSDOM(
     '<!doctype html><html><body><div id="amkOv"></div><aside id="amk" aria-hidden="true"><div id="amkCtx"></div><button id="amkX"></button>'
     + '<div id="amkBody"></div><div class="amk-foot"><div class="amk-in"><textarea id="amkIn"></textarea><button id="amkSend"></button></div></div></aside></body></html>',
@@ -40,7 +40,12 @@ function boot(opts: { caps: boolean; chatStatus?: number; refusal?: unknown }) {
   w.createImageBitmap = (async () => ({ width: 3136, height: 1000, close() {} })) as never;
   const C = (w as unknown as { HTMLCanvasElement: typeof HTMLCanvasElement }).HTMLCanvasElement.prototype as unknown as Record<string, unknown>;
   C.getContext = () => ({ drawImage: (_s: unknown, x: number, y: number, ww: number, hh: number) => drawn.push([x, y, ww, hh]) });
-  C.toBlob = function (cb: (b: Blob) => void, type: string) { cb(new (w as unknown as { Blob: typeof Blob }).Blob(['SCREENSHOT'], { type })); };
+  const encodes: Array<[string, number | undefined, number]> = [];
+  C.toBlob = function (this: HTMLCanvasElement, cb: (b: Blob) => void, type: string, q?: number) {
+    encodes.push([type, q, this.width]);
+    const big = opts.bigUntil ? !(type === opts.bigUntil.type && q === opts.bigUntil.q && this.width === opts.bigUntil.width) : false;
+    cb(new (w as unknown as { Blob: typeof Blob }).Blob([big ? new Uint8Array(900 * 1024 + 1) : 'SCREENSHOT'], { type }));
+  };
   (w as unknown as { URL: typeof URL }).URL.createObjectURL = () => 'blob:local/1';
   (w as unknown as { URL: typeof URL }).URL.revokeObjectURL = () => {};
 
@@ -82,7 +87,7 @@ function boot(opts: { caps: boolean; chatStatus?: number; refusal?: unknown }) {
     input().dispatchEvent(new w.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
     await settle();
   }
-  return { w, doc, chats, store, session, drawn, paste, ask, settle, input };
+  return { w, doc, chats, store, session, drawn, encodes, paste, ask, settle, input };
 }
 
 describe('Map drawer pasted screenshots', () => {
@@ -152,5 +157,21 @@ describe('Map drawer pasted screenshots', () => {
     await b.ask('q');
     expect(b.doc.querySelector('.amk-shot-note')!.textContent).toBe('Up to 3 screenshots can be sent with one message.');
     expect(b.input().value).toBe('q');
+  });
+
+  it('steps JPEG quality, then the edge, until a screenshot fits ~900 KB', async () => {
+    const b = boot({ caps: true, bigUntil: { type: 'image/jpeg', q: 0.62, width: 1280 } });
+    await b.paste(['image/png']);
+    expect(b.encodes[0]).toEqual(['image/png', undefined, 1568]);
+    expect(b.encodes[b.encodes.length - 1]).toEqual(['image/jpeg', 0.62, 1280]);
+    await b.ask('q');
+    expect((b.chats[0].images as Array<{ media_type: string }>)[0].media_type).toBe('image/jpeg');
+  });
+
+  it('a screenshot that cannot get under the target is refused in plain English', async () => {
+    const b = boot({ caps: true, bigUntil: { type: 'never', width: 0 } });
+    await b.paste(['image/png']);
+    expect(b.doc.querySelectorAll('[data-testid="amk-shot-remove"]').length).toBe(0);
+    expect(b.doc.querySelector('.amk-shot-note')!.textContent).toMatch(/too large to send/);
   });
 });

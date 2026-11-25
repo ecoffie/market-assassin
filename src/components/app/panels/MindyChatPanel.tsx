@@ -28,7 +28,7 @@ import { useChatCapabilities } from '../chat/useChatCapabilities';
 import { ChatScreenshots } from '../chat/ChatScreenshots';
 import {
   prepareScreenshot, imageFilesFrom, screenshotsField, screenshotMarker,
-  SCREENSHOT_MAX_COUNT, SCREENSHOT_MESSAGES, SCREENSHOT_DEFAULT_PROMPT, screenshotRefusalNote, type PreparedScreenshot,
+  SCREENSHOT_MAX_COUNT, SCREENSHOT_MESSAGES, SCREENSHOT_DEFAULT_PROMPT, screenshotRefusalNote, screenshotsFit, type PreparedScreenshot,
 } from '@/lib/chat/screenshot-client';
 import { ResearchProgressView } from '../chat/ResearchProgressView';
 import { addProgress, startProgress, type ResearchProgress } from '@/lib/chat/research-progress';
@@ -256,6 +256,9 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
       setShowUpgrade(true);
       return;
     }
+
+    // The route caps the images' base64 in total (Vercel body limit): refuse plainly before sending, keep everything.
+    if (turnShots.length && !screenshotsFit(turnShots)) { setShotNote(SCREENSHOT_MESSAGES.total); return; }
 
     // Build the history payload from existing messages BEFORE we mutate state
     const historyForServer = messages

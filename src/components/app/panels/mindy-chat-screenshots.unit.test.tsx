@@ -33,7 +33,7 @@ vi.mock('@/lib/chat/screenshot-client', async (orig) => {
   return {
     ...real,
     prepareScreenshot: vi.fn(async (f: File) => f.type === 'image/png'
-      ? { ok: true, shot: { id: `s-${Math.random()}`, media_type: 'image/png', data: B64, previewUrl: 'blob:local/1', bytes: 20 } }
+      ? { ok: true, shot: { id: `s-${Math.random()}`, media_type: 'image/png', data: f.name === 'huge.png' ? 'A'.repeat(2_000_000) : B64, previewUrl: 'blob:local/1', bytes: 20 } }
       : { ok: false, reason: 'type' }),
   };
 });
@@ -183,5 +183,17 @@ describe('Ask Mindy /app: pasted screenshots', () => {
     Object.defineProperty(ev, 'clipboardData', { value: { items: [{ kind: 'string', type: 'text/plain' }], files: [] } });
     await act(async () => { ta(el).dispatchEvent(ev); });
     expect(ev.defaultPrevented).toBe(false);
+  });
+
+  it('screenshots too large to send together are refused before sending; text and screenshots stay', async () => {
+    const el = await mount();
+    const huge = () => new File([new Uint8Array([1])], 'huge.png', { type: 'image/png' });
+    await paste(el, [huge(), huge()]);
+    await type(el, 'Who are these?');
+    await enter(el);
+    expect(bodies).toHaveLength(0);
+    expect(el.querySelector('[data-testid="chat-screenshot-note"]')?.textContent).toMatch(/too large to send together/);
+    expect(el.querySelectorAll('[data-testid="chat-screenshot-remove"]').length).toBe(2);
+    expect(ta(el).value).toBe('Who are these?');
   });
 });

@@ -11364,25 +11364,39 @@ const ASK_MINDY_JS = `<script>(function(){
   // history, sessionStorage, localStorage, a retry or the Vault. The transcript keeps only "[screenshot attached]".
   var amkShots=null, SHOT_MAX=3, SHOT_BYTES=3.5*1024*1024, SHOT_EDGE=1568, SHOT_TYPES={'image/png':1,'image/jpeg':1,'image/webp':1};
   var SHOT_DEFAULT='Who or what is in this screenshot? Research it for me.';
-  var SHOT_MSG={type:'Mindy can read PNG, JPEG or WebP screenshots. That file is not one.',count:'You can attach up to 3 screenshots to one message.',size:'That screenshot is too large to send. Try a smaller capture.',unreadable:'Mindy could not open that image. Try taking the screenshot again.',server:'Mindy could not read that screenshot. Your message is still here. Remove the screenshot or try another one.'};
+  var SHOT_MSG={type:'Mindy can read PNG, JPEG or WebP screenshots. That file is not one.',count:'You can attach up to 3 screenshots to one message.',size:'That screenshot is too large to send. Try a smaller capture.',unreadable:'Mindy could not open that image. Try taking the screenshot again.',server:'Mindy could not read that screenshot. Your message is still here. Remove the screenshot or try another one.',total:'These screenshots are too large to send together. Remove one, or try smaller captures.'};
   function shotMarker(n){ return n===1?'[screenshot attached]':('['+n+' screenshots attached]'); }
   function shotDecode(f){ return new Promise(function(res,rej){
     if(typeof createImageBitmap==='function'){ createImageBitmap(f).then(function(b){ res({w:b.width,h:b.height,src:b,done:function(){ try{ b.close(); }catch(e){} }}); },rej); return; }
     var u=URL.createObjectURL(f), im=new Image(); im.onload=function(){ res({w:im.naturalWidth,h:im.naturalHeight,src:im,done:function(){ URL.revokeObjectURL(u); }}); }; im.onerror=function(){ URL.revokeObjectURL(u); rej(new Error('decode')); }; im.src=u; }); }
   function shotEncode(cv,type,q){ return new Promise(function(res){ try{ cv.toBlob(function(b){ res(b); },type,q); }catch(e){ res(null); } }); }
   function shotB64(blob){ return new Promise(function(res,rej){ var fr=new FileReader(); fr.onload=function(){ var s=String(fr.result||''); res(s.slice(s.indexOf(',')+1)); }; fr.onerror=rej; fr.readAsDataURL(blob); }); }
+  // Each image aims for <= 900 KB so three stay well under the route's ~4 MB base64 total (Vercel body limit): PNG
+  // first for a PNG source, then JPEG 0.82 to 0.52, then a smaller edge (1280, 1024).
+  var SHOT_TARGET=900*1024, SHOT_TOTAL_B64=3800000, SHOT_EDGES=[SHOT_EDGE,1280,1024], SHOT_QS=[0.82,0.72,0.62,0.52];
   function shotPrepare(f){
     if(!SHOT_TYPES[f.type]) return Promise.resolve({err:'type'});
     return shotDecode(f).then(function(img){
-      var w=img.w, h=img.h, L=Math.max(w,h); if(!L){ img.done(); return {err:'unreadable'}; }
-      if(L>SHOT_EDGE){ var s=SHOT_EDGE/L; w=Math.max(1,Math.round(w*s)); h=Math.max(1,Math.round(h*s)); }
-      var cv=document.createElement('canvas'); cv.width=w; cv.height=h; var cx=cv.getContext('2d'); if(!cx){ img.done(); return {err:'unreadable'}; }
-      cx.drawImage(img.src,0,0,w,h); img.done();
-      var type=f.type==='image/png'?'image/png':'image/jpeg';
-      return shotEncode(cv,type,type==='image/jpeg'?0.9:undefined).then(function(b){
-        if(b&&b.size>SHOT_BYTES&&type==='image/png'){ type='image/jpeg'; return shotEncode(cv,type,0.85); } return b; })
-        .then(function(b){ if(!b) return {err:'unreadable'}; if(b.size>SHOT_BYTES) return {err:'size'};
-          return shotB64(b).then(function(d){ return {shot:{media_type:type,data:d,url:URL.createObjectURL(b)}}; }); });
+      var L=Math.max(img.w,img.h); if(!L){ img.done(); return {err:'unreadable'}; }
+      var cv=document.createElement('canvas'), cx=cv.getContext('2d'); if(!cx){ img.done(); return {err:'unreadable'}; }
+      var plan=[];
+      SHOT_EDGES.forEach(function(edge,ei){ if(ei>0&&L<=SHOT_EDGES[ei-1]) return;
+        if(f.type==='image/png') plan.push({edge:edge,type:'image/png'});
+        SHOT_QS.forEach(function(q){ plan.push({edge:edge,type:'image/jpeg',q:q}); }); });
+      var drawnEdge=0, any=false;
+      function attempt(i){
+        if(i>=plan.length){ img.done(); return Promise.resolve({err:any?'size':'unreadable'}); }
+        var st=plan[i];
+        if(st.edge!==drawnEdge){ var w=img.w, h=img.h; if(L>st.edge){ var s=st.edge/L; w=Math.max(1,Math.round(w*s)); h=Math.max(1,Math.round(h*s)); }
+          cv.width=w; cv.height=h; cx.drawImage(img.src,0,0,w,h); drawnEdge=st.edge; }
+        return shotEncode(cv,st.type,st.q).then(function(b){
+          if(!b) return attempt(i+1); any=true;
+          if(b.size>SHOT_TARGET) return attempt(i+1);
+          img.done();
+          return shotB64(b).then(function(d){ return {shot:{media_type:st.type,data:d,url:URL.createObjectURL(b)}}; });
+        });
+      }
+      return attempt(0);
     },function(){ return {err:'unreadable'}; });
   }
   function buildShots(){
@@ -11416,6 +11430,8 @@ const ASK_MINDY_JS = `<script>(function(){
     if(input&&!oppCtx) input.placeholder='Ask Mindy, or paste a screenshot';
     amkShots={
       count:function(){ return oppCtx?0:shots.length; },
+      fits:function(){ var n=0; shots.forEach(function(x){ n+=x.data.length; }); return n<=SHOT_TOTAL_B64; },
+      tooBig:function(){ note.textContent=SHOT_MSG.total; },
       // Hand the screenshots to one question: off the composer at once.
       take:function(){ if(oppCtx) return []; var t=shots; shots=[]; note.textContent=''; paintShots(); return t; },
       // The server's refusal message is customer-safe by contract (400/413/415 JSON {error, message}); ours if absent.
@@ -11781,6 +11797,8 @@ const ASK_MINDY_JS = `<script>(function(){
     // its existing reload.
     if(!t||!em){ var _cq=q, _card=!!oppCtx; if(window.openSignInModal){window.openSignInModal(_card?'ask Mindy about this opportunity':'ask Mindy',function(){ if(_card&&oppCtx){ ask(_cq); } else location.reload(); });}else{location.href='/app?next='+encodeURIComponent(location.pathname);} return; }
     // clear the greeting on first ask
+    // The route caps the images' base64 in total: refuse plainly before anything is sent; text and screenshots stay.
+    if(!oppCtx&&!opts.turnId&&amkShots&&amkShots.count()&&!amkShots.fits()){ amkShots.tooBig(); return; }
     if(body.querySelector('.amk-empty'))body.innerHTML='';
     // Screenshots go with THIS question only (never a retry or a card turn); the transcript keeps a marker.
     var shotsAtSend=(!oppCtx&&!opts.turnId&&amkShots)?amkShots.take():[];
