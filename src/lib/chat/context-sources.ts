@@ -134,7 +134,7 @@ const TOOL_LABELS: Record<string, string> = {
   search_web: 'Open web (Serper)',
 };
 
-function toolLabel(tool: string): string {
+export function toolLabel(tool: string): string {
   return TOOL_LABELS[tool] ?? tool.replace(/_/g, ' ').replace(/^\w/, (c) => c.toUpperCase());
 }
 

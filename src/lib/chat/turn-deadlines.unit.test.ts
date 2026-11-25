@@ -22,6 +22,12 @@ describe('chatDeadlines', () => {
     const route = readFileSync(join(process.cwd(), 'src/app/api/app/chat/route.ts'), 'utf8');
     expect(route).toMatch(new RegExp(`export const maxDuration = ${CHAT_ROUTE_MAX_DURATION_S};`));
   });
+  it('an ordinary turn keeps its 285 s watchdog; a research turn\'s watchdog and deadline also sit below maxDuration', async () => {
+    const { RESEARCH_TURN_MS, RESEARCH_DEADLINE_MS } = await import('@/lib/ask-mindy/research-mode');
+    expect(DEFAULT_CHAT_DEADLINES.turnMs).toBe(285_000);
+    expect(RESEARCH_DEADLINE_MS).toBeLessThan(RESEARCH_TURN_MS);
+    expect(RESEARCH_TURN_MS).toBeLessThan(CHAT_ROUTE_MAX_DURATION_S * 1000);
+  });
   it('no single tool may outlast the round budget', () => {
     for (const ms of Object.values(TOOL_TIMEOUT_OVERRIDES_MS)) expect(ms).toBeLessThanOrEqual(DEFAULT_CHAT_DEADLINES.toolRoundBudgetMs);
   });

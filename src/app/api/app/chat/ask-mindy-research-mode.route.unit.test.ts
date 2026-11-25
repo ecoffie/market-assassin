@@ -1,0 +1,171 @@
+/**
+ * Ask Mindy RESEARCH MODE through the real route (ASK_MINDY_RESEARCH_MODE, default off). Synthetic names only.
+ * Harness copied from ask-mindy-intelligence-gate.route.unit.test.ts (its gate notes are kept below).
+ *   - Flag off: a market question takes the existing path (planner runs; the gate never does).
+ *   - Flag on: a market question whose words name the work streams the gate's decision, the market_report event
+ *     the Ask pane opens, and a History trace that restores it. The OpenAI planner is never called.
+ *   - Flag on, not a market question (or no work phrase): unchanged existing path.
+ */
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { plannerResponse, answerStream, isPlannerCall, readSse, chatRequest, withinMs, type SseEvent } from './__fixtures__/route-harness';
+
+const h = vi.hoisted(() => ({
+  runMcpTool: vi.fn(),
+  runGate: vi.fn(),
+  extract: vi.fn(),
+  create: vi.fn(),
+  overBudget: false,
+  inserts: [] as Array<Record<string, unknown>>,
+}));
+
+vi.mock('@supabase/supabase-js', () => {
+  const chain: Record<string, unknown> = {};
+  const self = () => chain;
+  for (const m of ['from', 'select', 'eq', 'in', 'order', 'limit', 'update', 'upsert', 'ilike', 'or', 'gte', 'lte', 'neq', 'is']) chain[m] = vi.fn(self);
+  chain.insert = vi.fn((row: unknown) => { for (const r of Array.isArray(row) ? row : [row]) h.inserts.push(r as Record<string, unknown>); return chain; });
+  chain.maybeSingle = vi.fn(async () => ({ data: null, error: null }));
+  chain.single = vi.fn(async () => ({ data: null, error: null }));
+  chain.then = (res: (v: unknown) => unknown) => Promise.resolve({ data: [], error: null }).then(res);
+  return { createClient: () => chain };
+});
+vi.mock('@/lib/api-auth', () => ({ verifyUserOwnsEmail: vi.fn(async (_r: unknown, email: string) => ({ authenticated: true, email })) }));
+vi.mock('@/lib/access/resolve-access', () => ({ hasProAccess: vi.fn(async () => true) }));
+vi.mock('@/lib/entitlements/shadow', () => ({ shadowEntitlement: vi.fn() }));
+vi.mock('@/lib/proposal/loaders', () => ({ loadBidderProfile: async () => ({}), loadBidderProfileResult: async () => ({ status: 'empty' as const, profile: {} }), formatProfileForPrompt: () => '' }));
+vi.mock('@/lib/llm/usage-cost', () => ({ isUserOverBudget: vi.fn(async () => h.overBudget), recordLlmUsage: vi.fn(async () => {}) }));
+vi.mock('@/lib/chat/provider-events', () => ({ recordProviderEvent: vi.fn(async () => {}) }));
+vi.mock('@/lib/chat/mentioned-notice', () => ({ resolveMentionedNotice: vi.fn(async () => ({ status: 'none' })), answerUsesNotice: () => false }));
+vi.mock('@/lib/chat/card-chat-turns', () => ({ parseTurnId: () => null, claimCardTurn: vi.fn(), completeCardTurn: vi.fn(), failCardTurn: vi.fn() }));
+vi.mock('@/lib/mcp/credits', async (orig) => ({ ...(await orig<typeof import('@/lib/mcp/credits')>()), logCall: vi.fn(async () => {}) }));
+vi.mock('@/lib/mcp/tool-registry', async (orig) => ({ ...(await orig<typeof import('@/lib/mcp/tool-registry')>()), runMcpTool: h.runMcpTool }));
+vi.mock('@/lib/ask-mindy/company-profile', async (orig) => ({ ...(await orig<typeof import('@/lib/ask-mindy/company-profile')>()), loadCompanyProfile: vi.fn(async () => ({ status: 'ok', workspace: 'own', profile: { companyName: 'Acme Clean', certifications: [{ name: 'WOSB', source: 'self_reported' }], unknown: [] } })) }));
+vi.mock('@/lib/ask-mindy/intelligence-gate', async (orig) => ({ ...(await orig<typeof import('@/lib/ask-mindy/intelligence-gate')>()), runIntelligenceGate: h.runGate }));
+vi.mock('@/lib/ask-mindy/gate-intent', async (orig) => ({ ...(await orig<typeof import('@/lib/ask-mindy/gate-intent')>()), extractWorkPhrase: h.extract }));
+
+vi.mock('@anthropic-ai/sdk', () => ({ default: class { messages = { create: (...a: unknown[]) => h.create(...a) }; } }));
+
+const ENV_KEYS = ['OPENAI_API_KEY', 'SUPABASE_SERVICE_ROLE_KEY', 'ASK_MINDY_INTELLIGENCE_GATE', 'ASK_MINDY_INTELLIGENCE_GATE_ALLOWLIST', 'ASK_MINDY_RESEARCH_MODE', 'ASK_MINDY_RESEARCH_MODE_ALLOWLIST', 'ASK_MINDY_RESEARCH_MODEL'] as const;
+const saved: Record<string, string | undefined> = {};
+const openaiCalls: string[] = [];
+const EMAIL = 'erika@example.com';
+const Q = 'Give me a full assessment of Ridgeline Digital.';
+type Block = Record<string, unknown>;
+const reply = (content: Block[], stop: string) => ({ content, stop_reason: stop, usage: { input_tokens: 100, output_tokens: 50 } });
+
+beforeEach(() => {
+  for (const k of ENV_KEYS) saved[k] = process.env[k];
+  process.env.OPENAI_API_KEY = 'sk-test';
+  process.env.SUPABASE_SERVICE_ROLE_KEY = 'srk-test';
+  for (const k of ENV_KEYS.slice(2)) delete process.env[k];
+  openaiCalls.length = 0; h.inserts.length = 0; h.overBudget = false;
+  h.runMcpTool.mockReset();
+  h.runMcpTool.mockImplementation(async (name: string) => ({ result: { ok: true, grounded: true, tool: name, note: 'obligated $1.2M' }, credits: 0 }));
+  h.runGate.mockReset(); h.extract.mockReset(); h.extract.mockImplementation(async () => 'digital marketing');
+  h.create.mockReset();
+  let step = 0;
+  h.create.mockImplementation(async () => (++step === 1
+    ? reply([{ type: 'text', text: 'Looking.' }, { type: 'tool_use', id: 'tu1', name: 'find_opportunities', input: { query: 'digital marketing' } }, { type: 'tool_use', id: 'tu2', name: 'search_contractors', input: { keyword: 'Ridgeline' } }], 'tool_use')
+    : reply([{ type: 'text', text: 'Start with the Navy recruiting campaign ($1.2M awarded so far).' }], 'end_turn')));
+  vi.stubGlobal('fetch', vi.fn(async (url: string, init: RequestInit) => {
+    openaiCalls.push(String(url));
+    const body = JSON.parse(String(init.body || '{}')) as Record<string, unknown>;
+    return isPlannerCall(body) ? plannerResponse([]) : answerStream(['Existing path answer.']);
+  }));
+  vi.spyOn(console, 'error').mockImplementation(() => {});
+  vi.spyOn(console, 'warn').mockImplementation(() => {});
+  vi.spyOn(console, 'info').mockImplementation(() => {});
+});
+afterEach(() => {
+  for (const k of ENV_KEYS) { if (saved[k] === undefined) delete process.env[k]; else process.env[k] = saved[k]; }
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
+
+async function ask(message: string): Promise<SseEvent[]> {
+  const { POST } = await import('./route');
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return withinMs(readSse(await POST(chatRequest({ message, email: EMAIL }) as any)), 5000, 'chat stream');
+}
+const text = (ev: SseEvent[]) => ev.filter((e) => e.type === 'token').map((e) => (e as { content: string }).content).join('');
+const flagOn = () => { process.env.ASK_MINDY_RESEARCH_MODE = 'true'; process.env.ASK_MINDY_RESEARCH_MODE_ALLOWLIST = EMAIL; };
+const savedTrace = async () => { await new Promise((r) => setTimeout(r, 20)); return (h.inserts.find((r) => r.role === 'assistant') as { trace?: Record<string, unknown> } | undefined)?.trace; };
+
+describe('research mode in the chat route', () => {
+  it('flag off: the existing path answers; Anthropic research never runs', async () => {
+    const ev = await ask(Q);
+    expect(h.create).not.toHaveBeenCalled();
+    expect(text(ev)).toContain('Existing path answer.');
+  });
+
+  it('flag on: Claude runs the loop over the catalog (both calls executed), the answer streams, no OpenAI call', async () => {
+    flagOn();
+    const ev = await ask(Q);
+    expect(h.create).toHaveBeenCalledTimes(2);
+    const first = h.create.mock.calls[0][0] as { model: string; system: string; tools: Array<{ name: string }> };
+    expect(first.model).toBe('claude-opus-5-5');
+    expect(first.system).toContain('IDENTITY FIRST');
+    const names = first.tools.map((t) => t.name);
+    expect(names).toEqual(expect.arrayContaining(['find_opportunities', 'search_contractors', 'search_web']));
+    for (const live of ['lookup_sam_entity', 'get_contractor_award_history', 'get_solicitation_incumbent', 'get_solicitation_documents']) expect(names).not.toContain(live);
+    expect(h.runMcpTool.mock.calls.map((c) => c[0])).toEqual(expect.arrayContaining(['find_opportunities', 'search_contractors']));
+    expect(text(ev)).toBe('Start with the Navy recruiting campaign ($1.2M awarded so far).');
+    expect(ev.filter((e) => e.type === 'progress').length).toBeGreaterThanOrEqual(2);
+    expect(openaiCalls).toHaveLength(0);
+    const trace = await savedTrace();
+    expect(trace).toMatchObject({ engine: 'research_mode', model: 'claude-opus-5-5', stop: 'done', call_count: 2, figure_check: { untraceable: [], disclosed: false } });
+    const calls = (trace?.calls as Array<Record<string, unknown>>);
+    expect(calls.map((c) => c.tool).sort()).toEqual(['find_opportunities', 'search_contractors']);
+    expect(JSON.stringify(trace)).not.toContain(EMAIL);
+    expect(JSON.stringify(trace)).not.toContain('obligated $1.2M');
+  });
+
+  it('the model is set by env and never swapped; over budget says so plainly and runs no model', async () => {
+    flagOn();
+    process.env.ASK_MINDY_RESEARCH_MODEL = 'claude-sonnet-5-5';
+    await ask(Q);
+    expect((h.create.mock.calls[0][0] as { model: string }).model).toBe('claude-sonnet-5-5');
+    h.create.mockClear(); h.inserts.length = 0; h.overBudget = true;
+    const ev = await ask(Q);
+    expect(h.create).not.toHaveBeenCalled();
+    expect(openaiCalls).toHaveLength(0);
+    expect(text(ev)).toMatch(/reached this month's research limit/);
+  });
+
+  it('an untraceable figure is fixed by one revision, or disclosed first', async () => {
+    flagOn();
+    let step = 0;
+    h.create.mockImplementation(async () => (++step === 1 ? reply([{ type: 'text', text: 'The award is $9.9M.' }], 'end_turn') : reply([{ type: 'text', text: 'The award is $9.9M.' }], 'end_turn')));
+    const ev = await ask(Q);
+    expect(text(ev).split('\n')[0]).toMatch(/^I could not fully verify this answer/);
+    expect(text(ev)).toContain('$9.9M');
+    expect(await savedTrace()).toMatchObject({ figure_check: { untraceable: ['$9.9M'], disclosed: true } });
+  });
+
+  it('research mode supersedes the intelligence gate on that turn', async () => {
+    flagOn();
+    process.env.ASK_MINDY_INTELLIGENCE_GATE = 'true'; process.env.ASK_MINDY_INTELLIGENCE_GATE_ALLOWLIST = EMAIL;
+    await ask('What open opportunities are there for digital marketing in Connecticut?');
+    expect(h.runGate).not.toHaveBeenCalled();
+    expect(h.create).toHaveBeenCalled();
+  });
+
+  it('a service failure gives a plain message, never the old planner', async () => {
+    flagOn();
+    h.create.mockImplementation(async () => { throw new Error('500 overloaded'); });
+    const ev = await ask(Q);
+    expect(text(ev)).toMatch(/could not finish this research/);
+    expect(openaiCalls).toHaveLength(0);
+  });
+
+  it('find_opportunities with a uei runs without it (its company anchor would call live SAM), and the trace says so', async () => {
+    flagOn();
+    let step = 0;
+    h.create.mockImplementation(async () => (++step === 1
+      ? reply([{ type: 'tool_use', id: 'tu1', name: 'find_opportunities', input: { query: 'digital marketing', uei: 'ABC123DEF456' } }], 'tool_use')
+      : reply([{ type: 'text', text: 'Done.' }], 'end_turn')));
+    await ask(Q);
+    const call = h.runMcpTool.mock.calls.find((c) => c[0] === 'find_opportunities');
+    expect(JSON.stringify(call)).not.toContain('ABC123DEF456');
+    expect(await savedTrace()).toMatchObject({ live_sam_args_dropped: ['find_opportunities:uei'] });
+  });
+});
