@@ -10914,7 +10914,7 @@ const ASK_MINDY_CSS =
   + '.amk-msg.a .bub.md .md-table{margin:6px 0 10px;overflow-x:auto}.amk-msg.a .bub.md table{border-collapse:collapse;width:100%;font-size:12.5px}'
   + '.amk-msg.a .bub.md th{text-align:left;font-weight:700;border-bottom:1px solid #d7dee8;padding:5px 6px;white-space:nowrap}.amk-msg.a .bub.md td{border-bottom:1px solid #edf1f5;padding:5px 6px;vertical-align:top;overflow-wrap:normal;word-break:normal}'
   // Narrow drawer: holder links must not break mid-word; the value stays on one line; every column stays visible at drawer width. 2026-11-16.
-  + '.amk-msg.a .bub.md td a{overflow-wrap:normal;word-break:normal}.amk-msg.a .bub.md td:first-child{min-width:130px}.amk-msg.a .bub.md td:nth-child(2){white-space:nowrap}'
+  + '.amk-msg.a .bub.md td a{overflow-wrap:normal;word-break:normal}.amk-msg.a .bub.md td:first-child{min-width:130px}.amk-msg.a .bub.md td:nth-child(2){white-space:nowrap}.amk-msg.a .bub.md td.md-wrap{white-space:normal;min-width:150px}.amk-msg.a .bub.md table.md-cols3 td:first-child{min-width:0}.amk-msg.a .bub.md table.md-cols3 td.md-wrap{min-width:110px}'
   // Follow-up ACTION chips under an answer (the vision\'s "What agencies use Azure? / Add to pipeline").
   + '.amk-act{display:flex;flex-wrap:wrap;gap:7px;margin-top:9px}'
   + '.amk-act button{font:600 11.5px Inter;color:#2563eb;background:#eaf1fe;border:1px solid #d3e2fc;border-radius:8px;padding:6px 11px;cursor:pointer;text-align:left}'
@@ -10943,6 +10943,11 @@ const ASK_MINDY_CSS =
   + '.amk-in textarea:focus{border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.12)}'
   + '.amk-send{flex:none;width:40px;height:40px;border:0;border-radius:11px;background:#2563eb;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center}'
   + '.amk-send:disabled{opacity:.45;cursor:default}.amk-send svg{width:18px;height:18px}'
+  + '.amk-rp{margin:0 0 8px;border:1px solid #e6ebf0;border-radius:10px;background:#f8fafc;padding:8px 10px;font:500 12.5px Inter,system-ui,sans-serif;color:#334155}.amk-rp-hd b{font-weight:600;color:#0f172a}.amk-rp-time,.amk-rp-n{color:#6b7787;font-variant-numeric:tabular-nums}'
+  + '.amk-rp-spin{display:inline-block;width:11px;height:11px;margin-right:6px;vertical-align:-1px;border:2px solid #c7d2fe;border-top-color:#6366f1;border-radius:50%;animation:amkspin .9s linear infinite}@keyframes amkspin{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){.amk-rp-spin{animation:none}}'
+  + '.amk-rp-cur{margin-top:3px;color:#475569}.amk-rp-still{margin-top:3px;font-size:11.5px;color:#6b7787}.amk-rp-still[hidden]{display:none}.amk-rp-tog{margin-top:4px;border:0;background:none;padding:0;cursor:pointer;font:600 11.5px Inter,system-ui,sans-serif;color:#6b7787}.amk-rp-tog:hover{color:#334155}'
+  + '.amk-rp-steps{margin:4px 0 0;padding:0 0 0 16px;font-size:12px;color:#64748b}.amk-rp-steps[hidden]{display:none}.amk-rp-sum{background:none;border:0;padding:0;color:#6b7787;font-size:12px}'
+  + '@media(prefers-color-scheme:dark){.amk-rp{background:#0d141d;border-color:#202b39;color:#cdd8e4}.amk-rp-hd b{color:#eaf1f8}.amk-rp-cur{color:#b6c3d1}.amk-rp-sum{background:none}}'
   + '.amk-notices{margin-top:8px;display:flex;flex-direction:column;gap:4px}.amk-notice{font:500 12px Inter,system-ui,sans-serif;color:#92400e;background:#fffbeb;border:1px solid #fde68a;border-radius:7px;padding:4px 8px}'
   + '@media(prefers-color-scheme:dark){.amk-notice{color:#fcd34d;background:rgba(245,158,11,.1);border-color:rgba(245,158,11,.25)}}'
   + '.amk-hd-tools{display:flex;gap:6px;flex:none}.amk-card .amk-hd-tools{display:none}.amk-tool{border:1px solid #dde3ec;background:#fff;color:#334155;font:600 11.5px Inter,system-ui,sans-serif;border-radius:7px;padding:4px 9px;cursor:pointer}.amk-tool:hover{background:#f1f5f9}'
@@ -11011,8 +11016,12 @@ const ASK_MINDY_JS = `<script>(function(){
   // Answer text \\u2192 the bubble. window.__mindyMd (src/lib/chat/safe-markdown.ts) ESCAPES the model text first
   // and only then writes its own markup for a small markdown subset, so innerHTML never receives raw model
   // text. Without it (script missing) the text is shown as plain text, never as HTML.
+  // A long table cell (a research answer's status or source column) wraps; short ones (a dollar value, a code) stay
+  // on one line as before. Without this the second column's nowrap pushed prose tables off the drawer.
+  function mdWrapCells(root){ var tds=root.querySelectorAll('td'); for(var i=0;i<tds.length;i++){ if(String(tds[i].textContent||'').length>24) tds[i].className='md-wrap'; }
+    var tbs=root.querySelectorAll('table'); for(var j=0;j<tbs.length;j++){ var r=tbs[j].querySelector('tr'); if(r&&r.children.length>=3) tbs[j].className='md-cols3'; } }
   function paint(bub,text){
-    if(typeof window.__mindyMd==='function'){ try{ bub.innerHTML=window.__mindyMd(text); bub.classList.add('md'); return; }catch(e){} }
+    if(typeof window.__mindyMd==='function'){ try{ bub.innerHTML=window.__mindyMd(text); bub.classList.add('md'); mdWrapCells(bub); return; }catch(e){} }
     bub.classList.remove('md'); bub.textContent=text;
   }
   function tok(){ try{return localStorage.getItem('mi_beta_auth_token');}catch(e){return null;} }
@@ -11794,6 +11803,45 @@ const ASK_MINDY_JS = `<script>(function(){
       saveView(); release(); body.scrollTop=body.scrollHeight;
     }
     var acc='', started=false, gotDone=false, gotError=false, ledger=null, turnDoc=false, turnFiles=null, turnReport=null;
+    // Research steps ('progress' events): a calm panel, not warnings. Timer, current step, count, Show steps, and a
+    // "still working" line after 20 s of quiet. Collapses to "Researched · N steps · m:ss" once the answer starts
+    // (or the turn ends any other way). A phase ('writing'|'checking') is the headline, not a step.
+    var rp=null;
+    function rpFmt(ms){ var s=Math.max(0,Math.floor(ms/1000)); var r=s%60; return Math.floor(s/60)+':'+(r<10?'0':'')+r; }
+    function rpCount(n){ return n===1?'1 step':(n+' steps'); }
+    function rpList(){ var ol=rp.el.querySelector('.amk-rp-steps'); if(!ol)return; ol.innerHTML='';
+      rp.steps.forEach(function(s){ var li=document.createElement('li'); li.textContent=s.text+(s.count>1?(' ×'+s.count):''); ol.appendChild(li); }); }
+    function rpPaint(){ if(!rp||rp.done)return; var now=Date.now();
+      rp.el.querySelector('.amk-rp-time').textContent=rpFmt(now-rp.start);
+      rp.el.querySelector('.amk-rp-n').textContent=rp.total?(' · '+rpCount(rp.total)):'';
+      rp.el.querySelector('.amk-rp-cur').textContent=rp.headline||(rp.steps.length?rp.steps[rp.steps.length-1].text:'Starting research.');
+      var still=rp.el.querySelector('.amk-rp-still'); still.hidden=(now-rp.last<20000); }
+    function rpStep(ev){
+      var text=String(ev.message||'').replace(/ +/g,' ').trim().slice(0,200); if(!text)return;
+      if(!rp){
+        var el=document.createElement('div'); el.className='amk-rp'; el.setAttribute('role','status'); el.setAttribute('aria-live','polite'); el.setAttribute('data-testid','amk-research');
+        el.innerHTML='<div class="amk-rp-hd"><span class="amk-rp-spin" aria-hidden="true"></span><b>Researching</b> <span class="amk-rp-time">0:00</span><span class="amk-rp-n"></span></div><div class="amk-rp-cur"></div><div class="amk-rp-still" hidden>Still working. Research answers can take a few minutes.</div><button type="button" class="amk-rp-tog" aria-expanded="false" data-testid="amk-research-toggle">Show steps</button><ol class="amk-rp-steps" hidden></ol>';
+        aEl.insertBefore(el,bub); if(!started) bub.style.display='none';
+        rp={steps:[],total:0,headline:null,start:Date.now(),last:Date.now(),el:el,done:false,timer:null};
+        var tog=el.querySelector('.amk-rp-tog'), ol=el.querySelector('.amk-rp-steps');
+        tog.onclick=function(){ var open=ol.hidden; ol.hidden=!open; tog.textContent=open?'Hide steps':'Show steps'; tog.setAttribute('aria-expanded',open?'true':'false'); if(open) rpList(); };
+        rp.timer=setInterval(rpPaint,1000);
+      }
+      if(rp.done)return;
+      rp.last=Date.now();
+      if(ev.phase==='writing'||ev.phase==='checking'){ rp.headline=text; }
+      else { rp.headline=null; rp.total++; var hit=null; for(var i=0;i<rp.steps.length;i++){ if(rp.steps[i].text===text){ hit=rp.steps[i]; break; } }
+        if(hit) hit.count++; else { rp.steps.push({text:text,count:1}); if(rp.steps.length>40) rp.steps.shift(); } }
+      if(!rp.el.querySelector('.amk-rp-steps').hidden) rpList();
+      rpPaint(); body.scrollTop=body.scrollHeight;
+    }
+    function rpDone(){ if(!rp||rp.done)return; rp.done=true; if(rp.timer) clearInterval(rp.timer); bub.style.display='';
+      var ol0=rp.el.querySelector('.amk-rp-steps'), tg0=rp.el.querySelector('.amk-rp-tog'); if(ol0) ol0.hidden=true; if(tg0){ tg0.textContent='Show steps'; tg0.setAttribute('aria-expanded','false'); }
+      rp.el.className='amk-rp amk-rp-sum'; rp.el.removeAttribute('aria-live'); rp.el.setAttribute('data-testid','amk-research-summary');
+      var hd=rp.el.querySelector('.amk-rp-hd'); hd.textContent='Researched · '+rpCount(rp.total)+' · '+rpFmt(Date.now()-rp.start);
+      var c=rp.el.querySelector('.amk-rp-cur'); if(c&&c.parentNode) c.parentNode.removeChild(c);
+      var st=rp.el.querySelector('.amk-rp-still'); if(st&&st.parentNode) st.parentNode.removeChild(st);
+      if(!rp.total&&rp.el.parentNode) rp.el.parentNode.removeChild(rp.el); }
     // Product decision 2026-11-19: Map and Ask Mindy are separate tools. Send the customer's words
     // only — never inject map viewport filters/geography into Ask. Card chat still sends notice
     // context (below); that is an opportunity record, not the map view.
@@ -11809,7 +11857,7 @@ const ASK_MINDY_JS = `<script>(function(){
     if(oppCtx){ payload.context={kind:'opportunity',notice_id:oppCtx.id}; payload.turn_id=turnId; if(opts.replay)payload.replay_only=true;
       if(!opts.turnId){ try{ if(window.__track) window.__track('tool_use','card_chat_ask',{turn:Math.floor(history.length/2)+1}); }catch(e){} } }
     var cardAtSend=oppCtx;
-    function release(){ busy=false; if(send)send.disabled=false; if(stopBtn&&stopBtn.parentNode)stopBtn.parentNode.removeChild(stopBtn); stopBtn=null; }
+    function release(){ rpDone(); busy=false; if(send)send.disabled=false; if(stopBtn&&stopBtn.parentNode)stopBtn.parentNode.removeChild(stopBtn); stopBtn=null; }
     // Drop the question's two bubbles (it is about to be re-asked with the same turn id).
     function dropBubbles(){ var u=aEl.previousSibling; if(aEl.parentNode)aEl.parentNode.removeChild(aEl); if(u&&u.classList&&u.classList.contains('u')&&u.parentNode)u.parentNode.removeChild(u); }
     // The answer did not arrive: offer to get it. Same turn id, so an answer the server already finished
@@ -11850,12 +11898,13 @@ const ASK_MINDY_JS = `<script>(function(){
             // create_document saved a document: a card under the answer and the report opens in the pane (view mode only).
             else if(ev.type==='deliverables'&&Array.isArray(ev.files)&&!oppCtx){ turnDoc=true; turnFiles=ev.files; try{ repOnDeliverables(ev.files,aEl); }catch(e){} }
             else if(ev.type==='market_report'&&ev.html&&!oppCtx){ turnDoc=true; turnReport=savedReport({id:ev.report_id,title:ev.title}); try{ repOnMarketReport(ev,aEl); }catch(e){} }
-            else if(ev.type==='token'){ if(!started){ bub.textContent=''; started=true; } acc+=(ev.content||''); paint(bub,acc); body.scrollTop=body.scrollHeight; }
+            else if(ev.type==='token'){ if(!started){ bub.textContent=''; started=true; rpDone(); } acc+=(ev.content||''); paint(bub,acc); body.scrollTop=body.scrollHeight; }
             // citations event is now always empty (RAG corpus removed 2026-08-02) \\u2014 ignored.
             else if(ev.type==='error'){ gotError=true; if(!started)bub.textContent=safeErr(ev.message); }
             // Server status lines (a data source unavailable, a lookup failed, a long step under way): shown under
             // the answer, as the old chat does, instead of only typing dots.
-            else if((ev.type==='notice'||ev.type==='progress')&&typeof ev.message==='string'&&ev.message.trim()){ addNotice(aEl,ev.message); }
+            else if(ev.type==='progress'&&typeof ev.message==='string'){ rpStep(ev); }
+            else if(ev.type==='notice'&&typeof ev.message==='string'&&ev.message.trim()){ addNotice(aEl,ev.message); }
             else if(ev.type==='done'){ gotDone=true; }
             else if(ev.type==='replayed'){ var rd=document.createElement('div'); rd.className='amk-credits'; rd.textContent='Saved answer \\u00b7 no extra credits'; aEl.appendChild(rd); }
             else if(ev.type==='citations'&&oppCtx&&Array.isArray(ev.sources)&&ev.sources.length){ var sd=document.createElement('div'); sd.className='amk-src'; var s0=ev.sources[0]; sd.innerHTML='Source: '+(s0.url?'<a href="'+esc(s0.url)+'" target="_blank" rel="noopener">'+esc(s0.title||'SAM.gov notice')+'</a>':esc(s0.title||'SAM.gov notice')); aEl.appendChild(sd); }

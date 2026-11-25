@@ -17,9 +17,11 @@
  *  - A non-JSON result that is still too large is cut with an explicit marker.
  */
 
-export const DEFAULT_TURN_BUDGET_CHARS = 60_000;   // ~15K tokens of tool evidence per turn
+// Raised 2026-11-25 (Eric: match Claude + Mindy MCP, which reads whole tool results): 120K chars is ~30K tokens,
+// well inside every chat model's context; strings were cut at 500 chars, which clipped scopes and descriptions.
+export const DEFAULT_TURN_BUDGET_CHARS = 120_000;   // ~30K tokens of tool evidence per turn
 export const MIN_PER_RESULT_CHARS = 4_000;
-export const LONG_STRING_CHARS = 500;
+export const LONG_STRING_CHARS = 1_500;
 
 const PROTECTED_KEYS = new Set([
   '_meta', 'meta', 'sources', 'source', 'citations', 'citation', 'provenance', 'evidence',

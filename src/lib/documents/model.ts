@@ -84,6 +84,8 @@ export interface BulletsBlock {
   id: string;
   items: BulletItem[];
   ordered?: boolean;
+  /** Rendering hint only: 'checklist' draws an empty checkbox per item (next steps, readiness). Ignored when ordered. */
+  style?: 'checklist';
 }
 
 export type ColumnFormat = 'text' | 'usd' | 'int' | 'pct' | 'date';

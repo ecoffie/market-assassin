@@ -39,12 +39,15 @@ import {
 // Meaning + eligibility come from the plan; this file owns only MCP surface policy + presentation.
 import {
   buildDiscoveryPlan,
+  contextFor,
+  OPEN_TEXT_COLS,
   applyOpenPlan,
   applyRecompetePlan,
   applyForecastPlan,
   performedOutsideRegion,
   rankRecords,
   matchesText,
+  conceptHit,
   MCP_POLICY,
   type DiscoveryInput,
   type DiscoveryPlan,
@@ -179,6 +182,11 @@ export interface HorizonItemBase {
   value_label: string | null;
   source: string;
   why_this_matched: string;
+  /**
+   * Open now, DIRECT text matches only: where the words were found. 'description' / 'statement_of_work' = a mention in
+   * the notice body only, not core demand (presentation.host_rules BODY-ONLY).
+   */
+  match_location?: OpenMatchLocation;
   identity: { kind: string; id: string };
   evidence_class?: EvidenceClass | 'HOLDER_SIGNAL';
   /** What put this row in front of the customer (buy-side vs holder/buyer name vs company codes). */
@@ -226,6 +234,12 @@ export interface HorizonResult {
    * own awards (forecast-awarded-to-company.ts). Flagged rows carry `already_awarded_to_company`.
    */
   company_award_check?: { status: 'checked' | 'unavailable'; flagged: number; rule: string; note: string } | null;
+  /**
+   * Open now only: the full search timed out, so it was re-run over fewer text columns. The columns actually
+   * searched and the ones skipped are named; a match only in a skipped column (e.g. the statement of work) can
+   * be missing from this answer.
+   */
+  narrowed_search?: { searched_columns: string[]; skipped_columns: string[]; reason: 'statement_timeout' };
 }
 
 export interface HorizonStage {
@@ -349,6 +363,7 @@ export const HOST_RULES_FIND_FIRST_VALUE = [
   'COMING SOON UNAVAILABLE: if coming_soon status is unavailable because this buyer has no forecast publisher, that is coverage not established — not a measured zero. Do not invent forecast rows from parent-department feeds.',
   'COMING SOON PARTIAL: if coming_soon status is partial, its count covers only the buyers with a forecast publisher. Name the buyers listed in coverage.gaps as not measured — never say they have zero upcoming buys.',
   'COMPETITION: a Coming back item may carry `competition`, read from that award\'s own USASpending record. Use competition.label for how the current award was made, in preference to set_aside_type. not_competed rows (for example "Not competed · AbilityOne" or "8(a) sole source") are not equally realistic targets: rank them after competed and not-established rows in every list, short list or table (items already arrive in that order; never open a list with a not-competed row), and say why in plain words (an AbilityOne award goes to a nonprofit that employs people with disabilities without competition; an 8(a) sole-source award goes to one 8(a) firm without competition). unknown means not established: say "not established", never "full and open". competition describes the CURRENT award only; never say the follow-on cannot be won.',
+  'BODY-ONLY: an Open now item with match_location "description" or "statement_of_work" mentions the words only in the notice body, not in its title or codes. Never present it as core demand for what they sell or count it as a fit without reading the notice; title and code matches come first.',
   'HOLDER_SIGNAL: a Coming back row labelled HOLDER_SIGNAL matched only on the incumbent\'s NAME (the company name contains the search words). It is NOT a direct match and NOT demand for this work — never count it with DIRECT_MATCH. At most say the holder\'s name suggests related work worth checking; the contract itself (see naics_code / psc_code) may be something else entirely.',
 ] as const;
 
@@ -543,6 +558,8 @@ type InterpretedQuery = {
    * capped, date-ordered fetch window by the (often much larger) registered-code population.
    */
   basePlan: DiscoveryPlan | null;
+  /** The same request re-planned with fewer Open-now text columns (timeout retry only; see queryOpenNow). */
+  narrowOpenPlan?: (cols: readonly string[]) => DiscoveryPlan;
 };
 
 /**
@@ -690,6 +707,7 @@ function interpretQuery(input: FindOpportunitiesInput, company: CompanyAnchorRes
     market,
     company,
     basePlan,
+    narrowOpenPlan: (cols) => buildDiscoveryPlan(mcpDiscoveryInput(input, company?.anchor), policy, { ...contextFor(), openTextCols: cols }),
     region: resolveRegion(input),
     stage: parseStageGroup(input.stage),
     interpreted: {
@@ -798,6 +816,29 @@ export function labelOpenRow(
   return { cls, basis, tier };
 }
 
+/**
+ * WHERE a DIRECT text match was found (Agent 4, from Eric's EFS Digital Claude + Mindy run, 2026-11-25). "advertising,
+ * marketing" ranked vehicle-marshalling and email-retention notices first: a single passing word in the description or
+ * statement of work made a row DIRECT, tied with title hits, and rows admitted only via sow_text scored 0 and fell to
+ * deadline order. Ranking only: nothing is admitted or dropped.
+ *   codes / title → 0 · description → 1 · statement_of_work (admitted by a column the ranker cannot see) → 2
+ */
+export type OpenMatchLocation = 'codes' | 'title' | 'description' | 'statement_of_work';
+export const OPEN_LOCATION_TIER: Record<OpenMatchLocation, number> = { codes: 0, title: 0, description: 1, statement_of_work: 2 };
+
+export function openMatchLocation(row: Record<string, unknown>, plan: DiscoveryPlan, label: OpenLabel): OpenMatchLocation | null {
+  if (label.cls !== 'DIRECT_MATCH' || plan.matcher.mode !== 'lexical') return null;
+  if (label.basis.includes('buy_side_code')) return 'codes';
+  const eligible = plan.matcher.alternatives.flatMap((a) => a.eligible);
+  const hitIn = (v: unknown) => typeof v === 'string' && !!v && eligible.some((c) => conceptHit(c, v));
+  if (hitIn(row.title)) return 'title';
+  if (hitIn(row.description)) return 'description';
+  return 'statement_of_work';
+}
+
+const BODY_ONLY_WHY = (phrase: string, loc: OpenMatchLocation) =>
+  `Mentions “${phrase}” only in the notice ${loc === 'description' ? 'description' : 'statement of work'}, not in its title or codes — a passing mention, not confirmed core demand. Read the notice before treating it as a fit.`;
+
 function openWhy(label: OpenLabel, phrase: string, row: Record<string, unknown>): string {
   if (label.basis[0] === 'buyer_name') return buyerNameWhy(phrase);
   if (label.basis[0] === 'related_market_code') return relatedCodeWhy(phrase, row as { naics_code?: string; naics_description?: string });
@@ -846,10 +887,21 @@ function eligibilityCounts(items: HorizonItem[], company: CompanyAnchorResolutio
   return out;
 }
 
+/**
+ * Open-now timeout retry ladder (Eric's Claude + Mindy EFS Digital run, 2026-11-25: a long query failed outright
+ * with search_too_long). The cost is the regex clauses × text columns; the statement of work is the large one.
+ * Each step searches fewer columns; the result names what was skipped. Only reached after a statement timeout.
+ */
+export const OPEN_TIMEOUT_RETRY_COLUMNS: readonly (readonly string[])[] = [
+  ['title', 'description', 'department', 'solicitation_number'],
+  ['title', 'department', 'solicitation_number'],
+];
+
 async function queryOpenNow(
   client: SupabaseClient,
   p: InterpretedQuery,
   limit: number,
+  attempt = 0,
 ): Promise<HorizonResult> {
   const source = 'sam_opportunities';
   if (p.plan.status !== 'ok') return blockedHorizon(source, OPEN_HANDOFFS, p.plan);
@@ -883,6 +935,20 @@ async function queryOpenNow(
     if (error) {
       // A timed-out search is "too long", with an actionable message; still unavailable, never zero (search-failure.ts).
       const f = classifySearchFailure(error);
+      const cols = OPEN_TIMEOUT_RETRY_COLUMNS[attempt];
+      if (f.code === 'search_too_long' && cols && p.narrowOpenPlan) {
+        const narrowed = await queryOpenNow(client, { ...p, plan: p.narrowOpenPlan(cols) }, limit, attempt + 1);
+        if (narrowed.narrowed_search || narrowed.error?.class === 'search_too_long') return narrowed;
+        const skipped = OPEN_TEXT_COLS.filter((c) => !cols.includes(c));
+        return {
+          ...narrowed,
+          narrowed_search: { searched_columns: [...cols], skipped_columns: skipped, reason: 'statement_timeout' },
+          semantics_note: [
+            `The full search was too long to finish, so Mindy re-ran it over ${cols.join(', ')} only; ${skipped.join(', ')} ${skipped.length === 1 ? 'was' : 'were'} not searched. A notice that matches only there can be missing.`,
+            narrowed.semantics_note,
+          ].filter(Boolean).join(' '),
+        };
+      }
       const u = unavailable(source, OPEN_HANDOFFS, f.message, unsupported);
       return f.code === 'search_too_long' ? { ...u, error: { class: 'search_too_long', message: f.message } } : u;
     }
@@ -929,9 +995,11 @@ async function queryOpenNow(
     const ranked = rows
       .map((r, i) => {
         const label = labelOpenRow(r, p.plan, cap, anchor);
-        return { i, row: r, cls: label.cls, label, s: scores.get(r) };
+        const loc = openMatchLocation(r, p.plan, label);
+        return { i, row: r, cls: label.cls, label, loc, s: scores.get(r) };
       })
       .sort((a, b) => a.label.tier - b.label.tier
+        || (a.loc ? OPEN_LOCATION_TIER[a.loc] : 0) - (b.loc ? OPEN_LOCATION_TIER[b.loc] : 0)
         || (b.s?.breadth ?? 0) - (a.s?.breadth ?? 0)
         || (b.s?.score ?? 0) - (a.s?.score ?? 0)
         || a.i - b.i);
@@ -940,7 +1008,7 @@ async function queryOpenNow(
     const sliced = ranked.slice(0, limit);
     const phrase = p.searchText || 'this work';
 
-    const items: HorizonItem[] = sliced.map(({ row: r, cls, label }) => {
+    const items: HorizonItem[] = sliced.map(({ row: r, cls, label, loc }) => {
       const office = r.office_address as { city?: string; state?: string } | null;
       const eligibility = eligibilityFor(p.company, 'notice', r);
       const st = String(r.pop_state || office?.state || '');
@@ -954,10 +1022,11 @@ async function queryOpenNow(
         relevant_date_label: 'response_deadline',
         value_label: null,
         source,
-        why_this_matched: openWhy(label, phrase, r),
+        why_this_matched: loc === 'description' || loc === 'statement_of_work' ? BODY_ONLY_WHY(phrase, loc) : openWhy(label, phrase, r),
         identity: { kind: 'notice_id', id: String(r.notice_id || '') },
         evidence_class: cls === 'WEAK_NON_MARKET' ? undefined : cls,
         match_basis: label.basis,
+        ...(loc ? { match_location: loc } : {}),
         ...(eligibility ? { eligibility } : {}),
         ...(stage ? { acquisition_stage: stageMatchFor(r, stage) } : {}),
         notice_id: String(r.notice_id || ''),

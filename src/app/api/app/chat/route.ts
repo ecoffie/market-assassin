@@ -50,7 +50,8 @@ import { vaultDocEnabledFor } from '@/lib/vault/flags';
 import { createChatToolExecutor, type ChatExecutionRecord } from '@/lib/chat/chat-tool-executor';
 import { resolveChatActingScope, vaultEmailFor } from '@/lib/chat/chat-acting-scope';
 import type { BidderProfile } from '@/lib/proposal/types';
-import { resolvePlannerChain, plannerKey, anthropicSupportsForcedToolChoice, resolveAnswerChain, answerKey, ANSWER_ENDPOINTS, openAiChatParams, type PlannerTarget } from '@/lib/chat/planner-config';
+import { createMarkupFilter } from '@/lib/chat/tool-markup-filter';
+import { budgetDowngradeActive, resolvePlannerChain, plannerKey, anthropicSupportsForcedToolChoice, resolveAnswerChain, answerKey, ANSWER_ENDPOINTS, openAiChatParams, type PlannerTarget } from '@/lib/chat/planner-config';
 import { fitMessages, inputBudget, type MsgKind } from '@/lib/chat/token-budget';
 import { stagingModelConfig, STAGING_CONFIG_HEADER } from '@/lib/chat/staging-model-config';
 import { customerErrorMessage } from '@/lib/chat/customer-errors';
@@ -119,6 +120,12 @@ import { ASK_MINDY_RULES_LAYER, askMindyRulesEnabledFor, askMindyRulesPromptBloc
 import { askMindyRecipesEnabledFor } from '@/lib/ask-mindy/flags';
 import { loadCompanyProfile } from '@/lib/ask-mindy/company-profile';
 import { intelligenceGateEnabledFor, runIntelligenceGate, type GateResult } from '@/lib/ask-mindy/intelligence-gate';
+import Anthropic from '@anthropic-ai/sdk';
+import {
+  researchModeEnabledFor, researchModel, researchSystemPrompt, toAnthropicTools, runResearchLoop, groundAnswer, progressLine,
+  RESEARCH_TURN_MS, RESEARCH_DEADLINE_MS, RESEARCH_NO_ANSWER, researchToolDefs, stripLiveSamArgs, type ResearchCall,
+} from '@/lib/ask-mindy/research-mode';
+import { toolLabel } from '@/lib/chat/context-sources';
 import { gateEligible, extractWorkPhrase, profileForGate } from '@/lib/ask-mindy/gate-intent';
 import { fitRankingNote, rankFindResult } from '@/lib/ask-mindy/compose';
 import { provenanceRecords } from '@/lib/chat/doc-provenance';
@@ -180,7 +187,9 @@ export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 // A7: an explicit platform limit. Must equal CHAT_ROUTE_MAX_DURATION_S (turn-deadlines.ts): the turn
 // watchdog fires before it, so a turn always ends with `error` + `done`, never a silent cut.
-export const maxDuration = 300;
+// 800 s (Fluid compute ceiling) so an allowlisted RESEARCH MODE turn can finish (Agent 4, 2026-11-25). Every other
+// turn keeps its own 285 s watchdog (turn-deadlines.ts), so it behaves exactly as before.
+export const maxDuration = 800;
 
 // B2: the answer-step model chain lives in resolveAnswerChain (planner-config.ts). The old
 // Groq llama-3.1-8b-instant backup is retired; Groq runs only if CHAT_ANSWER_FALLBACKS lists it.
@@ -607,6 +616,9 @@ export async function POST(request: NextRequest) {
   const startedAt = Date.now();
   // A7: every wait in this turn is bounded (src/lib/chat/turn-deadlines.ts).
   const deadlines = chatDeadlines(process.env);
+  // Research mode (ASK_MINDY_RESEARCH_MODE, default off + allowlist): Claude + the Mindy MCP catalog in its own loop.
+  // Card chat is unchanged (Eric, 2026-11-25).
+  const researchTurn = !cardCtx && researchModeEnabledFor(auth.email);
 
   // SSE response — manually constructed ReadableStream since the
   // Vercel Edge / Node runtime doesn't expose an out-of-the-box helper.
@@ -665,7 +677,7 @@ export async function POST(request: NextRequest) {
           void failCardTurn({ turnId, claimToken, reason: 'turn_timeout' })
             .catch((e) => console.error('[chat] card turn fail-mark failed:', (e as Error)?.message));
         }
-      }, deadlines.turnMs);
+      }, researchTurn ? RESEARCH_TURN_MS : deadlines.turnMs);
 
       try {
         // Tell client which session this exchange belongs to right away
@@ -707,7 +719,7 @@ export async function POST(request: NextRequest) {
         // Market questions: gather evidence -> record checks -> analyst -> independent evaluator -> publish only on
         // pass, else disclose. The chat answer and the report brief come from the same decision. Any other turn, or a
         // turn where the customer's own words name no work, falls through to the existing path unchanged.
-        if (!cardCtx && intelligenceGateEnabledFor(auth.email)) {
+        if (!cardCtx && !researchTurn && intelligenceGateEnabledFor(auth.email)) {
           const ask = splitViewPreamble(message).rest || message;
           const eligible = gateEligible(ask);
           const work = eligible.ok ? await extractWorkPhrase(ask).catch(() => null) : null;
@@ -1029,7 +1041,7 @@ export async function POST(request: NextRequest) {
         const staging = stagingModelConfig(request.headers.get(STAGING_CONFIG_HEADER), TRACE_EVENTS);
         const overBudgetEarly = staging?.config.overBudget ?? await isUserOverBudget(email).catch(() => false);
         const modelEnv: Record<string, string | undefined> = staging ? { ...process.env, ...staging.config.env } : process.env;
-        const chatModelEarly = overBudgetEarly
+        const chatModelEarly = budgetDowngradeActive(modelEnv, overBudgetEarly)
           ? (modelEnv.LLM_OPENAI_MODEL || 'gpt-4o-mini')
           : (modelEnv.CHAT_OPENAI_MODEL || 'gpt-4o');
 
@@ -1210,6 +1222,116 @@ export async function POST(request: NextRequest) {
             ...(cardCtx ? { allowedToolNames: CARD_CHAT_TOOLS } : {}),
             toolTimeoutMs: (n) => toolTimeoutMs(n, deadlines),
           });
+
+          // ── RESEARCH MODE: Claude runs its own loop over the same catalog (src/lib/ask-mindy/research-mode.ts). ──
+          if (researchTurn) {
+            const rmStarted = Date.now();
+            const model = researchModel();
+            const rmTrace: Record<string, unknown> = { engine: 'research_mode', model };
+            const finish = (answer: string, extra: Record<string, unknown> = {}, sources: typeof turnSources = []) => {
+              send({ type: 'token', content: answer });
+              const rmCited = citationsFromSources(sources);
+              send({ type: 'sources', ledger: ledgerFromSources(sources) });
+              send({ type: 'citations', sources: rmCited });
+              send({ type: 'done' });
+              closeStream();
+              persistExchange({
+                email: auth.email!, sessionId, userMessage: message, assistantMessage: answer, citedSources: rmCited, tokensUsed: 0,
+                latencyMs: Date.now() - startedAt, trace: { ...rmTrace, ...extra, total_ms: Date.now() - rmStarted },
+              }).catch((err) => console.error('[chat] persist failed:', err));
+            };
+            // Never a silent model swap: if a budget limit applies, say so plainly and stop.
+            if (await isUserOverBudget(email).catch(() => false)) {
+              finish('You have reached this month\'s research limit, so I can\'t run a full research answer right now. Your saved conversations and reports are unaffected.', { stop: 'over_budget' });
+              return;
+            }
+            const rmTools = toAnthropicTools(researchToolDefs(executor.offeredToolDefs(), privateNames));
+            const conversation = [
+              ...history.filter((h) => h.role === 'user' || h.role === 'assistant').slice(-12).map((h) => ({ role: h.role as 'user' | 'assistant', content: String(h.content || '').slice(0, 12_000) || '(empty)' })),
+              { role: 'user' as const, content: message },
+            ];
+            const callLog: Array<{ tool: string; status: string; ms: number; args: unknown }> = [];
+            const liveSamArgsDropped: string[] = [];
+            let rmReport: { report_id: string | null; url: string | null; title: string; html: string } | null = null;
+            const rmDeliverables: Array<{ format: string; document_id: string; file_name?: string; version?: number | null }> = [];
+            const rmSources: typeof turnSources = [];
+            const planner = { model, provider: 'anthropic' };
+            const isWrite = (n: string) => executor.policyFor(n).decision === 'allowed_write';
+            const execOne = async (c: ResearchCall) => {
+              // Zero live SAM: an argument that would switch this tool onto a live SAM path is dropped (and traced).
+              const safe = stripLiveSamArgs(c.name, c.input ?? {});
+              if (safe.dropped.length) liveSamArgsDropped.push(`${c.name}:${safe.dropped.join(',')}`);
+              const [r] = await executor.executeRound([{ id: c.id, function: { name: c.name, arguments: JSON.stringify(safe.input) } }], planner, { deadlineAt: rmStarted + RESEARCH_DEADLINE_MS });
+              callLog.push({ tool: c.name, status: r.record.status, ms: r.record.latency_ms ?? 0, args: r.argsRedacted });
+              if (r.record.tool === CREATE_DOCUMENT && r.record.status === 'success') {
+                const d = parseCreateDocumentDeliverables(r.content);
+                if (d) rmDeliverables.push(...d.files.map((f) => ({ format: f.format, document_id: f.document_id, ...(f.file_name ? { file_name: f.file_name } : {}), ...(f.version != null ? { version: f.version } : {}) })));
+              }
+              let content = r.content;
+              if (r.record.tool === MARKET_REPORT_TOOL && r.record.status === 'success') {
+                try {
+                  const parsed = JSON.parse(r.content) as { client_name?: string; market?: { keyword?: string; naics?: string }; deliverable?: { html?: string; url?: string | null; report_id?: string | null } };
+                  const html = typeof parsed.deliverable?.html === 'string' ? parsed.deliverable.html : '';
+                  if (html) {
+                    rmReport = { report_id: parsed.deliverable?.report_id ?? null, url: parsed.deliverable?.url ?? null, title: String([parsed.client_name, parsed.market?.keyword || parsed.market?.naics, 'Market report'].filter(Boolean)[0]), html };
+                    content = JSON.stringify({ ...parsed, deliverable: { url: parsed.deliverable?.url ?? null, report_id: parsed.deliverable?.report_id ?? null, html: '[delivered to report pane]' } });
+                  }
+                } catch { /* leave raw content */ }
+              }
+              rmSources.push(sourceFromToolResult({
+                tool: r.record.tool, toolCallId: r.tool_call_id, status: r.record.status, content, rendered: null, argsRedacted: r.argsRedacted,
+                owner: { email: (actingScope.kind === 'client' ? actingScope.vaultEmail : auth.email!) || auth.email!, scope: actingScopeKey },
+                retrievedAt: new Date().toISOString(),
+              }));
+              return { id: c.id, content, isError: r.record.status !== 'success' };
+            };
+            const client = new Anthropic();
+            try {
+              const loop = await runResearchLoop({
+                client, model,
+                system: researchSystemPrompt({ today, profileBlock: userProfileBlock }),
+                conversation,
+                tools: rmTools,
+                effort: process.env.ASK_MINDY_RESEARCH_EFFORT || 'high',
+                onCalls: (cs) => { for (const c of cs) send({ type: 'progress', message: progressLine(toolLabel(c.name)) }); },
+                // Independent reads run in parallel; writes (documents, reports) run one at a time after them.
+                execute: async (cs) => {
+                  const reads = cs.filter((c) => !isWrite(c.name));
+                  const writes = cs.filter((c) => isWrite(c.name));
+                  const out = await Promise.all(reads.map(execOne));
+                  for (const w of writes) out.push(await execOne(w));
+                  return out;
+                },
+              });
+              void recordLlmUsage({ userEmail: auth.email, tool: 'chat', job: 'research_mode', provider: 'anthropic', model, usage: { prompt_tokens: loop.usage.input, completion_tokens: loop.usage.output } });
+              Object.assign(rmTrace, { stop: loop.stop, steps: loop.steps, call_count: loop.calls, calls: callLog, results_cut: loop.resultsCut, ...(liveSamArgsDropped.length ? { live_sam_args_dropped: liveSamArgsDropped } : {}) });
+              if (!loop.text) { finish(RESEARCH_NO_ANSWER, {}, rmSources); return; }
+              const grounded = await groundAnswer({
+                text: loop.text,
+                evidence: [...loop.evidence, userProfileBlock],
+                revise: async (note) => {
+                  const r = await client.messages.create({
+                    model, max_tokens: 16_000, system: researchSystemPrompt({ today, profileBlock: userProfileBlock }),
+                    messages: [{ role: 'user', content: `${note}\n\nANSWER TO REWRITE:\n${loop.text}` }],
+                  }, { timeout: 90_000, maxRetries: 0 });
+                  return r.content.filter((b) => b.type === 'text').map((b) => (b as Anthropic.TextBlock).text).join('').trim() || null;
+                },
+              });
+              rmTrace.figure_check = { untraceable: grounded.untraceable, revised: grounded.revised, disclosed: grounded.disclosed };
+              if (rmDeliverables.length) { rmTrace.deliverables = { files: rmDeliverables }; send({ type: 'deliverables', files: rmDeliverables }); }
+              if (rmReport) {
+                const rep = rmReport as { report_id: string | null; url: string | null; title: string; html: string };
+                rmTrace.market_report = { report_id: rep.report_id, url: rep.url, title: rep.title, html: '' };
+                send({ type: 'market_report', ...rep });
+              }
+              finish(grounded.text, {}, rmSources);
+            } catch (err) {
+              console.error('[chat] research mode failed:', (err as Error)?.message);
+              Object.assign(rmTrace, { stop: 'error', calls: callLog });
+              finish('I could not finish this research because a service did not respond. Please try again in a moment.', {}, rmSources);
+            }
+            return;
+          }
           // Offered tools are filtered by the chat tool policy (blocked tools are never shown).
           // B2: an open-opportunity question is not offered the expiring-contracts tool (it returns
           // awarded contracts, not open solicitations). See src/lib/chat/tool-selection.ts.
@@ -2574,6 +2696,8 @@ export async function POST(request: NextRequest) {
         const decoder = new TextDecoder();
         let leftover = '';
         let finishReason: string | null = null;
+        // Tool-call markup never reaches the customer as answer text (see tool-markup-filter.ts).
+        const markupFilter = createMarkupFilter();
 
         while (true) {
           // Nobody is reading: stop the provider stream instead of generating unread tokens.
@@ -2609,11 +2733,12 @@ export async function POST(request: NextRequest) {
               const delta = parsed?.choices?.[0]?.delta?.content;
               const fr = parsed?.choices?.[0]?.finish_reason;
               if (typeof fr === 'string' && fr) finishReason = fr;
-              if (typeof delta === 'string' && delta.length > 0) {
-                assistantContent += delta;
+              const shown = typeof delta === 'string' && delta.length > 0 ? markupFilter.push(delta) : '';
+              if (shown.length > 0) {
+                assistantContent += shown;
                 // With a verified list on screen, the analysis is checked before it is shown (see below).
                 // When create_document left download paths, buffer until host rewrite runs.
-                if (!renderedRecords.length && !deferAnswerTokens) send({ type: 'token', content: delta });
+                if (!renderedRecords.length && !deferAnswerTokens) send({ type: 'token', content: shown });
               }
               if (parsed?.usage?.total_tokens) {
                 tokensUsed = parsed.usage.total_tokens;
@@ -2627,6 +2752,13 @@ export async function POST(request: NextRequest) {
             } catch {
               // Ignore unparseable lines — Groq occasionally sends keep-alives
             }
+          }
+        }
+        {
+          const tail = markupFilter.end();
+          if (tail) {
+            assistantContent += tail;
+            if (!renderedRecords.length && !deferAnswerTokens) send({ type: 'token', content: tail });
           }
         }
 

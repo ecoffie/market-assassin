@@ -133,7 +133,16 @@ export interface DiscoveryPlan {
   notes: string[];
 }
 
-export interface PlanContext { today: string; fiscalYear: number }
+export interface PlanContext {
+  today: string;
+  fiscalYear: number;
+  /**
+   * Open-now text columns. Default OPEN_TEXT_COLS. Set ONLY by FIND's timeout retry (find-opportunities.ts
+   * queryOpenNow): a long query over sow_text exceeds the statement timeout, so the retry searches fewer columns
+   * and says so. Never set on the normal path, so plans (and golden plans) are unchanged.
+   */
+  openTextCols?: readonly string[];
+}
 
 /**
  * Forecast publisher coverage for the requested buyers (Eric, 2026-09-23 — "unavailable ≠ zero").
@@ -271,12 +280,12 @@ export function buildDiscoveryPlan(input: DiscoveryInput, policy: SurfacePolicy,
   if (lexicalPositive) {
     const tn = openRetrievalNaics(cap);
     const tp = openRetrievalPsc(cap);
-    const parts = [textPredicate(matcher, OPEN_TEXT_COLS), ...naicsMatchConds(tn), ...pscMatchConds(tp), ...companyConds].filter(Boolean) as string[];
+    const parts = [textPredicate(matcher, ctx.openTextCols ?? OPEN_TEXT_COLS), ...naicsMatchConds(tn), ...pscMatchConds(tp), ...companyConds].filter(Boolean) as string[];
     oOps.push({ op: 'or', expr: parts.join(',') || 'notice_id.is.null' });
     oVia = tn.length || tp.length ? 'text_or_taxonomy' : 'text';
     if (companyConds.length) oVia += '_or_company_codes';
   }
-  const oEx = exclusionPredicate(matcher, OPEN_TEXT_COLS);
+  const oEx = exclusionPredicate(matcher, ctx.openTextCols ?? OPEN_TEXT_COLS);
   if (oEx) oOps.push({ op: 'or', expr: oEx });
   if (buyerOpen) oOps.push({ op: 'or', expr: buyerOpen });
   for (const k of setAsides) oOps.push({ op: 'or', expr: setAsideOrExpr(k, { codeCol: 'set_aside_code', textCols: ['set_aside_description'] }) || 'notice_id.is.null' });
