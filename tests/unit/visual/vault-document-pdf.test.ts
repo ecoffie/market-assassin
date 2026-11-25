@@ -17,13 +17,20 @@ import { renderPdf } from '@/lib/documents/render-pdf';
 import { htmlToPdf } from '@/lib/pdf/launch-browser';
 import { CHROME, PDFTOTEXT, launch, pdfPages, htmlLines, squash, norm } from './report-harness';
 
-/** The sample report plus one unverified statement, so the "Unverified statements" listing is covered too. */
+/**
+ * The sample report plus one unverified statement (so the "Unverified statements" listing is covered) and a
+ * next-steps checklist (the checklist block).
+ */
+const CHECKLIST = ['Register the legal entity in SAM.gov', 'Call the small business office before the next quarter'];
 const MODEL: DocModel = {
   ...SAMPLE_REPORT,
-  sections: SAMPLE_REPORT.sections.map((s, i) => i !== 1 ? s : {
-    ...s,
-    blocks: [...s.blocks, { type: 'paragraph', id: 'c1-unverified', claim: 'unverified', text: 'Two further regional buyers are expected to consolidate their janitorial contracts next year.' }],
-  }),
+  sections: [
+    ...SAMPLE_REPORT.sections.map((s, i) => i !== 1 ? s : {
+      ...s,
+      blocks: [...s.blocks, { type: 'paragraph' as const, id: 'c1-unverified', claim: 'unverified' as const, text: 'Two further regional buyers are expected to consolidate their janitorial contracts next year.' }],
+    }),
+    { id: 'next', heading: 'Next steps', blocks: [{ type: 'bullets', id: 'next-list', style: 'checklist', items: CHECKLIST.map((text) => ({ text, claim: 'recommendation' as const })) }] },
+  ],
 };
 
 /**
@@ -109,6 +116,24 @@ describe.runIf(!!CHROME)('Vault document: on-screen preview and PDF carry the sa
 
   it('never prints a blank page', () => {
     expect(pages.map((p, i) => [i + 1, p.replace(RUNNING, '').trim().length] as const).filter(([, n]) => n === 0)).toEqual([]);
+  });
+
+  // Reference layout (2026-11-25): professional plans open with the summary on page 1 and carry no contents page.
+  it('opens with content on page 1: no cover-alone page and no contents-alone page', () => {
+    expect(norm(pages[0])).toContain(norm(MODEL.sections[0].heading));
+    expect(norm(pages.join(' '))).not.toContain(norm('Contents'));
+    const body = pages.map((p) => p.replace(RUNNING, '').replace(/\s+/g, ' ').trim().length);
+    const median = [...body].sort((a, b) => a - b)[Math.floor(body.length / 2)];
+    expect(body.slice(0, -1).map((n, i) => [i + 1, n] as const).filter(([, n]) => n < median * 0.35), 'near-empty pages').toEqual([]);
+  });
+
+  it('embeds real fonts: no Type 3 glyph fonts (searchable, crisp text)', () => {
+    expect(pdf.toString('latin1').match(/\/Subtype\s*\/Type3/g) ?? []).toEqual([]);
+  });
+
+  it('renders the checklist block: every item in the PDF, as a checklist in the page', () => {
+    expect(renderHtml(MODEL)).toContain('<ul class="checklist">');
+    expect(CHECKLIST.filter((t) => !norm(text).includes(norm(t)))).toEqual([]);
   });
 });
 
