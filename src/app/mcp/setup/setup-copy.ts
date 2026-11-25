@@ -78,3 +78,14 @@ export const AI_SECTIONS_CLASS = 'setup-ai-sections';
  */
 export const AI_CHOOSER_CSS =
   `.${AI_SECTIONS_CLASS}:has(> section[data-ai]:target) > section[data-ai]:not(:target){display:none}`;
+
+/**
+ * The first question a beginner is told to ask once Claude is connected. Plain words only:
+ * a person who does not know their NAICS code must not be stuck here (the homepage promises
+ * "Mindy picks the codes for you").
+ */
+export const CLAUDE_FIRST_ASK =
+  'Use Mindy to find federal contracts for [what you sell] that are ending in the next 6 months.';
+
+/** Under the first-question cards when no saved market is known. */
+export const FIRST_QUESTIONS_NO_MARKET_NOTE = 'Tell Mindy what you sell and these get specific to your market.';
