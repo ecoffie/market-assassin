@@ -11,7 +11,7 @@ beforeEach(() => {
 const own: ChatActingScope = { kind: 'own', email: 'owner@acme.com' };
 const client: ChatActingScope = { kind: 'client', email: 'coach@x.com', workspaceId: 'w-9', vaultEmail: 'v@x.com' };
 const handle = (o: Partial<Parameters<typeof signFileHandle>[0]> = {}) =>
-  signFileHandle({ scopeKey: 'own:owner@acme.com', connectionId: 'conn-1', provider: 'microsoft', fileId: 'item-1', name: 'Cap Statement.txt', ...o });
+  signFileHandle({ scopeKey: 'own:owner@acme.com', ownerEmail: 'owner@acme.com', connectionId: 'conn-1', provider: 'microsoft', fileId: 'item-1', name: 'Cap Statement.txt', ...o });
 
 const connection = { id: 'conn-1', provider: 'microsoft' as const, connected_email: 'owner@acme.com', display_name: null, granted_scopes: [], status: 'connected' as const, created_at: '' };
 const okToken = vi.fn(async () => ({ ok: true as const, token: 'at', provider: 'microsoft' as const, connection }));
@@ -33,7 +33,7 @@ describe('read_connected_file', () => {
     expect(r.ok).toBe(true);
     expect(r.file).toEqual({ name: 'Cap Statement.txt', provider: 'OneDrive', connected_account: 'owner@acme.com', source_id: 'item-1', source_url: 'https://onedrive.live.com/x', modified: '2026-11-20T00:00:00Z', retrieved_at: NOW.toISOString() });
     expect(String(r.content)).toContain('ISO 9001');
-    expect(okToken).toHaveBeenCalledWith('own:owner@acme.com', 'conn-1');
+    expect(okToken).toHaveBeenCalledWith('own:owner@acme.com', 'owner@acme.com', 'conn-1');
     // Only the selected item was requested.
     for (const [u] of f.mock.calls) expect(String(u)).toContain('/items/item-1');
   });
@@ -60,6 +60,15 @@ describe('read_connected_file', () => {
   it('a coach in a client workspace cannot use a handle picked in their own scope', async () => {
     const tool = makeReadConnectedFileTool(client, { accessTokenFor: okToken, fetch: providerFetch('x') as unknown as typeof fetch, now: () => NOW });
     expect(await tool.execute({ file_handle: handle() })).toMatchObject({ ok: false, error_category: 'other_workspace' });
+  });
+
+  it('shared workspace: coach B cannot read a file coach A picked, and the token store is never asked', async () => {
+    const coachB: ChatActingScope = { kind: 'client', email: 'coach-b@x.com', workspaceId: 'w-9', vaultEmail: 'v@x.com' };
+    const tool = makeReadConnectedFileTool(coachB, { accessTokenFor: okToken, fetch: providerFetch('x') as unknown as typeof fetch, now: () => NOW });
+    const aPick = handle({ scopeKey: 'ws:w-9', ownerEmail: 'coach-a@x.com' });
+    expect(await tool.execute({ file_handle: aPick })).toMatchObject({ ok: false, error_category: 'other_user' });
+    expect(okToken).not.toHaveBeenCalled();
+    expect(connectedFilesNote([aPick], coachB).note).toBeNull();
   });
 
   it('an unconfirmed workspace reads nothing', async () => {

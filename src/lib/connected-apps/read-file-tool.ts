@@ -62,15 +62,15 @@ export function makeReadConnectedFileTool(scope: ChatActingScope, deps: ReadFile
     const scopeKey = scopeKeyFor(scope);
     if (!scopeKey) return refuse('workspace_unavailable', 'The workspace could not be confirmed, so no connected file can be read for it.');
 
-    const v = verifyFileHandle(args.file_handle, scopeKey, Math.floor(now().getTime() / 1000));
+    const v = verifyFileHandle(args.file_handle, scopeKey, scope.email, Math.floor(now().getTime() / 1000));
     if (!v.ok) {
       return refuse(v.reason, v.reason === 'expired'
         ? 'That file selection has expired. Ask the user to pick the file again.'
-        : 'That is not a file the user selected in this workspace. Ask the user to pick the file from their connected account.');
+        : 'That is not a file this user selected in this workspace. Ask the user to pick the file from their own connected account.');
     }
     const h = v.handle;
 
-    const tok = await getToken(scopeKey, h.connectionId);
+    const tok = await getToken(scopeKey, scope.email, h.connectionId);
     if (!tok.ok) {
       return refuse(tok.reason, tok.reason === 'reauth_needed' || tok.reason === 'revoked'
         ? 'The connected account needs to be reconnected before Mindy can read this file.'
@@ -124,7 +124,7 @@ export function connectedFilesNote(rawHandles: unknown, scope: ChatActingScope, 
   const lines: string[] = [];
   let dropped = 0;
   for (const raw of list) {
-    const v = verifyFileHandle(raw, scopeKey, nowSec);
+    const v = verifyFileHandle(raw, scopeKey, scope.email, nowSec);
     if (!v.ok) { dropped++; continue; }
     lines.push(`- "${safeName(v.handle.name)}" (${v.handle.provider === 'google' ? 'Google Drive' : 'OneDrive'}) file_handle=${String(raw)}`);
   }

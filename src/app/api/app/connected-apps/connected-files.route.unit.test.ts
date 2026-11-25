@@ -42,10 +42,11 @@ describe('POST /selections', () => {
     const { POST } = await import('./selections/route');
     const j = await (await POST(post('selections', { email: 'owner@acme.com', connection_id: 'conn-1', file_id: 'g1' }))).json();
     const { verifyFileHandle } = await import('@/lib/connected-apps/files');
-    expect(verifyFileHandle(j.file_handle, 'own:owner@acme.com')).toMatchObject({ ok: true, handle: { connectionId: 'conn-1', fileId: 'g1', provider: 'google' } });
-    expect(verifyFileHandle(j.file_handle, 'ws:other').ok).toBe(false);
+    expect(verifyFileHandle(j.file_handle, 'own:owner@acme.com', 'owner@acme.com')).toMatchObject({ ok: true, handle: { connectionId: 'conn-1', fileId: 'g1', provider: 'google' } });
+    expect(verifyFileHandle(j.file_handle, 'ws:other', 'owner@acme.com').ok).toBe(false);
+    expect(verifyFileHandle(j.file_handle, 'own:owner@acme.com', 'someone-else@acme.com').ok).toBe(false);
     expect(j.file).toMatchObject({ name: 'Cap Statement', connected_account: 'owner@acme.com' });
-    expect(h.token).toHaveBeenCalledWith('own:owner@acme.com', 'conn-1');
+    expect(h.token).toHaveBeenCalledWith('own:owner@acme.com', 'owner@acme.com', 'conn-1');
   });
   it('an unreadable type is refused (415) and no handle is issued', async () => {
     vi.stubGlobal('fetch', meta({ name: 'logo.png', mimeType: 'image/png' }));
@@ -119,5 +120,18 @@ describe('POST /picker-token is Google-only', () => {
     const r = await POST(post('picker-token', { email: 'owner@acme.com', connection_id: 'conn-1' }));
     expect(r.status).toBe(400);
     expect(await r.text()).not.toContain('ms-secret-token');
+  });
+});
+
+describe('shared client workspace: every connection route is bound to the calling coach', () => {
+  const coachB = () => { h.scope = { kind: 'client', email: 'coach-b@x.com', workspaceId: 'w-9', vaultEmail: 'v' }; process.env.CONNECTED_APPS_ALLOWLIST = 'coach-b@x.com'; };
+  const body = { email: 'coach-b@x.com', connection_id: 'conn-of-coach-a', file_id: 'f1' };
+  it.each(['selections', 'browse', 'picker-token'] as const)('%s asks the store for the caller\'s own connection only', async (route) => {
+    coachB();
+    h.token.mockImplementation(async () => ({ ok: false, reason: 'not_found' }));
+    const mod = await import(`./${route}/route`);
+    const r = await mod.POST(post(route, body));
+    expect(h.token).toHaveBeenLastCalledWith('ws:w-9', 'coach-b@x.com', 'conn-of-coach-a');
+    expect(r.status).toBe(404);
   });
 });

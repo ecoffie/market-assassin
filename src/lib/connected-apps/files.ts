@@ -21,6 +21,8 @@ export const MAX_FILE_BYTES = 15 * 1024 * 1024;
 
 export interface FileHandlePayload {
   scopeKey: string;
+  /** The Mindy user who picked the file (and owns the connection). A colleague in the same workspace is refused. */
+  ownerEmail: string;
   connectionId: string;
   provider: Provider;
   fileId: string;
@@ -39,14 +41,14 @@ function handleKey(): Buffer {
 }
 
 export function signFileHandle(p: Omit<FileHandlePayload, 'exp'>, nowSec = Math.floor(Date.now() / 1000)): string {
-  const body = b64u(Buffer.from(JSON.stringify({ ...p, exp: nowSec + FILE_HANDLE_TTL_SEC }), 'utf8'));
+  const body = b64u(Buffer.from(JSON.stringify({ ...p, ownerEmail: p.ownerEmail.trim().toLowerCase(), exp: nowSec + FILE_HANDLE_TTL_SEC }), 'utf8'));
   return `fh1.${body}.${b64u(crypto.createHmac('sha256', handleKey()).update(body).digest())}`;
 }
 
-export type VerifiedHandle = { ok: true; handle: FileHandlePayload } | { ok: false; reason: 'invalid_handle' | 'expired' | 'other_workspace' };
+export type VerifiedHandle = { ok: true; handle: FileHandlePayload } | { ok: false; reason: 'invalid_handle' | 'expired' | 'other_workspace' | 'other_user' };
 
-/** Signature, expiry, and the handle must belong to the acting scope of THIS request. */
-export function verifyFileHandle(raw: unknown, scopeKey: string, nowSec = Math.floor(Date.now() / 1000)): VerifiedHandle {
+/** Signature, expiry, and the handle must belong to the acting scope AND the caller of THIS request. */
+export function verifyFileHandle(raw: unknown, scopeKey: string, callerEmail: string, nowSec = Math.floor(Date.now() / 1000)): VerifiedHandle {
   const [ver, body, sig] = String(raw || '').split('.');
   if (ver !== 'fh1' || !body || !sig) return { ok: false, reason: 'invalid_handle' };
   const expected = b64u(crypto.createHmac('sha256', handleKey()).update(body).digest());
@@ -61,6 +63,7 @@ export function verifyFileHandle(raw: unknown, scopeKey: string, nowSec = Math.f
   }
   if (!p.exp || p.exp < nowSec) return { ok: false, reason: 'expired' };
   if (p.scopeKey !== scopeKey) return { ok: false, reason: 'other_workspace' };
+  if (!p.ownerEmail || p.ownerEmail.toLowerCase() !== String(callerEmail || '').trim().toLowerCase()) return { ok: false, reason: 'other_user' };
   if ((p.provider !== 'google' && p.provider !== 'microsoft') || !p.fileId || !p.connectionId) return { ok: false, reason: 'invalid_handle' };
   return { ok: true, handle: p };
 }

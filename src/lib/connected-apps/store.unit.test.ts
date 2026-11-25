@@ -48,7 +48,7 @@ beforeEach(() => {
 const decryptSecret = (v: string) => decrypt(v, { secret: KEY, salt: 'mindy-connected-apps-v1' });
 
 const tokens = (o: Partial<{ accessToken: string; refreshToken: string | null; expiresAt: number }> = {}) => ({ accessToken: 'at-1', refreshToken: 'rt-1', expiresAt: Date.now() + 3600_000, grantedScopes: ['openid'], ...o });
-const conn = (scopeKey: string, accountId = 'g-1') => ({ scopeKey, ownerEmail: 'a@b.com', provider: 'google' as const, accountId, email: 'owner@acme.com', name: 'Owner', tokens: tokens() });
+const conn = (scopeKey: string, accountId = 'g-1', ownerEmail = 'a@b.com') => ({ scopeKey, ownerEmail, provider: 'google' as const, accountId, email: 'owner@acme.com', name: 'Owner', tokens: tokens() });
 
 describe('scopeKeyFor', () => {
   it('own, client workspace, and refuse when unconfirmed', () => {
@@ -80,9 +80,21 @@ describe('connected accounts store', () => {
   it('isolation: another scope can neither list nor use the connection', async () => {
     const { db } = fakeDb();
     const v = await saveConnection(conn('own:a@b.com'), db);
-    expect(await listConnections('ws:other', db)).toEqual([]);
-    expect(await accessTokenFor('ws:other', v.id, { db })).toEqual({ ok: false, reason: 'not_found' });
-    expect(await disconnect('ws:other', v.id, { db, revoke: async () => 'revoked' })).toBe('not_found');
+    expect(await listConnections('ws:other', 'a@b.com', db)).toEqual([]);
+    expect(await accessTokenFor('ws:other', 'a@b.com', v.id, { db })).toEqual({ ok: false, reason: 'not_found' });
+    expect(await disconnect('ws:other', 'a@b.com', v.id, { db, revoke: async () => 'revoked' })).toBe('not_found');
+  });
+
+  it('shared client workspace: a colleague can neither list, use nor disconnect another coach\'s connection', async () => {
+    const { db, rows } = fakeDb();
+    const mine = await saveConnection(conn('ws:w-9', 'g-1', 'coach-a@x.com'), db);
+    await saveConnection(conn('ws:w-9', 'g-2', 'coach-b@x.com'), db);
+    expect((await listConnections('ws:w-9', 'coach-b@x.com', db)).map((c) => c.id)).not.toContain(mine.id);
+    expect(await listConnections('ws:w-9', 'coach-a@x.com', db)).toHaveLength(1);
+    expect(await accessTokenFor('ws:w-9', 'coach-b@x.com', mine.id, { db })).toEqual({ ok: false, reason: 'not_found' });
+    expect(await disconnect('ws:w-9', 'coach-b@x.com', mine.id, { db, revoke: async () => 'revoked' })).toBe('not_found');
+    expect(rows.find((r) => r.id === mine.id)?.status).toBe('connected');
+    expect(await accessTokenFor('ws:w-9', 'Coach-A@x.com', mine.id, { db })).toMatchObject({ ok: true });
   });
 
   it('a re-consent without a refresh token keeps the stored one', async () => {
@@ -96,25 +108,25 @@ describe('connected accounts store', () => {
   it('a fresh access token is used as-is; an expiring one is refreshed', async () => {
     const { db } = fakeDb();
     const v = await saveConnection(conn('own:a@b.com'), db);
-    expect(await accessTokenFor('own:a@b.com', v.id, { db })).toMatchObject({ ok: true, token: 'at-1' });
+    expect(await accessTokenFor('own:a@b.com', 'a@b.com', v.id, { db })).toMatchObject({ ok: true, token: 'at-1' });
     const later = Date.now() + 3600_000;
-    const r = await accessTokenFor('own:a@b.com', v.id, { db, now: later, refresh: async () => tokens({ accessToken: 'at-new', refreshToken: null, expiresAt: later + 3600_000 }) });
+    const r = await accessTokenFor('own:a@b.com', 'a@b.com', v.id, { db, now: later, refresh: async () => tokens({ accessToken: 'at-new', refreshToken: null, expiresAt: later + 3600_000 }) });
     expect(r).toMatchObject({ ok: true, token: 'at-new' });
   });
 
   it('a dead grant marks reauth_needed and fails closed', async () => {
     const { db, rows } = fakeDb();
     const v = await saveConnection(conn('own:a@b.com'), db);
-    const r = await accessTokenFor('own:a@b.com', v.id, { db, now: Date.now() + 7200_000, refresh: async () => { throw new OAuthError('invalid_grant'); } });
+    const r = await accessTokenFor('own:a@b.com', 'a@b.com', v.id, { db, now: Date.now() + 7200_000, refresh: async () => { throw new OAuthError('invalid_grant'); } });
     expect(r).toEqual({ ok: false, reason: 'reauth_needed' });
     expect(rows[0].status).toBe('reauth_needed');
-    expect(await accessTokenFor('own:a@b.com', v.id, { db })).toEqual({ ok: false, reason: 'reauth_needed' });
+    expect(await accessTokenFor('own:a@b.com', 'a@b.com', v.id, { db })).toEqual({ ok: false, reason: 'reauth_needed' });
   });
 
   it('a transient refresh failure is not a reauth', async () => {
     const { db, rows } = fakeDb();
     const v = await saveConnection(conn('own:a@b.com'), db);
-    expect(await accessTokenFor('own:a@b.com', v.id, { db, now: Date.now() + 7200_000, refresh: async () => { throw new OAuthError('http_503'); } })).toEqual({ ok: false, reason: 'refresh_failed' });
+    expect(await accessTokenFor('own:a@b.com', 'a@b.com', v.id, { db, now: Date.now() + 7200_000, refresh: async () => { throw new OAuthError('http_503'); } })).toEqual({ ok: false, reason: 'refresh_failed' });
     expect(rows[0].status).toBe('connected');
   });
 
@@ -122,10 +134,10 @@ describe('connected accounts store', () => {
     const { db, rows } = fakeDb();
     const v = await saveConnection(conn('own:a@b.com'), db);
     let revoked = '';
-    expect(await disconnect('own:a@b.com', v.id, { db, revoke: async (_p, t) => { revoked = t; return 'revoked'; } })).toBe('disconnected');
+    expect(await disconnect('own:a@b.com', 'a@b.com', v.id, { db, revoke: async (_p, t) => { revoked = t; return 'revoked'; } })).toBe('disconnected');
     expect(revoked).toBe('rt-1');
     expect(rows[0]).toMatchObject({ status: 'revoked', refresh_token_enc: null, access_token_enc: null });
-    expect(await accessTokenFor('own:a@b.com', v.id, { db })).toEqual({ ok: false, reason: 'revoked' });
-    expect(await listConnections('own:a@b.com', db)).toEqual([]);
+    expect(await accessTokenFor('own:a@b.com', 'a@b.com', v.id, { db })).toEqual({ ok: false, reason: 'revoked' });
+    expect(await listConnections('own:a@b.com', 'a@b.com', db)).toEqual([]);
   });
 });
