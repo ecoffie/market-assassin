@@ -26,6 +26,7 @@ import {
   getRollupOrSingleBySlug,
   resolveCanonicalSlug,
   getRecentAwardsForRecipient,
+  getExecutivesForRecipient,
   getTopAgenciesForRecipient,
   getYearlyTotalsForRecipient,
   getSetAsideHistoryForRecipient,
@@ -62,6 +63,31 @@ function resolveLimit(raw: unknown, def: number, max: number): number {
   const n = typeof raw === 'number' ? raw : Number(raw);
   if (!Number.isFinite(n)) return def;
   return Math.max(1, Math.min(max, Math.floor(n)));
+}
+
+/**
+ * Key people (Agent 4, Mindy Day research parity, 2026-11-25): the officers USASpending reports for this contractor
+ * under FFATA executive-compensation disclosure (BQ recipient_executives). Only recipients over the FFATA thresholds
+ * report, so "none_reported" is never "no executives". Compensation is the reported figure, not salary research.
+ */
+export const KEY_PEOPLE_SOURCE = 'USASpending recipient executive compensation (FFATA disclosure)';
+export function shapeKeyPeople(
+  rows: Array<{ exec_name: string; exec_amount: number; reported_at: string }>,
+  unavailable: boolean,
+): { status: 'reported' | 'none_reported' | 'unavailable'; people: Array<{ name: string; reported_compensation: number | null; reported_at: string | null }>; source: string; note: string } {
+  if (unavailable) {
+    return { status: 'unavailable', people: [], source: KEY_PEOPLE_SOURCE, note: 'Executive disclosures were not retrieved this time (cache cold or lookup budget spent). Not "none".' };
+  }
+  const people = rows
+    .filter((r) => String(r.exec_name ?? '').trim())
+    .map((r) => ({
+      name: String(r.exec_name).trim(),
+      reported_compensation: r.exec_amount == null || Number.isNaN(Number(r.exec_amount)) ? null : Number(r.exec_amount),
+      reported_at: r.reported_at ?? null,
+    }));
+  return people.length
+    ? { status: 'reported', people, source: KEY_PEOPLE_SOURCE, note: 'Officers as reported to USASpending (top 5 by reported compensation). Verify current roles on the company site before outreach.' }
+    : { status: 'none_reported', people: [], source: KEY_PEOPLE_SOURCE, note: 'No executive compensation is reported for this contractor. Only recipients over the FFATA thresholds report it, so this is not evidence of who runs the company.' };
 }
 
 export const TIER2_TOOL_DEFS = [
@@ -296,14 +322,16 @@ export function makeTier2Tools(email: string) {
     const agenciesCacheKey = `rollup:${profile.rollup_uei}:top-agencies:${TOP_AGENCIES_LIMIT}:v4-m`;
     const yearlyCacheKey = `rollup:${profile.rollup_uei}:yearly-totals:v3-m`;
     const setAsideCacheKey = `rollup:${profile.rollup_uei}:set-aside-history:v4-m`;
+    const executivesCacheKey = `rollup:${profile.rollup_uei}:executives:v3-m`;
 
     // Pass 1 — warm only. Free, and the overwhelmingly common case once a company is warm.
-    let [awards, agencies, yearly, setAsideHist, warehouseCoverage] = await Promise.all([
+    let [awards, agencies, yearly, setAsideHist, warehouseCoverage, executives] = await Promise.all([
       getRecentAwardsForRecipient(childUeis, profile.rollup_uei, RECENT_LIMIT, false).catch(() => []),
       getTopAgenciesForRecipient(childUeis, profile.rollup_uei, TOP_AGENCIES_LIMIT, false).catch(() => []),
       getYearlyTotalsForRecipient(childUeis, profile.rollup_uei, false).catch(() => []),
       getSetAsideHistoryForRecipient(childUeis, profile.rollup_uei, false).catch(() => []),
       loadAwardsWarehouseCoverage().catch(() => null),
+      getExecutivesForRecipient(childUeis, profile.rollup_uei, false).catch(() => []),
     ]);
 
     // Pass 2 — per-surface cold fill only when the cache marks a MISS/FAILURE.
@@ -316,6 +344,8 @@ export function makeTier2Tools(email: string) {
     const needAgencies = hasAwards && bqUnavailable(agenciesCacheKey, agencies.length);
     const needYearly = hasAwards && bqUnavailable(yearlyCacheKey, yearly.length);
     const needSetAside = hasAwards && bqUnavailable(setAsideCacheKey, setAsideHist.length);
+    // Executives ride the same cold fill, but never mark the profile budget_limited on their own.
+    const needExecutives = hasAwards && bqUnavailable(executivesCacheKey, executives.length);
     if (needAwards || needAgencies || needYearly || needSetAside) {
       if (resolvedCold || (await allowColdLookup())) {
         const [a2, g2, y2, s2] = await Promise.all([
@@ -336,6 +366,7 @@ export function makeTier2Tools(email: string) {
         agencies = g2;
         yearly = y2;
         setAsideHist = s2;
+        if (needExecutives) executives = await getExecutivesForRecipient(childUeis, profile.rollup_uei, true).catch(() => []);
       } else {
         enrichmentStatus = 'budget_limited';
         console.warn('[p0-2] enrichment budget_limited', JSON.stringify({
@@ -343,6 +374,13 @@ export function makeTier2Tools(email: string) {
           award_count: profile.award_count,
           need: { awards: needAwards, agencies: needAgencies, yearly: needYearly, setAside: needSetAside },
         }));
+      }
+    }
+
+    // Executives cold while the rest of the profile was warm: one cold fill of its own (still budget-gated).
+    if (needExecutives && !(needAwards || needAgencies || needYearly || needSetAside)) {
+      if (resolvedCold || (await allowColdLookup())) {
+        executives = await getExecutivesForRecipient(childUeis, profile.rollup_uei, true).catch(() => []);
       }
     }
 
@@ -517,6 +555,7 @@ export function makeTier2Tools(email: string) {
       recent_awards_note:
         'recent_awards are dollar-bearing obligation actions (often modifications). See counting_bases for unique awards in this sample.',
       historical_set_asides: historicalSetAsides,
+      key_people: shapeKeyPeople(executives, bqUnavailable(executivesCacheKey, executives.length)),
       // P0-2 invariant: when award_count > 0 and enrichment was not actually queried,
       // empty arrays must NEVER be presented as complete data.
       enrichment_status: enrichmentStatus,
