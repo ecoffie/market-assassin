@@ -98,6 +98,13 @@ export interface McpToolContext {
    * MCP transports never set it, so hosted MCP behaviour is unchanged.
    */
   vaultEmail?: string;
+  /**
+   * Ask Mindy research mode (Eric, 2026-11-25: "we have sam cache no need to make live calls"): tools that would reach
+   * live SAM serve Mindy's SAM cache instead, and say so in _meta. MCP transports never set it, so hosted MCP
+   * behaviour is unchanged. Wired: lookup_sam_entity, find_opportunities (company anchor), get_solicitation_incumbent,
+   * get_solicitation_documents.
+   */
+  samCacheOnly?: boolean;
 }
 
 /**
@@ -2345,7 +2352,7 @@ async function dispatchMcpTool(
     const result = (await getSolicitationIncumbent({
       solicitation_number: typeof args.solicitation_number === 'string' ? args.solicitation_number : undefined,
       notice_id: typeof args.notice_id === 'string' ? args.notice_id : undefined,
-    })) as unknown as Record<string, unknown>;
+    }, { samCacheOnly: ctx.samCacheOnly === true })) as unknown as Record<string, unknown>;
     return { result, credits };
   }
 
@@ -2355,7 +2362,7 @@ async function dispatchMcpTool(
       name: typeof args.name === 'string' ? args.name : undefined,
       state: typeof args.state === 'string' ? args.state : undefined,
       limit: typeof args.limit === 'number' ? args.limit : undefined,
-    })) as unknown as Record<string, unknown>;
+    }, { cacheOnly: ctx.samCacheOnly === true })) as unknown as Record<string, unknown>;
     return { result, credits };
   }
 
@@ -2485,7 +2492,7 @@ async function dispatchMcpTool(
         ? (args.states as unknown[]).filter((s): s is string => typeof s === 'string')
         : typeof args.states === 'string' ? args.states : undefined,
       stage: typeof args.stage === 'string' ? args.stage : undefined,
-    })) as unknown as Record<string, unknown>;
+    }, { samCacheOnly: ctx.samCacheOnly === true })) as unknown as Record<string, unknown>;
     // Result contract: report the coerced arguments the tool DID apply, so a string `states`
     // (schema: array) or a normalized `stage` ("market research" -> MARKET_RESEARCH) is not
     // reported as ignored. An unrecognizable stage stays reported (the enum check flags it).
@@ -2788,7 +2795,7 @@ async function dispatchMcpTool(
       continuation: typeof args.continuation === 'string' ? args.continuation : undefined,
       // The VERIFIED caller from the transport — never an argument — binds continuation tokens.
       userEmail: ctx.userEmail,
-    })) as unknown as Record<string, unknown>;
+    }, { samCacheOnly: ctx.samCacheOnly === true })) as unknown as Record<string, unknown>;
     return { result, credits };
   }
 
