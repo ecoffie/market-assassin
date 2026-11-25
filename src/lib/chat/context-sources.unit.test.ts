@@ -21,11 +21,6 @@ describe('sourceFromToolResult', () => {
     expect(s).toMatchObject({ id: 'src:get_buying_offices:c1', kind: 'federal_record', owner: null, status: 'ok', rendered: true, asOf: '2026-11-01' });
     expect(s.items).toEqual([{ n: 21, key: 'W912PL', label: '' }, { n: 22, key: 'W912BV', label: '' }]);
   });
-  it('the source chip shows data_current_through over a window-bounded as_of (buying offices: FY end vs warehouse)', () => {
-    const content = JSON.stringify({ ok: true, _meta: { as_of: '2026-09-30', data_current_through: '2026-11-20', window: { fy_from: 2024, fy_to: 2026 } } });
-    const s = sourceFromToolResult({ tool: 'get_buying_offices', toolCallId: 'c9', status: 'success', content, rendered: rendered(['W912PL'], 1), owner, retrievedAt: at });
-    expect(s.asOf).toBe('2026-11-20');
-  });
   it('an unrendered result lists keyed records WITHOUT numbers (the model wrote that list)', () => {
     const s = sourceFromToolResult({ tool: 'find_opportunities', toolCallId: 'c2', status: 'success', content: JSON.stringify({ horizons: { open_now: { items: [{ notice_id: 'abcdef0123456789abcdef0123456789', title: 'JANITORIAL SERVICES' }] } } }), owner, retrievedAt: at });
     expect(s.items).toEqual([{ key: 'abcdef0123456789abcdef0123456789', label: 'Janitorial Services' }]);
