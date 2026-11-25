@@ -50,7 +50,8 @@ import { vaultDocEnabledFor } from '@/lib/vault/flags';
 import { createChatToolExecutor, type ChatExecutionRecord } from '@/lib/chat/chat-tool-executor';
 import { resolveChatActingScope, vaultEmailFor } from '@/lib/chat/chat-acting-scope';
 import type { BidderProfile } from '@/lib/proposal/types';
-import { resolvePlannerChain, plannerKey, anthropicSupportsForcedToolChoice, resolveAnswerChain, answerKey, ANSWER_ENDPOINTS, openAiChatParams, type PlannerTarget } from '@/lib/chat/planner-config';
+import { createMarkupFilter } from '@/lib/chat/tool-markup-filter';
+import { budgetDowngradeActive, resolvePlannerChain, plannerKey, anthropicSupportsForcedToolChoice, resolveAnswerChain, answerKey, ANSWER_ENDPOINTS, openAiChatParams, type PlannerTarget } from '@/lib/chat/planner-config';
 import { fitMessages, inputBudget, type MsgKind } from '@/lib/chat/token-budget';
 import { stagingModelConfig, STAGING_CONFIG_HEADER } from '@/lib/chat/staging-model-config';
 import { customerErrorMessage } from '@/lib/chat/customer-errors';
@@ -1040,7 +1041,7 @@ export async function POST(request: NextRequest) {
         const staging = stagingModelConfig(request.headers.get(STAGING_CONFIG_HEADER), TRACE_EVENTS);
         const overBudgetEarly = staging?.config.overBudget ?? await isUserOverBudget(email).catch(() => false);
         const modelEnv: Record<string, string | undefined> = staging ? { ...process.env, ...staging.config.env } : process.env;
-        const chatModelEarly = overBudgetEarly
+        const chatModelEarly = budgetDowngradeActive(modelEnv, overBudgetEarly)
           ? (modelEnv.LLM_OPENAI_MODEL || 'gpt-4o-mini')
           : (modelEnv.CHAT_OPENAI_MODEL || 'gpt-4o');
 
@@ -2695,6 +2696,8 @@ export async function POST(request: NextRequest) {
         const decoder = new TextDecoder();
         let leftover = '';
         let finishReason: string | null = null;
+        // Tool-call markup never reaches the customer as answer text (see tool-markup-filter.ts).
+        const markupFilter = createMarkupFilter();
 
         while (true) {
           // Nobody is reading: stop the provider stream instead of generating unread tokens.
@@ -2730,11 +2733,12 @@ export async function POST(request: NextRequest) {
               const delta = parsed?.choices?.[0]?.delta?.content;
               const fr = parsed?.choices?.[0]?.finish_reason;
               if (typeof fr === 'string' && fr) finishReason = fr;
-              if (typeof delta === 'string' && delta.length > 0) {
-                assistantContent += delta;
+              const shown = typeof delta === 'string' && delta.length > 0 ? markupFilter.push(delta) : '';
+              if (shown.length > 0) {
+                assistantContent += shown;
                 // With a verified list on screen, the analysis is checked before it is shown (see below).
                 // When create_document left download paths, buffer until host rewrite runs.
-                if (!renderedRecords.length && !deferAnswerTokens) send({ type: 'token', content: delta });
+                if (!renderedRecords.length && !deferAnswerTokens) send({ type: 'token', content: shown });
               }
               if (parsed?.usage?.total_tokens) {
                 tokensUsed = parsed.usage.total_tokens;
@@ -2748,6 +2752,13 @@ export async function POST(request: NextRequest) {
             } catch {
               // Ignore unparseable lines — Groq occasionally sends keep-alives
             }
+          }
+        }
+        {
+          const tail = markupFilter.end();
+          if (tail) {
+            assistantContent += tail;
+            if (!renderedRecords.length && !deferAnswerTokens) send({ type: 'token', content: tail });
           }
         }
 
