@@ -168,3 +168,41 @@ export const FULL_REPORT = {
     }
   }
 } as const;
+
+/**
+ * The same report as Ask Mindy's intelligence gate publishes it: led by a checked decision ("What to pursue").
+ * Synthetic wording at real lengths (two pursuits, one with a barrier, one without; also-consider; ruled out;
+ * gaps), so the print checks cover the brief the customer reads first.
+ */
+export const FULL_REPORT_WITH_DECISION = {
+  ...FULL_REPORT,
+  payload: {
+    ...FULL_REPORT.payload,
+    decision: {
+      headline: 'Two Florida janitorial recompetes are worth pursuing in the next 12 months; the strongest is the FAA West Palm Beach custodial contract, a small-business set-aside expiring in September 2027.',
+      pursuits: [
+        {
+          contract_id: 'fixture-pursuit-1',
+          title: 'FAA West Palm Beach ATCT custodial services',
+          why: [
+            'Work is in West Palm Beach, FL (place of performance on the award record).',
+            'Janitorial PSC S201 matches the work you described.',
+            'Previously awarded as a total small-business set-aside; expires 2027-09-30, inside your capture window.',
+          ],
+          barrier: 'Your small-business status for NAICS 561720 is not on file in your Vault profile.',
+          next_move: 'Confirm your size status in SAM.gov, then request the current performance work statement from the FAA contracting office listed under Who to call.',
+        },
+        {
+          contract_id: 'fixture-pursuit-2',
+          title: 'VA Bay Pines Healthcare System environmental services',
+          why: ['Work is in Bay Pines, FL.', 'PSC S201; full and open competition on the last award.'],
+          barrier: null,
+          next_move: 'Ask the VA small-business liaison whether the recompete will be set aside, and register for the industry day if one is announced.',
+        },
+      ],
+      also_consider: ['NASA Kennedy Space Center facilities support (janitorial is one task area of a larger base-operations contract).'],
+      ruled_out: '5 of 7 recompetes: 2 are performed in Gulfport, MS and Washington, DC despite a Florida state field; 2 are AbilityOne mandatory-source awards that are not competed; 1 is grounds maintenance, not janitorial.',
+      gaps: ['Your set-aside eligibility (size and socioeconomic status) is not on file.', 'Incumbent pricing is not available from the award records.'],
+    },
+  },
+} as const;
