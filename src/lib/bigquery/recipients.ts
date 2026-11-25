@@ -123,6 +123,12 @@ export interface RollupProfile {
   last_action_date: string;
   distinct_agency_count: number;
   distinct_naics_count: number;
+  /**
+   * Present ONLY on a profile synthesized from ONE recipient row (getRollupOrSingleBySlug's
+   * fallback): that registration's own SAM parent. The page resolver uses it to tell a confirmed
+   * alias (the parent family containing this exact UEI) from a same-name, different entity.
+   */
+  single?: { parent_uei: string | null };
 }
 
 // Shared SQL fragment: the computed-slug expression mirrors recipientSlug()
@@ -304,6 +310,7 @@ export async function getRollupOrSingleBySlug(
     last_action_date: recipient.last_action_date,
     distinct_agency_count: Number(recipient.distinct_agency_count || 0),
     distinct_naics_count: Number(recipient.distinct_naics_count || 0),
+    single: { parent_uei: recipient.parent_uei ?? null },
   };
 }
 
