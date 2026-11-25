@@ -165,4 +165,17 @@ describe('ConnectedFiles', () => {
     await click(button('Cancel'));
     expect(h.calls.some((c) => c.method === 'DELETE')).toBe(false);
   });
+
+  it('back from consent when the app already rewrote the address: the outcome cookie is shown once, then cleared', async () => {
+    document.cookie = 'mindy_ca_result=ok.microsoft.; Path=/';
+    await mount();
+    expect(el.textContent).toContain('OneDrive is connected. Pick a file to use it in this conversation.');
+    expect(document.cookie).not.toContain('mindy_ca_result=ok');
+  });
+
+  it('a failed connect from the cookie says why in plain words', async () => {
+    document.cookie = 'mindy_ca_result=error.microsoft.invalid_client; Path=/';
+    await mount();
+    expect(el.textContent).toContain('Mindy could not finish connecting because of a setup problem on our side. Nothing was connected.');
+  });
 });

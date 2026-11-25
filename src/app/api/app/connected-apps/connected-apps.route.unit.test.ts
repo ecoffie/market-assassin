@@ -174,6 +174,24 @@ describe('GET /callback', () => {
     expect(loc(r).searchParams.get('reason')).toBe('invalid_grant');
     expect(r.headers.get('location')).not.toContain('secret');
     expect(h.save).not.toHaveBeenCalled();
+    // The outcome cookie carries the same sanitized code, readable by the page, short-lived.
+    const set = r.headers.get('set-cookie') || '';
+    expect(set).toMatch(/mindy_ca_result=error\.google\.invalid_grant/);
+    expect(set).not.toContain('secret');
+  });
+
+  it('success also sets a short-lived, page-readable outcome cookie with no ids or tokens', async () => {
+    const { state, cookie } = await start();
+    okFetch();
+    const { GET } = await import('./callback/route');
+    const r = await GET(cb(`code=c1&state=${encodeURIComponent(state)}`, cookie));
+    const set = r.headers.get('set-cookie') || '';
+    const result = set.split(/,(?=\s*\w+=)/).find((c) => c.trim().startsWith('mindy_ca_result=')) || '';
+    expect(result).toMatch(/^\s*mindy_ca_result=ok\.google\.;/);
+    expect(result).toMatch(/Max-Age=300/i);
+    expect(result).toMatch(/Path=\//);
+    expect(result).not.toMatch(/HttpOnly/i);
+    expect(result).not.toMatch(/access|refresh|token|conn/i);
   });
 });
 

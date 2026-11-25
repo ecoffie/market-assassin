@@ -16,6 +16,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { HardDrive, Loader2, X } from 'lucide-react';
 import { authedFetch } from '../authHeaders';
 import { OneDriveChooser } from './OneDriveChooser';
+import { parseResultCookie, RESULT_COOKIE } from '@/lib/connected-apps/result-cookie';
 
 export interface ConnectedFile {
   handle: string;
@@ -32,6 +33,7 @@ const CONNECT_REASON: Record<string, string> = {
   invalid_state: 'That connection link expired. Please try again.',
   consent_required: 'Your organization requires an administrator to approve Mindy first.',
   not_configured: 'Connecting accounts is not set up yet.',
+  invalid_client: 'Mindy could not finish connecting because of a setup problem on our side. Nothing was connected.',
 };
 const PICK_ERROR: Record<string, string> = {
   unsupported_type: 'Mindy can read PDF, Word, Excel, text, Google Docs and Google Sheets files.',
@@ -106,20 +108,28 @@ export function ConnectedFiles({ email, files, onChange, disabled }: {
 
   useEffect(() => { if (email) void load(); }, [email, load]);
 
-  // Back from the provider: say what happened once, then clean the address bar.
+  // Back from the provider: say what happened once. The outcome comes from the address (?connect=) when it
+  // survived, else from the one-use result cookie the callback sets (the app rewrites its address to ?panel=
+  // before this panel mounts). Both are cleared after reading.
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const u = new URL(window.location.href);
-    const status = u.searchParams.get('connect');
+    const fromUrl = u.searchParams.get('connect');
+    const fromCookie = parseResultCookie(document.cookie);
+    if (fromCookie) document.cookie = `${RESULT_COOKIE}=; Max-Age=0; Path=/; Secure; SameSite=Lax`;
+    const status = fromUrl || fromCookie?.status;
     if (!status) return;
-    const reason = u.searchParams.get('reason') || '';
-    const provider = u.searchParams.get('provider') as 'google' | 'microsoft' | null;
+    const reason = (fromUrl ? u.searchParams.get('reason') : fromCookie?.reason) || '';
+    const provider = (fromUrl ? u.searchParams.get('provider') : fromCookie?.provider) as 'google' | 'microsoft' | null;
     setMessage(status === 'ok'
       ? `${provider ? PROVIDER_LABEL[provider] : 'Your account'} is connected. Pick a file to use it in this conversation.`
       : CONNECT_REASON[reason] || 'The account could not be connected. Please try again.');
-    for (const k of ['connect', 'reason', 'provider', 'connection']) u.searchParams.delete(k);
-    window.history.replaceState(null, '', u.pathname + (u.search ? u.search : '') + u.hash);
-  }, []);
+    if (status === 'ok') void load();
+    if (fromUrl) {
+      for (const k of ['connect', 'reason', 'provider', 'connection']) u.searchParams.delete(k);
+      window.history.replaceState(null, '', u.pathname + (u.search ? u.search : '') + u.hash);
+    }
+  }, [load]);
 
   const startConnect = useCallback(async (provider: 'google' | 'microsoft') => {
     setBusy(true); setMessage(null);
