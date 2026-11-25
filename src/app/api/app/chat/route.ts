@@ -119,6 +119,8 @@ import { ASK_MINDY_RULES_LAYER, askMindyRulesEnabledFor, askMindyRulesPromptBloc
 import { askMindyRecipesEnabledFor } from '@/lib/ask-mindy/flags';
 import { loadCompanyProfile } from '@/lib/ask-mindy/company-profile';
 import { intelligenceGateEnabledFor, runIntelligenceGate, type GateResult } from '@/lib/ask-mindy/intelligence-gate';
+import { companyResearchEnabledFor, extractCompanyClues, researchIdentityOnWeb, proposeWebCandidates, resolveCompanyIdentity, identityPromptBlock, clarifyingQuestion, type CompanyIdentity } from '@/lib/ask-mindy/company-research';
+import { lookupSamEntity } from '@/mcp/tools/sam-entity';
 import { gateEligible, extractWorkPhrase, profileForGate } from '@/lib/ask-mindy/gate-intent';
 import { fitRankingNote, rankFindResult } from '@/lib/ask-mindy/compose';
 import { provenanceRecords } from '@/lib/chat/doc-provenance';
@@ -707,7 +709,55 @@ export async function POST(request: NextRequest) {
         // Market questions: gather evidence -> record checks -> analyst -> independent evaluator -> publish only on
         // pass, else disclose. The chat answer and the report brief come from the same decision. Any other turn, or a
         // turn where the customer's own words name no work, falls through to the existing path unchanged.
-        if (!cardCtx && intelligenceGateEnabledFor(auth.email)) {
+        // Ask Mindy company research (ASK_MINDY_COMPANY_RESEARCH, default off; src/lib/ask-mindy/company-research.ts).
+        // A turn about a specific company or person: clues from the customer's words -> open-web identity candidates
+        // -> SAM resolution with evidence. Ambiguous -> one question, then stop. Otherwise the identity (or "no
+        // federal registration found") is given to the answer below. Card chat is unchanged (Eric, 2026-11-25).
+        let companyIdentityBlock: string | null = null;
+        let companyTrace: Record<string, unknown> | null = null;
+        if (!cardCtx && companyResearchEnabledFor(auth.email)) {
+          const ask = splitViewPreamble(message).rest || message;
+          try {
+            const clues = await extractCompanyClues(ask);
+            if (clues.isCompanyRequest) {
+              send({ type: 'progress', message: 'Looking this company up on the web and in SAM.gov.' });
+              const identityWeb = makeSearchWebTool({
+                maxCallsPerTurn: 3,
+                forbidden: { emails: [auth.email, vaultEmailFor(actingScope)] },
+                attribution: { callerKey: callerKeyFor(auth.email), sessionId },
+              });
+              const web = await researchIdentityOnWeb(clues, { search: (a) => identityWeb.execute(a), propose: (h, c) => proposeWebCandidates(h, c) });
+              const identity: CompanyIdentity = await resolveCompanyIdentity(clues, web, { samLookup: (i) => lookupSamEntity(i) });
+              const d = identity.decision;
+              companyTrace = {
+                status: d.status,
+                web_status: web.status,
+                web_hits: web.hits.length,
+                web_candidates: web.candidates.length,
+                ...(d.status === 'confirmed' || d.status === 'likely' ? { uei: d.entity.uei, matched: d.entity.matched.map((m) => `${m.field}:${m.from}`) } : {}),
+                ...(d.status === 'ambiguous' ? { candidates: d.candidates.map((c) => c.uei) } : {}),
+              };
+              if (d.status === 'ambiguous') {
+                const question = clarifyingQuestion(d);
+                send({ type: 'token', content: question });
+                send({ type: 'citations', sources: [] });
+                send({ type: 'done' });
+                closeStream();
+                persistExchange({
+                  email: auth.email!, sessionId, userMessage: message, assistantMessage: question, citedSources: [], tokensUsed: 0,
+                  latencyMs: Date.now() - startedAt, trace: { engine: 'company_research', company_research: companyTrace },
+                }).catch((err) => console.error('[chat] persist failed:', err));
+                return;
+              }
+              companyIdentityBlock = identityPromptBlock(identity);
+            }
+          } catch (err) {
+            // Value first: a failed identity step never blocks the answer (the existing path still runs).
+            console.error('[chat] company research failed:', (err as Error)?.message);
+          }
+        }
+
+        if (!cardCtx && !companyIdentityBlock && intelligenceGateEnabledFor(auth.email)) {
           const ask = splitViewPreamble(message).rest || message;
           const eligible = gateEligible(ask);
           const work = eligible.ok ? await extractWorkPhrase(ask).catch(() => null) : null;
@@ -843,6 +893,7 @@ export async function POST(request: NextRequest) {
           ? buildOpportunityContextBlock(cardRecord, splitViewPreamble(message).rest || message, noticeFacts ? formatSelectedNoticeFacts(noticeFacts) : [], noticeOrigin)
           : null;
         if (cardContext) messages.push({ role: 'system', content: cardContext.block });
+        if (companyIdentityBlock) messages.push({ role: 'system', content: companyIdentityBlock });
         if (selfReportNote) messages.push({ role: 'system', content: selfReportNote });
         if (pathwayNote) messages.push({ role: 'system', content: pathwayNote });
         if (vehicleNote) messages.push({ role: 'system', content: vehicleNote });
@@ -1009,6 +1060,7 @@ export async function POST(request: NextRequest) {
         if (outsideWebNote) turnTrace0.push('fmp_outside_web_note');
         if (writeupNote) turnTrace0.push('fmp_writeup_note');
         if (cardContext) toolRoundMessages.push({ role: 'system', content: cardContext.block });
+        if (companyIdentityBlock) toolRoundMessages.push({ role: 'system', content: companyIdentityBlock });
         // The planner sees which documents exist, not their text.
         if (documentContext) toolRoundMessages.push({ role: 'system', content: documentContext.manifest });
         // create_document only: the uploaded text (fenced, with document ids) so the document can include it.
@@ -2881,7 +2933,7 @@ export async function POST(request: NextRequest) {
           citedSources,
           tokensUsed,
           latencyMs,
-          trace: turnTrace,
+          trace: companyTrace ? { ...turnTrace, company_research: companyTrace } : turnTrace,
         }).catch(err => console.error('[chat] persist failed:', err));
       } catch (err) {
         console.error('[chat] stream error:', err);
