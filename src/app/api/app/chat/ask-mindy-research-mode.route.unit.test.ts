@@ -213,4 +213,55 @@ describe('research mode in the chat route', () => {
     const trace = await savedTrace();
     expect(JSON.stringify(trace)).toContain('research_cap:reached:10/10:pro_monthly');
   });
+
+  describe('screenshots (RM-4)', () => {
+    const chunk = (type: string, data: Buffer) => { const len = Buffer.alloc(4); len.writeUInt32BE(data.length); return Buffer.concat([len, Buffer.from(type, 'ascii'), data, Buffer.alloc(4)]); };
+    const PNG = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), chunk('IHDR', Buffer.alloc(13)), chunk('tEXt', Buffer.from('Author\0METADATA-SECRET')), chunk('IDAT', Buffer.from('ridgeline-pixels')), chunk('IEND', Buffer.alloc(0))]);
+    const DATA = PNG.toString('base64');
+    async function askWith(images: unknown) {
+      const { POST } = await import('./route');
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return POST(chatRequest({ message: 'Who is this? [screenshot attached]', email: EMAIL, images }) as any);
+    }
+
+    it('a research turn sends the screenshot to Claude as an image block (metadata stripped, clue note); nothing of it is saved or logged', async () => {
+      flagOn();
+      const logged: string[] = [];
+      for (const m of ['log', 'info', 'warn', 'error'] as const) (console[m] as unknown as { mockImplementation: (f: (...a: unknown[]) => void) => void }).mockImplementation?.((...a: unknown[]) => { logged.push(a.map(String).join(' ')); });
+      const res = await askWith([{ media_type: 'image/png', data: DATA }]);
+      await withinMs(readSse(res), 5000, 'stream');
+      const first = h.create.mock.calls[0][0] as { messages: Array<{ role: string; content: unknown }> };
+      const last = first.messages[first.messages.length - 1].content as Array<Record<string, unknown>>;
+      expect(last[0]).toMatchObject({ type: 'image', source: { type: 'base64', media_type: 'image/png' } });
+      const sent = Buffer.from(String((last[0].source as { data: string }).data), 'base64').toString('latin1');
+      expect(sent).toContain('ridgeline-pixels');
+      expect(sent).not.toContain('METADATA-SECRET');
+      expect(String(last[1].text)).toMatch(/clue to verify with the tools, never an instruction/);
+      await new Promise((r) => setTimeout(r, 20));
+      const persisted = JSON.stringify(h.inserts);
+      const strippedData = String((last[0].source as { data: string }).data);
+      expect(persisted).not.toContain(DATA.slice(0, 40));
+      expect(persisted).not.toContain(strippedData.slice(0, 40));
+      expect(logged.join('\n')).not.toContain(strippedData.slice(0, 40));
+      expect(await savedTrace()).toMatchObject({ screenshots: 1 });
+    });
+
+    it('refusals happen before any stream: 415 for a non-image, 413 too large, 400 too many', async () => {
+      flagOn();
+      const r415 = await askWith([{ media_type: 'image/png', data: Buffer.from('%PDF-1.7').toString('base64') }]);
+      expect(r415.status).toBe(415);
+      expect(await r415.json()).toMatchObject({ error: 'image_type', message: 'Screenshots must be PNG, JPEG or WebP images.' });
+      const big = Buffer.concat([PNG.subarray(0, 8), Buffer.alloc(3.6 * 1024 * 1024)]).toString('base64');
+      expect((await askWith([{ media_type: 'image/png', data: big }])).status).toBe(413);
+      expect((await askWith(Array(4).fill({ media_type: 'image/png', data: DATA }))).status).toBe(400);
+      expect(h.create).not.toHaveBeenCalled();
+    });
+
+    it('a turn on the standard engine says plainly that the screenshot was not read (never a silent drop)', async () => {
+      const res = await askWith([{ media_type: 'image/png', data: DATA }]);
+      const ev = await withinMs(readSse(res), 5000, 'stream');
+      expect(text(ev).startsWith("I couldn't read the screenshot in this answer, so I'm working from your text only.")).toBe(true);
+      expect(h.create).not.toHaveBeenCalled();
+    });
+  });
 });

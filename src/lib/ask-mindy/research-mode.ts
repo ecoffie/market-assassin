@@ -213,7 +213,8 @@ export async function runResearchLoop(a: {
         system: a.system,
         tools: a.tools as unknown as Anthropic.Tool[],
         tool_choice: forced ? { type: 'none' } : { type: 'auto' },
-        messages: msgs as unknown as Anthropic.MessageParam[],
+        // A snapshot per request: the loop keeps appending to msgs after this call.
+        messages: [...msgs] as unknown as Anthropic.MessageParam[],
         ...(a.effort ? { output_config: { effort: a.effort } } : {}),
       } as unknown as Anthropic.MessageCreateParamsNonStreaming, { timeout: stepMs, maxRetries: 0 }), stepMs);
     } catch (err) {

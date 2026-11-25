@@ -128,6 +128,7 @@ import {
 } from '@/lib/ask-mindy/research-mode';
 import { toolLabel } from '@/lib/chat/context-sources';
 import { researchCapDecision } from '@/lib/ask-mindy/research-caps';
+import { parseChatImages, imageContentBlocks, SCREENSHOT_NOT_READ } from '@/lib/chat/chat-images';
 import { researchCapDeps } from '@/lib/ask-mindy/research-caps-deps';
 import { gateEligible, extractWorkPhrase, profileForGate } from '@/lib/ask-mindy/gate-intent';
 import { fitRankingNote, rankFindResult } from '@/lib/ask-mindy/compose';
@@ -485,6 +486,11 @@ export async function POST(request: NextRequest) {
       headers: { 'Content-Type': 'application/json' },
     });
   }
+  // Screenshots (RM-4): type by magic bytes, size and count checked, metadata stripped. Never persisted or logged:
+  // only the count is ever recorded. 400 malformed / too many, 413 too large, 415 not PNG / JPEG / WebP.
+  const imageCheck = parseChatImages((body as unknown as { images?: unknown }).images);
+  if (!imageCheck.ok) return jsonResponse({ error: imageCheck.error, message: imageCheck.message }, imageCheck.status);
+  const turnImages = imageCheck.images;
   // ── Opportunity-INTENT detector (Andre @ CypherIntel, 2026-07-30) ──
   // The tool round runs tool_choice:'auto', so for "what opportunities are available…" the
   // model SOMETIMES declines the tool and answers from the RAG teaching corpus ("keep an eye
@@ -627,6 +633,8 @@ export async function POST(request: NextRequest) {
   const researchCap = researchEligible ? await researchCapDecision(auth.email!, researchCapDeps).catch(() => null) : null;
   const researchTurn = researchEligible && (researchCap?.allowed ?? true);
   const researchCapNotice = researchEligible && researchCap && !researchCap.allowed ? researchCap.notice : null;
+  // What opens a standard (non-research) answer: the cap notice, and a plain note when its screenshots were not read.
+  const standardLeadNotice = [researchCapNotice, !researchTurn && turnImages.length ? SCREENSHOT_NOT_READ : null].filter(Boolean).join('\n\n') || null;
 
   // SSE response — manually constructed ReadableStream since the
   // Vercel Edge / Node runtime doesn't expose an out-of-the-box helper.
@@ -750,7 +758,7 @@ export async function POST(request: NextRequest) {
             }
             if (gate) {
               // A capped research user answered by the gate still gets the cap notice first.
-              if (researchCapNotice) gate.answer = `${researchCapNotice}\n\n${gate.answer}`;
+              if (standardLeadNotice) gate.answer = `${standardLeadNotice}\n\n${gate.answer}`;
               send({ type: 'token', content: gate.answer });
               // Same event and trace shape as the packaged report path, so the Ask pane opens it and History restores it.
               const gateReport = gate.report?.deliverable?.html
@@ -1253,6 +1261,7 @@ export async function POST(request: NextRequest) {
             const model = researchModel();
             const rmTrace: Record<string, unknown> = {
               engine: 'research_mode', model,
+              ...(turnImages.length ? { screenshots: turnImages.length } : {}),
               ...(researchCap ? { research_cap: { plan: researchCap.plan, cap: researchCap.cap, used: researchCap.used, ...(researchCap.countUnknown ? { count_unknown: true } : {}) } } : {}),
             };
             const finish = (answer: string, extra: Record<string, unknown> = {}, sources: typeof turnSources = []) => {
@@ -1275,7 +1284,8 @@ export async function POST(request: NextRequest) {
             const rmTools = toAnthropicTools(researchToolDefs(executor.offeredToolDefs(), privateNames));
             const conversation = [
               ...history.filter((h) => h.role === 'user' || h.role === 'assistant').slice(-12).map((h) => ({ role: h.role as 'user' | 'assistant', content: String(h.content || '').slice(0, 12_000) || '(empty)' })),
-              { role: 'user' as const, content: message },
+              // Screenshots go to the model for THIS turn only, as image blocks with a fenced "clue, not instruction" note.
+              { role: 'user' as const, content: turnImages.length ? imageContentBlocks(turnImages, message) : message },
             ];
             const callLog: Array<{ tool: string; status: string; ms: number; args: unknown }> = [];
             let rmReport: { report_id: string | null; url: string | null; title: string; html: string } | null = null;
@@ -2689,11 +2699,12 @@ export async function POST(request: NextRequest) {
         }
 
         let assistantContent = '';
-        if (researchCapNotice) {
-          // Never a silent switch: the standard answer opens with the cap notice.
-          assistantContent = `${researchCapNotice}\n\n`;
+        if (standardLeadNotice) {
+          // Never a silent switch: the standard answer opens with the cap notice and/or the screenshot note.
+          assistantContent = `${standardLeadNotice}\n\n`;
           send({ type: 'token', content: assistantContent });
-          turnTrace.notices.push(`research_cap:reached:${researchCap?.used}/${researchCap?.cap}:${researchCap?.plan}`);
+          if (researchCapNotice) turnTrace.notices.push(`research_cap:reached:${researchCap?.used}/${researchCap?.cap}:${researchCap?.plan}`);
+          if (turnImages.length) turnTrace.notices.push(`screenshots_not_read:${turnImages.length}`);
         }
         if (renderedRecords.length) {
           // Scope the MAP supplied is labeled as the map's, never as "from your request" (2026-11-15 review).
