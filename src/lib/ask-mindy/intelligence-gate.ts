@@ -23,7 +23,36 @@ export function intelligenceGateEnabledFor(email: string | null | undefined, env
   return list.includes('*') || list.includes(email.trim().toLowerCase());
 }
 
-export type GateStatus = 'complete' | 'disclosed' | 'measurement_failure';
+export type GateStatus = 'complete' | 'disclosed' | 'measurement_failure' | 'out_of_time';
+
+/**
+ * The gate's own deadline, well inside the route's 300 s limit (maxDuration). Past it the gate stops: it skips the
+ * retry and discloses what it has. It never hands the turn back to the old path, which would also run out of time.
+ */
+export const GATE_DEADLINE_MS = 170_000;
+/** A model call is not started with less than this left: it could not finish usefully. */
+const MIN_CALL_MS = 15_000;
+const ANALYST_CALL_MAX_MS = 120_000;
+const EVALUATOR_CALL_MAX_MS = 60_000;
+
+/** What the customer reads when the gate could not finish any recommendation in time (never "the market is small"). */
+export const GATE_OUT_OF_TIME_ANSWER = 'This one is taking longer than I can wait, so I stopped before recommending anything. That says nothing about the market. Please ask again, or narrow it to one state or one kind of work.';
+
+/** Plain progress lines for the customer while the gate works (shown by the chat as notices). */
+export const GATE_PROGRESS = {
+  gather: 'Looking at open bids, contracts coming back and agency plans for this work.',
+  check: 'Checking which of these fit your company.',
+  analyst: 'Weighing the best options for you.',
+  review: 'Double-checking the recommendation.',
+  retry: 'Tightening the recommendation.',
+} as const;
+
+class GateDeadline extends Error {}
+/** Resolves with the promise, or rejects with GateDeadline after ms (the call itself also carries its own timeout). */
+function within<T>(p: Promise<T>, ms: number): Promise<T> {
+  let t: ReturnType<typeof setTimeout> | undefined;
+  return Promise.race([p, new Promise<T>((_, rej) => { t = setTimeout(() => rej(new GateDeadline(`deadline after ${ms}ms`)), ms); })]).finally(() => clearTimeout(t));
+}
 
 export interface GateResult {
   status: GateStatus;
@@ -38,6 +67,9 @@ export interface GateResult {
   integrity: IntegrityFinding[];
   removed: { recompetes: number; contacts: number };
   cost: { analystIn: number; analystOut: number; evalIn: number; evalOut: number };
+  /** Per-step wall time in ms, plus whether the deadline cut the run short (counts and ms only; for the trace). */
+  timings: Record<string, number>;
+  deadlineHit: boolean;
 }
 
 function money(n: unknown): string {
@@ -220,8 +252,13 @@ export async function runIntelligenceGate(args: {
   profile: string | null;
   eligibility?: CustomerEligibility;
   competitionLookup?: CompetitionLookup;
+  /** Plain progress lines for the customer (the route sends them as `progress` events). */
+  onProgress?: (message: string) => void;
+  /** Overall budget in ms (default GATE_DEADLINE_MS). */
+  deadlineMs?: number;
   /** Injectable for tests. */
   deps?: {
+    now?: () => number;
     gather?: typeof gatherMarketEvidence;
     publish?: typeof publishMarketReport;
     analyst?: typeof runAnalyst;
@@ -237,6 +274,21 @@ export async function runIntelligenceGate(args: {
   const analyst = args.deps?.analyst ?? runAnalyst;
   const evaluate = args.deps?.evaluate ?? evaluateDecision;
   const cost = { analystIn: 0, analystOut: 0, evalIn: 0, evalOut: 0 };
+  const now = args.deps?.now ?? Date.now;
+  const t0 = now();
+  const deadline = t0 + (args.deadlineMs ?? GATE_DEADLINE_MS);
+  const left = () => deadline - now();
+  const timings: Record<string, number> = {};
+  let deadlineHit = false;
+  const timed = async <T>(name: string, f: () => Promise<T>): Promise<T> => {
+    const s0 = now();
+    try { return await f(); } finally { timings[name] = now() - s0; }
+  };
+  const progress = (m: string) => { try { args.onProgress?.(m); } catch { /* progress is best effort */ } };
+  const outOfTime = (report: MarketReportResult, checks: RecordCheck[] = []): GateResult => {
+    timings.total = now() - t0;
+    return { status: 'out_of_time', decision: null, evaluation: null, attempts: 0, checks, report, cost, integrity: [], removed: { recompetes: 0, contacts: 0 }, answer: GATE_OUT_OF_TIME_ANSWER, timings, deadlineHit: true };
+  };
 
   const query = String(args.reportInput.keyword || args.reportInput.naics || '').trim();
   const states = (args.states?.length ? args.states : args.reportInput.state ? [args.reportInput.state] : []).map((x) => x.toUpperCase());
@@ -257,16 +309,18 @@ export async function runIntelligenceGate(args: {
     }, { competitionLookup: null }));
   const findNationalForecasts = args.deps?.findNationalForecasts ?? (async (q: { query: string }) =>
     findOpportunities({ query: q.query, horizons: { open_now: false, coming_back: false, coming_soon: true }, limit_per_horizon: 1 }, { competitionLookup: null }));
-  const [ev, open] = await Promise.all([
+  progress(GATE_PROGRESS.gather);
+  const [ev, open] = await timed('gather', () => Promise.all([
     states.length > 1
       ? Promise.all(states.map((st) => gather({ ...args.reportInput, state: st }))).then((rs) => mergeStateEvidence(rs, states))
       : gather(args.reportInput),
     query ? findOpen({ query, state: states.length === 1 ? states[0] : null, states }).catch(() => null) : Promise.resolve(null),
-  ]);
+  ]));
   if (ev._meta.publication_state === 'measurement_failure') {
     return {
       status: 'measurement_failure', decision: null, evaluation: null, attempts: 0, checks: [], report: ev, cost, integrity: [], removed: { recompetes: 0, contacts: 0 },
       answer: `I could not measure this market right now (the data source did not respond), so I can't recommend anything yet. This is not a sign the market is small. Please try again in a few minutes.`,
+      timings: { ...timings, total: now() - t0 }, deadlineHit: false,
     };
   }
 
@@ -277,7 +331,7 @@ export async function runIntelligenceGate(args: {
   // 25 of 206 open notices, a coming-back list of building repairs) while the real work sits under its NAICS.
   const targetNaics = work.basis === 'name' ? work.naics[0] : undefined;
   const targeted = targetNaics && query
-    ? await findTargeted({ query, naics: targetNaics, state: states.length === 1 ? states[0] : null, states }).catch(() => null)
+    ? await timed('targeted', () => findTargeted({ query, naics: targetNaics, state: states.length === 1 ? states[0] : null, states }).catch(() => null))
     : null;
   const targetedBack = ((targeted?.horizons?.coming_back?.items as Array<Record<string, unknown>>) || []).map(findRecompeteRow);
   if (targetedBack.length) {
@@ -305,13 +359,15 @@ export async function runIntelligenceGate(args: {
   // The customer's SAM size per NAICS, when the profile carries a UEI (self-represented in SAM; unknown stays unknown).
   const eligibility: CustomerEligibility = { ...(args.eligibility || {}) };
   if (eligibility.uei) {
-    const res = await resolveCompanyAnchor(eligibility.uei, args.deps?.entityLookup).catch(() => null);
+    const res = await timed('entity', () => resolveCompanyAnchor(eligibility.uei!, args.deps?.entityLookup).catch(() => null));
     if (res?.status === 'resolved' && res.anchor && res.anchor.size_source !== 'unavailable') {
       eligibility.sizeByNaics = res.anchor.size_by_naics as Record<string, 'Y' | 'N' | 'E'>;
     }
   }
-  const comp = await competitionFactsFor(recompetes.map((r) => r.contract_id), args.competitionLookup, { budgetMs: 8000 });
+  progress(GATE_PROGRESS.check);
+  const comp = await timed('competition', () => competitionFactsFor(recompetes.map((r) => r.contract_id), args.competitionLookup, { budgetMs: 8000 }));
   const checks = checkRecords(recs, scope, eligibility, comp);
+  timings.records = recs.length;
 
   const market = marketContext(ev, scope.state);
   market.openNowLine = !openH || openH.status === 'unavailable'
@@ -325,7 +381,7 @@ export async function runIntelligenceGate(args: {
         const added = openRecs.length - distinct;
         return `${matched} open SAM.gov notice(s) matched the search${dupes > 0 ? `; ${dupes} were repeat postings of the same solicitation, leaving ${distinct} distinct bid(s)` : ''}${matched > items ? `; the top ${items} were returned and ${matched - items} were not` : `; all were checked`}${added > 0 ? `; a second search on the customer's industry code added ${added} more distinct bid(s), also checked` : ''}`;
       })();
-  market.forecastsLine = await forecastsLine({ horizon: soonH, shown: soonRecs.length, state: scope.state, query, national: findNationalForecasts });
+  market.forecastsLine = await timed('forecasts', () => forecastsLine({ horizon: soonH, shown: soonRecs.length, state: scope.state, query, national: findNationalForecasts }));
   const input: AnalystInput = { question: args.question, profile: args.profile, market, records: recs, checks, customerUei: eligibility.uei ?? null };
   const evidence = buildAnalystPrompt(input);
 
@@ -334,19 +390,41 @@ export async function runIntelligenceGate(args: {
   let attempts = 0;
   let feedback: string[] = [];
   while (attempts < 2) {
+    // Not enough time for another analyst + review: stop here (the retry is skipped; a first decision is disclosed).
+    if (left() < MIN_CALL_MS * 2) { deadlineHit = true; break; }
     attempts++;
+    progress(attempts === 1 ? GATE_PROGRESS.analyst : GATE_PROGRESS.retry);
     const asked = feedback.length
       ? { ...input, question: `${input.question}\n\nA reviewer rejected the previous answer. Fix these and answer again from the same evidence:\n${feedback.map((f) => `- ${f}`).join('\n')}` }
       : input;
-    const a = await analyst(asked);
+    const aMs = Math.min(ANALYST_CALL_MAX_MS, left() - MIN_CALL_MS);
+    let a: Awaited<ReturnType<typeof runAnalyst>>;
+    try {
+      a = await timed(`analyst_${attempts}`, () => within(analyst(asked, { timeoutMs: aMs }), aMs));
+    } catch (err) {
+      // Out of time (or a timed-out call): keep the earlier decision, if any. A real error with time left still throws.
+      if (err instanceof GateDeadline || left() < MIN_CALL_MS * 2 || /timed? ?out/i.test(String((err as Error)?.message))) { deadlineHit = true; attempts--; break; }
+      throw err;
+    }
     cost.analystIn += a.usage.input; cost.analystOut += a.usage.output;
     decision = a.decision;
-    const e = await evaluate({ question: args.question, evidence, decision, checks, dropped: a.dropped });
+    evaluation = null;
+    progress(GATE_PROGRESS.review);
+    const eMs = Math.min(EVALUATOR_CALL_MAX_MS, left());
+    let e: Awaited<ReturnType<typeof evaluateDecision>>;
+    try {
+      if (eMs < MIN_CALL_MS) throw new GateDeadline('no time to review');
+      e = await timed(`evaluator_${attempts}`, () => within(evaluate({ question: args.question, evidence, decision: decision!, checks, dropped: a.dropped }, { timeoutMs: eMs }), eMs));
+    } catch (err) {
+      if (err instanceof GateDeadline || left() < MIN_CALL_MS || /timed? ?out/i.test(String((err as Error)?.message))) { deadlineHit = true; break; }
+      throw err;
+    }
     cost.evalIn += e.usage.input; cost.evalOut += e.usage.output;
     evaluation = { pass: e.pass, results: e.results, fix: e.fix };
     if (e.pass) break;
     feedback = e.fix;
   }
+  if (!decision) return outOfTime(ev, checks);
 
   ev.decision = decision ? { headline: decision.headline, pursuits: decision.pursuits, also_consider: decision.also_consider || [], ruled_out: decision.ruled_out, gaps: decision.gaps } : null;
   // The report must agree with the checks: ruled-out records and contacts tied only to them come out, then the
@@ -356,16 +434,23 @@ export async function runIntelligenceGate(args: {
     ? reportIntegrity(cleaned, checks, { requestedState: scope.state, html: renderMarketReportHtml(cleaned) })
     : [];
   const status: GateStatus = evaluation?.pass && integrity.every((f) => f.pass) ? 'complete' : 'disclosed';
+  // A decision the review never finished (out of time) is disclosed as unchecked, never shown as verified.
+  const unreviewed = deadlineHit && !evaluation;
   // Only a decision that passed review AND a report that passed integrity is published as a shareable report.
-  const report = status === 'complete' ? await publish(cleaned, args.reportInput) : cleaned;
+  const report = status === 'complete' ? await timed('publish', () => publish(cleaned, args.reportInput)) : cleaned;
   // The customer is told what could not be VERIFIED (facts, relevance, report data). An actionability failure blocks
   // the shareable report but is not a verification claim; clarity is advisory and only recorded in the trace.
   const FACTUAL = new Set(['relevant', 'pursuable', 'reasoned']);
   const disclosed = status === 'disclosed'
-    ? [...(evaluation?.results || []).filter((r) => !r.pass && FACTUAL.has(r.criterion)).map((r) => r.reason), ...integrity.filter((f) => !f.pass).map((f) => f.reason)]
+    ? [
+        ...(unreviewed ? ['I ran out of time before double-checking this recommendation.'] : []),
+        ...(evaluation?.results || []).filter((r) => !r.pass && FACTUAL.has(r.criterion)).map((r) => r.reason),
+        ...integrity.filter((f) => !f.pass).map((f) => f.reason),
+      ]
     : undefined;
+  timings.total = now() - t0;
   return {
-    status, decision, evaluation, attempts, checks, report, cost, integrity, removed,
+    status, decision, evaluation, attempts, checks, report, cost, integrity, removed, timings, deadlineHit,
     answer: decision ? renderDecisionAnswer(decision, { reportUrl: report.deliverable?.url, disclosed: disclosed?.length ? disclosed : undefined }) : 'I could not produce a recommendation from this evidence.',
   };
 }

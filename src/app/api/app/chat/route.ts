@@ -722,6 +722,8 @@ export async function POST(request: NextRequest) {
                 states: eligible.states,
                 profile: gateProfile.text,
                 eligibility: gateProfile.eligibility,
+                // Customer-language progress while the gate works (the chat shows `progress` as notices).
+                onProgress: (m) => send({ type: 'progress', message: m }),
               });
             } catch (err) {
               console.error('[chat] intelligence gate failed:', (err as Error)?.message);
@@ -751,6 +753,8 @@ export async function POST(request: NextRequest) {
                   engine: 'intelligence_gate',
                   gate_status: gate.status,
                   attempts: gate.attempts,
+                  gate_timings_ms: gate.timings,
+                  gate_deadline_hit: gate.deadlineHit,
                   work,
                   states: eligible.states,
                   checks: gate.checks.map((c) => ({ id: c.contract_id, verdict: c.verdict, codes: [...c.exclusions, ...c.barriers, ...c.actions].map((x) => x.code) })),

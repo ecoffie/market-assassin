@@ -10,6 +10,8 @@ import type { AnalystDecision } from './analyst';
 import type { RecordCheck } from './evidence-checks';
 
 export const EVALUATOR_MODEL_DEFAULT = 'claude-sonnet-5-5';
+/** Per-call ceiling when the caller gives none; the gate always passes the time it has left. */
+const DEFAULT_CALL_TIMEOUT_MS = 60_000;
 
 export type Criterion = 'relevant' | 'pursuable' | 'reasoned' | 'actionable' | 'clear';
 
@@ -88,7 +90,7 @@ export function verifyQuotedTerms(reason: string, decision: AnalystDecision): 'n
 
 export async function evaluateDecision(
   args: { question: string; evidence: string; decision: AnalystDecision; checks: RecordCheck[]; dropped?: string[] },
-  opts: { client?: Anthropic; model?: string } = {},
+  opts: { client?: Anthropic; model?: string; /** Hard limit for this one call (the gate's deadline). */ timeoutMs?: number } = {},
 ): Promise<Evaluation & { usage: { input: number; output: number }; model: string }> {
   const software = softwareChecks(args.decision, args.checks, args.dropped || []);
   const client = opts.client ?? new Anthropic();
@@ -102,7 +104,7 @@ export async function evaluateDecision(
       role: 'user',
       content: `CUSTOMER QUESTION: ${args.question}\n\nEVIDENCE:\n${args.evidence}\n\nANSWER TO GRADE (JSON):\n${JSON.stringify(args.decision, null, 2)}`,
     }],
-  });
+  }, { timeout: opts.timeoutMs ?? DEFAULT_CALL_TIMEOUT_MS, maxRetries: 0 });
   if (msg.stop_reason === 'refusal' || msg.stop_reason === 'max_tokens') throw new Error(`evaluator stopped: ${msg.stop_reason}`);
   const text = msg.content.filter((b) => b.type === 'text').map((b) => (b as Anthropic.TextBlock).text).join('');
   const j = JSON.parse(text) as Record<'reasoned' | 'actionable' | 'clear', { pass: boolean; reason: string }> & { fix: string[] };

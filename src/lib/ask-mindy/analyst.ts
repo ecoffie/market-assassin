@@ -10,6 +10,8 @@ import Anthropic from '@anthropic-ai/sdk';
 import type { CandidateRecord, RecordCheck } from './evidence-checks';
 
 export const ANALYST_MODEL_DEFAULT = 'claude-opus-5-5';
+/** Per-call ceiling when the caller gives none; the gate always passes the time it has left. */
+const DEFAULT_CALL_TIMEOUT_MS = 120_000;
 
 export interface AnalystInput {
   question: string;
@@ -217,7 +219,7 @@ export function enforceDecision(decision: AnalystDecision, checks: RecordCheck[]
 
 export async function runAnalyst(
   input: AnalystInput,
-  opts: { client?: Anthropic; model?: string } = {},
+  opts: { client?: Anthropic; model?: string; /** Hard limit for this one call (the gate's deadline). */ timeoutMs?: number } = {},
 ): Promise<{ decision: AnalystDecision; dropped: string[]; usage: { input: number; output: number }; model: string }> {
   const client = opts.client ?? new Anthropic();
   const model = opts.model ?? process.env.ASK_MINDY_ANALYST_MODEL ?? ANALYST_MODEL_DEFAULT;
@@ -227,7 +229,7 @@ export async function runAnalyst(
     system: ANALYST_SYSTEM,
     output_config: { effort: 'high', format: { type: 'json_schema', schema: ANALYST_SCHEMA as unknown as Record<string, unknown> } },
     messages: [{ role: 'user', content: buildAnalystPrompt(input) }],
-  });
+  }, { timeout: opts.timeoutMs ?? DEFAULT_CALL_TIMEOUT_MS, maxRetries: 0 });
   if (msg.stop_reason === 'refusal' || msg.stop_reason === 'max_tokens') throw new Error(`analyst stopped: ${msg.stop_reason}`);
   const text = msg.content.filter((b) => b.type === 'text').map((b) => (b as Anthropic.TextBlock).text).join('');
   const parsed = JSON.parse(text) as AnalystDecision;

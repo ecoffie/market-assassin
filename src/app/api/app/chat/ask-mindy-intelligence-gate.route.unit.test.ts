@@ -144,4 +144,20 @@ describe('intelligence gate in the chat route', () => {
     const ev = await ask(FL_Q);
     expect(text(ev)).toContain('Existing path answer.');
   });
+
+  it('flag on: the gate\'s progress lines reach the customer as progress events, before the answer; timings go to the trace', async () => {
+    flagOn();
+    h.runGate.mockImplementation(async (a: { onProgress?: (m: string) => void }) => {
+      a.onProgress?.('Looking at open bids, contracts coming back and agency plans for this work.');
+      a.onProgress?.('Weighing the best options for you.');
+      return { ...gateResult, timings: { gather: 1200, analyst_1: 40000, total: 52000 }, deadlineHit: false };
+    });
+    const ev = await ask(FL_Q);
+    const prog = ev.filter((e) => e.type === 'progress').map((e) => (e as { message: string }).message);
+    expect(prog).toEqual(['Looking at open bids, contracts coming back and agency plans for this work.', 'Weighing the best options for you.']);
+    expect(ev.findIndex((e) => e.type === 'progress')).toBeLessThan(ev.findIndex((e) => e.type === 'token'));
+    await new Promise((r) => setTimeout(r, 20));
+    const assistant = h.inserts.find((r) => r.role === 'assistant') as { trace?: Record<string, unknown> } | undefined;
+    expect(assistant?.trace).toMatchObject({ gate_timings_ms: { gather: 1200, analyst_1: 40000, total: 52000 }, gate_deadline_hit: false });
+  });
 });
