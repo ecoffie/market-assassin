@@ -14,6 +14,11 @@ describe('costOf — every model Ask Mindy can route to is priced (unpriced = $0
     ['openai/gpt-oss-120b', 0.75],
     ['gpt-4o-mini', 0.75],
     ['gpt-4o', 12.5],
+    // Claude list prices (2026-11-25): Opus 5.5 $4/$20, Opus 5 $5/$25, Sonnet 5.x $2/$10 per MTok.
+    ['claude-opus-5-5', 24.0],
+    ['claude-opus-5', 30.0],
+    ['claude-sonnet-5-5', 12.0],
+    ['claude-sonnet-5', 12.0],
   ])('%s', (model, usd) => {
     expect(costOf(model, M)).toBeCloseTo(usd, 5);
   });

@@ -51,6 +51,10 @@ vi.mock('@/lib/bigquery/recipients', () => ({
     return { rollup_uei: 'UEI1', rollup_name: 'Leidos', child_ueis: ['UEI1'], city: 'Reston', state: 'VA', total_obligated: 5e9, award_count: 1200, distinct_agency_count: 40, first_action_date: '2008-01-01', last_action_date: '2026-06-01' };
   }),
   getRecipientByUei: vi.fn(async () => null),
+  getExecutivesForRecipient: vi.fn(async (_ueis: string[], _rollupUei: string, liveBq = false) => {
+    bqCalls.push({ fn: 'getExecutives', liveBq });
+    return [{ exec_rank: 1, exec_name: 'Jane Officer', exec_amount: 900000, reported_at: '2025-03-01' }];
+  }),
   getRecentAwardsForRecipient: vi.fn(async (_ueis: string[], rollupUei: string, _limit = 5, liveBq = false) => {
     bqCalls.push({ fn: 'getRecentAwards', liveBq });
     const key = `rollup:${rollupUei}:recent-awards:5:v4-m`;

@@ -24,6 +24,8 @@ import { ChatAttachments } from '../chat/ChatAttachments';
 import type { GeneratedDownloadFile } from '../chat/GeneratedDownloadChips';
 import { ChatReportPreview, validReportId, type ChatInlineReport, type ChatSavedReport } from '../chat/ChatReportPreview';
 import { useVaultCapabilities } from '../chat/useVaultCapabilities';
+import { ResearchProgressView } from '../chat/ResearchProgressView';
+import { addProgress, startProgress, type ResearchProgress } from '@/lib/chat/research-progress';
 import { UpgradeModal } from '../UpgradeModal';
 import { renderSafeMarkdown } from '@/lib/chat/safe-markdown';
 import { startProposalFromNotice } from '@/lib/chat/start-proposal';
@@ -85,6 +87,10 @@ interface ChatMessage {
   report?: ChatInlineReport;
   /** A packaged market report in a reopened conversation: History keeps its id and title; the pane reloads it. */
   savedReport?: ChatSavedReport;
+  /** Live research steps for this turn ('progress' events). Not persisted; the answer is what History keeps. */
+  progress?: ResearchProgress;
+  /** When the answer started arriving: the research summary's elapsed time stops here. */
+  progressDoneAt?: number;
 }
 
 
@@ -292,7 +298,9 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
             } else if (evt.type === 'token' && typeof evt.content === 'string') {
               finalContent += evt.content;
               setMessages(prev => prev.map(m =>
-                m.id === assistantMsg.id ? { ...m, content: m.content + evt.content } : m
+                m.id === assistantMsg.id
+                  ? { ...m, content: m.content + evt.content, ...(m.progress && !m.progressDoneAt ? { progressDoneAt: Date.now() } : {}) }
+                  : m
               ));
             } else if (evt.type === 'deliverables' && Array.isArray(evt.files)) {
               const files = (evt.files as GeneratedDownloadFile[]).filter(
@@ -328,7 +336,13 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
               setMessages(prev => prev.map(m =>
                 m.id === assistantMsg.id ? { ...m, citations: evt.sources } : m
               ));
-            } else if ((evt.type === 'notice' || evt.type === 'progress') && typeof evt.message === 'string') {
+            } else if (evt.type === 'progress' && typeof evt.message === 'string') {
+              // A research step, not a warning: it goes in the progress panel (timer, current step, Show steps).
+              const at = Date.now();
+              setMessages(prev => prev.map(m =>
+                m.id === assistantMsg.id ? { ...m, progress: addProgress(m.progress ?? startProgress(at), evt, at) } : m
+              ));
+            } else if (evt.type === 'notice' && typeof evt.message === 'string') {
               setMessages(prev => prev.map(m =>
                 m.id === assistantMsg.id ? { ...m, notices: [...(m.notices || []), evt.message] } : m
               ));
@@ -719,6 +733,9 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
                     </div>
                   )}
                   {/* Report first; Export lives in the open pane header (Claude/ChatGPT), not under the answer. */}
+                  {msg.role === 'assistant' && msg.progress && (
+                    <ResearchProgressView progress={msg.progress} running={!!msg.isStreaming && !msg.content && !msg.errored} finishedAt={msg.progressDoneAt} />
+                  )}
                   {msg.role === 'assistant' && !msg.isStreaming && !msg.errored && email && msg.report && (
                     <ChatReportPreview email={email} inline={msg.report} files={msg.deliverables} pdfNote={msg.deliverablePdfNote} />
                   )}
@@ -733,7 +750,7 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
                       // A Map conversation's user turn carries the Map view preamble for the model; the
                       // bubble shows only what the customer typed (history still sends msg.content as stored).
                       ? renderMessageContent(msg.role === 'user' ? customerText(msg.content) : msg.content, msg.role === 'assistant' && !msg.errored)
-                      : msg.isStreaming
+                      : msg.isStreaming && !msg.progress
                         ? <span className="text-faint italic">Thinking…</span>
                         : null}
                   </div>
