@@ -174,6 +174,8 @@ export async function runResearchLoop(a: {
   tools: AnthropicToolDef[];
   execute: (calls: ResearchCall[]) => Promise<ResearchCallResult[]>;
   onCalls?: (calls: ResearchCall[]) => void;
+  /** Called once when the loop stops researching and the final answer is being written (a limit was reached). */
+  onFinalStep?: (reason: StopReason) => void;
   deadlineMs?: number;
   maxCalls?: number;
   now?: () => number;
@@ -198,6 +200,7 @@ export async function runResearchLoop(a: {
       else if (steps >= MAX_STEPS) forced = 'max_steps';
       else if (left() < FINAL_RESERVE_MS) forced = 'deadline';
       if (forced) {
+        a.onFinalStep?.(forced);
         const note = { type: 'text', text: `[Research limit reached (${forced === 'max_calls' ? 'tool-call limit' : forced === 'deadline' ? 'time limit' : 'step limit'}). Do not call more tools. Write the answer now from what you have gathered, following the output standard, and say in one line per gap what you could not finish.]` };
         const last = msgs[msgs.length - 1];
         if (last?.role === 'user' && Array.isArray(last.content)) last.content.push(note);
