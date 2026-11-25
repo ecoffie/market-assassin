@@ -293,7 +293,7 @@ export async function lookupSamEntity(input: SamEntityInput): Promise<SamEntityR
         else if (looked.status === 'unavailable') { lookupStatus = 'lookup_failed'; localStatus = 'unavailable'; }
         else { localStatus = 'ok'; localHits = 0; }
       } else if (mode === 'name') {
-        const looked = await lookupLocalEntitiesByName(name, limit);
+        const looked = await lookupLocalEntitiesByName(name, limit, state);
         if (looked.status === 'found') {
           matches = looked.hits.map((h) => h.entity);
           localHits = looked.hits.length;
@@ -331,7 +331,7 @@ export async function lookupSamEntity(input: SamEntityInput): Promise<SamEntityR
         else if (looked.status === 'unavailable') { degraded = true; lookupStatus = 'lookup_failed'; localStatus = 'unavailable'; }
         else { localStatus = 'ok'; localHits = 0; }
       } else {
-        const looked = await lookupLocalEntitiesByName(name, limit);
+        const looked = await lookupLocalEntitiesByName(name, limit, state);
         if (looked.status === 'found') {
           localHits = looked.hits.length;
           localStatus = 'ok';
