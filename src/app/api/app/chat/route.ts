@@ -149,6 +149,7 @@ import { chatDeadlines, toolTimeoutMs, readWithIdleTimeout, incompleteToolNotice
 import {
   decideSecondToolRound,
   dropDuplicateRound2Calls,
+  SECOND_ROUND_RECOVERY_NOTE,
 } from '@/lib/chat/second-tool-round';
 
 // Every Ask Mindy turn carries customer-private context (the user's profile; often Vault or
@@ -2235,6 +2236,7 @@ export async function POST(request: NextRequest) {
                     + '(e.g. competitors after an incumbent, contacts after a notice). Do not re-call a tool '
                     + 'that already appears above with the same arguments. Do not write or create anything '
                     + 'in this second pass. If you can answer from these results, call no tools.\n\n'
+                    + (secondRound.recovery ? `${SECOND_ROUND_RECOVERY_NOTE}\n\n` : '')
                     + fenceUntrusted(round1Digest, {
                       name: 'round-1-tool-results',
                       chars: round1Digest.length,

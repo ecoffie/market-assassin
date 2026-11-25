@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { anthropicAnswerResponse, supportsAdaptiveThinking, toAnthropicMessages } from './anthropic-answer-stream';
+import { ANSWER_STEP_RULE, anthropicAnswerResponse, createMarkupFilter, supportsAdaptiveThinking, toAnthropicMessages } from './anthropic-answer-stream';
 import { claudeAnswerTarget, resolveAnswerChain } from './planner-config';
 
 describe('toAnthropicMessages', () => {
@@ -11,7 +11,7 @@ describe('toAnthropicMessages', () => {
       { role: 'tool', tool_call_id: 'c1', content: '{"incumbent":"Citadel"}' },
       { role: 'system', content: 'VERIFIED RECORD LIST ...' },
     ]);
-    expect(r.system).toBe('You are Mindy.\n\nVERIFIED RECORD LIST ...');
+    expect(r.system).toBe(`You are Mindy.\n\nVERIFIED RECORD LIST ...\n\n${ANSWER_STEP_RULE}`);
     expect(r.messages).toEqual([
       { role: 'user', content: 'Should we pursue 36C24823P1623?' },
       { role: 'assistant', content: '[Called get_award_detail with {"piid":"36C24823P1623"}]' },
@@ -79,7 +79,7 @@ describe('anthropicAnswerResponse', () => {
     expect(text).toBe('Pursue it if you are an SDVOSB.');
     expect(body).not.toContain('private'); // thinking is never shown
     expect(parsed.find((p) => p.usage)?.usage).toEqual({ prompt_tokens: 1200, completion_tokens: 340, total_tokens: 1540 });
-    expect(client.calls[0]).toMatchObject({ model: 'claude-opus-5-5', system: 'S', thinking: { type: 'adaptive' }, max_tokens: 2048 + 8000 });
+    expect(client.calls[0]).toMatchObject({ model: 'claude-opus-5-5', system: `S\n\n${ANSWER_STEP_RULE}`, thinking: { type: 'adaptive' }, max_tokens: 2048 + 8000 });
   });
 
   it('a connect error is a non-OK Response, so the route falls back to the next answer model', async () => {
@@ -103,5 +103,21 @@ describe('answer chain with Claude', () => {
     expect(claudeAnswerTarget({ CHAT_CLAUDE_ANSWER: 'true' })).toBeNull();
     expect(claudeAnswerTarget({ ...KEYS, CHAT_CLAUDE_ANSWER: 'true' }, { downgrade: true })).toBeNull();
     expect(claudeAnswerTarget({ ...KEYS, CHAT_CLAUDE_ANSWER: 'true', CHAT_CLAUDE_ANSWER_MODEL: 'claude-sonnet-5-5' })).toEqual({ provider: 'anthropic', model: 'claude-sonnet-5-5' });
+  });
+});
+
+describe('tool-call markup never reaches the customer (preview 2026-11-25: the answer printed <invoke ...>)', () => {
+  it('drops markup split across chunks and keeps ordinary text, including a plain "<"', () => {
+    const f = createMarkupFilter();
+    const chunks = ['Here is what I found. ', '\n<inv', 'oke name="get_award_detail">\n<parameter name="piid">36C2', '4823P1623</parameter>\n</invoke>', ' Values < $5M are small.'];
+    const out = chunks.map((c) => f.push(c)).join('') + f.end();
+    expect(out).toBe('Here is what I found. \n Values < $5M are small.');
+  });
+  it('an unclosed markup tail at the end is dropped', () => {
+    const f = createMarkupFilter();
+    expect(f.push('Answer. <function_calls><invoke name="x">') + f.end()).toBe('Answer. ');
+  });
+  it('the answer step tells Claude it has no tools', () => {
+    expect(toAnthropicMessages([{ role: 'user', content: 'Q' }]).system).toContain('no tools in this step');
   });
 });
