@@ -10936,6 +10936,8 @@ const ASK_MINDY_CSS =
   + '.amk-in{display:flex;gap:8px;align-items:flex-end}'
   + '.amk-attach{margin-bottom:6px}.amk-attach-bar{display:flex;align-items:center;gap:8px}.amk-clip{flex:none;border:1px solid #dde3ec;background:#fff;color:#334155;cursor:pointer;font:600 11.5px Inter,system-ui,sans-serif;border-radius:7px;padding:4px 9px}.amk-clip:disabled{opacity:.5;cursor:default}'
   + '.amk-priv{font:500 11px Inter,system-ui,sans-serif;color:#6b7787}.amk-docs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:4px}.amk-doc{display:inline-flex;align-items:center;gap:6px;max-width:100%;border:1px solid #dde3ec;border-radius:7px;padding:2px 4px 2px 8px;font:500 11.5px Inter,system-ui,sans-serif;color:#334155}'
+  + '.amk-shots{margin-bottom:6px}.amk-shot-list{display:flex;flex-wrap:wrap;gap:6px}.amk-shot-list:empty{display:none}.amk-shot{position:relative;width:64px;height:44px;border:1px solid #dde3ec;border-radius:7px;overflow:hidden;background:#f5f8fb}.amk-shot img{width:100%;height:100%;object-fit:cover;display:block}'
+  + '.amk-shot button{position:absolute;top:2px;right:2px;border:0;border-radius:4px;background:rgba(0,0,0,.65);color:#fff;cursor:pointer;font:600 10px Inter,system-ui,sans-serif;line-height:1;padding:2px 4px}.amk-shot-note{font:500 11.5px Inter,system-ui,sans-serif;color:#b45309;margin-top:4px}.amk-shot-note:empty{display:none}'
   + '.amk-doc button{border:0;background:none;color:#6b7787;cursor:pointer;font:600 12px Inter;padding:0 4px}.amk-attach-err{font:500 11.5px Inter,system-ui,sans-serif;color:#b91c1c}.amk-attach-err:empty{display:none}'
   + '.amk-in textarea{flex:1;resize:none;border:1px solid #dde3ec;border-radius:12px;padding:10px 12px;font:400 13.5px Inter;color:#111c26;max-height:120px;outline:none}'
   + '.amk-in textarea:focus{border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.12)}'
@@ -11356,6 +11358,94 @@ const ASK_MINDY_JS = `<script>(function(){
         .then(function(d){ if(d && d.uploads===true && !amkDocs) buildAttach(); },function(){});
     }catch(e){}
   }
+  // Pasted screenshots (view mode only): shown only when the SERVER says it will read them for this account
+  // (/api/app/chat/capabilities). Each image is redrawn on a canvas (longest edge 1568 px) and re-encoded, so no
+  // EXIF/GPS metadata is sent. They ride on ONE question as images:[{media_type,data}] and are never kept: not in
+  // history, sessionStorage, localStorage, a retry or the Vault. The transcript keeps only "[screenshot attached]".
+  var amkShots=null, SHOT_MAX=3, SHOT_BYTES=3.5*1024*1024, SHOT_EDGE=1568, SHOT_TYPES={'image/png':1,'image/jpeg':1,'image/webp':1};
+  var SHOT_DEFAULT='Who or what is in this screenshot? Research it for me.';
+  var SHOT_MSG={type:'Mindy can read PNG, JPEG or WebP screenshots. That file is not one.',count:'You can attach up to 3 screenshots to one message.',size:'That screenshot is too large to send. Try a smaller capture.',unreadable:'Mindy could not open that image. Try taking the screenshot again.',server:'Mindy could not read that screenshot. Your message is still here. Remove the screenshot or try another one.',total:'These screenshots are too large to send together. Remove one, or try smaller captures.'};
+  function shotMarker(n){ return n===1?'[screenshot attached]':('['+n+' screenshots attached]'); }
+  function shotDecode(f){ return new Promise(function(res,rej){
+    if(typeof createImageBitmap==='function'){ createImageBitmap(f).then(function(b){ res({w:b.width,h:b.height,src:b,done:function(){ try{ b.close(); }catch(e){} }}); },rej); return; }
+    var u=URL.createObjectURL(f), im=new Image(); im.onload=function(){ res({w:im.naturalWidth,h:im.naturalHeight,src:im,done:function(){ URL.revokeObjectURL(u); }}); }; im.onerror=function(){ URL.revokeObjectURL(u); rej(new Error('decode')); }; im.src=u; }); }
+  function shotEncode(cv,type,q){ return new Promise(function(res){ try{ cv.toBlob(function(b){ res(b); },type,q); }catch(e){ res(null); } }); }
+  function shotB64(blob){ return new Promise(function(res,rej){ var fr=new FileReader(); fr.onload=function(){ var s=String(fr.result||''); res(s.slice(s.indexOf(',')+1)); }; fr.onerror=rej; fr.readAsDataURL(blob); }); }
+  // Each image aims for <= 900 KB so three stay well under the route's ~4 MB base64 total (Vercel body limit): PNG
+  // first for a PNG source, then JPEG 0.82 to 0.52, then a smaller edge (1280, 1024).
+  var SHOT_TARGET=900*1024, SHOT_TOTAL_B64=3800000, SHOT_EDGES=[SHOT_EDGE,1280,1024], SHOT_QS=[0.82,0.72,0.62,0.52];
+  function shotPrepare(f){
+    if(!SHOT_TYPES[f.type]) return Promise.resolve({err:'type'});
+    return shotDecode(f).then(function(img){
+      var L=Math.max(img.w,img.h); if(!L){ img.done(); return {err:'unreadable'}; }
+      var cv=document.createElement('canvas'), cx=cv.getContext('2d'); if(!cx){ img.done(); return {err:'unreadable'}; }
+      var plan=[];
+      SHOT_EDGES.forEach(function(edge,ei){ if(ei>0&&L<=SHOT_EDGES[ei-1]) return;
+        if(f.type==='image/png') plan.push({edge:edge,type:'image/png'});
+        SHOT_QS.forEach(function(q){ plan.push({edge:edge,type:'image/jpeg',q:q}); }); });
+      var drawnEdge=0, any=false;
+      function attempt(i){
+        if(i>=plan.length){ img.done(); return Promise.resolve({err:any?'size':'unreadable'}); }
+        var st=plan[i];
+        if(st.edge!==drawnEdge){ var w=img.w, h=img.h; if(L>st.edge){ var s=st.edge/L; w=Math.max(1,Math.round(w*s)); h=Math.max(1,Math.round(h*s)); }
+          cv.width=w; cv.height=h; cx.drawImage(img.src,0,0,w,h); drawnEdge=st.edge; }
+        return shotEncode(cv,st.type,st.q).then(function(b){
+          if(!b) return attempt(i+1); any=true;
+          if(b.size>SHOT_TARGET) return attempt(i+1);
+          img.done();
+          return shotB64(b).then(function(d){ return {shot:{media_type:st.type,data:d,url:URL.createObjectURL(b)}}; });
+        });
+      }
+      return attempt(0);
+    },function(){ return {err:'unreadable'}; });
+  }
+  function buildShots(){
+    var foot=drawer.querySelector('.amk-foot'); if(!foot||amkShots)return;
+    var row=document.createElement('div'); row.className='amk-shots'; row.setAttribute('data-testid','amk-shots');
+    row.innerHTML='<div class="amk-shot-list" aria-label="Attached screenshots"></div><div class="amk-shot-note" role="status"></div>';
+    var inRow=foot.querySelector('.amk-in'); foot.insertBefore(row,inRow||null);
+    var list=row.querySelector('.amk-shot-list'), note=row.querySelector('.amk-shot-note'), shots=[];
+    function paintShots(){ list.innerHTML=''; shots.forEach(function(s,i){ var c=document.createElement('span'); c.className='amk-shot';
+      var im=document.createElement('img'); im.src=s.url; im.alt='Screenshot '+(i+1); c.appendChild(im);
+      var x=document.createElement('button'); x.type='button'; x.setAttribute('data-testid','amk-shot-remove'); x.setAttribute('aria-label','Remove screenshot '+(i+1)); x.textContent='x';
+      x.onclick=function(){ if(busy){ note.textContent=''; return; } URL.revokeObjectURL(s.url); shots=shots.filter(function(o){ return o!==s; }); note.textContent=''; paintShots(); }; c.appendChild(x); list.appendChild(c); }); }
+    function add(dt){
+      var raw=[], items=dt&&dt.items?Array.prototype.slice.call(dt.items):[];
+      if(items.length){ items.forEach(function(it){ if(it.kind==='file'){ var f=it.getAsFile(); if(f) raw.push(f); } }); }
+      else if(dt&&dt.files){ raw=Array.prototype.slice.call(dt.files); }
+      if(!raw.length) return false;
+      var ok=raw.filter(function(f){ return !!SHOT_TYPES[f.type]; });
+      note.textContent=(ok.length<raw.length)?SHOT_MSG.type:'';
+      var room=SHOT_MAX-shots.length; if(room<=0){ note.textContent=SHOT_MSG.count; return true; }
+      if(ok.length>room) note.textContent=SHOT_MSG.count;
+      ok.slice(0,room).reduce(function(p,f){ return p.then(function(){ return shotPrepare(f).then(function(r){
+        if(r.err){ note.textContent=SHOT_MSG[r.err]; return; }
+        if(shots.length>=SHOT_MAX){ URL.revokeObjectURL(r.shot.url); return; }
+        shots.push(r.shot); paintShots(); }); }); },Promise.resolve());
+      return true;
+    }
+    if(input) input.addEventListener('paste',function(e){ if(busy||oppCtx)return; var cd=e.clipboardData; var has=cd&&cd.items&&Array.prototype.some.call(cd.items,function(i){ return i.kind==='file'; }); if(!has)return; e.preventDefault(); add(cd); });
+    foot.addEventListener('dragover',function(e){ if(oppCtx)return; var t=e.dataTransfer&&e.dataTransfer.types; if(t&&Array.prototype.indexOf.call(t,'Files')>=0) e.preventDefault(); });
+    foot.addEventListener('drop',function(e){ if(busy||oppCtx||!e.dataTransfer||!e.dataTransfer.files||!e.dataTransfer.files.length)return; e.preventDefault(); add(e.dataTransfer); });
+    if(input&&!oppCtx) input.placeholder='Ask Mindy, or paste a screenshot';
+    amkShots={
+      count:function(){ return oppCtx?0:shots.length; },
+      fits:function(){ var n=0; shots.forEach(function(x){ n+=x.data.length; }); return n<=SHOT_TOTAL_B64; },
+      tooBig:function(){ note.textContent=SHOT_MSG.total; },
+      // Hand the screenshots to one question: off the composer at once.
+      take:function(){ if(oppCtx) return []; var t=shots; shots=[]; note.textContent=''; paintShots(); return t; },
+      // The server's refusal message is customer-safe by contract (400/413/415 JSON {error, message}); ours if absent.
+      restore:function(t,msg){ shots=t.slice(0,SHOT_MAX); note.textContent=msg||SHOT_MSG.server; paintShots(); },
+      release:function(t){ t.forEach(function(s){ URL.revokeObjectURL(s.url); }); }
+    };
+  }
+  if(drawer && tok() && email()){
+    try{
+      fetch('/api/app/chat/capabilities?email='+encodeURIComponent(email()),{headers:{'x-mi-auth-token':tok()||'','x-user-email':email()}})
+        .then(function(r){ return r.ok?r.json():null; },function(){ return null; })
+        .then(function(d){ if(d && d.screenshots===true) buildShots(); },function(){});
+    }catch(e){}
+  }
   // ── REPORT PANE. A document Mindy just saved (create_document) opens HERE, in the chat, as a readable page:
   // no download needed. Reuses the Vault: GET /api/app/vault/documents/preview renders the stored DocModel with
   // the same engine that made the PDF/Word, owner-scoped. Export (PDF/Word/Excel/CSV) is a menu in the open pane.
@@ -11698,18 +11788,26 @@ const ASK_MINDY_JS = `<script>(function(){
   // opts (card chat only): turnId = reuse this question's id (retry/reopen); replay = only fetch the saved answer.
   function ask(q,opts){
     opts=opts||{};
-    q=(q||'').trim(); if(!q||busy)return;
+    var typed=(q||'').trim(); q=typed;
+    // A pasted screenshot with nothing typed still asks a plain question about it.
+    if(!q&&!busy&&!opts.turnId&&!oppCtx&&amkShots&&amkShots.count()) q=SHOT_DEFAULT;
+    if(!q||busy)return;
     var t=tok(), em=email();
     // Card chat resumes the same question after sign-in (the card and its thread stay open); view mode keeps
     // its existing reload.
     if(!t||!em){ var _cq=q, _card=!!oppCtx; if(window.openSignInModal){window.openSignInModal(_card?'ask Mindy about this opportunity':'ask Mindy',function(){ if(_card&&oppCtx){ ask(_cq); } else location.reload(); });}else{location.href='/app?next='+encodeURIComponent(location.pathname);} return; }
     // clear the greeting on first ask
+    // The route caps the images' base64 in total: refuse plainly before anything is sent; text and screenshots stay.
+    if(!oppCtx&&!opts.turnId&&amkShots&&amkShots.count()&&!amkShots.fits()){ amkShots.tooBig(); return; }
     if(body.querySelector('.amk-empty'))body.innerHTML='';
+    // Screenshots go with THIS question only (never a retry or a card turn); the transcript keeps a marker.
+    var shotsAtSend=(!oppCtx&&!opts.turnId&&amkShots)?amkShots.take():[];
+    var shown=shotsAtSend.length?(q+' '+shotMarker(shotsAtSend.length)):q;
     if(input&&!opts.turnId){ input.value=''; input.style.height='auto'; }
     // A card question is recorded as pending (with its turn id) before it is sent.
     var turnId=null, polls=opts.polls||0;
     if(oppCtx){ turnId=opts.turnId||newTurnId(); pendingTurn={turnId:turnId,q:q}; saveCard(); }
-    addMsg('user', q);
+    addMsg('user', shown);
     var aEl=addMsg('assistant',''); var bub=aEl.querySelector('.bub');
     bub.innerHTML='<span class="amk-typing"><i></i><i></i><i></i></span>';
     busy=true; if(send)send.disabled=true; clearFollowups(); hideHistory();
@@ -11718,7 +11816,7 @@ const ASK_MINDY_JS = `<script>(function(){
     if(ctrl){ stopBtn=document.createElement('button'); stopBtn.type='button'; stopBtn.className='amk-stop'; stopBtn.setAttribute('data-testid','amk-stop'); stopBtn.textContent='Stop';
       stopBtn.onclick=function(){ stopped=true; try{ ctrl.abort(); }catch(e){} }; aEl.appendChild(stopBtn); }
     function stoppedEnd(){
-      if(acc){ paint(bub,acc); history.push({role:'user',content:q}); history.push(ledger?{role:'assistant',content:acc,sources:ledger}:{role:'assistant',content:acc}); }
+      if(acc){ paint(bub,acc); history.push({role:'user',content:shown}); history.push(ledger?{role:'assistant',content:acc,sources:ledger}:{role:'assistant',content:acc}); }
       else bub.textContent='';
       var sn=document.createElement('div'); sn.className='amk-credits'; sn.setAttribute('data-testid','amk-stopped'); sn.textContent=acc?'You stopped this answer, so it may be incomplete.':'You stopped this answer.'; aEl.appendChild(sn);
       saveView(); release(); body.scrollTop=body.scrollHeight;
@@ -11773,6 +11871,7 @@ const ASK_MINDY_JS = `<script>(function(){
     // the oldest assistant turn (the server verifies the signature and the owner; a forged one is ignored).
     if(!oppCtx&&!history.length&&rep&&rep.ledger&&rep.email===em){ history.push({role:'assistant',content:'I saved your report'+(rep.title?' "'+rep.title+'"':'')+' to your Vault.',sources:rep.ledger}); }
     var payload={email:em,message:sendMsg,sessionId:sessionId||undefined,history:history.slice(-8).map(function(h){ return h.sources?{role:h.role,content:h.content,sources:h.sources}:{role:h.role,content:h.content}; }),display:'narrow_panel'};
+    if(shotsAtSend.length) payload.images=shotsAtSend.map(function(x){ return {media_type:x.media_type,data:x.data}; });
     if(attAtSend){ payload.context={kind:'opportunity',notice_id:attAtSend.id}; try{ if(window.__track) window.__track('tool_use','ask_mindy_with_notice',{}); }catch(e){} }
     if(oppCtx){ payload.context={kind:'opportunity',notice_id:oppCtx.id}; payload.turn_id=turnId; if(opts.replay)payload.replay_only=true;
       if(!opts.turnId){ try{ if(window.__track) window.__track('tool_use','card_chat_ask',{turn:Math.floor(history.length/2)+1}); }catch(e){} } }
@@ -11786,6 +11885,11 @@ const ASK_MINDY_JS = `<script>(function(){
       b.onclick=function(){ if(busy||oppCtx!==cardAtSend)return; dropBubbles(); ask(q,{turnId:turnId}); }; w.appendChild(b); aEl.appendChild(w); }
     fetch('/api/app/chat',{method:'POST',headers:withWorkspace({'Content-Type':'application/json','x-mi-auth-token':t,'x-user-email':em}),body:JSON.stringify(payload),signal:ctrl?ctrl.signal:undefined})
       .then(function(r){
+        // The server would not read the screenshot(s): nothing was answered. Give back the typed text and the
+        // screenshots with a plain note.
+        if(shotsAtSend.length&&(r.status===400||r.status===413||r.status===415||r.status===422)){ var back=shotsAtSend; shotsAtSend=[]; dropBubbles(); if(input){ input.value=typed; } release();
+          return r.json().then(function(d){ return d; },function(){ return null; }).then(function(d){ var m=(d&&typeof d.message==='string')?d.message.replace(/ +/g,' ').trim():''; amkShots.restore(back,(m&&m.length<=300)?m:''); return null; }); }
+        if(shotsAtSend.length){ amkShots.release(shotsAtSend); shotsAtSend=[]; }
         if(r.status===403){ if(turnId){ pendingTurn=null; saveCard(); } upsell(); release(); return null; }
         if(r.status===402){ if(turnId){ pendingTurn=null; saveCard(); } r.json().then(function(d){ creditsWall(bub,d||{}); },function(){ creditsWall(bub,{}); }); release(); return null; }
         // Charge once per question: the same question is still being answered by another request (a second
@@ -11835,7 +11939,7 @@ const ASK_MINDY_JS = `<script>(function(){
           if(turnId&&!gotDone){ if(oppCtx===cardAtSend){ offerRetry(acc?'The connection dropped before the answer finished.':'The connection dropped before the answer arrived.'); } release(); body.scrollTop=body.scrollHeight; return; }
           if(turnId&&oppCtx===cardAtSend){ pendingTurn=null; }
           if(!started&&!acc&&!gotError)bub.textContent='Mindy had no answer for that \\u2014 try rephrasing.';
-          if(!(turnId&&gotError&&!acc)){ history.push({role:'user',content:q}); history.push(ledger?{role:'assistant',content:acc,sources:ledger}:{role:'assistant',content:acc}); }
+          if(!(turnId&&gotError&&!acc)){ history.push({role:'user',content:shown}); history.push(ledger?{role:'assistant',content:acc,sources:ledger}:{role:'assistant',content:acc}); }
           if(turnFiles&&history.length&&history[history.length-1].role==='assistant') history[history.length-1].files=turnFiles;
           if(turnReport&&history.length&&history[history.length-1].role==='assistant') history[history.length-1].report=turnReport;
           saveCard(); saveView(); if(acc)paint(bub,acc);

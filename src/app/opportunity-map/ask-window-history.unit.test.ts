@@ -55,6 +55,7 @@ function boot(opts: { session?: Store; local?: Store; chat?: Array<Array<Record<
     const js = (status: number, json: unknown = {}) => Promise.resolve({ ok: status < 300, status, json: async () => json });
     if (url.startsWith('/api/app/vault/')) p = js(200, { uploads: false, generate: true, success: true, title: 'R', version: 1, html: '<p>R</p>', files: [] });
     else if (url.startsWith('/api/app/chat/suggestions')) p = js(200, { suggestions: [] });
+    else if (url.startsWith('/api/app/chat/capabilities')) p = js(200, { screenshots: false });
     else if (url.startsWith('/reports/')) {
       const h = opts.hosted ?? { status: 200, html: HOSTED_HTML };
       p = h === 'network-error' ? Promise.reject(new Error('offline')) : Promise.resolve({ ok: h.status < 300, status: h.status, text: async () => h.html ?? '' });
