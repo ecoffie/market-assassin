@@ -19,7 +19,7 @@ import { SAMPLE_REPORT } from './__fixtures__/sample-report';
 import { DOC_SCHEMA, type DocModel } from './model';
 import { validateDocModel, demoteUncitedFacts, repairDocModelStructure, hardenedAssumptions, DEFAULT_ASSUMPTION_ORIGIN, repeatedSentences, fixtureMarkers } from './validate';
 import { keepDash, citationIndex, citeMarker, formatCell, formatColumn, formatChartValue, chartDuplicatesTable, parseInline, NOT_AVAILABLE, fileBaseName } from './format';
-import { renderHtml } from './render-html';
+import { renderHtml, DOC_HTML_CSP, TOC_MIN_SECTIONS } from './render-html';
 import { renderDocx } from './render-docx';
 import { renderPdf, pdfOptions } from './render-pdf';
 import { renderDocument } from './index';
@@ -877,7 +877,9 @@ describe('render-html', () => {
     expect(html).not.toMatch(/<script/i);
     expect(html).not.toMatch(/<link/i);
     expect(html).not.toMatch(/<img/i);
-    expect(html).not.toMatch(/@import|url\(/i);
+    expect(html).not.toMatch(/@import/i);
+    // The only url() allowed is an embedded data: font (no request); any other url() would be a fetch.
+    expect(html.match(/url\((?!data:font\/woff2;base64,)/gi)).toBeNull();
   });
 
   it('shows labels, citations, Not available and a numbered Sources section', () => {
@@ -889,7 +891,9 @@ describe('render-html', () => {
     expect(html).toContain('<sup class="cite">[1]</sup>');
     expect(html).toContain(NOT_AVAILABLE);
     expect(html).toMatch(/<h2>Sources<\/h2><ol><li>Example award data extract/);
-    expect(html).toContain('<h2>Contents</h2>');
+    // 8 sections: short enough to read without a contents list (TOC_MIN_SECTIONS), like the reference plans.
+    expect(html).not.toContain('<h2>Contents</h2>');
+    expect(renderHtml(SAMPLE_REPORT, { toc: true })).toContain('<h2>Contents</h2>');
     expect((html.match(/<svg /g) || []).length).toBe(4);
   });
 });
@@ -897,7 +901,7 @@ describe('render-html', () => {
 describe('contents list matches the body numbering', () => {
   it('numbered-rule: TOC numbers equal body numbers; Sources/Unverified unnumbered; model-supplied "1." prefix not doubled', () => {
     const m = { ...SAMPLE_REPORT, theme: 'mindy' as const, sections: SAMPLE_REPORT.sections.map((s, i) => (i === 0 ? { ...s, heading: '1. Executive summary' } : s)) };
-    const html = renderHtml(m);
+    const html = renderHtml(m, { toc: true });
     expect(html).toContain('<h2><span class="num">1.</span>Executive summary</h2>');
     expect(html).not.toContain('1. 1.');
     expect(html).toContain('<li><span class="n">1.</span>Executive summary</li>');
@@ -907,7 +911,8 @@ describe('contents list matches the body numbering', () => {
     expect(html).not.toContain(`<span class="n">${n + 1}.</span>`);
   });
   it('briefing theme (unnumbered body): TOC carries no numbers', () => {
-    const html = renderHtml({ ...SAMPLE_REPORT, theme: 'briefing' });
+    const html = renderHtml({ ...SAMPLE_REPORT, theme: 'briefing' }, { toc: true });
+    expect(html).toContain('<h2>Contents</h2>');
     expect(html).not.toContain('<span class="n">');
   });
   it('wide tables get the dense class and header cells may wrap', () => {
@@ -963,7 +968,7 @@ describe('HTML Content-Security-Policy', () => {
   it('the CSP meta is the FIRST element of <head> (it must govern prefetch/preconnect links too)', () => {
     const html = renderHtml(SAMPLE_REPORT);
     const head = html.slice(html.indexOf('<head>') + '<head>'.length);
-    expect(head.startsWith(`<meta http-equiv="Content-Security-Policy" content="${"default-src 'none'; style-src 'unsafe-inline'; img-src data:"}">`)).toBe(true);
+    expect(head.startsWith(`<meta http-equiv="Content-Security-Policy" content="${"default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:"}">`)).toBe(true);
     expect(html.match(/http-equiv="Content-Security-Policy"/g)).toHaveLength(1);
   });
 
@@ -1224,5 +1229,32 @@ describe('module boundary', () => {
       const src = readFileSync(f, 'utf8');
       expect(src, f).not.toMatch(/supabase|@vercel\/kv|\.insert\(|\.upsert\(|\.update\(|\.delete\(|\.storage\b|writeFile|appendFile/);
     }
+  });
+});
+
+describe('reference layout (Design & Output, 2026-11-25)', () => {
+  it('contents list only for long documents (TOC_MIN_SECTIONS top-level sections), never on a forced page', () => {
+    const many = { ...SAMPLE_REPORT, sections: Array.from({ length: TOC_MIN_SECTIONS }, (_, i) => ({ ...SAMPLE_REPORT.sections[i % SAMPLE_REPORT.sections.length], id: `s${i}` })) };
+    expect(renderHtml(many)).toContain('<h2>Contents</h2>');
+    expect(renderHtml({ ...many, sections: many.sections.slice(1) })).not.toContain('<h2>Contents</h2>');
+    expect(renderHtml(many)).not.toMatch(/\.(?:toc|cover)\s*\{[^}]*break-after:\s*page/);
+  });
+  it('the default theme opens with a letterhead: brand, contact lines, title, byline and the metadata table', () => {
+    const html = renderHtml({ ...SAMPLE_REPORT, meta: { ...SAMPLE_REPORT.meta, attention: 'A. Reader' } });
+    expect(html).toContain('<section class="cover letterhead">');
+    expect(html).toMatch(/<p class="byline">Prepared for Example Company \(fixture\) · November 17, 2026<\/p>/);
+    expect(html).toContain('<dt>Attention</dt><dd>A. Reader</dd>');
+  });
+  it('a checklist bullets block renders as checkboxes; ordered lists and plain bullets are unchanged', () => {
+    const blk = (extra: object) => ({ ...SAMPLE_REPORT, sections: [{ id: 'n', heading: 'Next steps', blocks: [{ type: 'bullets' as const, id: 'c', items: [{ text: 'Register in SAM.gov', claim: 'recommendation' as const }], ...extra }] }] });
+    expect(renderHtml(blk({ style: 'checklist' }))).toContain('<ul class="checklist"><li>');
+    expect(renderHtml(blk({ style: 'checklist', ordered: true }))).toContain('<ol><li>');
+    expect(renderHtml(blk({}))).toContain('<ul><li>');
+  });
+  it('embeds the static Inter faces (real fonts in the PDF, not Type 3) and the CSP allows data: fonts only', () => {
+    const html = renderHtml(SAMPLE_REPORT);
+    expect(html).toContain("font-family:'Mindy Report Inter'");
+    expect(html).toContain("font-family: 'Mindy Report Inter', ");
+    expect(DOC_HTML_CSP).toContain('font-src data:');
   });
 });

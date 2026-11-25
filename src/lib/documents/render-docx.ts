@@ -179,6 +179,14 @@ function blockToDocx(b: Block, numberOf: Numberer, shownByAdjacentTable = false)
     case 'paragraph':
       return [new Paragraph({ style: 'Body', children: [...labelRun(b.claim), ...runs(b.text), ...citeRun(b.cites, numberOf), ...originRun(b)] })];
     case 'bullets':
+      // A checklist reads as empty boxes in Word too (a ballot-box glyph instead of the bullet).
+      if (!b.ordered && b.style === 'checklist') {
+        return b.items.map((it) => new Paragraph({
+          style: 'Body',
+          indent: { left: 360, hanging: 300 },
+          children: [new TextRun({ font: FONT, text: '\u2610  ' }), ...labelRun(it.claim), ...runs(it.text), ...citeRun(it.cites, numberOf), ...originRun(it)],
+        }));
+      }
       return b.items.map((it) => new Paragraph({
         style: 'Body',
         numbering: { reference: b.ordered ? 'mindy-numbers' : 'mindy-bullets', level: 0 },
@@ -239,7 +247,7 @@ export function buildDocx(model: DocModel): Document {
       })),
     });
   };
-  if (T.cover === 'brand-band') {
+  if (T.cover === 'brand-band' || T.cover === 'letterhead') {
     // Brand header band: solid accent fill in Word (no gradients there), mark + tagline + contact lines.
     const brand = T.brand;
     const fill = { type: ShadingType.CLEAR, color: 'auto', fill: NAVY };
