@@ -62,3 +62,16 @@ describe('null-safety: a blank extract field never erases another writer\'s valu
     expect(src).toMatch(/payload columns {7}\$\{PAYLOAD_COLUMNS/);
   });
 });
+
+describe('the SAM key never reaches a log (monthly GitHub Action prints this output)', () => {
+  const dl = src.slice(src.indexOf('async function downloadIfNeeded'), src.indexOf('function redactSecrets'));
+  it('the download URL is never logged; failures report status / error code only', () => {
+    expect(dl).not.toMatch(/console\.\w+\([^)]*\burl\b/);
+    expect(dl).toMatch(/download failed: HTTP \$\{r\.statusCode\}/);
+    expect(dl).toMatch(/download failed: \$\{e\.code \|\| 'network error'\}/);
+  });
+  it('the fatal handler redacts api_key values and the raw key', () => {
+    expect(src).toMatch(/main\(\)\.catch\(e => \{ console\.error\('FATAL', redactSecrets\(/);
+    expect(src).toMatch(/replace\(\/api_key=\[\^&\\s"'\]\+\/gi, 'api_key=\*\*\*'\)/);
+  });
+});

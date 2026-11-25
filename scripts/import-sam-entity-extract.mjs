@@ -230,19 +230,32 @@ function parseRecord(fields) {
 async function downloadIfNeeded() {
   if (existsSync(ZIP_PATH)) { console.log('Using existing file:', ZIP_PATH); return; }
   if (!SAM_KEY) { console.error('No SAM key to download; provide --file'); process.exit(1); }
-  await mkdir('/tmp/sam-extract', { recursive: true });
-  const url = `https://api.sam.gov/data-services/v1/extracts?fileType=ENTITY&fileName=${EXTRACT_FILENAME}&api_key=${SAM_KEY}`;
+  await mkdir(dirname(ZIP_PATH), { recursive: true });
+  // ⚠️ The key travels in the query string (SAM's extract API). The URL is NEVER logged, and a failed download
+  // reports only the HTTP status or error code (Agent 4, 2026-11-25: the monthly GitHub Action prints this output).
+  const url = `https://api.sam.gov/data-services/v1/extracts?fileType=ENTITY&fileName=${encodeURIComponent(EXTRACT_FILENAME)}&api_key=${SAM_KEY}`;
   console.log('Downloading', EXTRACT_FILENAME, '...');
-  await new Promise((res, rej) => {
-    const get = (u) => https.get(u, (r) => {
-      if (r.statusCode >= 300 && r.statusCode < 400 && r.headers.location) return get(r.headers.location);
-      if (r.statusCode !== 200) return rej(new Error('HTTP ' + r.statusCode));
-      const f = createWriteStream(ZIP_PATH);
-      r.pipe(f); f.on('finish', () => f.close(res));
-    }).on('error', rej);
-    get(url);
-  });
+  try {
+    await new Promise((res, rej) => {
+      const get = (u, hops = 0) => https.get(u, (r) => {
+        if (r.statusCode >= 300 && r.statusCode < 400 && r.headers.location && hops < 5) { r.resume(); return get(r.headers.location, hops + 1); }
+        if (r.statusCode !== 200) { r.resume(); return rej(new Error(`download failed: HTTP ${r.statusCode}`)); }
+        const f = createWriteStream(ZIP_PATH);
+        r.pipe(f); f.on('finish', () => f.close(res)); f.on('error', (e) => rej(new Error(`download failed: write ${e.code || 'error'}`)));
+      }).on('error', (e) => rej(new Error(`download failed: ${e.code || 'network error'}`)));
+      get(url);
+    });
+  } catch (e) {
+    throw new Error(redactSecrets(e instanceof Error ? e.message : String(e)));
+  }
   console.log('Downloaded to', ZIP_PATH);
+}
+
+/** Strip any api_key value (and the raw key) from text before it reaches a log. */
+function redactSecrets(text) {
+  let out = String(text).replace(/api_key=[^&\s"']+/gi, 'api_key=***');
+  if (SAM_KEY) out = out.split(SAM_KEY).join('***');
+  return out;
 }
 
 /**
@@ -464,4 +477,4 @@ ${failed ? `\n  ${failed} rows dead-lettered to ${DEADLETTER} — re-run with --
   }
 }
 
-main().catch(e => { console.error('FATAL', e); process.exit(1); });
+main().catch(e => { console.error('FATAL', redactSecrets(e instanceof Error ? (e.stack || e.message) : e)); process.exit(1); });
