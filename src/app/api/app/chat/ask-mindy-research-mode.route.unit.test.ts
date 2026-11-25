@@ -56,6 +56,7 @@ vi.mock('@anthropic-ai/sdk', () => ({ default: class { messages = { create: (...
 const ENV_KEYS = ['OPENAI_API_KEY', 'SUPABASE_SERVICE_ROLE_KEY', 'ASK_MINDY_INTELLIGENCE_GATE', 'ASK_MINDY_INTELLIGENCE_GATE_ALLOWLIST', 'ASK_MINDY_RESEARCH_MODE', 'ASK_MINDY_RESEARCH_MODE_ALLOWLIST', 'ASK_MINDY_RESEARCH_MODEL'] as const;
 const saved: Record<string, string | undefined> = {};
 const openaiCalls: string[] = [];
+const openaiTools: string[] = [];
 const EMAIL = 'erika@example.com';
 const Q = 'Give me a full assessment of Ridgeline Digital.';
 type Block = Record<string, unknown>;
@@ -66,7 +67,7 @@ beforeEach(() => {
   process.env.OPENAI_API_KEY = 'sk-test';
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'srk-test';
   for (const k of ENV_KEYS.slice(2)) delete process.env[k];
-  openaiCalls.length = 0; h.inserts.length = 0; h.overBudget = false; h.capUsed = 0; h.afterFns.length = 0;
+  openaiCalls.length = 0; openaiTools.length = 0; h.inserts.length = 0; h.overBudget = false; h.capUsed = 0; h.afterFns.length = 0;
   h.runMcpTool.mockReset();
   h.runMcpTool.mockImplementation(async (name: string) => ({ result: { ok: true, grounded: true, tool: name, note: 'obligated $1.2M' }, credits: 0 }));
   h.runGate.mockReset(); h.extract.mockReset(); h.extract.mockImplementation(async () => 'digital marketing');
@@ -78,6 +79,7 @@ beforeEach(() => {
   vi.stubGlobal('fetch', vi.fn(async (url: string, init: RequestInit) => {
     openaiCalls.push(String(url));
     const body = JSON.parse(String(init.body || '{}')) as Record<string, unknown>;
+    for (const t of ((body.tools as Array<{ function?: { name?: string } }>) || [])) openaiTools.push(String(t.function?.name));
     return isPlannerCall(body) ? plannerResponse([]) : answerStream(['Existing path answer.']);
   }));
   vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -104,6 +106,8 @@ describe('research mode in the chat route', () => {
     const ev = await ask(Q);
     expect(h.create).not.toHaveBeenCalled();
     expect(text(ev)).toContain('Existing path answer.');
+    expect(openaiTools).toContain('search_web');
+    expect(openaiTools).not.toContain('read_web_page');
   });
 
   it('flag on: Claude runs the loop over the catalog (both calls executed), the answer streams, no OpenAI call', async () => {
@@ -114,7 +118,7 @@ describe('research mode in the chat route', () => {
     expect(first.model).toBe('claude-opus-5-5');
     expect(first.system).toContain('IDENTITY FIRST');
     const names = first.tools.map((t) => t.name);
-    expect(names).toEqual(expect.arrayContaining(['find_opportunities', 'search_contractors', 'search_web']));
+    expect(names).toEqual(expect.arrayContaining(['find_opportunities', 'search_contractors', 'search_web', 'read_web_page']));
     for (const t of ['lookup_sam_entity', 'get_contractor_award_history', 'get_solicitation_incumbent', 'get_solicitation_documents', 'get_buying_offices']) expect(names).toContain(t);
     expect(h.runMcpTool.mock.calls.map((c) => c[0])).toEqual(expect.arrayContaining(['find_opportunities', 'search_contractors']));
     expect(text(ev)).toBe('Start with the Navy recruiting campaign ($1.2M awarded so far).');

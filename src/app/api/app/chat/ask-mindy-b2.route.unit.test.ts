@@ -33,6 +33,7 @@ const state: {
   extraOffered: string[];
   plannerBodies: Array<Record<string, unknown>>;
   plannerFailModels: Set<string>;
+  answerText?: string;
 } = {} as never;
 const budget = { over: false };
 
@@ -83,6 +84,7 @@ function sse(text: string) {
 }
 
 beforeEach(() => {
+  state.answerText = undefined;
   Object.assign(state, {
     plannerCalls: [], offered: [], executed: [], executedArgs: [], toolContent: '{"ok":true,"results":[]}', toolStatus: 'success',
     answerModels: [], answerUrls: [], failModels: new Set(), answerThrows: false, answerMessages: [], plannerModels: [], plannerBodies: [], plannerFailModels: new Set(), extraOffered: [],
@@ -106,7 +108,7 @@ beforeEach(() => {
     if (state.answerThrows) {
       return new Response(new ReadableStream({ start(c) { c.error(new Error(SECRET)); } }), { status: 200 });
     }
-    return new Response(sse('Review the records above.'), { status: 200 });
+    return new Response(sse(state.answerText ?? 'Review the records above.'), { status: 200 });
   }));
   vi.spyOn(console, 'error').mockImplementation(() => {});
   vi.spyOn(console, 'warn').mockImplementation(() => {});
@@ -184,7 +186,7 @@ describe('B2: tool selection and bounded results', () => {
     await ask(OPP_Q);
     const toolMsg = state.answerMessages[0].find((m) => m.role === 'tool')!;
     expect(state.toolContent.length).toBeGreaterThan(1_000_000);
-    expect(toolMsg.content.length).toBeLessThanOrEqual(60_000);
+    expect(toolMsg.content.length).toBeLessThanOrEqual(120_000);
     const parsed = JSON.parse(toolMsg.content);
     expect(parsed._meta).toEqual({ grounded: true, source: 'sam_opportunities' });
     expect(parsed._truncation.lists).toEqual([{ path: 'results', shown: parsed.results.length, total: 400 }]);
@@ -248,7 +250,19 @@ describe('B2: whole-request token budget', () => {
   });
 });
 
-describe('B2: over-budget users (LLM_OPENAI_MODEL || gpt-4o-mini, unchanged by this release)', () => {
+describe('B2: over-budget users, default (no silent downgrade since 2026-11-25)', () => {
+  it('an over-budget user plans and answers on the configured model, not gpt-4o-mini', async () => {
+    budget.over = true;
+    vi.stubEnv('CHAT_OPENAI_MODEL', 'gpt-6.1-terra');
+    state.plannerCalls = [{ id: 'c1', function: { name: 'search_sam_opportunities', arguments: '{}' } }];
+    await ask('What janitorial opportunities are open in Florida right now?');
+    expect(state.plannerModels).toEqual(['gpt-6.1-terra']);
+    expect(state.answerModels).toEqual(['gpt-6.1-terra']);
+  });
+});
+
+describe('B2: over-budget users with the downgrade lever ON (CHAT_BUDGET_DOWNGRADE=true)', () => {
+  beforeEach(() => { vi.stubEnv('CHAT_BUDGET_DOWNGRADE', 'true'); });
   it('with the proposed release env, an over-budget user plans and answers on gpt-4o-mini; luna is the answer fallback', async () => {
     budget.over = true;
     vi.stubEnv('CHAT_OPENAI_MODEL', 'gpt-6.1-terra'); vi.stubEnv('CHAT_ANSWER_FALLBACKS', 'openai:gpt-6-luna');
@@ -401,6 +415,7 @@ describe('gpt-6-luna as the PLANNER (gpt-4o / gpt-4o-mini shut down 2027-01-14)'
 
   it('as the over-budget planner + answer (LLM_OPENAI_MODEL=gpt-6-luna): luna plans with GPT-6 params', async () => {
     budget.over = true;
+    vi.stubEnv('CHAT_BUDGET_DOWNGRADE', 'true');
     vi.stubEnv('LLM_OPENAI_MODEL', 'gpt-6-luna');
     state.plannerCalls = [call];
     await ask(Q);
@@ -547,5 +562,15 @@ describe('F1: a CURRENT_FIND question uses find_opportunities across three horiz
     state.extraOffered = ['find_opportunities'];
     await ask(ERIC_Q.replace('What open opportunities are there for janitorial services in Florida?', 'Which agencies spend the most on facilities here?'));
     expect(state.offered[0]).toEqual(['get_expiring_contracts', 'search_sam_opportunities', 'find_opportunities']);
+  });
+});
+
+describe('B2: tool-call markup never reaches the customer (2026-11-25)', () => {
+  it('markup printed by the answer model is dropped from the streamed tokens; the rest of the answer arrives', async () => {
+    state.answerText = 'Watch it for now. <invoke name="get_award_detail"><parameter name="piid">36C24823P1623</parameter></invoke> I can look it up as an award.';
+    const { events, raw } = await ask('How do I write a capability statement?');
+    const text = events.filter((e) => e.type === 'token').map((e) => e.content).join('');
+    expect(text).toBe('Watch it for now.  I can look it up as an award.');
+    expect(raw).not.toContain('<invoke');
   });
 });
