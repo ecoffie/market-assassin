@@ -111,8 +111,11 @@ export function ConnectedFiles({ email, files, onChange, disabled }: {
   // Back from the provider: say what happened once. The outcome comes from the address (?connect=) when it
   // survived, else from the one-use result cookie the callback sets (the app rewrites its address to ?panel=
   // before this panel mounts). Both are cleared after reading.
+  // Read only once the control is showing (the list answered): right after a provider redirect the chat panel can
+  // mount before the session is restored and then mount again, and an outcome read by the first mount was lost
+  // (acceptance 2026-11-25: "connected" never showed after a successful connect).
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (typeof window === 'undefined' || !enabled) return;
     const u = new URL(window.location.href);
     const fromUrl = u.searchParams.get('connect');
     const fromCookie = parseResultCookie(document.cookie);
@@ -129,7 +132,7 @@ export function ConnectedFiles({ email, files, onChange, disabled }: {
       for (const k of ['connect', 'reason', 'provider', 'connection']) u.searchParams.delete(k);
       window.history.replaceState(null, '', u.pathname + (u.search ? u.search : '') + u.hash);
     }
-  }, [load]);
+  }, [enabled, load]);
 
   const startConnect = useCallback(async (provider: 'google' | 'microsoft') => {
     setBusy(true); setMessage(null);
