@@ -96,15 +96,19 @@ export const RESEARCH_INSTRUCTIONS = [
   '5. Grounding. Every dollar figure, date and count comes from a tool result or a cited page. Actionable never means stating something unverified as verified.',
 ].join('\n');
 
-export function researchSystemPrompt(a: { today: string; profileBlock?: string | null }): string {
+/** The fixed part of the system prompt: identical for every turn and customer, so it can be cached across turns. */
+export const RESEARCH_SYSTEM_STATIC = [MCP_CONNECTOR_INSTRUCTIONS, '', RESEARCH_INSTRUCTIONS].join('\n');
+
+/** The per-turn part (today's date, the saved profile): kept OUT of the cached prefix, since any byte change invalidates it. */
+export function researchSystemDynamic(a: { today: string; profileBlock?: string | null }): string {
   return [
-    MCP_CONNECTOR_INSTRUCTIONS,
-    '',
-    RESEARCH_INSTRUCTIONS,
-    '',
     `Today is ${a.today}.`,
     a.profileBlock ? `\nSAVED COMPANY PROFILE (the customer's own Vault; a starting point, not a verified fact):\n${a.profileBlock}` : '',
   ].join('\n');
+}
+
+export function researchSystemPrompt(a: { today: string; profileBlock?: string | null }): string {
+  return [RESEARCH_SYSTEM_STATIC, '', researchSystemDynamic(a)].join('\n');
 }
 
 export interface OpenAiToolDef { type: 'function'; function: Record<string, unknown> }
@@ -199,7 +203,9 @@ const textOf = (content: Array<{ type: string; text?: string }>) => content.filt
 export async function runResearchLoop(a: {
   client: Pick<Anthropic, 'messages'>;
   model: string;
+  /** The fixed system prompt (cached), and the per-turn part sent after the cache breakpoint. */
   system: string;
+  systemDynamic?: string;
   conversation: Msg[];
   tools: AnthropicToolDef[];
   execute: (calls: ResearchCall[]) => Promise<ResearchCallResult[]>;
@@ -245,7 +251,10 @@ export async function runResearchLoop(a: {
         max_tokens: STEP_MAX_TOKENS,
         // Prompt caching: the system prompt and the tool definitions are the same every step, and the conversation only
         // grows, so each step re-reads the cached prefix (0.1x) instead of paying for it again.
-        system: [{ type: 'text', text: a.system, cache_control: { type: 'ephemeral' } }],
+        system: [
+          { type: 'text', text: a.system, cache_control: { type: 'ephemeral' } },
+          ...(a.systemDynamic ? [{ type: 'text', text: a.systemDynamic }] : []),
+        ],
         tools: withCachedTools(a.tools) as unknown as Anthropic.Tool[],
         tool_choice: forced ? { type: 'none' } : { type: 'auto' },
         // A snapshot per request: the loop keeps appending to msgs after this call.
