@@ -1244,7 +1244,9 @@ async function queryComingBack(
       potential_total_value: a.potential_total_value,
       ceiling_basis: a.ceiling_basis,
       total_obligation: r.total_obligation ?? null,
-      recompete_likelihood: (r.recompete_likelihood as string) || null,
+      // The read-time correction (annotate.ts): one-time construction is not_recurring, never the DB's 'high'.
+      recompete_likelihood: a.recompete_likelihood ?? ((r.recompete_likelihood as string) || null),
+      ...(a.recompete_likelihood_basis ? { recompete_likelihood_basis: a.recompete_likelihood_basis } : {}),
       set_aside_type: (r.set_aside_type as string) || null,
       naics_code: (r.naics_code as string) || null,
       psc_code: (r.psc_code as string) || null,
