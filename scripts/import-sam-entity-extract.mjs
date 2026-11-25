@@ -61,6 +61,14 @@ const ALL_NAICS = process.argv.includes('--all-naics');
 // the local ZIP and a pre-existence probe per batch, so the would-update vs would-insert split is real.
 const DRY = process.argv.includes('--dry');
 const DRY_SAMPLE_ROWS = 3;
+/**
+ * Payload columns the extract can leave BLANK (null / 'Unknown') while another writer holds a value. A blank never
+ * overwrites: the existing value is kept (flush). Every other payload column is always populated by the parser.
+ */
+const PRESERVE_IF_BLANK = [
+  'cage_code', 'dba_name', 'physical_city', 'physical_state', 'physical_zip', 'physical_country',
+  'primary_naics', 'registration_status', 'registration_expiry',
+];
 const SECTORS = (process.env.SECTORS || '')
   .split(',').map(s => s.trim()).filter(Boolean);
 const SEED_NAICS = new Set((process.env.NAICS ||
@@ -326,6 +334,8 @@ async function main() {
   let parsed = 0, kept = 0, upserted = 0, lineNo = 0;
   let unparseable = 0, failed = 0, inserted = 0, updated = 0, skippedResume = 0;
   let structural = 0, dedupedInBatch = 0;   // BOF/EOF markers; repeat UEIs collapsed per batch
+  const preservedByCol = {};
+  let PAYLOAD_COLUMNS = null;              // the exact column set every upsert row carries (reported)
   let batch = [];
 
   // Which UEIs already exist? Needed for the inserted-vs-updated split, since
@@ -339,14 +349,39 @@ async function main() {
     const ueis = rows.map(r => r.uei);
 
     let preExisting = new Set();
+    /** Existing values of the fields this extract can carry as NULL (see PRESERVE_IF_BLANK). */
+    let existingByUei = new Map();
     // .range() is REQUIRED: PostgREST silently caps an unranged select at 1,000 rows, so a
     // batch larger than that would report missing UEIs as "new" and inflate the inserted
     // count. Batches are 500 today; the explicit range makes the guarantee independent of
     // that constant instead of relying on it.
     const { data: existing, error: exErr } = await sb
-      .from('sam_entities').select('uei').in('uei', ueis).range(0, Math.max(ueis.length - 1, 0));
-    if (exErr) console.warn('  [warn] pre-existence probe failed:', exErr.message);
-    else preExisting = new Set((existing || []).map(r => r.uei));
+      .from('sam_entities').select(['uei', ...PRESERVE_IF_BLANK].join(', ')).in('uei', ueis).range(0, Math.max(ueis.length - 1, 0));
+    if (exErr) {
+      // Without the existing values a blank extract field would ERASE another writer's value. Never write blind.
+      console.warn('  [warn] pre-existence probe failed — batch NOT written:', exErr.message);
+      failed += rows.length;
+      if (!DRY) appendFileSync(DEADLETTER, rows.map(r => JSON.stringify({ uei: r.uei, line: lineNo, err: `probe: ${exErr.message}` })).join('\n') + '\n');
+      batch = [];
+      return;
+    }
+    preExisting = new Set((existing || []).map(r => r.uei));
+    existingByUei = new Map((existing || []).map(r => [r.uei, r]));
+    // NULL-SAFETY (Agent 4, 2026-11-25): an upsert writes every key in the payload, so a key the extract left blank
+    // would overwrite a value another source filled (live entity sync, POC importer). Keep the existing value
+    // instead, and count each preserved field. Columns the extract never carries (entity_url, points_of_contact,
+    // certification_records, psc_codes, exclusion_flag, raw_data, duns) are not in the payload at all.
+    for (const r of rows) {
+      const ex = existingByUei.get(r.uei);
+      if (!ex) continue;
+      for (const col of PRESERVE_IF_BLANK) {
+        const blank = col === 'registration_status' ? (r[col] == null || r[col] === 'Unknown') : r[col] == null;
+        if (blank && ex[col] != null && !(col === 'registration_status' && ex[col] === 'Unknown')) {
+          r[col] = ex[col];
+          preservedByCol[col] = (preservedByCol[col] || 0) + 1;
+        }
+      }
+    }
 
     if (DRY) {
       // Same accounting as a real batch, with no write: would-update / would-insert from the read-only probe.
@@ -388,6 +423,7 @@ async function main() {
     parsed++;
     if (!ALL_NAICS && !naicsMatches(row.naics_codes)) continue;
     kept++;
+    if (!PAYLOAD_COLUMNS) PAYLOAD_COLUMNS = Object.keys(row).sort();
     batch.push(row);
     if (batch.length >= 500) await flush();
     if (lineNo % 100000 === 0) console.log(`  ...line ${lineNo}, parsed ${parsed}, kept ${kept}, upserted ${upserted}`);
@@ -412,6 +448,10 @@ kept (matched filter)   ${kept.toLocaleString()}
   deduped in batch      ${dedupedInBatch.toLocaleString()}  (same UEI twice in one batch)
   failed (dead-letter)  ${failed.toLocaleString()}
   accounted             ${keptAccounted.toLocaleString()}  ${keptAccounted === kept ? 'BALANCES' : 'MISMATCH — investigate'}
+
+NULL-SAFETY (existing value kept where the extract field was blank)
+${PRESERVE_IF_BLANK.map((c) => `  ${c.padEnd(22)}${(preservedByCol[c] || 0).toLocaleString()}`).join('\n')}
+  payload columns       ${PAYLOAD_COLUMNS ? PAYLOAD_COLUMNS.join(', ') : '(no rows)'}
 
 REGISTRY CHANGE${DRY ? ' (DRY RUN — nothing written; "upserted" = would upsert)' : ''}
   ${DRY ? 'would update' : 'updated existing'}      ${updated.toLocaleString()}
