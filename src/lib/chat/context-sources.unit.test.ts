@@ -10,6 +10,7 @@ afterAll(() => { if (savedKey === undefined) delete process.env.SUPABASE_SERVICE
 /** A ledger exactly as the server would sign it (parseLedger only accepts signed ledgers). */
 const signed = (entries: unknown[]) => signLedger(entries as LedgerEntry[]);
 import type { RenderedRecords } from './record-render';
+import { sourceDateLabel, labelledSourceDate } from './context-sources';
 
 const owner = { email: 'u@example.com', scope: 'own' };
 const at = '2026-11-17T12:00:00.000Z';
@@ -18,7 +19,7 @@ const rendered = (ids: string[], from = 1) => ({ tool: 'get_buying_offices', tex
 describe('sourceFromToolResult', () => {
   it('a rendered result keeps the displayed numbering and is marked rendered', () => {
     const s = sourceFromToolResult({ tool: 'get_buying_offices', toolCallId: 'c1', status: 'success', content: '{"ok":true,"_meta":{"as_of":"2026-11-01"}}', rendered: rendered(['W912PL', 'W912BV'], 21), owner, retrievedAt: at });
-    expect(s).toMatchObject({ id: 'src:get_buying_offices:c1', kind: 'federal_record', owner: null, status: 'ok', rendered: true, asOf: '2026-11-01' });
+    expect(s).toMatchObject({ id: 'src:get_buying_offices:c1', kind: 'federal_record', owner: null, status: 'ok', rendered: true, asOf: 'source dated 2026-11-01' });
     expect(s.items).toEqual([{ n: 21, key: 'W912PL', label: '' }, { n: 22, key: 'W912BV', label: '' }]);
   });
   it('an unrendered result lists keyed records WITHOUT numbers (the model wrote that list)', () => {
@@ -167,5 +168,32 @@ describe('Vault documents in the ledger (revise across turns)', () => {
     expect(resolveRevisionTarget('revise that document', [both])).toBeNull();
     expect(resolveRevisionTarget('revise that document', [ledgerFromSources([created]), ledgerFromSources([findOne])])).toEqual({ id: U2, kind: 'generated', version: 3 });
     expect(resolveRevisionTarget('revise that document', [])).toBeNull();
+  });
+});
+
+describe('source dates say what they mean (never a bare "as of")', () => {
+  it('data_current_through -> "data through", with the window', () => {
+    expect(sourceDateLabel('get_buying_offices', { _meta: { as_of: '2026-09-30', data_current_through: '2026-11-20', window: 'FY2024–FY2026' } })).toBe('FY2024–FY2026 · data through 2026-11-20');
+    expect(sourceDateLabel('get_buying_offices', { _meta: { data_current_through: '2026-11-20T03:00:00Z', window: { label: 'FY2024–FY2026' } } })).toBe('FY2024–FY2026 · data through 2026-11-20');
+  });
+  it('lookup_sam_entity -> "SAM registration record from"', () => {
+    expect(sourceDateLabel('lookup_sam_entity', { _meta: { source: 'local_registry', as_of: '2026-08-25T10:00:00Z' } })).toBe('SAM registration record from 2026-08-25');
+  });
+  it('data_as_of -> "data as of"; any other date -> "source dated"; none -> null', () => {
+    expect(sourceDateLabel('get_agency_intel', { _meta: { data_as_of: '2026-11-01' } })).toBe('data as of 2026-11-01');
+    expect(sourceDateLabel('get_agency_intel', { _meta: { as_of: '2026-09-30' } })).toBe('source dated 2026-09-30');
+    expect(sourceDateLabel('get_agency_intel', { _meta: {} })).toBeNull();
+  });
+  it('the citation chip carries the label, and an older saved bare date is labelled too', () => {
+    const mk = (tool: string, content: string) => sourceFromToolResult({ tool, toolCallId: 'x', status: 'success', content, owner, retrievedAt: at });
+    const chips = citationsFromSources([
+      mk('get_buying_offices', JSON.stringify({ ok: true, _meta: { as_of: '2026-09-30', data_current_through: '2026-11-20', window: 'FY2024–FY2026' } })),
+      mk('lookup_sam_entity', JSON.stringify({ ok: true, _meta: { as_of: '2026-08-25' } })),
+    ]);
+    expect(chips[0].title).toMatch(/· FY2024–FY2026 · data through 2026-11-20$/);
+    expect(chips[1].title).toMatch(/· SAM registration record from 2026-08-25$/);
+    for (const c of chips) expect(c.title).not.toMatch(/as of/);
+    expect(labelledSourceDate('2026-11-20')).toBe('source dated 2026-11-20');
+    expect(labelledSourceDate('data through 2026-11-20')).toBe('data through 2026-11-20');
   });
 });

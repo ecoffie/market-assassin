@@ -165,12 +165,36 @@ function statusFor(execStatus: string, parsed: Record<string, unknown> | null, r
   return 'ok';
 }
 
-function asOfFrom(parsed: Record<string, unknown> | null): string | null {
+const SOURCE_DATE_MAX = 80;
+const day = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, 10) : null);
+
+/**
+ * The source's date WITH what it means (Eric, 2026-11-25: a bare "as of" misled customers). Each tool's as_of means
+ * something different, so the label says which:
+ *   - _meta.data_current_through -> "data through <date>" (with the window when the tool gives one);
+ *   - lookup_sam_entity -> "SAM registration record from <date>" (the cached registration's date);
+ *   - _meta.data_as_of -> "data as of <date>";
+ *   - any other date -> "source dated <date>". Never a bare "as of".
+ */
+export function sourceDateLabel(tool: string | undefined, parsed: Record<string, unknown> | null): string | null {
   if (!parsed) return null;
   const meta = (parsed._meta && typeof parsed._meta === 'object' ? parsed._meta : {}) as Record<string, unknown>;
-  const win = (meta.window && typeof meta.window === 'object' ? meta.window : {}) as Record<string, unknown>;
-  const cand = meta.as_of ?? win.as_of ?? meta.data_as_of ?? parsed.as_of ?? null;
-  return typeof cand === 'string' && cand ? cand.slice(0, 32) : null;
+  const winObj = (meta.window && typeof meta.window === 'object' ? meta.window : {}) as Record<string, unknown>;
+  const windowLabel = typeof meta.window === 'string' ? meta.window : typeof winObj.label === 'string' ? winObj.label : null;
+  const out = (s: string) => s.slice(0, SOURCE_DATE_MAX);
+  const through = day(meta.data_current_through);
+  if (through) return out(`${windowLabel ? `${windowLabel} · ` : ''}data through ${through}`);
+  const asOf = day(meta.as_of ?? winObj.as_of ?? parsed.as_of);
+  if (tool === 'lookup_sam_entity' && asOf) return out(`SAM registration record from ${asOf}`);
+  const dataAsOf = day(meta.data_as_of);
+  if (dataAsOf) return out(`data as of ${dataAsOf}`);
+  return asOf ? out(`source dated ${asOf}`) : null;
+}
+
+/** A date carried by an older saved ledger (a bare date) gets a neutral label too. */
+export function labelledSourceDate(v: string | null | undefined): string | null {
+  if (!v) return null;
+  return /^\d{4}-\d{2}-\d{2}(T[\d:.Z+-]*)?$/.test(v.trim()) ? `source dated ${v.trim().slice(0, 10)}` : v;
 }
 
 const KEY_FIELDS = ['piid', 'notice_id', 'solicitation_number', 'award_id', 'uei', 'office_code', 'contract_id', 'id'];
@@ -304,7 +328,7 @@ export function sourceFromToolResult(p: {
     status,
     ...(p.rendered ? { shown: p.rendered.shown, total: p.rendered.total, rendered: true } : {}),
     retrievedAt: p.retrievedAt,
-    asOf: asOfFrom(parsed),
+    asOf: sourceDateLabel(p.tool, parsed),
     scope: 'turn',
     items,
     query,
@@ -336,7 +360,7 @@ export function citationsFromSources(sources: ContextSource[]): Array<{ title: s
     if (seen.has(dedupe)) continue;
     seen.add(dedupe);
     out.push({
-      title: s.asOf ? `${s.label} · as of ${s.asOf.slice(0, 10)}` : s.label,
+      title: s.asOf ? `${s.label} · ${labelledSourceDate(s.asOf)}` : s.label,
       url: s.ref?.url ?? null,
       doc_type: s.kind === 'account_record' ? 'mindy_account_data' : 'mindy_federal_data',
       source_path: s.id,
@@ -406,7 +430,7 @@ export function parseLedger(raw: unknown, currentScope: string): SourceLedger | 
     entries.push({
       id, kind: isPrivate ? 'account_record' : 'federal_record', ...(tool ? { tool } : {}),
       label: tool ? toolLabel(tool) : safeLabel(x.label, 60), status,
-      asOf: typeof x.asOf === 'string' ? safeLabel(x.asOf, 32) : null,
+      asOf: typeof x.asOf === 'string' ? safeLabel(x.asOf, SOURCE_DATE_MAX) : null,
       retrievedAt: typeof x.retrievedAt === 'string' ? safeLabel(x.retrievedAt, 32) : '',
       ...(isPrivate ? { private: true as const, scope: currentScope } : {}),
       ...(query && Object.keys(query).length ? { query } : {}),
@@ -503,7 +527,7 @@ export function ledgerNotes(message: string, ledgersNewestFirst: SourceLedger[])
       const range = e.items?.some((i) => i.n) ? ` items ${e.items!.filter((i) => i.n).map((i) => i.n).filter((n, i, a) => i === 0 || i === a.length - 1).join('–')}` : '';
       const keys = e.items?.length ? `: ${e.items.slice(0, 20).map((i) => (i.n ? `${i.n}=${i.key}` : i.key)).join(', ')}${e.items.length > 20 ? ', …' : ''}` : '';
       const q = e.query ? ` · search ${JSON.stringify(e.query)}` : '';
-      lines.push(`- [${e.id}] ${e.label} (${e.status}${e.asOf ? `, as of ${e.asOf}` : ''})${range}${q}${keys}`);
+      lines.push(`- [${e.id}] ${e.label} (${e.status}${e.asOf ? `, ${labelledSourceDate(e.asOf)}` : ''})${range}${q}${keys}`);
     }
   }
   if (lines.length) {
