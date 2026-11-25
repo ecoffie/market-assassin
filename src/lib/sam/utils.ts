@@ -5,6 +5,7 @@
  * Includes API key rotation for rate limit management
  */
 
+import { withoutRejected } from '@/lib/sam/key-health';
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
 
@@ -35,7 +36,8 @@ export function getAvailableSAMKeys(): string[] {
     }
   }
 
-  return keys;
+  // A key SAM rejected (401/403) in this process is skipped (key-health.ts, 2026-11-25 outage).
+  return withoutRejected(keys);
 }
 
 /**
@@ -55,8 +57,8 @@ export function getAllDistinctSAMKeys(): string[] {
   if (base && base.trim()) raw.push(base.trim());
   const backup = process.env.SAM_API_KEY_BACKUP;
   if (backup && backup.trim()) raw.push(backup.trim());
-  // Dedupe, preserve order.
-  return [...new Set(raw)];
+  // Dedupe, preserve order; drop keys SAM rejected (401/403) in this process (key-health.ts).
+  return withoutRejected([...new Set(raw)]);
 }
 
 /**

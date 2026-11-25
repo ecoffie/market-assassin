@@ -24,6 +24,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { isDescriptionLink, fetchNoticeDescription } from '@/lib/sam/notice-description';
 import { getAllDistinctSAMKeys } from '@/lib/sam/utils';
+import { markSamKeyRejected, keyStatusFromError } from '@/lib/sam/key-health';
 import { authorizeCronRequest } from '@/lib/cron/cron-request-auth';
 
 export const runtime = 'nodejs';
@@ -53,6 +54,7 @@ class RateLimitedError extends Error {}
 // worker moves to the next key together; RateLimitedError only throws once the LAST key is exhausted.
 type KeyPool = { keys: string[]; idx: number };
 
+
 async function processOne(supabase: ReturnType<typeof sb>, row: Row, pool: KeyPool): Promise<'text' | 'empty' | 'fail'> {
   const rawDesc = row.raw_data?.description;
   const link = isDescriptionLink(rawDesc) ? String(rawDesc) : row.notice_id;
@@ -69,8 +71,12 @@ async function processOne(supabase: ReturnType<typeof sb>, row: Row, pool: KeyPo
         ]);
         break;
       } catch (e) {
-        if (e instanceof Error && /\b429\b/.test(e.message) && pool.idx < pool.keys.length - 1) {
-          pool.idx++;         // this key's 1000/day is spent → next key
+        // 429 = this key's 1000/day is spent; 401/403 = SAM rejected the key (2026-11-25: expired production keys).
+        // Either way the KEY is unusable, not the notice: move to the next key, never stamp the row as empty.
+        const st = e instanceof Error ? keyStatusFromError(e.message) : null;
+        if (st && (st === 401 || st === 403)) markSamKeyRejected(pool.keys[pool.idx], st);
+        if (st && pool.idx < pool.keys.length - 1) {
+          pool.idx++;
           continue;
         }
         throw e;
@@ -83,8 +89,9 @@ async function processOne(supabase: ReturnType<typeof sb>, row: Row, pool: KeyPo
   } catch (e) {
     // 429 on the LAST key = all quotas exhausted. Do NOT write '' or stamp — leave the row so it's
     // re-claimed after the quota resets. Signal the caller to stop the run cleanly.
-    if (e instanceof Error && /\b429\b/.test(e.message)) {
-      throw new RateLimitedError('SAM 429 (all keys)');
+    // A REJECTED key (401/403) on the last key is the same: an unusable key, not an empty notice.
+    if (e instanceof Error && keyStatusFromError(e.message)) {
+      throw new RateLimitedError(`SAM ${keyStatusFromError(e.message)} (all keys unusable)`);
     }
     // Genuine failure (404/timeout/hang) → store '' AND stamp checked_at so it's not re-claimed
     // (the stamp replaces the old ''-as-poison-marker; a NULL stamp still means "re-claimable").
