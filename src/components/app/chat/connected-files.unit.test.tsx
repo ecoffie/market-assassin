@@ -12,12 +12,17 @@ import { createRoot, type Root } from 'react-dom/client';
 const h = vi.hoisted(() => ({
   list: { status: 200, body: { connections: [], providers: [{ provider: 'google', available: true }, { provider: 'microsoft', available: true }] } } as { status: number; body: Record<string, unknown> },
   start: { status: 200, body: { authorize_url: 'https://accounts.google.com/o/oauth2/v2/auth?x=1', access_note: 'Google will let Mindy open only the files you pick.' } } as { status: number; body: Record<string, unknown> },
-  calls: [] as Array<{ url: string; body?: string }>,
+  calls: [] as Array<{ url: string; body?: string; method?: string }>,
 }));
 
 vi.mock('../authHeaders', () => ({
   authedFetch: vi.fn(async (url: string, _e: string, init?: { method?: string; body?: string }) => {
-    h.calls.push({ url, body: init?.body });
+    h.calls.push({ url, body: init?.body, method: init?.method });
+    if (init?.method === 'DELETE') {
+      // After a disconnect the list no longer has the connection (the store marks it revoked).
+      h.list = { status: 200, body: { connections: [], providers: (h.list.body.providers as unknown[]) || [] } };
+      return { ok: true, status: 200, json: async () => ({ status: 'disconnected' }) };
+    }
     if (url.includes('/browse')) {
       const b = JSON.parse(init?.body || '{}');
       const items = b.folder_id === 'fold-1'
@@ -132,5 +137,32 @@ describe('ConnectedFiles', () => {
     await mount();
     await click(button('Use a file from Drive or OneDrive'));
     expect(button('Reconnect Google Drive')).toBeTruthy();
+  });
+  it('Disconnect asks first, then removes the account and its picks', async () => {
+    h.list = { status: 200, body: { connections: [{ id: 'c1', provider: 'google', connected_email: 'o@acme.com', status: 'connected' }], providers: [{ provider: 'google', available: true }, { provider: 'microsoft', available: true }] } };
+    const onChange = await mount([{ handle: 'fh1.g', name: 'Cap.txt', provider: 'google' }, { handle: 'fh1.m', name: 'Plan.pdf', provider: 'microsoft' }]);
+    await click(button('Use a file from Drive or OneDrive'));
+    await click(button('Disconnect Google Drive (o@acme.com)'));
+    // Nothing is sent until the customer confirms.
+    expect(h.calls.some((c) => c.method === 'DELETE')).toBe(false);
+    expect(el.textContent).toContain('files you picked from it will stop working');
+    await click([...el.querySelectorAll('button')].find((b) => b.textContent === 'Disconnect'));
+    const del = h.calls.find((c) => c.method === 'DELETE');
+    expect(del?.url).toBe('/api/app/connected-apps');
+    expect(JSON.parse(del!.body!)).toEqual({ email: 'pro@example.com', id: 'c1' });
+    expect(onChange).toHaveBeenCalledWith([{ handle: 'fh1.m', name: 'Plan.pdf', provider: 'microsoft' }]);
+    expect(el.textContent).toContain('Google Drive (o@acme.com) is disconnected');
+    await click(button('Use a file from Drive or OneDrive'));
+    expect(button('Connect Google Drive')).toBeTruthy();
+    expect(button('Pick from Google Drive')).toBeUndefined();
+  });
+
+  it('Cancel leaves the connection alone', async () => {
+    h.list = { status: 200, body: { connections: [{ id: 'c1', provider: 'google', connected_email: 'o@acme.com', status: 'connected' }], providers: [{ provider: 'google', available: true }] } };
+    await mount();
+    await click(button('Use a file from Drive or OneDrive'));
+    await click(button('Disconnect Google Drive'));
+    await click(button('Cancel'));
+    expect(h.calls.some((c) => c.method === 'DELETE')).toBe(false);
   });
 });

@@ -104,6 +104,7 @@ Use a file from Drive or OneDrive in Ask Mindy: server side plus the Ask Mindy c
   - Never in card chat; flag off or caller not allowlisted reads nothing.
 - **`POST /api/app/connected-apps/picker-token`** gives the browser picker a short-lived **access** token (never the refresh token, `no-store`), plus the public Google Picker key and app id. This is the provider-documented pattern.
 - **Ask Mindy control (`src/components/app/chat/ConnectedFiles.tsx`).**
+  - Disconnect (added 2026-11-25 after acceptance found no way for a customer to reach `DELETE /api/app/connected-apps`): a "Disconnect <provider> (<account>)" item per connection in the file menu, an inline confirm that says picks will stop working, then the DELETE; the account's chips are removed and the list reloads (a revoked connection is no longer listed).
   - Hidden unless the list endpoint answers, so it is invisible while the flag is off.
   - Connect shows the server's `access_note` and leaves Mindy only on "Continue". The consent outcome (`connect=ok|error`) is shown in plain words, then stripped from the address bar.
   - Google uses Google's own Picker (`drive.file`). The pick is exchanged for a handle and shown as a removable chip (up to 5). Handles go with every question as `connectedFiles` and are cleared on New chat.
