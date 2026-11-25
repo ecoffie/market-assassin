@@ -46,3 +46,23 @@ describe('Pro invoice allowance', () => {
     expect(apply).not.toHaveBeenCalled();
   });
 });
+
+describe('Pro + credit add-on (two-line invoice, 2026-11-23)', () => {
+  it('reads the Pro line even when it is not first, and never the invoice total', async () => {
+    decision.next = { grant: true };
+    const inv = {
+      id: 'in_2', billing_reason: 'subscription_cycle', customer_email: 'mg@x.com', amount_paid: 54800,
+      lines: { data: [{ price: { unit_amount: 39900 } }, { price: { unit_amount: 14900 } }] },
+    } as never;
+    expect(await handleAppTierSubscriptionInvoice(inv)).toMatchObject({ handled: true, tier: 'pro' });
+  });
+
+  it('a two-line invoice with no Pro/Team line is not an app-tier invoice (total is not used)', async () => {
+    const inv = {
+      id: 'in_3', billing_reason: 'subscription_cycle', customer_email: 'mg@x.com', amount_paid: 14900,
+      lines: { data: [{ price: { unit_amount: 9900 } }, { price: { unit_amount: 5000 } }] },
+    } as never;
+    expect(await handleAppTierSubscriptionInvoice(inv)).toEqual({ handled: false });
+  });
+});
+

@@ -19,6 +19,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { getMIApiHeaders } from '@/components/app/authHeaders';
 import SubscriptionsCard from '@/components/billing/SubscriptionsCard';
+import ProCreditAddons from '@/components/billing/ProCreditAddons';
 import NoRefundNote from '@/components/NoRefundNote';
 import { McpNav, MCP_URL } from '@/app/mcp/catalog-ui';
 import {
@@ -366,6 +367,9 @@ export default function CreditsConsole({ embedded = false }: { embedded?: boolea
         </div>
         <Link href="/mcp/pricing" className="rounded-lg bg-emerald-500 px-3.5 py-2 text-[13px] font-semibold text-white hover:bg-emerald-400">Top up credits</Link>
       </div>
+
+      {/* Pro credit add-ons: more credits every month (owner, 2026-11-23). */}
+      <ProCreditAddons email={email} />
 
       {/* Auto-recharge — full controls */}
       <div className="rounded-xl border border-white/[0.07] bg-surface p-4">

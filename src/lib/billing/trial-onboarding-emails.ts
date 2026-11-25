@@ -11,6 +11,7 @@
  * Same white-card look as the trial reminder. Every send is claimed in KV per subscription +
  * step so webhook retries and repeated cron runs never send twice.
  */
+import { primaryItem, subscriptionTotalCents } from './subscription-items';
 import { kv } from '@vercel/kv';
 import { sendEmail } from '@/lib/send-email';
 import { appendEmailUtm } from '@/lib/engagement';
@@ -205,8 +206,9 @@ type SubLike = {
 /** Email context from a trialing subscription. null when it isn't a usable trial. */
 export function trialContextFromSubscription(sub: SubLike, email: string, firstName?: string | null): TrialContext | null {
   if (sub.status !== 'trialing' || !sub.trial_end || !email) return null;
-  const item = sub.items.data[0];
-  const amount = (item?.price?.unit_amount ?? 0) / 100;
+  // Pro + credit add-on (2026-11-23): the plan is the Pro/Team item, the charge is every item.
+  const item = primaryItem(sub);
+  const amount = (subscriptionTotalCents(sub) ?? 0) / 100;
   if (!(amount > 0)) return null;
   const tier = sub.metadata?.tier || '';
   const priceId = item?.price?.id || '';

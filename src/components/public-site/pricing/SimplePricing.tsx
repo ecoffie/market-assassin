@@ -25,6 +25,7 @@ import {
   PRO_ANNUAL_USD, PRO_MONTHLY_USD, PRO_TRIAL_ANNUAL, PRO_TRIAL_MONTHLY, SALES_URL,
   TEAM_ANNUAL_PER_MONTH, TEAM_ANNUAL_USD, TEAM_MONTHLY_USD, TEAM_TRIAL_ANNUAL, TEAM_TRIAL_MONTHLY, pctOff,
 } from './app-plan-links';
+import { PRO_CREDIT_ADDONS, PENDING_ADDON_KEY, addonCheckoutHref, addonPrice, proWithAddonCheckoutHref, type ProCreditAddon } from '@/lib/billing/pro-credit-addons';
 import { TEAM_SEAT_COUNTS, TEAM_SEAT_PRICING_ON, teamSeatPlan, type TeamSeatCount } from '@/lib/billing/team-seat-plans';
 
 type Feature = [title: string, detail: React.ReactNode];
@@ -119,49 +120,45 @@ function TrialUpgradeBox({ offer, email, token, onDone }: {
 
 const fmt = (n: number) => n.toLocaleString('en-US', { maximumFractionDigits: 2 });
 
-/** A credit-only (MCP) plan for the dropdown under the cards. */
-export type CreditPlan = {
-  id: string; label: string; credits: number;
-  monthlyUsd: number; monthlyHref: string;
-  annualPerMonthUsd: number | null; annualHref: string | null;
-};
+/** Saves the add-on picked before signup, so Billing can offer it after (this browser only). */
+function rememberAddon(addon: ProCreditAddon | null) {
+  try {
+    if (addon) localStorage.setItem(PENDING_ADDON_KEY, addon.id);
+    else localStorage.setItem(PENDING_ADDON_KEY, '');
+  } catch { /* private mode */ }
+}
 
 /**
- * "Only need Mindy in your AI?" — the credit-only plans as a dropdown on /pricing instead of a
- * link to a separate page (Eric 2026-11-16). Follows the page's Monthly/Annual toggle.
+ * "Need more credits?" on the Pro card (owner, 2026-11-23, option A): Pro's own credits, or Pro
+ * plus one add-on. The card's price and usage line show the total.
  */
-function CreditPlansDropdown({ plans, annual }: { plans: CreditPlan[]; annual: boolean }) {
-  if (!plans.length) return null;
+function ProAddonPicker({ annual, addon, onPick, proCredits }: {
+  annual: boolean; addon: ProCreditAddon | null; onPick: (a: ProCreditAddon | null) => void; proCredits: number;
+}) {
   return (
-    <details className="credits-dd" data-testid="credit-plans-dropdown">
-      <summary>Only need Mindy inside Claude, ChatGPT or Cursor? <span>See credit-only plans</span></summary>
-      <div className="cdd-grid">
-        {plans.map((p) => {
-          const useAnnual = annual && p.annualPerMonthUsd != null && !!p.annualHref;
-          return (
-            <div className="cdd-card" key={p.id}>
-              <h3>{p.label}</h3>
-              <div className="cdd-price"><b>${fmt(useAnnual ? p.annualPerMonthUsd! : p.monthlyUsd)}</b><span>/ mo{useAnnual ? ', billed annually' : ''}</span></div>
-              <p className="cdd-cr">{fmt(p.credits)} credits / month</p>
-              <a className="cta outline" href={useAnnual ? p.annualHref! : p.monthlyHref}>Get {p.label}</a>
-              <NoRefundNote />
-            </div>
-          );
-        })}
-      </div>
-      <p className="cdd-fine">Same tools on every plan; you&apos;re charged only for successful calls. No app included. <Link href="/mcp/pricing">Compare credit plans in detail</Link>.</p>
-    </details>
+    <fieldset className="addon-pick">
+      <legend>Need more credits?</legend>
+      <button type="button" aria-pressed={!addon} className={!addon ? 'on' : ''} onClick={() => onPick(null)}>
+        <span>{fmt(proCredits)} credits</span><span className="x">included</span>
+      </button>
+      {PRO_CREDIT_ADDONS.map((a) => (
+        <button key={a.id} type="button" aria-pressed={addon?.id === a.id} className={addon?.id === a.id ? 'on' : ''} onClick={() => onPick(a)}>
+          <span>+{fmt(a.credits)} credits</span><span className="x">+${fmt(addonPrice(a, annual))}/mo</span>
+        </button>
+      ))}
+    </fieldset>
   );
 }
 
 type Cell = boolean | string;
 type CompareGroup = [group: string, rows: Array<[label: React.ReactNode, pro: Cell, team: Cell, ent: Cell]>];
 
-export default function SimplePricing({ proCredits, teamCredits, forecastsLabel, faqs, creditPlans = [] }: {
+export default function SimplePricing({ proCredits, teamCredits, forecastsLabel, faqs }: {
   proCredits: number; teamCredits: number; forecastsLabel: string; faqs: { q: string; a: string }[];
-  creditPlans?: CreditPlan[];
 }) {
   const [annual, setAnnual] = useState(false);
+  // Extra monthly credits picked on the Pro card (null = Pro's own credits only).
+  const [addon, setAddon] = useState<ProCreditAddon | null>(null);
   // Team by seats (held behind NEXT_PUBLIC_TEAM_SEAT_PRICING until Eric approves).
   const [teamSeats, setTeamSeats] = useState<TeamSeatCount>(2);
   const seatPlan = TEAM_SEAT_PRICING_ON ? teamSeatPlan(teamSeats) : null;
@@ -200,10 +197,11 @@ export default function SimplePricing({ proCredits, teamCredits, forecastsLabel,
   const basePlans: Plan[] = [
     {
       name: 'Pro', tag: 'For solo contractors and small firms going after federal work.', featured: true,
-      price: annual ? `$${fmt(Math.round(PRO_ANNUAL_USD / 12))}` : `$${PRO_MONTHLY_USD}`,
-      was: annual ? `$${PRO_MONTHLY_USD}` : undefined,
+      price: `$${fmt((annual ? Math.round(PRO_ANNUAL_USD / 12) : PRO_MONTHLY_USD) + (addon ? addonPrice(addon, annual) : 0))}`,
+      was: annual && !addon ? `$${PRO_MONTHLY_USD}` : undefined,
       per: annual ? '/ mo, billed annually' : '/ mo, billed monthly', trial: true,
-      cta: 'Start free trial', href: annual ? PRO_TRIAL_ANNUAL : PRO_TRIAL_MONTHLY,
+      // With extra credits picked: ONE checkout for Pro + the add-on (/api/checkout/pro-credits).
+      cta: 'Start free trial', href: addon ? proWithAddonCheckoutHref(addon, annual) : (annual ? PRO_TRIAL_ANNUAL : PRO_TRIAL_MONTHLY),
       lead: 'Find and win your own contracts.', base: 'Everything you need to start',
       features: [
         ['Opportunities matched to you', <>Daily alerts and briefings for the industries, keywords and agencies you choose (industries are set by <Link href="/glossary/naics-code">NAICS codes</Link>).</>],
@@ -211,7 +209,9 @@ export default function SimplePricing({ proCredits, teamCredits, forecastsLabel,
         ['Market research', 'Who buys, who wins and what they spend.'],
         ['Mindy in your AI', 'Use Mindy inside Claude, ChatGPT or Cursor.'],
       ],
-      usage: ['Monthly usage included', `${fmt(proCredits)} credits / month`],
+      usage: addon
+        ? ['Monthly usage', `${fmt(proCredits + addon.credits)} credits / month (${fmt(proCredits)} with Pro + ${fmt(addon.credits)} extra)`]
+        : ['Monthly usage included', `${fmt(proCredits)} credits / month`],
     },
     {
       name: 'Team', tag: 'Built for business development teams working several markets at once.',
@@ -340,10 +340,25 @@ export default function SimplePricing({ proCredits, teamCredits, forecastsLabel,
               <div className="price"><span className="now sales">Speak to sales</span></div>
             )}
             <p className="per">{p.per}</p>
+            {p.name === 'Pro' && me !== 'team' && me !== 'enterprise' && (
+              <ProAddonPicker annual={annual} addon={addon} onPick={setAddon} proCredits={proCredits} />
+            )}
             {p.trial && <p className="trial"><b>$0 today</b> · 14 days free</p>}
             {p.current
               ? <span className="cta is-current" aria-current="true">Current plan</span>
-              : <a className={`cta ${p.outline ? 'outline' : ''}`} href={p.href} onClick={p.trial ? () => trackTrialClick(p.name === 'Team' ? 'team' : 'pro', annual ? 'annual' : 'monthly', 'card') : undefined}>{p.cta}</a>}
+              : <a className={`cta ${p.outline ? 'outline' : ''}`} href={p.href} onClick={p.trial ? () => {
+                  trackTrialClick(p.name === 'Team' ? 'team' : 'pro', annual ? 'annual' : 'monthly', 'card');
+                  if (p.name === 'Pro') rememberAddon(addon);
+                } : undefined}>{p.cta}</a>}
+            {p.name === 'Pro' && addon && !p.current && p.trial && (
+              <p className="addon-note">Pro and your extra {fmt(addon.credits)} credits are both free for 14 days, then ${fmt((annual ? Math.round(PRO_ANNUAL_USD / 12) : PRO_MONTHLY_USD) + addonPrice(addon, annual))}/mo. The extra credits start when the trial ends.</p>
+            )}
+            {p.name === 'Pro' && addon && p.current && (
+              <>
+                <a className="cta addon-cta" href={addonCheckoutHref(addon, annual, session?.email)}>Add {fmt(addon.credits)} credits · ${fmt(addonPrice(addon, annual))}/mo</a>
+                <NoRefundNote style={{ margin: '-14px 0 18px' }} />
+              </>
+            )}
             {p.current && upgraded && <p className="tu-ok" role="status">{TRIAL_UPGRADE_SUCCESS_TEXT}</p>}
             {p.current && !upgraded && session && (() => {
               const offer = trialOfferForCard(p.name, me, offers);
@@ -369,7 +384,7 @@ export default function SimplePricing({ proCredits, teamCredits, forecastsLabel,
         After that, all sales final.
       </p>
 
-      <CreditPlansDropdown plans={creditPlans} annual={annual} />
+      <p className="credit-only">Only need Mindy inside Claude, ChatGPT or Cursor? <Link href="/mcp/pricing">See credit-only plans</Link></p>
 
       <LogoMarquee />
 
@@ -472,27 +487,20 @@ const CSS = `
 .sp .foot{text-align:center;font-size:14px;color:var(--mp-muted);margin:16px 0 0}
 .sp .foot a,.sp .fine a{color:var(--mp-navy)}
 .sp .fine{text-align:center;color:var(--mp-muted);font-size:13px;line-height:1.6;max-width:640px;margin:28px auto 0}
-.sp .credits-dd{max-width:900px;margin:24px auto 0;border:1px solid var(--mp-line);border-radius:14px;background:var(--mp-surface)}
-.sp .credits-dd summary{cursor:pointer;padding:16px 20px;font-size:15px;color:var(--mp-body);text-align:center;list-style:none}
-.sp .credits-dd summary::-webkit-details-marker{display:none}
-.sp .credits-dd summary span{color:var(--mp-navy);font-weight:600;margin-left:6px}
-.sp .credits-dd summary span::after{content:' ▾'}
-.sp .credits-dd[open] summary span::after{content:' ▴'}
-.sp .cdd-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;padding:4px 20px 8px}
-@media (max-width:700px){.sp .cdd-grid{grid-template-columns:1fr}}
-.sp .cdd-card{border:1px solid var(--mp-line);border-radius:12px;padding:18px;background:var(--mp-wash)}
-.sp .cdd-card h3{margin:0;font-family:var(--mp-font-serif);font-size:20px}
-.sp .cdd-price{display:flex;align-items:baseline;gap:6px;margin:8px 0 0}
-.sp .cdd-price b{font-size:28px}
-.sp .cdd-price span{color:var(--mp-muted);font-size:13px}
-.sp .cdd-cr{margin:4px 0 0;font-size:14px;font-weight:600}
-.sp .cdd-card .cta{margin:14px 0 4px}
+.sp .credit-only{max-width:900px;margin:24px auto 0;text-align:center;font-size:15px;color:var(--mp-body)}
+.sp .credit-only a{color:var(--mp-navy);font-weight:600}
+.sp .addon-pick{margin:4px 0 16px;padding:0;border:0;display:grid;gap:8px}
+.sp .addon-pick legend{font-size:13px;font-weight:700;color:var(--mp-muted);margin-bottom:8px}
+.sp .addon-pick button{display:flex;justify-content:space-between;align-items:center;gap:10px;min-height:44px;padding:10px 14px;border-radius:12px;border:1px solid var(--mp-line);background:var(--mp-surface);font:inherit;font-size:15px;font-weight:600;color:var(--mp-ink);cursor:pointer;text-align:left}
+.sp .addon-pick button.on{border:2px solid var(--mp-navy);background:var(--mp-navy-wash)}
+.sp .addon-pick button:focus-visible{outline:3px solid var(--mp-navy);outline-offset:2px}
+.sp .addon-pick .x{color:var(--mp-muted);font-weight:500}
+.sp .addon-note{margin:-6px 0 18px;font-size:13px;line-height:1.45;color:var(--mp-muted)}
+.sp .cta.addon-cta{margin-top:12px}
 .sp .seat-pick{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;padding:4px;margin:0 0 14px;border-radius:12px;background:var(--mp-wash)}
 .sp .seat-pick button{min-height:44px;border:0;border-radius:9px;background:transparent;font:inherit;font-size:14px;font-weight:600;color:var(--mp-muted);cursor:pointer}
 .sp .seat-pick button.on{background:var(--mp-surface);color:var(--mp-ink);box-shadow:0 1px 3px rgba(18,16,14,.12)}
 .sp .seat-pick button:focus-visible{outline:3px solid var(--mp-navy);outline-offset:2px}
-.sp .cdd-fine{margin:0;padding:8px 20px 18px;text-align:center;font-size:13px;color:var(--mp-muted)}
-.sp .cdd-fine a{color:var(--mp-navy)}
 .sp .cmp{margin:80px 0 0}
 .sp .cmp h2{font-family:var(--mp-font-serif);font-size:clamp(28px,3.4vw,40px);font-weight:700;text-align:center;margin:0 0 28px}
 .sp .cmp-scroll{overflow-x:auto;border:1px solid var(--mp-line);border-radius:18px;background:var(--mp-surface)}

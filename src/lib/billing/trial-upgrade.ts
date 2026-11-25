@@ -22,12 +22,14 @@ import { appTierForAmount } from '@/lib/mcp/app-tier-subscription';
 import { EARLY_UPGRADE_FLAG, hasEarlyUpgradeFlag } from '@/lib/mcp/trial-upgrade-bonus';
 import { TRIAL_UPGRADE_BONUS_CREDITS } from '@/lib/mcp/packages';
 import { subscriptionKind } from './subscription-list';
+import { primaryItem, subscriptionTotalCents } from './subscription-items';
 import type { TrialUpgradeOffer } from './trial-upgrade-offer';
 
 type SubLike = Pick<Stripe.Subscription, 'id' | 'status' | 'metadata' | 'items' | 'cancel_at_period_end' | 'trial_end' | 'customer'>;
 
 function firstPrice(sub: Pick<Stripe.Subscription, 'items'>): Stripe.Price | null {
-  const p = sub.items?.data?.[0]?.price;
+  // The Pro/Team item, so a Pro + credit add-on subscription still reads as Pro.
+  const p = primaryItem(sub)?.price;
   return p && typeof p === 'object' ? p : null;
 }
 
@@ -57,7 +59,8 @@ export function offerFromSubscription(sub: SubLike, planName: string | null, bil
     tier,
     // tier-display-ok: fallback plan NAME for the upgrade card; not an entitlement or access gate
     planName: planName || price?.nickname || (tier === 'team' ? 'Mindy Team' : 'Mindy Pro'),
-    amount: typeof price?.unit_amount === 'number' ? price.unit_amount / 100 : null,
+    // Ending the trial bills every item, so the offer shows the whole charge.
+    amount: (() => { const t = subscriptionTotalCents(sub); return typeof t === 'number' ? t / 100 : null; })(),
     interval: price?.recurring?.interval ?? null,
     trialEnd: sub.trial_end ? new Date(sub.trial_end * 1000).toISOString() : null,
     billedTo,

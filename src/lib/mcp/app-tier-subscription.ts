@@ -35,6 +35,7 @@ import { applyCreditOnce } from './credits';
 import { proAllowanceDecision } from './pro-allowance';
 import { PRO_MONTHLY_CREDITS, TEAM_MONTHLY_CREDITS } from './packages';
 import { getStripe } from '@/lib/stripe';
+import { appTierInvoiceLine } from '@/lib/billing/subscription-items';
 import { teamSeatPlanForPriceId } from '@/lib/billing/team-seat-plans';
 
 /** App-tier price amounts (cents). Mirrors grant-mcp-pro-credits so the two agree. */
@@ -96,9 +97,11 @@ export async function handleAppTierSubscriptionInvoice(
   // InvoiceLineItem type; guard with an `unknown` cast the same way
   // stripe-subscription.ts does, so a future rename can't break the build.
   // Falls back to amount_paid, which is what the cron effectively matches on.
-  const line = invoice.lines?.data?.[0] as unknown as
-    { price?: { unit_amount?: number | null } } | undefined;
-  const amount = line?.price?.unit_amount ?? invoice.amount_paid ?? 0;
+  // A Pro + credit add-on subscription has two lines (2026-11-23): find the Pro/Team line by
+  // amount. amount_paid is only a fallback for a one-line invoice (it is the TOTAL of all lines).
+  const lines = invoice.lines?.data ?? [];
+  const line = appTierInvoiceLine(invoice) ?? (lines.length === 1 ? (lines[0] as unknown as { price?: { unit_amount?: number | null } }) : null);
+  const amount = line?.price?.unit_amount ?? (lines.length <= 1 ? invoice.amount_paid : null) ?? 0;
   let tier: 'pro' | 'team' | null = null;
   let credits = 0;
   // Team by seats (2026-11-24, held behind Stripe price ids that do not exist yet): matched by

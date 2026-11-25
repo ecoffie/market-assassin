@@ -49,7 +49,12 @@ function grantFromInvoice(invoice: Stripe.Invoice): SubscriptionGrant | null {
     const anyLine = line as unknown as {
       price?: { id?: string; metadata?: Record<string, unknown> };
       metadata?: Record<string, unknown>;
+      amount?: number;
     };
+    // A credit add-on bought with a Pro trial (2026-11-23) is on a $0 trial line until the trial
+    // ends: no credits for a line nobody paid for. A discount does not zero the line amount
+    // (discounts are separate), so a coupon never hides a paid plan.
+    if (anyLine.amount === 0) continue;
     const price = anyLine.price;
     const byId = subscriptionGrantForPriceId(price?.id);
     if (byId) return byId;

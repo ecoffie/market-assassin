@@ -23,7 +23,7 @@ import SimplePricing from '@/components/public-site/pricing/SimplePricing';
 import { appPricingFaqs } from '@/components/public-site/pricing/faqs';
 // Server component, so the credit constants are imported directly — the same values
 // /api/mcp/catalog serves as `tierCredits` and the grant cron actually pays out.
-import { PRO_MONTHLY_CREDITS, SUBSCRIPTION_PLANS, TEAM_MONTHLY_CREDITS } from '@/lib/mcp/packages';
+import { PRO_MONTHLY_CREDITS, TEAM_MONTHLY_CREDITS } from '@/lib/mcp/packages';
 // Corpus counts come from ONE place — see the file header for why (they were hand-typed
 // in 32 spots and every one understated the real table by 4.3x).
 import { forecastsLabel } from '@/lib/marketing-stats';
@@ -31,14 +31,6 @@ import { forecastsLabel } from '@/lib/marketing-stats';
 // Checkout links live in src/components/public-site/pricing/app-plan-links.ts.
 // FAQ is mirrored in JSON-LD below — same list the page renders.
 const faqs = appPricingFaqs({ proCredits: PRO_MONTHLY_CREDITS, teamCredits: TEAM_MONTHLY_CREDITS });
-
-// Credit-only plans for the "Only need Mindy in your AI?" dropdown — the same ladder
-// /mcp/pricing sells (Agency is not advertised there either).
-const creditPlans = SUBSCRIPTION_PLANS.filter((p) => p.id !== 'agency').map((p) => ({
-  id: p.id, label: p.label, credits: p.creditsPerMonth,
-  monthlyUsd: p.monthly.usd, monthlyHref: p.monthly.checkoutUrl,
-  annualPerMonthUsd: p.annual?.usdPerMonth ?? null, annualHref: p.annual?.checkoutUrl ?? null,
-}));
 
 export const metadata: Metadata = {
   title: 'Pricing — Pro, Team and Enterprise | Mindy',
@@ -136,7 +128,7 @@ export default function PricingPage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
-      <SimplePricing proCredits={PRO_MONTHLY_CREDITS} teamCredits={TEAM_MONTHLY_CREDITS} forecastsLabel={forecastsLabel} faqs={faqs} creditPlans={creditPlans} />
+      <SimplePricing proCredits={PRO_MONTHLY_CREDITS} teamCredits={TEAM_MONTHLY_CREDITS} forecastsLabel={forecastsLabel} faqs={faqs} />
     </>
   );
 }
