@@ -27,7 +27,7 @@
  *   - { type: 'error', message }       — on failure
  */
 
-import { NextRequest } from 'next/server';
+import { NextRequest, after } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verifyUserOwnsEmail } from '@/lib/api-auth';
 import { canUseAskMindy } from '@/lib/access/chat-access';
@@ -634,6 +634,13 @@ export async function POST(request: NextRequest) {
   const researchTurn = researchEligible && (researchCap?.allowed ?? true);
   const researchCapNotice = researchEligible && researchCap && !researchCap.allowed ? researchCap.notice : null;
   // What opens a standard (non-research) answer: the cap notice, and a plain note when its screenshots were not read.
+  // A research turn must finish and save even if the browser disconnects (Eric, 2026-11-25: no background job).
+  // after() keeps the function alive until the research work settles, within maxDuration.
+  let researchSettled: () => void = () => {};
+  if (researchTurn) {
+    const settled = new Promise<void>((resolve) => { researchSettled = resolve; });
+    try { after(() => settled); } catch { /* outside a request scope (unit tests): nothing to extend */ }
+  }
   const standardLeadNotice = [researchCapNotice, !researchTurn && turnImages.length ? SCREENSHOT_NOT_READ : null].filter(Boolean).join('\n\n') || null;
 
   // SSE response — manually constructed ReadableStream since the
@@ -1264,21 +1271,22 @@ export async function POST(request: NextRequest) {
               ...(turnImages.length ? { screenshots: turnImages.length } : {}),
               ...(researchCap ? { research_cap: { plan: researchCap.plan, cap: researchCap.cap, used: researchCap.used, ...(researchCap.countUnknown ? { count_unknown: true } : {}) } } : {}),
             };
-            const finish = (answer: string, extra: Record<string, unknown> = {}, sources: typeof turnSources = []) => {
+            // Awaited: after() keeps the function alive only until this turn settles, so the save must finish first.
+            const finish = async (answer: string, extra: Record<string, unknown> = {}, sources: typeof turnSources = []) => {
               send({ type: 'token', content: answer });
               const rmCited = citationsFromSources(sources);
               send({ type: 'sources', ledger: ledgerFromSources(sources) });
               send({ type: 'citations', sources: rmCited });
               send({ type: 'done' });
               closeStream();
-              persistExchange({
+              await persistExchange({
                 email: auth.email!, sessionId, userMessage: message, assistantMessage: answer, citedSources: rmCited, tokensUsed: 0,
                 latencyMs: Date.now() - startedAt, trace: { ...rmTrace, ...extra, total_ms: Date.now() - rmStarted },
               }).catch((err) => console.error('[chat] persist failed:', err));
             };
             // Never a silent model swap: if a budget limit applies, say so plainly and stop.
             if (await isUserOverBudget(email).catch(() => false)) {
-              finish('You have reached this month\'s research limit, so I can\'t run a full research answer right now. Your saved conversations and reports are unaffected.', { stop: 'over_budget' });
+              await finish('You have reached this month\'s research limit, so I can\'t run a full research answer right now. Your saved conversations and reports are unaffected.', { stop: 'over_budget' });
               return;
             }
             const rmTools = toAnthropicTools(researchToolDefs(executor.offeredToolDefs(), privateNames));
@@ -1327,6 +1335,7 @@ export async function POST(request: NextRequest) {
                 tools: rmTools,
                 effort: process.env.ASK_MINDY_RESEARCH_EFFORT || 'high',
                 onCalls: (cs) => { for (const c of cs) send({ type: 'progress', message: progressLine(toolLabel(c.name)) }); },
+                onFinalStep: () => send({ type: 'progress', message: 'Writing the answer.', phase: 'writing' }),
                 // Independent reads run in parallel; writes (documents, reports) run one at a time after them.
                 execute: async (cs) => {
                   const reads = cs.filter((c) => !isWrite(c.name));
@@ -1338,7 +1347,8 @@ export async function POST(request: NextRequest) {
               });
               void recordLlmUsage({ userEmail: auth.email, tool: 'chat', job: 'research_mode', provider: 'anthropic', model, usage: { prompt_tokens: loop.usage.input, completion_tokens: loop.usage.output } });
               Object.assign(rmTrace, { stop: loop.stop, steps: loop.steps, call_count: loop.calls, calls: callLog, results_cut: loop.resultsCut, sam_cache_only: true });
-              if (!loop.text) { finish(RESEARCH_NO_ANSWER, {}, rmSources); return; }
+              if (!loop.text) { await finish(RESEARCH_NO_ANSWER, {}, rmSources); return; }
+              send({ type: 'progress', message: 'Checking every figure against the sources.', phase: 'checking' });
               const grounded = await groundAnswer({
                 text: loop.text,
                 evidence: [...loop.evidence, userProfileBlock],
@@ -1357,11 +1367,11 @@ export async function POST(request: NextRequest) {
                 rmTrace.market_report = { report_id: rep.report_id, url: rep.url, title: rep.title, html: '' };
                 send({ type: 'market_report', ...rep });
               }
-              finish(grounded.text, {}, rmSources);
+              await finish(grounded.text, {}, rmSources);
             } catch (err) {
               console.error('[chat] research mode failed:', (err as Error)?.message);
               Object.assign(rmTrace, { stop: 'error', calls: callLog });
-              finish('I could not finish this research because a service did not respond. Please try again in a moment.', {}, rmSources);
+              await finish('I could not finish this research because a service did not respond. Please try again in a moment.', {}, rmSources);
             }
             return;
           }
@@ -3063,6 +3073,7 @@ export async function POST(request: NextRequest) {
         closeStream();
       } finally {
         clearTimeout(watchdog);
+        researchSettled();
         // Any path that did not settle the turn (provider failure, early return, thrown error) leaves it
         // free and re-askable. The update matches only this claim, so it can never undo a completed turn.
         if (claimToken && turnId && !turnSettled) {

@@ -72,6 +72,14 @@ describe('the loop is Claude\'s: call, read, call again, then answer', () => {
     expect(r.text).toBe('Answer from what I have.');
   });
 
+  it('onFinalStep fires once when a limit forces the final answer (the "writing" phase)', async () => {
+    const { client } = scripted([msg([toolUse('a', 'find_opportunities')], 'tool_use'), msg([text('Done.')], 'end_turn')]);
+    const onFinalStep = vi.fn();
+    await runResearchLoop({ ...base, client, maxCalls: 1, onFinalStep, execute: async (cs) => cs.map((c) => ({ id: c.id, content: 'ok' })) });
+    expect(onFinalStep).toHaveBeenCalledTimes(1);
+    expect(onFinalStep).toHaveBeenCalledWith('max_calls');
+  });
+
   it('the deadline: once less than the final reserve is left, the next step answers with tools disabled', async () => {
     let t = 0;
     const { client, create } = scripted([msg([toolUse('a', 'find_opportunities')], 'tool_use'), msg([text('Partial answer.')], 'end_turn')]);
