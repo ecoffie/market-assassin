@@ -206,6 +206,11 @@ export async function runIntelligenceGate(args: {
   profile: string | null;
   eligibility?: CustomerEligibility;
   competitionLookup?: CompetitionLookup;
+  /**
+   * Open notices already known for this turn (a card turn's selected notice), in find_opportunities item shape.
+   * Checked and ranked with the searched candidates; a duplicate of a searched notice is kept once.
+   */
+  knownOpenItems?: Array<Record<string, unknown>>;
   /** Injectable for tests. */
   deps?: {
     gather?: typeof gatherMarketEvidence;
@@ -274,7 +279,7 @@ export async function runIntelligenceGate(args: {
   const recompetes = ((ev.sections.recompetes?.contracts as unknown[]) || []) as CandidateRecord[];
   const openH = open?.horizons?.open_now;
   const targetedOpen = (targeted?.horizons?.open_now?.items as Array<Record<string, unknown>>) || [];
-  const openRecs = openNoticesAsRecords([...targetedOpen, ...(openH?.items || [])]);
+  const openRecs = openNoticesAsRecords([...(args.knownOpenItems || []), ...targetedOpen, ...(openH?.items || [])]);
   const soonH = open?.horizons?.coming_soon;
   const soonRecs = forecastsAsRecords(soonH?.items || []);
   const recs = [...openRecs, ...soonRecs, ...recompetes];

@@ -208,12 +208,28 @@ describe('Ask Mindy rules layer flag', () => {
     expect(sys).not.toContain('Pick the 3 to 5 best fits');
   });
 
-  it('card chat gets the rules layer but no FIND contract', async () => {
+  it('billed (non-Pro) card chat gets the rules layer but keeps the reduced pipeline: no FIND contract, card tools only', async () => {
+    state.pro = false;
     vi.stubEnv('ASK_MINDY_RULES_LAYER', 'true');
     const { res } = await post(card);
     expect(res.status).toBe(200);
     const sys = sysOf(state.answerMessages[0]);
     expect(sys).toContain('ASK MINDY RULES');
     expect(sys).not.toContain('FINDING OPPORTUNITIES');
+    expect(state.allowedToolNames).not.toBeNull();
+    expect(completeCardTurn).toHaveBeenCalledWith(expect.objectContaining({ credits: 10 }));
+  });
+
+  it('Pro card chat runs the full pipeline: rules layer, FIND contract, every tool, charged nothing', async () => {
+    vi.stubEnv('ASK_MINDY_RULES_LAYER', 'true');
+    const { res } = await post({ ...card, message: FIND_Q });
+    expect(res.status).toBe(200);
+    const sys = sysOf(state.answerMessages[0]);
+    expect(sys).toContain('ASK MINDY RULES');
+    expect(sys).toContain('FINDING OPPORTUNITIES');
+    expect(sys).toContain('W912PL26Q0042');
+    expect(state.allowedToolNames).toBeNull();
+    expect(completeCardTurn).toHaveBeenCalledTimes(1);
+    expect(completeCardTurn).toHaveBeenCalledWith(expect.objectContaining({ credits: 0 }));
   });
 });
