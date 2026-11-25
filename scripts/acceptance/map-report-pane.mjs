@@ -118,6 +118,25 @@ for (const [label, opts] of [['desktop 1440x900', { viewport: { width: 1440, hei
       const lastVisible = await page.evaluate(() => { const b = document.querySelector('.amk-rep-body').getBoundingClientRect(); const f = document.querySelector('.amk-rep-f'); const last = [...f.contentDocument.querySelectorAll('.sec')].pop(); const r = last.getBoundingClientRect(); const fr = f.getBoundingClientRect(); return fr.top + r.bottom <= b.bottom + 1 && fr.top + r.bottom > b.top; });
       check(`${tag} the last section is on screen at the end`, lastVisible);
       await page.keyboard.press('Home'); await page.waitForTimeout(300);
+      // 1b. after a CLICK INSIDE the report (focus moves into the frame): the production retest of 2026-11-25
+      // found Page Down / End / Arrow Down stuck at 0 on both Map surfaces. Keyboard only applies off-phone.
+      if (!/iPhone/.test(label)) {
+        const b2 = await page.locator('.amk-rep-body').boundingBox();
+        await page.mouse.click(b2.x + 30, b2.y + Math.min(120, b2.height / 2)); await page.waitForTimeout(200);
+        const inFrame = await page.evaluate(() => document.activeElement && document.activeElement.classList.contains('amk-rep-f'));
+        await page.keyboard.press('PageDown'); await page.keyboard.press('PageDown'); await page.keyboard.press('PageDown'); await page.waitForTimeout(400);
+        const yPg = (await pos()).top;
+        check(`${tag} after a click inside the report, Page Down scrolls it`, yPg > 0, `scrollTop=${yPg} focusInFrame=${inFrame}`);
+        await page.keyboard.press('End'); await page.waitForTimeout(400);
+        const end2 = await pos();
+        check(`${tag} after a click inside the report, End reaches the last section`, end2.max > 0 && end2.top >= end2.max - 1, JSON.stringify(end2));
+        await page.keyboard.press('ArrowUp'); await page.keyboard.press('ArrowUp'); await page.waitForTimeout(200);
+        const up = (await pos()).top;
+        await page.keyboard.press('ArrowDown'); await page.waitForTimeout(200);
+        const down = (await pos()).top;
+        check(`${tag} after a click inside the report, Arrow Up / Down move it`, up < end2.top && down > up, `end=${end2.top} up=${up} down=${down}`);
+        await page.keyboard.press('Home'); await page.waitForTimeout(300);
+      }
       // 2. dead in-frame button hidden
       const inFrameBtn = await frame.evaluate(() => { const b = document.querySelector('.pdfbtn'); return b ? getComputedStyle(b).display : 'absent'; });
       check(`${tag} in-frame print button hidden`, inFrameBtn === 'none' || inFrameBtn === 'absent', inFrameBtn);

@@ -246,6 +246,41 @@ describe('Map report pane: the preview can be scrolled', () => {
     expect(focus).toHaveBeenCalledTimes(1); // fallback: the frame's own document scrolls
   });
 
+  it('after a click INSIDE the report (focus in the frame), Page Down / End / arrows / Space scroll the pane body (retest 2026-11-25)', async () => {
+    const t = boot({ chat: reportTurn() });
+    await t.ask('market report');
+    const f = t.doc.querySelector('.amk-rep-f') as HTMLIFrameElement;
+    const body = t.doc.querySelector('.amk-rep-body') as HTMLElement;
+    const d = f.contentDocument!; d.open(); d.write(HTML); d.close();
+    fakeHeight(f, 6000);
+    f.dispatchEvent(new t.w.Event('load'));
+    expect(f.classList.contains('fit')).toBe(true);
+    // jsdom has no layout: give the pane a real viewport and a stored, clamped scroll position.
+    let top = 0;
+    Object.defineProperty(body, 'clientHeight', { configurable: true, get: () => 400 });
+    Object.defineProperty(body, 'scrollHeight', { configurable: true, get: () => 6000 });
+    Object.defineProperty(body, 'scrollTop', { configurable: true, get: () => top, set: (v: number) => { top = Math.max(0, Math.min(5600, v)); } });
+    const key = (k: string, o: KeyboardEventInit = {}) => {
+      const ev = new (d.defaultView as unknown as typeof window).KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true, ...o });
+      d.body.dispatchEvent(ev);
+      return ev;
+    };
+    key('PageDown'); key('PageDown'); key('PageDown');
+    expect(top).toBe(3 * 360);
+    expect(key('End').defaultPrevented).toBe(true);
+    expect(top).toBe(5600); // the end of the report: last section and footer in view
+    key('ArrowUp'); expect(top).toBe(5560);
+    key('ArrowDown'); expect(top).toBe(5600);
+    key('Home'); expect(top).toBe(0);
+    key(' '); expect(top).toBe(360);
+    key(' ', { shiftKey: true }); expect(top).toBe(0);
+    key('PageUp'); expect(top).toBe(0);
+    // Left alone: modified keys (browser shortcuts) and sideways arrows (a wide table scrolls itself).
+    expect(key('End', { metaKey: true }).defaultPrevented).toBe(false);
+    expect(key('ArrowRight').defaultPrevented).toBe(false);
+    expect(top).toBe(0);
+  });
+
   it('focus moves into the loaded report so the keyboard scrolls it, and opening the drawer does not take it back', async () => {
     const t = boot({ chat: reportTurn() });
     await t.ask('market report');

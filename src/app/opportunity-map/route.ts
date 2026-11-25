@@ -11494,6 +11494,27 @@ const ASK_MINDY_JS = `<script>(function(){
       else if(/^mailto:/i.test(href)){ try{ window.location.href=href; }catch(e){} }
     },true);
   }
+  // Keyboard reading after a click INSIDE the report: the click focuses the frame, whose document is sized to
+  // its content (repFit) and so has nothing to scroll; the keys never reached the pane body that does scroll
+  // (production retest 2026-11-25: Page Down / End / Arrow Down stayed at 0 on both Map surfaces). The reading
+  // keys are forwarded to the pane body. Horizontal arrows are left alone (a wide table scrolls sideways).
+  var REP_KEYS={PageDown:1,PageUp:1,End:1,Home:1,ArrowDown:1,ArrowUp:1,' ':1,Spacebar:1};
+  function repKeys(E){
+    var d=null; try{ d=E.f.contentDocument; }catch(e){ d=null; }
+    if(!d||d.__amkKeys) return; d.__amkKeys=1;
+    d.addEventListener('keydown',function(ev){
+      if(!REP_KEYS[ev.key]||ev.ctrlKey||ev.metaKey||ev.altKey||!E.f.classList.contains('fit')) return;
+      var b=E.body; if(!b) return;
+      var page=Math.max(40,Math.round(b.clientHeight*0.9)), k=ev.key;
+      if(k==='End') b.scrollTop=b.scrollHeight;
+      else if(k==='Home') b.scrollTop=0;
+      else if(k==='PageDown'||((k===' '||k==='Spacebar')&&!ev.shiftKey)) b.scrollTop+=page;
+      else if(k==='PageUp'||k===' '||k==='Spacebar') b.scrollTop-=page;
+      else if(k==='ArrowDown') b.scrollTop+=40;
+      else if(k==='ArrowUp') b.scrollTop-=40;
+      ev.preventDefault();
+    },true);
+  }
   function repFit(E){
     var d=null; try{ d=E.f.contentDocument; }catch(e){ d=null; }
     if(!d||!d.documentElement||!d.body||!d.body.firstChild) return false;
@@ -11519,7 +11540,7 @@ const ASK_MINDY_JS = `<script>(function(){
     var body=el.querySelector('.amk-rep-body'); repEls.body=body;
     repEls.f.addEventListener('load',function(){
       if(repEls.f.style.visibility!=='visible') return;
-      var fitted=repFit(repEls); repLinks(repEls); body.scrollTop=0;
+      var fitted=repFit(repEls); repLinks(repEls); repKeys(repEls); body.scrollTop=0;
       if(repIsOpen()){ try{ (fitted?body:repEls.f).focus(); }catch(e){} }
     });
     // A width change reflows the report, so its height is measured again.
