@@ -707,7 +707,6 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
   .prov td { white-space:normal; }
   .rowsub { color:var(--muted); font-weight:400; font-size:.88em; margin-top:2px; white-space:normal; }
   .note { color:#b45309; font-size:12.5px; }
-  /* What to pursue: the decision reads first and strongest. Presentation only; content and order come from the gate. */
   .brief .lead { font-size:16px; font-weight:600; line-height:1.45; color:var(--ink,#0f172a); margin:8px 0 14px; }
   .brief-pursuits { margin:0 0 6px; padding-left:22px; }
   .brief-pursuits > li { padding:12px 0 4px; border-top:1px solid var(--line); }
