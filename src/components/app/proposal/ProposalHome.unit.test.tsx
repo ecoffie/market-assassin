@@ -58,6 +58,27 @@ describe('New proposal steps', () => {
     expect(html).toContain('data-testid="draft-my-proposal"');
   });
 
+  it('step 2 lists the documents Mindy read and links the SAM.gov solicitation, so the source can be checked', () => {
+    const d = dom(ready({
+      documentNames: ['RFP.pdf', 'SOW.docx', 'notes.pdf'],
+      documents: [{ name: 'RFP.pdf', docId: 'd1' }, { name: 'SOW.docx', docId: 'd2' }, { name: 'notes.pdf' }],
+      samUrl: 'https://sam.gov/opp/abc123/view',
+      onOpenDoc: noop,
+    }));
+    const box = d.querySelector('[data-testid="source-documents"]')!;
+    expect(box.querySelector('summary')!.textContent).toContain('Mindy read 3 documents');
+    const rows = Array.from(box.querySelectorAll('li')).map(li => li.textContent);
+    expect(rows[0]).toContain('RFP.pdf'); expect(rows[0]).toContain('Open');
+    expect(rows[2]).toContain('Uploaded by you');
+    const sam = box.querySelector('a[href="https://sam.gov/opp/abc123/view"]')!;
+    expect(sam.getAttribute('target')).toBe('_blank');
+    expect(sam.textContent).toContain('View the solicitation on SAM.gov');
+  });
+
+  it('no SAM.gov link when the proposal has no notice', () => {
+    expect(ready({ documents: [{ name: 'rfp.pdf' }] })).not.toContain('sam.gov');
+  });
+
   it('step 2 without a source asks for the RFP instead of a dead Draft button', () => {
     const html = ready({ documentNames: [], hasSource: false, canDraft: false });
     expect(html).not.toContain('draft-my-proposal');

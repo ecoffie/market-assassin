@@ -707,6 +707,17 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
   .prov td { white-space:normal; }
   .rowsub { color:var(--muted); font-weight:400; font-size:.88em; margin-top:2px; white-space:normal; }
   .note { color:#b45309; font-size:12.5px; }
+  .brief .lead { font-size:16px; font-weight:600; line-height:1.45; color:var(--ink,#0f172a); margin:8px 0 14px; }
+  .brief-pursuits { margin:0 0 6px; padding-left:22px; }
+  .brief-pursuits > li { padding:12px 0 4px; border-top:1px solid var(--line); }
+  .brief-pursuits > li:first-child { border-top:0; padding-top:4px; }
+  .brief-pursuits > li::marker { font-weight:800; color:var(--navy); }
+  .brief .brief-pursuits h3 { font-size:15px; text-transform:none; letter-spacing:0; color:var(--navy); margin:0 0 6px; }
+  .brief ul { margin:4px 0 8px; padding-left:20px; }
+  .brief li li { margin:2px 0; }
+  .brief .note { font-size:13.5px; }
+  .brief p { margin:6px 0; }
+  .brief .sub { margin:12px 0 4px; }
   .rec { border-color:#c7b7f5; background:linear-gradient(180deg,#faf8ff,#fff); }
   .rec h2 { color:var(--purple); }
   footer.rp { margin-top:28px; text-align:center; color:var(--muted); font-size:12px; }
@@ -729,6 +740,8 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
     .sec h2, .sec h3, .sec .sub { break-after: avoid; }
     .stat, .sub, .note { break-inside: avoid; }
     .two > div { break-inside: auto; }
+    .brief-pursuits > li { break-inside: avoid; }
+    .brief .lead { break-after: avoid; }
     .wrap { padding-bottom: 0; }
     footer.rp { display: none; }
     .rp-print { display: block; margin-top: 14px; text-align: center; color: var(--muted); font-size: 12px; break-before: avoid; break-inside: avoid; }

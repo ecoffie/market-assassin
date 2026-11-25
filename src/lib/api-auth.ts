@@ -44,7 +44,8 @@ export interface AuthResult {
 }
 
 export type MIAccessTier = 'free' | 'pro' | 'team' | 'enterprise' | 'none';
-export type MIStaffRole = 'none' | 'staff' | 'admin';
+export type { MIStaffRole } from '@/lib/access/staff-role';
+import type { MIStaffRole } from '@/lib/access/staff-role';
 
 export interface MIAccessSources {
   marketAssassin: boolean;
@@ -110,42 +111,8 @@ function parseEmailList(value: string | undefined): Set<string> {
   );
 }
 
-// Internal team members with non-govcongiants.com emails.
-// Exported so the MCP monthly-credit grant can include the team (they get an ongoing comp
-// allowance) — the grant audience can't enumerate the @govcongiants.com domain from KV.
-export const INTERNAL_TEAM_EMAILS = new Set([
-  'kashif6331@gmail.com',
-  'kashifhameedvlogs@gmail.com',
-  'evankoffdev@gmail.com',
-  'usamashraf2@gmail.com',
-  'muneebamehmood07@gmail.com',
-  // I lowercase on read but normalize on write too so future copy-paste
-  // adds (mixed case from email signatures) match the set.
-  'sikandarphulpoto35@gmail.com',
-]);
-
-export function getStaffRole(email: string): MIStaffRole {
-  const normalizedEmail = email.toLowerCase();
-  const domain = normalizedEmail.split('@')[1] || '';
-  const configuredStaff = parseEmailList(process.env.MI_STAFF_EMAILS);
-  const configuredAdmins = parseEmailList(process.env.MI_ADMIN_EMAILS);
-
-  if (normalizedEmail === 'eric@govcongiants.com' || configuredAdmins.has(normalizedEmail)) {
-    return 'admin';
-  }
-
-  if (
-    domain === 'govcongiants.com'
-    || domain === 'govconedu.com'
-    || domain === 'getmindy.ai'
-    || INTERNAL_TEAM_EMAILS.has(normalizedEmail)
-    || configuredStaff.has(normalizedEmail)
-  ) {
-    return 'staff';
-  }
-
-  return 'none';
-}
+export { INTERNAL_TEAM_EMAILS, getStaffRole } from '@/lib/access/staff-role';
+import { getStaffRole } from '@/lib/access/staff-role';
 
 /**
  * Prototype / case-study demo surfaces (Vehicle Expiry Watch, SMB Market Research,

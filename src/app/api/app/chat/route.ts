@@ -30,7 +30,7 @@
 import { NextRequest } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verifyUserOwnsEmail } from '@/lib/api-auth';
-import { hasProAccess } from '@/lib/access/resolve-access';
+import { canUseAskMindy } from '@/lib/access/chat-access';
 // RAG corpus removed 2026-08-02 (Eric: "not just the podcast the 8 year corpus training —
 // anything not related to the data core we should remove. No one wants to learn here").
 // Ask Mindy now answers ONLY from the live federal Data Core tools; the teaching-chunk +
@@ -52,7 +52,7 @@ import { vaultDocEnabledFor } from '@/lib/vault/flags';
 import { createChatToolExecutor, type ChatExecutionRecord } from '@/lib/chat/chat-tool-executor';
 import { resolveChatActingScope, vaultEmailFor } from '@/lib/chat/chat-acting-scope';
 import type { BidderProfile } from '@/lib/proposal/types';
-import { resolvePlannerChain, plannerKey, anthropicSupportsForcedToolChoice, resolveAnswerChain, answerKey, ANSWER_ENDPOINTS, openAiChatParams, type PlannerTarget } from '@/lib/chat/planner-config';
+import { budgetDowngradeActive, resolvePlannerChain, plannerKey, anthropicSupportsForcedToolChoice, resolveAnswerChain, answerKey, ANSWER_ENDPOINTS, openAiChatParams, type PlannerTarget } from '@/lib/chat/planner-config';
 import { fitMessages, inputBudget, type MsgKind } from '@/lib/chat/token-budget';
 import { stagingModelConfig, STAGING_CONFIG_HEADER } from '@/lib/chat/staging-model-config';
 import { customerErrorMessage } from '@/lib/chat/customer-errors';
@@ -514,7 +514,7 @@ export async function POST(request: NextRequest) {
   // Pro gate: Mindy Chat retrieves from the proprietary knowledge base, so it's a
   // paid feature. Enforced server-side (hiding the sidebar item isn't enough — a
   // free user could call this API directly). 403 → the UI shows the upgrade prompt.
-  const chatPro = await hasProAccess(auth.email);
+  const chatPro = await canUseAskMindy(auth.email);
   shadowEntitlement({ route: 'app/chat POST', capability: 'chat.ask', email: auth.email, identityVerified: true, currentAllow: chatPro });
 
   // ── Selected listing (Eric 2026-11-16: it attaches to THIS main chat; see src/lib/chat/selected-notice.ts) ──
@@ -726,6 +726,8 @@ export async function POST(request: NextRequest) {
                 states: eligible.states,
                 profile: gateProfile.text,
                 eligibility: gateProfile.eligibility,
+                // Customer-language progress while the gate works (the chat shows `progress` as notices).
+                onProgress: (m) => send({ type: 'progress', message: m }),
               });
             } catch (err) {
               console.error('[chat] intelligence gate failed:', (err as Error)?.message);
@@ -755,6 +757,10 @@ export async function POST(request: NextRequest) {
                   engine: 'intelligence_gate',
                   gate_status: gate.status,
                   attempts: gate.attempts,
+                  gate_timings_ms: gate.timings,
+                  gate_deadline_hit: gate.deadlineHit,
+                  // Figure text only (no surrounding answer text): shows whether the figure check over-fires.
+                  gate_untraceable_figures: gate.untraceableFigures,
                   work,
                   states: eligible.states,
                   checks: gate.checks.map((c) => ({ id: c.contract_id, verdict: c.verdict, codes: [...c.exclusions, ...c.barriers, ...c.actions].map((x) => x.code) })),
@@ -1036,7 +1042,7 @@ export async function POST(request: NextRequest) {
         const staging = stagingModelConfig(request.headers.get(STAGING_CONFIG_HEADER), TRACE_EVENTS);
         const overBudgetEarly = staging?.config.overBudget ?? await isUserOverBudget(email).catch(() => false);
         const modelEnv: Record<string, string | undefined> = staging ? { ...process.env, ...staging.config.env } : process.env;
-        const chatModelEarly = overBudgetEarly
+        const chatModelEarly = budgetDowngradeActive(modelEnv, overBudgetEarly)
           ? (modelEnv.LLM_OPENAI_MODEL || 'gpt-4o-mini')
           : (modelEnv.CHAT_OPENAI_MODEL || 'gpt-4o');
 

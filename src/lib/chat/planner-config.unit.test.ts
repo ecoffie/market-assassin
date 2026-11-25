@@ -16,8 +16,13 @@ describe('resolvePlannerChain', () => {
     expect(chain.map((t) => `${t.provider}:${t.model}`)).toEqual(['anthropic:claude-sonnet-5', 'openai:gpt-4o']);
   });
 
-  it('over-budget users get the cheaper OpenAI model and never Claude (existing margin guard)', () => {
-    const chain = resolvePlannerChain({ ...KEYS, CHAT_CLAUDE_ENABLED: 'true' }, { overBudget: true });
+  it('over-budget users are NOT downgraded by default: same models, Claude still allowed (2026-11-25)', () => {
+    const chain = resolvePlannerChain({ ...KEYS, CHAT_CLAUDE_ENABLED: 'true', CHAT_CLAUDE_MODEL: 'claude-sonnet-5-5' }, { overBudget: true });
+    expect(chain.map((t) => `${t.provider}:${t.model}`)).toEqual(['anthropic:claude-sonnet-5-5', 'openai:gpt-4o']);
+  });
+
+  it('with the downgrade lever on (CHAT_BUDGET_DOWNGRADE=true), over-budget users get the cheaper OpenAI model and never Claude', () => {
+    const chain = resolvePlannerChain({ ...KEYS, CHAT_CLAUDE_ENABLED: 'true', CHAT_BUDGET_DOWNGRADE: 'true' }, { overBudget: true });
     expect(chain).toEqual([{ provider: 'openai', model: 'gpt-4o-mini' }]);
   });
 

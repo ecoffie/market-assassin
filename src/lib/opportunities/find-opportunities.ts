@@ -602,9 +602,9 @@ function regionCodes(p: InterpretedQuery): string[] {
 }
 
 /** Drop rows performed in another state/territory (place of performance known and not asked). */
-function inRegion<T extends Record<string, unknown>>(rows: T[], col: string, p: InterpretedQuery): T[] {
+function inRegion<T extends Record<string, unknown>>(rows: T[], col: string, p: InterpretedQuery, countryCol?: string): T[] {
   const codes = regionCodes(p);
-  return codes.length ? rows.filter((r) => !performedOutsideRegion(r[col], codes)) : rows;
+  return codes.length ? rows.filter((r) => !performedOutsideRegion(r[col], codes, countryCol ? r[countryCol] : undefined)) : rows;
 }
 
 export function mcpDiscoveryInput(input: FindOpportunitiesInput, anchor?: CompanyAnchor | null): DiscoveryInput {
@@ -873,7 +873,7 @@ async function queryOpenNow(
   try {
     const cap = p.market.capability;
     const COLS =
-      'notice_id, title, department, sub_tier, naics_code, psc_code, description, set_aside_code, set_aside_description, notice_type, response_deadline, ui_link, solicitation_number, pop_state, pop_city, office_address, map_lat, updated_at';
+      'notice_id, title, department, sub_tier, naics_code, psc_code, description, set_aside_code, set_aside_description, notice_type, response_deadline, ui_link, solicitation_number, pop_state, pop_city, pop_country, office_address, map_lat, updated_at';
 
     // Candidate window: deadline-ordered, capped (OPEN_FETCH_CAP measured), then ranked.
     const fetchCap = Math.max(limit, OPEN_FETCH_CAP);
@@ -917,7 +917,7 @@ async function queryOpenNow(
         .limit(fetchCap);
       if (!base.error) baseRows = (base.data || []) as Array<Record<string, unknown>>;
     }
-    const rows = inRegion(unionRows(baseRows, (data || []) as Array<Record<string, unknown>>, 'notice_id'), 'pop_state', p);
+    const rows = inRegion(unionRows(baseRows, (data || []) as Array<Record<string, unknown>>, 'notice_id'), 'pop_state', p, 'pop_country');
     if (!rows.length) {
       const e = emptyHorizon(source, OPEN_HANDOFFS, consumed, unsupported, asOf, stage ? `No matching open ${STAGE_GROUP_LABEL[stage]} notices under these filters.` : 'No matching open solicitations under these filters.', unmapped);
       return stageInfo ? { ...e, stage: { ...stageInfo, returned_by_signal: { structured_notice_type: 0, title_keyword: 0 } } } : e;

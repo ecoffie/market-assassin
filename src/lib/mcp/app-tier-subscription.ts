@@ -35,6 +35,7 @@ import { applyCreditOnce } from './credits';
 import { proAllowanceDecision } from './pro-allowance';
 import { PRO_MONTHLY_CREDITS, TEAM_MONTHLY_CREDITS } from './packages';
 import { getStripe } from '@/lib/stripe';
+import { teamSeatPlanForPriceId } from '@/lib/billing/team-seat-plans';
 
 /** App-tier price amounts (cents). Mirrors grant-mcp-pro-credits so the two agree. */
 const PRO_AMOUNTS = new Set([14900, 149000, 4900]);   // Pro $149/mo · $1,490/yr · $49 grandfathered
@@ -100,7 +101,12 @@ export async function handleAppTierSubscriptionInvoice(
   const amount = line?.price?.unit_amount ?? invoice.amount_paid ?? 0;
   let tier: 'pro' | 'team' | null = null;
   let credits = 0;
-  if (PRO_AMOUNTS.has(amount)) { tier = 'pro'; credits = PRO_MONTHLY_CREDITS; }
+  // Team by seats (2026-11-24, held behind Stripe price ids that do not exist yet): matched by
+  // price ID, never by amount ($249 for 2 seats is also the Mid credit plan's amount).
+  const seatLines = (invoice.lines?.data ?? []) as unknown as Array<{ price?: { id?: string } }>;
+  const seat = seatLines.map((l) => teamSeatPlanForPriceId(l.price?.id)).find(Boolean) ?? null;
+  if (seat) { tier = 'team'; credits = seat.plan.credits; }
+  else if (PRO_AMOUNTS.has(amount)) { tier = 'pro'; credits = PRO_MONTHLY_CREDITS; }
   else if (TEAM_AMOUNTS.has(amount)) { tier = 'team'; credits = TEAM_MONTHLY_CREDITS; }
   if (!tier || credits <= 0) return { handled: false };
 
@@ -123,7 +129,11 @@ export async function handleAppTierSubscriptionInvoice(
         let org = await findPooledOrgBySubscription(subscriptionId);
         if (!org) {
           const customerId = typeof invoice.customer === 'string' ? invoice.customer : invoice.customer?.id ?? null;
-          await provisionPooledOrg({ subscriptionId, customerId, ownerEmail: email, planKey: 'team' });
+          await provisionPooledOrg({
+            subscriptionId, customerId, ownerEmail: email, planKey: 'team',
+            // A seat plan sets its own seat limit and shared credits; classic Team keeps the defaults.
+            ...(seat ? { seatLimit: seat.plan.seats, monthlyCredits: seat.plan.credits } : {}),
+          });
           org = await findPooledOrgBySubscription(subscriptionId);
         }
         if (org) {
