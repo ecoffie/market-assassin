@@ -256,7 +256,8 @@ export async function runResearchLoop(a: {
       const timedOut = err instanceof StepDeadline || /timed? ?out/i.test(String((err as Error)?.message));
       if (timedOut && !forced) { forced = 'deadline'; continue; }
       if (timedOut) return { text: '', stop: forced ?? 'deadline', calls, steps, usage, evidence, resultsCut };
-      throw err;
+      // A provider failure still carries what the turn cost so far and how far it got (logged and traced by the caller).
+      throw Object.assign(err instanceof Error ? err : new Error(String(err)), { researchProgress: { usage: { ...usage }, steps, calls } });
     }
     steps++;
     usage.input += res.usage?.input_tokens ?? 0;
@@ -285,6 +286,27 @@ export async function runResearchLoop(a: {
     const text = textOf(res.content as Array<{ type: string; text?: string }>);
     return { text, stop: text ? (forced ?? 'done') : 'no_answer', calls, steps, usage, evidence, resultsCut };
   }
+}
+
+/** What a failed research turn had used and done before the error (attached to the thrown error by the loop). */
+export interface ResearchProgress { usage: LoopResult['usage']; steps: number; calls: number }
+
+/**
+ * The error, classified for the trace: the provider's error type when it gives one (for example
+ * credit_balance_too_low, overloaded_error, rate_limit_error), the HTTP status, and a short message. No request body.
+ */
+export function describeResearchError(err: unknown): { class: string; status: number | null; message: string; progress: ResearchProgress | null } {
+  const e = err as { name?: string; status?: number; error?: { error?: { type?: string; message?: string }; type?: string; message?: string }; message?: string; researchProgress?: ResearchProgress };
+  const providerType = e?.error?.error?.type ?? e?.error?.type ?? null;
+  const providerMessage = e?.error?.error?.message ?? e?.error?.message ?? null;
+  const raw = String(providerMessage ?? e?.message ?? err ?? 'unknown error');
+  const credit = /credit balance is too low|credit_balance/i.test(raw) ? 'credit_balance_too_low' : null;
+  return {
+    class: String(credit ?? providerType ?? e?.name ?? 'Error'),
+    status: typeof e?.status === 'number' ? e.status : null,
+    message: raw.replace(/\s+/g, ' ').slice(0, 300),
+    progress: e?.researchProgress ?? null,
+  };
 }
 
 /** Plain progress line for a tool call (customer words; no tool names or codes). */

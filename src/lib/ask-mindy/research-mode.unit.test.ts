@@ -4,7 +4,7 @@
  */
 import { describe, it, expect, vi } from 'vitest';
 import {
-  researchModeEnabledFor, toAnthropicTools, runResearchLoop, billedInputTokens, groundAnswer, fullResult, progressLine, researchSystemPrompt,
+  researchModeEnabledFor, toAnthropicTools, runResearchLoop, billedInputTokens, describeResearchError, groundAnswer, fullResult, progressLine, researchSystemPrompt,
   RESEARCH_INSTRUCTIONS, RESEARCH_WITHHELD_TOOLS, RESEARCH_EXTRA_TOOLS, RESULT_CEILING_CHARS, FINAL_RESERVE_MS, researchToolDefs,
 } from './research-mode';
 import { MCP_CONNECTOR_INSTRUCTIONS } from '@/lib/mcp/schedule-discovery';
@@ -223,5 +223,28 @@ describe('prompt caching (766K input tokens on one answer)', () => {
       prefix = prompt;
     }
     expect(after / before).toBeLessThan(0.25);
+  });
+});
+
+describe('a failed research turn keeps its cost and its cause', () => {
+  const creditError = () => Object.assign(new Error('400 {"type":"error","error":{"type":"invalid_request_error","message":"Your credit balance is too low to access the Anthropic API."}}'), {
+    status: 400, error: { type: 'error', error: { type: 'invalid_request_error', message: 'Your credit balance is too low to access the Anthropic API.' } },
+  });
+  it('the thrown error carries the usage, steps and calls accrued before it', async () => {
+    let n = 0;
+    const create = vi.fn(async () => {
+      if (++n === 1) return { content: [toolUse('t1', 'find_opportunities')], stop_reason: 'tool_use', usage: { input_tokens: 500, output_tokens: 40, cache_read_input_tokens: 2000, cache_creation_input_tokens: 100 } };
+      throw creditError();
+    });
+    const err = await runResearchLoop({ ...base, client: { messages: { create } } as never, execute: async (cs) => cs.map((c) => ({ id: c.id, content: 'ok' })) }).catch((e) => e);
+    const d = describeResearchError(err);
+    expect(d.class).toBe('credit_balance_too_low');
+    expect(d.status).toBe(400);
+    expect(d.message).toMatch(/credit balance is too low/);
+    expect(d.progress).toEqual({ usage: { input: 500, output: 40, cacheRead: 2000, cacheWrite: 100 }, steps: 1, calls: 1 });
+  });
+  it('other provider errors keep their own type; a plain error its name', () => {
+    expect(describeResearchError(Object.assign(new Error('529 overloaded'), { status: 529, error: { type: 'error', error: { type: 'overloaded_error', message: 'Overloaded' } } }))).toMatchObject({ class: 'overloaded_error', status: 529, message: 'Overloaded' });
+    expect(describeResearchError(new TypeError('boom'))).toMatchObject({ class: 'TypeError', status: null, message: 'boom', progress: null });
   });
 });
