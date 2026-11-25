@@ -19,6 +19,7 @@ import {
   ANY_ASSISTANT_LINE,
   OTHER_ASSISTANTS,
   CLAUDE_COMPUTER_NOTE,
+  CLAUDE_FIRST_ASK,
   AI_CHOOSER,
   AI_SECTIONS_CLASS,
   AI_CHOOSER_CSS,
@@ -165,7 +166,7 @@ export default function McpSetupPage() {
           <div className="mt-6 rounded-none border border-(--mp-ok-line) bg-(--mp-ok-bg) px-4 py-3">
             <p className="text-[14px] text-(--mp-body)">
               <span className="font-semibold text-(--mp-ok)">That&rsquo;s it for Claude.</span> Ask:{' '}
-              <span className="text-(--mp-ink)">&ldquo;Use Mindy to find contracts expiring in my NAICS in the next 6 months.&rdquo;</span>
+              <span className="text-(--mp-ink)">&ldquo;{CLAUDE_FIRST_ASK}&rdquo;</span>
             </p>
           </div>
           <p className="mt-3 text-[13px] text-(--mp-muted)">
