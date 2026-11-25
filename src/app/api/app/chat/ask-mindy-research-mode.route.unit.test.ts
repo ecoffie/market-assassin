@@ -15,6 +15,8 @@ const h = vi.hoisted(() => ({
   extract: vi.fn(),
   create: vi.fn(),
   overBudget: false,
+  capUsed: 0,
+  afterFns: [] as Array<() => unknown>,
   inserts: [] as Array<Record<string, unknown>>,
 }));
 
@@ -48,6 +50,7 @@ vi.mock('@/lib/ask-mindy/research-caps-deps', () => ({
     todaysTraces: async () => Array.from({ length: h.capUsed }, () => ({ engine: 'research_mode', call_count: 2 })),
   },
 }));
+vi.mock('next/server', async (orig) => ({ ...(await orig<typeof import('next/server')>()), after: (fn: () => unknown) => { h.afterFns.push(fn); } }));
 vi.mock('@anthropic-ai/sdk', () => ({ default: class { messages = { create: (...a: unknown[]) => h.create(...a) }; } }));
 
 const ENV_KEYS = ['OPENAI_API_KEY', 'SUPABASE_SERVICE_ROLE_KEY', 'ASK_MINDY_INTELLIGENCE_GATE', 'ASK_MINDY_INTELLIGENCE_GATE_ALLOWLIST', 'ASK_MINDY_RESEARCH_MODE', 'ASK_MINDY_RESEARCH_MODE_ALLOWLIST', 'ASK_MINDY_RESEARCH_MODEL'] as const;
@@ -64,7 +67,7 @@ beforeEach(() => {
   process.env.OPENAI_API_KEY = 'sk-test';
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'srk-test';
   for (const k of ENV_KEYS.slice(2)) delete process.env[k];
-  openaiCalls.length = 0; openaiTools.length = 0; h.inserts.length = 0; h.overBudget = false; h.capUsed = 0;
+  openaiCalls.length = 0; openaiTools.length = 0; h.inserts.length = 0; h.overBudget = false; h.capUsed = 0; h.afterFns.length = 0;
   h.runMcpTool.mockReset();
   h.runMcpTool.mockImplementation(async (name: string) => ({ result: { ok: true, grounded: true, tool: name, note: 'obligated $1.2M' }, credits: 0 }));
   h.runGate.mockReset(); h.extract.mockReset(); h.extract.mockImplementation(async () => 'digital marketing');
@@ -263,5 +266,60 @@ describe('research mode in the chat route', () => {
       expect(text(ev).startsWith("I couldn't read the screenshot in this answer, so I'm working from your text only.")).toBe(true);
       expect(h.create).not.toHaveBeenCalled();
     });
+  });
+
+  it('a closed tab never loses the work: the client disconnects mid-research and the answer is still saved', async () => {
+    flagOn();
+    let release!: () => void;
+    const gate = new Promise<void>((r) => { release = r; });
+    let step = 0;
+    h.create.mockImplementation(async () => {
+      step++;
+      if (step === 1) { await gate; return reply([{ type: 'tool_use', id: 't1', name: 'find_opportunities', input: { query: 'x' } }], 'tool_use'); }
+      return reply([{ type: 'text', text: 'Saved even though the tab closed.' }], 'end_turn');
+    });
+    const { POST } = await import('./route');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const res = await POST(chatRequest({ message: Q, email: EMAIL }) as any);
+    const reader = res.body!.getReader();
+    await reader.read();
+    await reader.cancel();
+    release();
+    for (let i = 0; i < 100 && !h.inserts.some((r) => r.role === 'assistant'); i++) await new Promise((r) => setTimeout(r, 10));
+    const assistant = h.inserts.find((r) => r.role === 'assistant') as { content?: string; trace?: Record<string, unknown> } | undefined;
+    expect(assistant?.content).toBe('Saved even though the tab closed.');
+    expect(assistant?.trace).toMatchObject({ engine: 'research_mode', stop: 'done', call_count: 1 });
+  });
+
+  it('progress phases: "checking" before the figure check, "writing" when a limit forces the final answer', async () => {
+    flagOn();
+    const ev = await ask(Q);
+    const phases = ev.filter((e) => e.type === 'progress' && (e as { phase?: string }).phase).map((e) => (e as { phase: string; message: string }));
+    expect(phases).toEqual([{ type: 'progress', message: 'Checking every figure against the sources.', phase: 'checking' }]);
+  });
+
+  it('the platform is asked to keep the function alive until the research turn has SAVED (after(), settles after the insert)', async () => {
+    flagOn();
+    let release!: () => void;
+    const gate = new Promise<void>((r) => { release = r; });
+    h.create.mockImplementation(async () => { await gate; return reply([{ type: 'text', text: 'Done.' }], 'end_turn'); });
+    const { POST } = await import('./route');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const res = await POST(chatRequest({ message: Q, email: EMAIL }) as any);
+    expect(h.afterFns).toHaveLength(1);
+    let settled = false;
+    const kept = Promise.resolve(h.afterFns[0]()).then(() => { settled = true; });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(settled).toBe(false);
+    release();
+    await res.text();
+    await kept;
+    expect(settled).toBe(true);
+    expect(h.inserts.some((r) => r.role === 'assistant' && r.content === 'Done.')).toBe(true);
+  });
+
+  it('ordinary turns register no keep-alive', async () => {
+    await ask(Q);
+    expect(h.afterFns).toHaveLength(0);
   });
 });
