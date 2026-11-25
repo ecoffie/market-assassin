@@ -11,13 +11,14 @@ import { createRoot } from 'react-dom/client';
 const B64 = 'iVBORw0KGgoSCREENSHOTBYTES';
 let caps: Record<string, unknown> = { screenshots: true };
 let chatStatus = 200;
+let refusalBody: unknown = {};
 const bodies: Array<Record<string, unknown>> = [];
 
 vi.mock('../authHeaders', () => ({
   authedFetch: vi.fn(async (url: string, _email: string, init?: RequestInit) => {
     if (url === '/api/app/chat') {
       bodies.push(JSON.parse(String(init?.body)));
-      if (chatStatus !== 200) return { ok: false, status: chatStatus, body: null, json: async () => ({}) };
+      if (chatStatus !== 200) return { ok: false, status: chatStatus, body: null, json: async () => refusalBody };
       const enc = new TextEncoder();
       const lines = [JSON.stringify({ type: 'token', content: 'That is EFS Digital.' }), JSON.stringify({ type: 'done' })];
       return { ok: true, status: 200, body: new ReadableStream({ start(c) { for (const l of lines) c.enqueue(enc.encode(`data: ${l}\n\n`)); c.close(); } }), json: async () => ({}) };
@@ -68,7 +69,7 @@ async function enter(el: HTMLElement) {
 const png = () => new File([new Uint8Array([137, 80, 78, 71])], 'shot.png', { type: 'image/png' });
 
 beforeEach(() => {
-  bodies.length = 0; caps = { screenshots: true }; chatStatus = 200;
+  bodies.length = 0; caps = { screenshots: true }; chatStatus = 200; refusalBody = {};
   sessionStorage.clear(); localStorage.clear(); document.body.innerHTML = '';
   Element.prototype.scrollIntoView = () => {};
   URL.revokeObjectURL = vi.fn();
@@ -145,6 +146,17 @@ describe('Ask Mindy /app: pasted screenshots', () => {
     expect(el.querySelectorAll('[data-testid="chat-screenshot-remove"]').length).toBe(1);
     expect(el.querySelector('[data-testid="chat-screenshot-note"]')?.textContent).toMatch(/still here/);
     expect(el.textContent).not.toContain('[screenshot attached]');
+  });
+
+  it("the server's customer-safe refusal message is shown as plain text (RM-4: 400/413/415 {error, message})", async () => {
+    chatStatus = 415;
+    refusalBody = { error: 'image_type', message: 'That image is not a PNG, JPEG or WebP screenshot.' };
+    const el = await mount();
+    await paste(el, [png()]);
+    await type(el, 'Who is this?');
+    await enter(el);
+    expect(el.querySelector('[data-testid="chat-screenshot-note"]')?.textContent).toBe('That image is not a PNG, JPEG or WebP screenshot.');
+    expect(ta(el).value).toBe('Who is this?');
   });
 
   it('without the server capability, pasting an image does nothing and a turn never carries images', async () => {

@@ -5,7 +5,7 @@
  */
 import { describe, it, expect, vi } from 'vitest';
 import {
-  fitWithin, prepareScreenshot, screenshotsField, screenshotMarker, imageFilesFrom,
+  fitWithin, prepareScreenshot, screenshotsField, screenshotMarker, imageFilesFrom, screenshotRefusalNote, SCREENSHOT_MESSAGES,
   SCREENSHOT_MAX_BYTES, type PrepareDeps, type PreparedScreenshot,
 } from './screenshot-client';
 
@@ -87,5 +87,12 @@ describe('screenshot-client', () => {
     const r = imageFilesFrom(dt);
     expect(r.files.map((f) => f.type)).toEqual(['image/png']);
     expect(r.rejectedType).toBe(true);
+  });
+
+  it('refusal note: the server message when it is a short string, ours otherwise', () => {
+    expect(screenshotRefusalNote({ error: 'image_too_large', message: '  That screenshot is   too large. ' })).toBe('That screenshot is too large.');
+    expect(screenshotRefusalNote(null)).toBe(SCREENSHOT_MESSAGES.server);
+    expect(screenshotRefusalNote({ message: 42 })).toBe(SCREENSHOT_MESSAGES.server);
+    expect(screenshotRefusalNote({ message: 'x'.repeat(301) })).toBe(SCREENSHOT_MESSAGES.server);
   });
 });

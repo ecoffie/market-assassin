@@ -142,5 +142,16 @@ export function screenshotMarker(count: number): string {
   return count === 1 ? '[screenshot attached]' : `[${count} screenshots attached]`;
 }
 
+/**
+ * The note shown when the server refuses a screenshot (400 images_invalid · 413 image_too_large · 415 image_type, as
+ * JSON {error, message} before any stream). The server's message is customer-safe by contract (Agent 1, RM-4); it is
+ * shown as plain text, bounded, and our own wording is used if it is missing or not a short string.
+ */
+export function screenshotRefusalNote(body: unknown): string {
+  const m = body && typeof body === 'object' ? (body as { message?: unknown }).message : undefined;
+  const text = typeof m === 'string' ? m.replace(/\s+/g, ' ').trim() : '';
+  return text && text.length <= 300 ? text : SCREENSHOT_MESSAGES.server;
+}
+
 /** Sent when the customer pastes a screenshot and presses Send without typing. */
 export const SCREENSHOT_DEFAULT_PROMPT = 'Who or what is in this screenshot? Research it for me.';

@@ -28,7 +28,7 @@ import { useChatCapabilities } from '../chat/useChatCapabilities';
 import { ChatScreenshots } from '../chat/ChatScreenshots';
 import {
   prepareScreenshot, imageFilesFrom, screenshotsField, screenshotMarker,
-  SCREENSHOT_MAX_COUNT, SCREENSHOT_MESSAGES, SCREENSHOT_DEFAULT_PROMPT, type PreparedScreenshot,
+  SCREENSHOT_MAX_COUNT, SCREENSHOT_MESSAGES, SCREENSHOT_DEFAULT_PROMPT, screenshotRefusalNote, type PreparedScreenshot,
 } from '@/lib/chat/screenshot-client';
 import { ResearchProgressView } from '../chat/ResearchProgressView';
 import { addProgress, startProgress, type ResearchProgress } from '@/lib/chat/research-progress';
@@ -310,7 +310,7 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
         setInput(rawText);
         setShots(turnShots);
         shotsRestored = true;
-        setShotNote(SCREENSHOT_MESSAGES.server);
+        setShotNote(screenshotRefusalNote(await res.json().catch(() => null)));
         return;
       }
 

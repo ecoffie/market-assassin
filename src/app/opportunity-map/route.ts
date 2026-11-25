@@ -11418,7 +11418,8 @@ const ASK_MINDY_JS = `<script>(function(){
       count:function(){ return oppCtx?0:shots.length; },
       // Hand the screenshots to one question: off the composer at once.
       take:function(){ if(oppCtx) return []; var t=shots; shots=[]; note.textContent=''; paintShots(); return t; },
-      restore:function(t){ shots=t.slice(0,SHOT_MAX); note.textContent=SHOT_MSG.server; paintShots(); },
+      // The server's refusal message is customer-safe by contract (400/413/415 JSON {error, message}); ours if absent.
+      restore:function(t,msg){ shots=t.slice(0,SHOT_MAX); note.textContent=msg||SHOT_MSG.server; paintShots(); },
       release:function(t){ t.forEach(function(s){ URL.revokeObjectURL(s.url); }); }
     };
   }
@@ -11868,7 +11869,8 @@ const ASK_MINDY_JS = `<script>(function(){
       .then(function(r){
         // The server would not read the screenshot(s): nothing was answered. Give back the typed text and the
         // screenshots with a plain note.
-        if(shotsAtSend.length&&(r.status===400||r.status===413||r.status===415||r.status===422)){ dropBubbles(); if(input){ input.value=typed; } amkShots.restore(shotsAtSend); shotsAtSend=[]; release(); return null; }
+        if(shotsAtSend.length&&(r.status===400||r.status===413||r.status===415||r.status===422)){ var back=shotsAtSend; shotsAtSend=[]; dropBubbles(); if(input){ input.value=typed; } release();
+          return r.json().then(function(d){ return d; },function(){ return null; }).then(function(d){ var m=(d&&typeof d.message==='string')?d.message.replace(/ +/g,' ').trim():''; amkShots.restore(back,(m&&m.length<=300)?m:''); return null; }); }
         if(shotsAtSend.length){ amkShots.release(shotsAtSend); shotsAtSend=[]; }
         if(r.status===403){ if(turnId){ pendingTurn=null; saveCard(); } upsell(); release(); return null; }
         if(r.status===402){ if(turnId){ pendingTurn=null; saveCard(); } r.json().then(function(d){ creditsWall(bub,d||{}); },function(){ creditsWall(bub,{}); }); release(); return null; }

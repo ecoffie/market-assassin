@@ -22,7 +22,7 @@ function token(email: string): string {
   return Buffer.from(JSON.stringify({ email, exp: Date.now() + 3_600_000 })).toString('base64').replace(/=+$/, '') + '.sig';
 }
 
-function boot(opts: { caps: boolean; chatStatus?: number }) {
+function boot(opts: { caps: boolean; chatStatus?: number; refusal?: unknown }) {
   const dom = new JSDOM(
     '<!doctype html><html><body><div id="amkOv"></div><aside id="amk" aria-hidden="true"><div id="amkCtx"></div><button id="amkX"></button>'
     + '<div id="amkBody"></div><div class="amk-foot"><div class="amk-in"><textarea id="amkIn"></textarea><button id="amkSend"></button></div></div></aside></body></html>',
@@ -53,7 +53,7 @@ function boot(opts: { caps: boolean; chatStatus?: number }) {
     else if (url === '/api/app/chat') {
       chats.push(JSON.parse(String(init.body)));
       const st = opts.chatStatus ?? 200;
-      if (st !== 200) p = Promise.resolve({ ok: false, status: st, body: null, json: async () => ({}) });
+      if (st !== 200) p = Promise.resolve({ ok: false, status: st, body: null, json: async () => opts.refusal ?? {} });
       else {
         const enc = new NodeTextEncoder();
         const text = ['{"type":"token","content":"That is EFS Digital."}', '{"type":"done"}'].map((e) => `data: ${e}\n\n`).join('');
@@ -144,5 +144,13 @@ describe('Map drawer pasted screenshots', () => {
     expect(b.doc.querySelectorAll('[data-testid="amk-shot-remove"]').length).toBe(1);
     expect(b.doc.querySelector('.amk-shot-note')!.textContent).toMatch(/still here/);
     expect(b.doc.getElementById('amkBody')!.textContent).not.toContain('[screenshot attached]');
+  });
+
+  it("the server's refusal message is shown as plain text", async () => {
+    const b = boot({ caps: true, chatStatus: 400, refusal: { error: 'images_invalid', message: 'Up to 3 screenshots can be sent with one message.' } });
+    await b.paste(['image/png']);
+    await b.ask('q');
+    expect(b.doc.querySelector('.amk-shot-note')!.textContent).toBe('Up to 3 screenshots can be sent with one message.');
+    expect(b.input().value).toBe('q');
   });
 });
