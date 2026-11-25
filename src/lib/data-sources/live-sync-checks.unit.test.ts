@@ -36,6 +36,32 @@ describe('thresholds per dataset', () => {
   });
 });
 
+describe('a different writer never masks a stale bulk clock (Agent 4 review)', () => {
+  it('sam_entities reads only the bulk extract rows (source = sam_public_extract)', () => {
+    expect(check('sam_entities_registrations').where).toEqual({ column: 'source', equals: 'sam_public_extract' });
+  });
+  it('newest BULK row 92 days old + a 1-day-old live row = STALE (the filtered read sees only the bulk row)', () => {
+    const rows = [
+      { source: 'sam_public_extract', synced_at: daysAgo(92) },
+      { source: 'sam_entity_api', synced_at: daysAgo(1) },
+    ];
+    const c = check('sam_entities_registrations');
+    const newest = rows.filter((r) => r[c.where!.column as 'source'] === c.where!.equals)
+      .map((r) => r.synced_at).sort().at(-1) ?? null;
+    expect(classifyLiveSync(c, { timestamp: newest }, NOW).status).toBe('stale');
+    // Unfiltered, the live row would have masked it — the defect this guards.
+    expect(classifyLiveSync(c, { timestamp: daysAgo(1) }, NOW).status).toBe('fresh');
+  });
+  it('the route applies the filter in the query', () => {
+    const route = readFileSync(join(process.cwd(), 'src/app/api/cron/check-data-freshness/route.ts'), 'utf8');
+    expect(route).toMatch(/if \(lc\.where\) q = q\.eq\(lc\.where\.column, lc\.where\.equals\);/);
+  });
+  it('the importer stamps exactly that source value', () => {
+    const importer = readFileSync(join(process.cwd(), 'scripts/import-sam-entity-extract.mjs'), 'utf8');
+    expect(importer).toMatch(/source: 'sam_public_extract'/);
+  });
+});
+
 describe('unknown is never fresh', () => {
   it('a read error is unreadable, with the reason', () => {
     expect(classifyLiveSync(check('sam_entities_registrations'), { error: { message: 'statement timeout' }, timestamp: null }, NOW))
@@ -47,7 +73,7 @@ describe('unknown is never fresh', () => {
   });
   it('the route alerts on unreadable and no_timestamp, not only on stale', () => {
     const route = readFileSync(join(process.cwd(), 'src/app/api/cron/check-data-freshness/route.ts'), 'utf8');
-    expect(route).toMatch(/const \{ data: latest, error: readErr \} = await sb/);
+    expect(route).toMatch(/const \{ data: latest, error: readErr \} = await q/);
     expect(route).toMatch(/v\.status === 'unreadable'\) \{\s*\n\s*stale\.push/);
     expect(route).toMatch(/v\.status === 'no_timestamp'\) \{\s*\n\s*stale\.push/);
     expect(route).toMatch(/v\.status === 'stale'\) \{\s*\n\s*stale\.push/);

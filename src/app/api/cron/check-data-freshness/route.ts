@@ -165,9 +165,9 @@ export async function GET(request: NextRequest) {
   // where a silently-broken daily federal_contacts sync raised no alarm.
   for (const lc of LIVE_SYNC_CHECKS) {
     try {
-      const { data: latest, error: readErr } = await sb
-        .from(lc.table)
-        .select(lc.column)
+      let q = sb.from(lc.table).select(lc.column);
+      if (lc.where) q = q.eq(lc.where.column, lc.where.equals);
+      const { data: latest, error: readErr } = await q
         .order(lc.column, { ascending: false, nullsFirst: false })
         .limit(1)
         .maybeSingle();

@@ -15,6 +15,12 @@ export interface LiveSyncCheck {
   column: string;
   staleDays: number;
   refreshWith: string;
+  /**
+   * Optional equality filter so the clock reads ONE producer's rows (fixed in code, never user input). Without it a
+   * different writer's fresh rows can mask a stale bulk load: sam_entities gets a handful of live-path rows daily
+   * while ~900K bulk rows sit at the August extract (Agent 4 review, 2026-11-25).
+   */
+  where?: { column: string; equals: string };
 }
 
 export const LIVE_SYNC_CHECKS: readonly LiveSyncCheck[] = [
@@ -63,6 +69,9 @@ export const LIVE_SYNC_CHECKS: readonly LiveSyncCheck[] = [
     name: 'SAM entity registrations (sam_entities mirror, monthly extract)',
     table: 'sam_entities',
     column: 'synced_at',
+    // The BULK clock only: scripts/import-sam-entity-extract.mjs stamps source='sam_public_extract'. The live
+    // per-entity path (sync-gov-buyer-data, source='sam_entity_api') touches a few rows daily and would mask it.
+    where: { column: 'source', equals: 'sam_public_extract' },
     staleDays: 35,
     refreshWith: 'refresh from the monthly SAM_PUBLIC_MONTHLY_V2 extract: node scripts/import-sam-entity-extract.mjs --file <zip> --all-naics --dry, then the real run with Eric\'s OK',
   },
@@ -87,8 +96,9 @@ export const LIVE_SYNC_CHECKS: readonly LiveSyncCheck[] = [
     refreshWith: 'live sync — verify /api/cron/sync-recompete-contracts in cron_job_runs',
   },
   {
-    // Coming soon. Forecast feeds sync on different cadences (daily crons + weekly/monthly publishers); the newest
-    // row across all of them should advance at least weekly. Per-feed health stays in data_source_instances.
+    // Coming soon. Forecast feeds sync on different cadences (daily crons + weekly/monthly publishers). ⚠️ This is an
+    // ALL-FEEDS-DOWN floor only: one healthy feed keeps it green while another feed is dead. Per-feed currency is
+    // self-reported by some feeds into data_source_instances; a per-feed alarm is a follow-up (not this check).
     key: 'agency_forecasts_sync',
     name: 'Agency forecasts (agency_forecasts.last_synced_at, newest across feeds)',
     table: 'agency_forecasts',
