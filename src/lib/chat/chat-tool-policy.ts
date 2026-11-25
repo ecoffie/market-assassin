@@ -106,7 +106,7 @@ const CHAT_OVERRIDES: Readonly<Record<string, ChatToolPolicy>> = {
 };
 
 /** The chat-only private tools (session-email-bound). Read-only. */
-export const CHAT_PRIVATE_READ_TOOLS: ReadonlySet<string> = new Set(['get_my_pipeline', 'search_my_vault', 'find_my_documents', 'read_connected_file']);
+export const CHAT_PRIVATE_READ_TOOLS: ReadonlySet<string> = new Set(['get_my_pipeline', 'search_my_vault', 'find_my_documents']);
 
 /**
  * Decide what chat may do with a tool.

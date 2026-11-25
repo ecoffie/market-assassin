@@ -3,7 +3,7 @@
  *
  * Called after the customer picks a file in the Google Picker or OneDrive picker. Confirms, through the
  * connection's own grant, that the file exists and is a type Mindy reads, then returns a FILE HANDLE signed for
- * this acting scope + connection + file (24 h). Ask Mindy's read_connected_file accepts only such a handle.
+ * this acting scope + connection + file (24 h). Ask Mindy reads a connected file only through such a handle.
  * Nothing is downloaded or stored here.
  */
 import { NextRequest, NextResponse } from 'next/server';

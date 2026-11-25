@@ -43,7 +43,7 @@ import { isUserOverBudget, recordLlmUsage } from '@/lib/llm/usage-cost';
 import { makeTier0Tools, TIER0_TOOL_DEFS, TIER0_TOOL_NAMES } from '@/lib/chat/tier0-tools';
 import { makeMyDocumentsTool, MY_DOCUMENTS_TOOL_DEF, FIND_MY_DOCUMENTS } from '@/lib/chat/my-documents-tool';
 import { connectedAppsEnabledFor } from '@/lib/connected-apps/config';
-import { connectedFilesNote, makeReadConnectedFileTool, READ_CONNECTED_FILE, READ_CONNECTED_FILE_TOOL_DEF } from '@/lib/connected-apps/read-file-tool';
+import { loadConnectedFilesContext } from '@/lib/connected-apps/read-file-tool';
 import { makeSearchWebTool, SEARCH_WEB_TOOL_DEF, SEARCH_WEB, callerKeyFor } from '@/lib/chat/search-web-tool';
 import { makeGenerateDocumentTool, CREATE_DOCUMENT_TOOL_DEF, CREATE_DOCUMENT, isDocumentCreationRequest, parseCreateDocumentDeliverables, type CreateDocumentDeliverable } from '@/lib/chat/generate-document-tool';
 import { vaultDocEnabledFor } from '@/lib/vault/flags';
@@ -881,10 +881,14 @@ export async function POST(request: NextRequest) {
           } else documentsNotice = `documents:${loaded.reason}`;
         }
         if (documentContext) messages.push({ role: 'system', content: documentContext.block });
-        // Connected files (CONNECTED_APPS, default off): files the customer picked from a connected Google Drive /
-        // OneDrive. Handles are verified against the acting scope; the model gets names + handles, never content.
-        const connectedFiles = !cardCtx && connectedAppsEnabledFor(auth.email) ? connectedFilesNote(body.connectedFiles, actingScope) : null;
-        if (connectedFiles?.note) messages.push({ role: 'system', content: connectedFiles.note });
+        // Connected files (CONNECTED_APPS, default off; never in card turns): files the customer picked from a
+        // connected Google Drive / OneDrive, READ BY THE SERVER for this turn (handles verified against the acting
+        // scope and owner) and given to the answer step as fenced, untrusted text. The planner sees names only.
+        // The text lives in this turn's memory only: never saved to chat history, the trace or logs.
+        const connectedFiles = !cardCtx && connectedAppsEnabledFor(auth.email)
+          ? await loadConnectedFilesContext(body.connectedFiles, actingScope, customerWords)
+          : null;
+        if (connectedFiles?.block) messages.push({ role: 'system', content: connectedFiles.block });
         // Category caveat grounded by the work the customer named in THIS message (janitorial → AbilityOne).
         const categoryNote = abilityOneCaveat(customerWords, interpretCapabilityNaics(customerWords).codes);
         if (categoryNote) messages.push({ role: 'system', content: categoryNote });
@@ -1013,7 +1017,7 @@ export async function POST(request: NextRequest) {
         if (cardContext) toolRoundMessages.push({ role: 'system', content: cardContext.block });
         // The planner sees which documents exist, not their text.
         if (documentContext) toolRoundMessages.push({ role: 'system', content: documentContext.manifest });
-        if (connectedFiles?.note) toolRoundMessages.push({ role: 'system', content: connectedFiles.note });
+        if (connectedFiles?.manifest) toolRoundMessages.push({ role: 'system', content: connectedFiles.manifest });
         // create_document only: the uploaded text (fenced, with document ids) so the document can include it.
         if (plannerDocumentText) toolRoundMessages.push({ role: 'system', content: plannerDocumentText });
         for (const n of ledgerSystemNotes) toolRoundMessages.push({ role: 'system', content: n });
@@ -1078,7 +1082,8 @@ export async function POST(request: NextRequest) {
         if (noticeFacts) turnTrace.notices.push(`selected_notice_incumbent:${noticeFacts.incumbent.finding}`);
         if (capabilityNote) turnTrace.notices.push('capability_interpreted');
         if (documentContext) turnTrace.notices.push(`documents:${documentContext.docCount}`);
-        if (connectedFiles && (connectedFiles.accepted || connectedFiles.dropped)) turnTrace.notices.push(`connected_files:${connectedFiles.accepted}${connectedFiles.dropped ? `:dropped=${connectedFiles.dropped}` : ''}`);
+        // Counts only: no file name, handle or text in the stored trace.
+        if (connectedFiles && (connectedFiles.accepted || connectedFiles.dropped)) turnTrace.notices.push(`connected_files:${connectedFiles.accepted}:read=${connectedFiles.read}${connectedFiles.failed ? `:failed=${connectedFiles.failed}` : ''}${connectedFiles.dropped ? `:dropped=${connectedFiles.dropped}` : ''}`);
         if (documentsNotice) turnTrace.notices.push(documentsNotice);
         turnTrace.notices.push(...turnTrace0);
         if (staging) turnTrace.notices.push(`staging_model_config:${staging.name}`);
@@ -1173,16 +1178,14 @@ export async function POST(request: NextRequest) {
             : null;
           // Server-side web-search controls (per-turn cap, privacy guard, usage log): search-web-tool.ts.
           // Every document excerpt this turn has seen: the attached block plus each find_my_documents result.
-          const turnDocumentTexts: string[] = documentContext?.block ? [documentContext.block] : [];
+          const turnDocumentTexts: string[] = [documentContext?.block, connectedFiles?.block].filter((t): t is string => !!t);
           const searchWeb = makeSearchWebTool({
             forbidden: { emails: [auth.email, vaultEmailFor(actingScope)] },
             documentText: () => turnDocumentTexts.join('\n'),
             attribution: { callerKey: callerKeyFor(auth.email), sessionId: turnSessionId },
           });
-          // read_connected_file: offered only when this turn carries a verified connected-file selection.
-          const connectedFileTool = connectedFiles?.accepted ? makeReadConnectedFileTool(actingScope) : null;
-          const privateDefs = [...TIER0_TOOL_DEFS, SEARCH_WEB_TOOL_DEF, ...(myDocs ? [MY_DOCUMENTS_TOOL_DEF] : []), ...(genDoc ? [CREATE_DOCUMENT_TOOL_DEF] : []), ...(connectedFileTool ? [READ_CONNECTED_FILE_TOOL_DEF] : [])];
-          const privateNames = new Set([...TIER0_TOOL_NAMES, SEARCH_WEB, ...(myDocs ? [FIND_MY_DOCUMENTS] : []), ...(genDoc ? [CREATE_DOCUMENT] : []), ...(connectedFileTool ? [READ_CONNECTED_FILE] : [])]);
+          const privateDefs = [...TIER0_TOOL_DEFS, SEARCH_WEB_TOOL_DEF, ...(myDocs ? [MY_DOCUMENTS_TOOL_DEF] : []), ...(genDoc ? [CREATE_DOCUMENT_TOOL_DEF] : [])];
+          const privateNames = new Set([...TIER0_TOOL_NAMES, SEARCH_WEB, ...(myDocs ? [FIND_MY_DOCUMENTS] : []), ...(genDoc ? [CREATE_DOCUMENT] : [])]);
           const executor = createChatToolExecutor({
             userEmail: auth.email!,
             ...(actingScope.kind === 'client' ? { vaultEmail: actingScope.vaultEmail } : {}),
@@ -1193,12 +1196,6 @@ export async function POST(request: NextRequest) {
               names: privateNames,
               execute: (n, a) => {
                 if (n === SEARCH_WEB) return searchWeb.execute(a);
-                if (connectedFileTool && n === READ_CONNECTED_FILE) {
-                  return connectedFileTool.execute(a).then((r) => {
-                    try { turnDocumentTexts.push(JSON.stringify(r)); } catch { /* unserializable result: nothing to guard */ }
-                    return r;
-                  });
-                }
                 if (myDocs && n === FIND_MY_DOCUMENTS) {
                   return myDocs.execute(a).then((r) => {
                     try { turnDocumentTexts.push(JSON.stringify(r)); } catch { /* unserializable result: nothing to guard */ }

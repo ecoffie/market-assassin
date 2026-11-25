@@ -68,6 +68,20 @@ describe('ConnectedFiles', () => {
     expect(el.querySelector('[data-testid="connected-files"]')).toBeNull();
   });
 
+  it('right after sign-in (first list call 401) the control still appears once the session lands', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      h.list = { status: 401, body: { error: 'unauthorized' } };
+      await mount();
+      expect(el.querySelector('[data-testid="connected-files"]')).toBeNull();
+      h.list = { status: 200, body: { connections: [], providers: [{ provider: 'google', available: true }] } };
+      await act(async () => { vi.advanceTimersByTime(1600); });
+      await tick();
+      expect(el.querySelector('[data-testid="connected-files"]')).not.toBeNull();
+      expect(h.calls.filter((c) => c.url.startsWith('/api/app/connected-apps?')).length).toBe(2);
+    } finally { vi.useRealTimers(); }
+  });
+
   it('Connect shows the access note first and does not leave Mindy until Continue', async () => {
     const assign = vi.fn();
     Object.defineProperty(window, 'location', { configurable: true, value: { ...window.location, assign, href: window.location.href, pathname: '/app', search: '?panel=ask', hash: '' } });

@@ -13,7 +13,7 @@ Spec: [CONNECTED-APPS-SPEC-2026-11-24.md](./CONNECTED-APPS-SPEC-2026-11-24.md). 
 | Google API clients (`src/lib/gsc`, `src/lib/ga4`, BigQuery) | Service-account access to Mindy's own Google properties | Not applicable. These connectors act on the customer's behalf, with delegated access. |
 | Whose data (acting scope) | `resolveChatActingScope` / `vaultEmailFor` (`src/lib/chat/chat-acting-scope.ts`), the same resolver as Vault and chat | **Reused.** A connection belongs to `own:<email>` or `ws:<workspaceId>`. An unconfirmed workspace refuses. |
 | Document text extraction | `src/lib/documents/extract.ts` (pdf, docx, txt, xlsx) | Will be reused for selected-file reads (Slice A, part 2). |
-| Chat tool execution and confirmation | `src/lib/chat/chat-tool-executor.ts`, `chat-tool-policy.ts` | Will be extended for `read_connected_file` and later the write tools. No direct LLM-to-provider calls. |
+| Chat tool execution and confirmation | `src/lib/chat/chat-tool-executor.ts`, `chat-tool-policy.ts` | Reads of connected files are done by the server, not by a model tool (see §3b); the write tools come later. No direct LLM-to-provider calls. |
 
 ## 2. Built in Slice A, part 1 (branch `feat/connected-apps-slice-a`, flag off)
 
@@ -89,16 +89,19 @@ Use a file from Drive or OneDrive in Ask Mindy: server side plus the Ask Mindy c
 - **Selection details:**
   - `POST /api/app/connected-apps/selections` confirms the picked file through the connection's own grant (exists, readable type, under 15 MB).
   - It returns a **file handle**: HMAC-signed (domain-separated from the OAuth state), bound to the acting scope, the connection, the provider and the file id, valid 24 h.
-  - `read_connected_file` accepts only a handle. A raw file id from the model, a forged handle, or one signed for another workspace is refused before any provider call.
+  - Ask Mindy reads a connected file only through a handle. A raw file id, a forged, expired or other-workspace handle, or a colleague's pick is refused before any provider call.
   - This is what limits Microsoft `Files.Read` to the file the customer chose.
-- **Every read re-checks.** The acting scope is re-resolved from the closure, the handle is re-verified against it, the connection is re-checked (revoked or reauth needed fails closed), and the provider must return the same file id.
+- **Every read re-checks.** The acting scope is re-resolved on the server for the turn, the handle is re-verified against it, the connection is re-checked (revoked or reauth needed fails closed), and the provider must return the same file id.
 - **One extraction pipeline.** Bytes are capped at 15 MB (metadata and body) and extracted by `src/lib/documents/extract.ts`. Native Google Docs and Sheets are exported to .docx and .xlsx. NUL bytes are stripped.
 - **Untrusted content.** Text is fenced with the same `UPLOADED_DOCUMENT` fence and rule as uploads (a file cannot close its own fence). Results go into the turn's document texts for the web-search privacy guard.
-- **Provenance.** Each read returns provider, connected account, source id, source link, modified date and retrieval time, kept separate from federal-record provenance.
-- **Chat wiring.**
-  - The client sends `connectedFiles` (handles). The server verifies them and adds a note listing the picked files.
-  - `read_connected_file` is offered only on a turn with a verified selection, never in card chat. It is a free tool, classified as a chat-private read in `chat-tool-policy.ts`.
-  - The trace records `connected_files:<n>[:dropped=<m>]`.
+- **Provenance.** The answer block lists each file's name, provider, connected account and modified date, kept separate from federal-record provenance.
+- **Chat wiring (server-read, revised 2026-11-24 after live acceptance; Agent 4 approved the direction).**
+  - Why: the first version offered a `read_connected_file` tool and told the model it could call it. In live acceptance (gpt-4o and the production model gpt-6.1-terra) the model skipped the call, so an attached file had no effect. Uploaded Vault documents are already loaded by the server for the same reason.
+  - The client sends `connectedFiles` (handles). `loadConnectedFilesContext` (`src/lib/connected-apps/read-file-tool.ts`) verifies each handle for THIS request, reads the verified files and builds one answer-step block: fenced untrusted text, a source line per file, and a plain "Could not read <name>: <reason>" line for any verified file that failed. Never empty or guessed content.
+  - Budget: at most 5 files and 20,000 characters across them per turn, using the question-relevant passage selection (`selectRelevantRfp`, which now fills its budget by relevance before restoring document order).
+  - The planner gets a manifest (names only). The block is added to the turn's document texts for the web-search privacy guard.
+  - Nothing persisted: the block lives in the turn's memory only. The trace records counts only, `connected_files:<n>:read=<r>[:failed=<f>][:dropped=<d>]`, with no name, handle or text.
+  - Never in card chat; flag off or caller not allowlisted reads nothing.
 - **`POST /api/app/connected-apps/picker-token`** gives the browser picker a short-lived **access** token (never the refresh token, `no-store`), plus the public Google Picker key and app id. This is the provider-documented pattern.
 - **Ask Mindy control (`src/components/app/chat/ConnectedFiles.tsx`).**
   - Hidden unless the list endpoint answers, so it is invisible while the flag is off.

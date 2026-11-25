@@ -7,7 +7,7 @@
  * The script reads both saved answers + traces (read-only) and a LOCAL copy of the document's text.
  *
  * Gates (all must pass):
- *   1. B's trace shows the connected file was offered and read (connected_files:1, read_connected_file call).
+ *   1. B's trace shows the server read the connected file (notice connected_files:<n>:read=<at least 1>).
  *   2. Every company claim the judge attributes to the document has a VERBATIM quote software finds in it.
  *   3. No claim in B contradicts the document.
  *   4. Certification is not verified eligibility: any eligibility B derives from a document's certification claim
@@ -131,7 +131,7 @@ async function main() {
   const [A, B] = await Promise.all([loadAnswer(aId!), loadAnswer(bId!)]);
   const target = testCase === 'material' ? await loadTarget(targetPiid) : null;
   const notices = ((B.trace?.notices as string[]) || []);
-  const gate1 = notices.some((n) => /^connected_files:[1-9]/.test(n)) && JSON.stringify(B.trace || {}).includes('read_connected_file');
+  const gate1 = notices.some((n) => /^connected_files:[1-9]\d*:read=[1-9]/.test(n));
 
   const targetBlock = target
     ? `TARGET OPPORTUNITY (from Mindy's records): PIID ${target.piid}; ${target.awarding_sub_agency}; "${target.description}"; incumbent ${target.incumbent_name}; ${target.place_of_performance_state}; set-aside ${target.set_aside_enriched || target.set_aside_type}; current period ends ${target.period_of_performance_current_end}; $${target.total_obligation} obligated.`
