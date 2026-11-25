@@ -68,7 +68,11 @@ export function decisionText(d: AnalystDecision): string {
 
 /** Figures stated in the answer that the evidence does not contain (exact text as written, de-duplicated). */
 export function ungroundedFigures(decision: AnalystDecision, evidence: string): string[] {
-  const text = decisionText(decision);
+  return ungroundedFiguresInText(decisionText(decision), evidence);
+}
+
+/** The same check on any free text (research mode's answer): figures stated that the evidence does not contain. */
+export function ungroundedFiguresInText(text: string, evidence: string): string[] {
   const evMoney = moneyIn(evidence).map((x) => x.num * x.unit);
   const evDates = datesIn(evidence);
   const bad = new Set<string>();
