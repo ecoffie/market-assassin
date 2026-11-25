@@ -132,6 +132,7 @@ const TOOL_LABELS: Record<string, string> = {
   find_my_documents: 'Your saved documents (Vault)',
   create_document: 'Document Mindy saved to your Vault',
   search_web: 'Open web (Serper)',
+  read_web_page: 'Open web page',
 };
 
 export function toolLabel(tool: string): string {
