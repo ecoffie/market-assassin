@@ -581,8 +581,8 @@ const CSS = `
 
 /** Seat variant only (rendered in its own <style> tag when NEXT_PUBLIC_TEAM_SEAT_PRICING is on). */
 const SEAT_CSS = `
-.sp .seat-pick{display:flex;gap:4px;margin:0 0 18px;padding:4px;width:100%;max-width:380px;border:1px solid var(--mp-line);border-radius:999px;background:var(--mp-wash)}
-.sp .seat-pick button{flex:1 1 0;min-height:40px;border:0;background:transparent;padding:8px 12px;border-radius:999px;font:500 14px var(--mp-font-sans);color:var(--mp-muted);cursor:pointer;white-space:nowrap}
+.sp .seat-pick{display:flex;gap:4px;margin:0 0 18px;padding:4px;width:100%;max-width:none;box-sizing:border-box;border:1px solid var(--mp-line);border-radius:999px;background:var(--mp-wash)}
+.sp .seat-pick button{flex:1 1 0;min-width:0;min-height:40px;border:0;background:transparent;padding:8px 4px;border-radius:999px;font:500 14px var(--mp-font-sans);color:var(--mp-muted);cursor:pointer;white-space:nowrap}
 .sp .seat-pick button.on{background:var(--mp-navy);color:var(--mp-surface)}
 .sp .seat-pick button:focus-visible{outline:2px solid var(--mp-navy);outline-offset:2px}
 .sp .seat-foot{text-align:center;margin:28px 0 0;font-size:15px;color:var(--mp-body)}
