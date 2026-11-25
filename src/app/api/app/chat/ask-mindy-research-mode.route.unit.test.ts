@@ -42,6 +42,12 @@ vi.mock('@/lib/ask-mindy/company-profile', async (orig) => ({ ...(await orig<typ
 vi.mock('@/lib/ask-mindy/intelligence-gate', async (orig) => ({ ...(await orig<typeof import('@/lib/ask-mindy/intelligence-gate')>()), runIntelligenceGate: h.runGate }));
 vi.mock('@/lib/ask-mindy/gate-intent', async (orig) => ({ ...(await orig<typeof import('@/lib/ask-mindy/gate-intent')>()), extractWorkPhrase: h.extract }));
 
+vi.mock('@/lib/ask-mindy/research-caps-deps', () => ({
+  researchCapDeps: {
+    facts: async () => ({ staff: false, appTier: 'pro', access: { level: 'pro', source: 'stripe' }, mcpPlan: null }),
+    todaysTraces: async () => Array.from({ length: h.capUsed }, () => ({ engine: 'research_mode', call_count: 2 })),
+  },
+}));
 vi.mock('@anthropic-ai/sdk', () => ({ default: class { messages = { create: (...a: unknown[]) => h.create(...a) }; } }));
 
 const ENV_KEYS = ['OPENAI_API_KEY', 'SUPABASE_SERVICE_ROLE_KEY', 'ASK_MINDY_INTELLIGENCE_GATE', 'ASK_MINDY_INTELLIGENCE_GATE_ALLOWLIST', 'ASK_MINDY_RESEARCH_MODE', 'ASK_MINDY_RESEARCH_MODE_ALLOWLIST', 'ASK_MINDY_RESEARCH_MODEL'] as const;
@@ -57,7 +63,7 @@ beforeEach(() => {
   process.env.OPENAI_API_KEY = 'sk-test';
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'srk-test';
   for (const k of ENV_KEYS.slice(2)) delete process.env[k];
-  openaiCalls.length = 0; h.inserts.length = 0; h.overBudget = false;
+  openaiCalls.length = 0; h.inserts.length = 0; h.overBudget = false; h.capUsed = 0;
   h.runMcpTool.mockReset();
   h.runMcpTool.mockImplementation(async (name: string) => ({ result: { ok: true, grounded: true, tool: name, note: 'obligated $1.2M' }, credits: 0 }));
   h.runGate.mockReset(); h.extract.mockReset(); h.extract.mockImplementation(async () => 'digital marketing');
@@ -181,5 +187,26 @@ describe('research mode in the chat route', () => {
     h.runMcpTool.mockClear();
     await ask(Q);
     for (const c of h.runMcpTool.mock.calls as Array<[string, unknown, Record<string, unknown>]>) expect(c[2]?.samCacheOnly).toBeUndefined();
+  });
+
+  it('under the daily cap: research runs and the trace records the cap (Pro monthly, 9 of 10 used)', async () => {
+    flagOn();
+    h.capUsed = 9;
+    await ask(Q);
+    expect(h.create).toHaveBeenCalled();
+    expect(await savedTrace()).toMatchObject({ engine: 'research_mode', research_cap: { plan: 'pro_monthly', cap: 10, used: 9 } });
+  });
+
+  it('at the daily cap: the standard engine answers, opening with the plain notice; no research model runs', async () => {
+    flagOn();
+    h.capUsed = 10;
+    const ev = await ask(Q);
+    expect(h.create).not.toHaveBeenCalled();
+    expect(openaiCalls.length).toBeGreaterThan(0);
+    const t = text(ev);
+    expect(t.startsWith("You've used today's 10 in-depth research answers, so this one is a standard answer. In-depth research resets tomorrow.")).toBe(true);
+    expect(t).toContain('Existing path answer.');
+    const trace = await savedTrace();
+    expect(JSON.stringify(trace)).toContain('research_cap:reached:10/10:pro_monthly');
   });
 });

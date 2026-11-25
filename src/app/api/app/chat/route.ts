@@ -125,6 +125,8 @@ import {
   RESEARCH_TURN_MS, RESEARCH_DEADLINE_MS, RESEARCH_NO_ANSWER, researchToolDefs, type ResearchCall,
 } from '@/lib/ask-mindy/research-mode';
 import { toolLabel } from '@/lib/chat/context-sources';
+import { researchCapDecision } from '@/lib/ask-mindy/research-caps';
+import { researchCapDeps } from '@/lib/ask-mindy/research-caps-deps';
 import { gateEligible, extractWorkPhrase, profileForGate } from '@/lib/ask-mindy/gate-intent';
 import { fitRankingNote, rankFindResult } from '@/lib/ask-mindy/compose';
 import { provenanceRecords } from '@/lib/chat/doc-provenance';
@@ -617,7 +619,12 @@ export async function POST(request: NextRequest) {
   const deadlines = chatDeadlines(process.env);
   // Research mode (ASK_MINDY_RESEARCH_MODE, default off + allowlist): Claude + the Mindy MCP catalog in its own loop.
   // Card chat is unchanged (Eric, 2026-11-25).
-  const researchTurn = !cardCtx && researchModeEnabledFor(auth.email);
+  const researchEligible = !cardCtx && researchModeEnabledFor(auth.email);
+  // Daily cap on in-depth answers (plan-based, research-caps.ts). At the cap the turn runs on the standard engine and
+  // the answer opens with a plain notice. A cap that cannot be read never blocks research.
+  const researchCap = researchEligible ? await researchCapDecision(auth.email!, researchCapDeps).catch(() => null) : null;
+  const researchTurn = researchEligible && (researchCap?.allowed ?? true);
+  const researchCapNotice = researchEligible && researchCap && !researchCap.allowed ? researchCap.notice : null;
 
   // SSE response — manually constructed ReadableStream since the
   // Vercel Edge / Node runtime doesn't expose an out-of-the-box helper.
@@ -740,6 +747,8 @@ export async function POST(request: NextRequest) {
               console.error('[chat] intelligence gate failed:', (err as Error)?.message);
             }
             if (gate) {
+              // A capped research user answered by the gate still gets the cap notice first.
+              if (researchCapNotice) gate.answer = `${researchCapNotice}\n\n${gate.answer}`;
               send({ type: 'token', content: gate.answer });
               // Same event and trace shape as the packaged report path, so the Ask pane opens it and History restores it.
               const gateReport = gate.report?.deliverable?.html
@@ -1228,7 +1237,10 @@ export async function POST(request: NextRequest) {
           if (researchTurn) {
             const rmStarted = Date.now();
             const model = researchModel();
-            const rmTrace: Record<string, unknown> = { engine: 'research_mode', model };
+            const rmTrace: Record<string, unknown> = {
+              engine: 'research_mode', model,
+              ...(researchCap ? { research_cap: { plan: researchCap.plan, cap: researchCap.cap, used: researchCap.used, ...(researchCap.countUnknown ? { count_unknown: true } : {}) } } : {}),
+            };
             const finish = (answer: string, extra: Record<string, unknown> = {}, sources: typeof turnSources = []) => {
               send({ type: 'token', content: answer });
               const rmCited = citationsFromSources(sources);
@@ -2663,6 +2675,12 @@ export async function POST(request: NextRequest) {
         }
 
         let assistantContent = '';
+        if (researchCapNotice) {
+          // Never a silent switch: the standard answer opens with the cap notice.
+          assistantContent = `${researchCapNotice}\n\n`;
+          send({ type: 'token', content: assistantContent });
+          turnTrace.notices.push(`research_cap:reached:${researchCap?.used}/${researchCap?.cap}:${researchCap?.plan}`);
+        }
         if (renderedRecords.length) {
           // Scope the MAP supplied is labeled as the map's, never as "from your request" (2026-11-15 review).
           const fromRequest = [...scopeApplied].filter((n) => !isMapScopeNote(n));
