@@ -14,9 +14,11 @@
  *      (8(a), SDVOSB, HUBZone, WOSB, small size) must be stated conditionally ("if your certification is current /
  *      verified"). Presenting the company as eligible solely because the document says so FAILS.
  *   5. Per case:
- *      --case material   a KNOWN opportunity (--target) whose assessment the document fact (--fact) should change.
- *                        Pass only if B's assessment of that target changes because of a verified quote of the
- *                        fact. No "unchanged but justified" path: a convincing explanation must not hide that the
+ *      --case material   a KNOWN opportunity (--target), asked about directly (both questions name it), whose
+ *                        assessment the document should materially change. Pass only if B's assessment of that
+ *                        target changes and every change rests on verified, relevant document quotes. Which
+ *                        relevant fact drove it is reported; --fact is recorded as information (Eric, 2026-11-25).
+ *                        No "unchanged but justified" path: a convincing explanation must not hide that the
  *                        document had no influence.
  *      --case relevance  no prescribed outcome. Every recommendation change must cite a verified document quote that
  *                        is relevant to the opportunity it changes (green-cleaning products CAN matter to a
@@ -98,10 +100,10 @@ const SCHEMA = {
     },
     changes: {
       type: 'array',
-      description: "Each way B's recommendation differs from A's (which opportunities, their order, barriers, next moves), with the document words that caused it and whether that fact is relevant to that opportunity.",
+      description: "Each way B's recommendation differs from A's (which opportunities, their order, barriers, next moves), with the document words that caused it and whether that fact is relevant to that opportunity. List real differences only; if you mention something B kept the same as A, set is_difference to false.",
       items: {
-        type: 'object', additionalProperties: false, required: ['opportunity', 'change', 'quote', 'relevant'],
-        properties: { opportunity: { type: 'string' }, change: { type: 'string' }, quote: { type: 'string' }, relevant: { type: 'boolean' } },
+        type: 'object', additionalProperties: false, required: ['opportunity', 'change', 'is_difference', 'quote', 'relevant'],
+        properties: { opportunity: { type: 'string' }, change: { type: 'string' }, is_difference: { type: 'boolean', description: 'False when this item describes something B kept the same as A.' }, quote: { type: 'string' }, relevant: { type: 'boolean' } },
       },
     },
     target: {
@@ -121,7 +123,7 @@ const SCHEMA = {
 type Judge = {
   claims_b: Array<{ claim: string; source: string; quote: string; contradicts_document: boolean }>;
   eligibility_statements: Array<{ statement: string; conditional: boolean }>;
-  changes: Array<{ opportunity: string; change: string; quote: string; relevant: boolean }>;
+  changes: Array<{ opportunity: string; change: string; is_difference: boolean; quote: string; relevant: boolean }>;
   target: { mentioned_in_a: boolean; mentioned_in_b: boolean; assessment_changed: boolean; quote: string };
   b_more_specific: boolean; why: string;
 };
@@ -146,6 +148,8 @@ async function main() {
   });
   const text = msg.content.find((c) => c.type === 'text');
   const j = JSON.parse(text && 'text' in text ? text.text : '{}') as Judge;
+  // Items the judge marks as unchanged are not recommendation changes (they need no quote).
+  j.changes = j.changes.filter((c) => c.is_difference !== false);
 
   // Software, not the judge, decides whether a document quote is real.
   const nd = norm(doc);
@@ -158,14 +162,22 @@ async function main() {
   const gate3 = contradictions.length === 0;
   const gate4 = overclaims.length === 0;
 
+  // Gate 5, material case (Eric, 2026-11-25): a relevant customer document must MATERIALLY improve the
+  // recommendation for a known opportunity, asked about directly (a future recompete is not forced into an
+  // answer about open opportunities). The change must rest on verified, relevant document quotes; which
+  // relevant fact drove it is reported, not prescribed. The named --fact is recorded as information.
   const factWords = new Set(words(fact));
   const tiedToFact = (q: string) => real(q) && words(q).filter((w) => factWords.has(w)).length >= Math.min(2, factWords.size);
   const badChanges = j.changes.filter((c) => !real(c.quote) || !c.relevant);
+  const targetSpecific = !!targetPiid && A.question.toUpperCase().includes(targetPiid.toUpperCase()) && B.question.toUpperCase().includes(targetPiid.toUpperCase());
+  const targetQuotes = [j.target.quote, ...j.changes.filter((c) => c.opportunity.toUpperCase().includes(targetPiid.toUpperCase())).map((c) => c.quote)];
+  const targetBacked = targetQuotes.some((q) => real(q)) && j.changes.filter((c) => c.opportunity.toUpperCase().includes(targetPiid.toUpperCase())).every((c) => real(c.quote) && c.relevant);
+  const namedFactUsed = targetQuotes.some((q) => tiedToFact(q));
   const gate5 = testCase === 'material'
-    ? j.target.mentioned_in_b && j.target.assessment_changed && tiedToFact(j.target.quote) && badChanges.length === 0
+    ? targetSpecific && j.target.mentioned_in_b && j.target.assessment_changed && targetBacked && badChanges.length === 0
     : badChanges.length === 0;
   const gate5Detail = testCase === 'material'
-    ? `target in A: ${j.target.mentioned_in_a}, in B: ${j.target.mentioned_in_b}; assessment changed: ${j.target.assessment_changed}; tied to the fact by a verified quote: ${tiedToFact(j.target.quote)}; unquoted/irrelevant changes: ${badChanges.length}`
+    ? `question names the target: ${targetSpecific}; target in A: ${j.target.mentioned_in_a}, in B: ${j.target.mentioned_in_b}; assessment changed: ${j.target.assessment_changed}; change backed by verified, relevant document quotes: ${targetBacked}; unquoted/irrelevant changes: ${badChanges.length}; named fact (${fact}) among the causes: ${namedFactUsed}`
     : `${j.changes.length} change(s); unquoted/irrelevant: ${badChanges.length}`;
   const accept = gate1 && gate2 && gate3 && gate4 && gate5;
 
@@ -180,7 +192,7 @@ async function main() {
     `| 2. Every document claim has a verbatim quote | ${gate2 ? 'PASS' : `FAIL (${unverified.length})`} |`,
     `| 3. No contradiction of the document | ${gate3 ? 'PASS' : `FAIL (${contradictions.length})`} |`,
     `| 4. Certification stated as conditional, not verified eligibility | ${gate4 ? 'PASS' : `FAIL (${overclaims.length})`} |`,
-    `| 5. ${testCase === 'material' ? 'Known opportunity assessed differently because of the fact' : 'Every change follows from a relevant, quoted fact'} | ${gate5 ? 'PASS' : 'FAIL'} (${gate5Detail}) |`,
+    `| 5. ${testCase === 'material' ? 'Known opportunity materially improved by relevant document facts' : 'Every change follows from a relevant, quoted fact'} | ${gate5 ? 'PASS' : 'FAIL'} (${gate5Detail}) |`,
     '', `**Verdict: ${accept ? 'ACCEPT' : 'REJECT'}**`, '', `Judge: ${j.why}`, '',
     '## Recommendation changes', ...(j.changes.length ? j.changes.map((c) => `- ${c.opportunity}: ${c.change}. "${c.quote}"${real(c.quote) ? '' : ' (QUOTE NOT FOUND)'}${c.relevant ? '' : ' (NOT RELEVANT TO THIS OPPORTUNITY)'}`) : ['- none']),
     '', '## Eligibility statements', ...(j.eligibility_statements.length ? j.eligibility_statements.map((e) => `- [${e.conditional ? 'conditional' : 'OVERCLAIM'}] ${e.statement}`) : ['- none']),
