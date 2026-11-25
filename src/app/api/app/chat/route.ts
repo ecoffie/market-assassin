@@ -50,7 +50,7 @@ import { vaultDocEnabledFor } from '@/lib/vault/flags';
 import { createChatToolExecutor, type ChatExecutionRecord } from '@/lib/chat/chat-tool-executor';
 import { resolveChatActingScope, vaultEmailFor } from '@/lib/chat/chat-acting-scope';
 import type { BidderProfile } from '@/lib/proposal/types';
-import { anthropicAnswerResponse } from '@/lib/chat/anthropic-answer-stream';
+import { createMarkupFilter } from '@/lib/chat/tool-markup-filter';
 import { budgetDowngradeActive, resolvePlannerChain, plannerKey, anthropicSupportsForcedToolChoice, resolveAnswerChain, answerKey, ANSWER_ENDPOINTS, openAiChatParams, type PlannerTarget } from '@/lib/chat/planner-config';
 import { fitMessages, inputBudget, type MsgKind } from '@/lib/chat/token-budget';
 import { stagingModelConfig, STAGING_CONFIG_HEADER } from '@/lib/chat/staging-model-config';
@@ -2437,7 +2437,7 @@ export async function POST(request: NextRequest) {
         // B2: explicit answer chain (primary, then supported fallbacks), each provider checked
         // against the private-data approved list. Provider error text goes to recordProviderEvent
         // only; the customer sees a fixed message from customer-errors.ts.
-        const answerChain = resolveAnswerChain(modelEnv, { primaryModel: staging?.config.answerPrimary ?? chatModel, downgrade: budgetDowngradeActive(modelEnv, overBudgetEarly) })
+        const answerChain = resolveAnswerChain(modelEnv, { primaryModel: staging?.config.answerPrimary ?? chatModel })
           .filter((t) => {
             if (providerApprovedForPrivate(t.provider)) return true;
             void recordProviderEvent({ kind: 'answer_failure', provider: t.provider, model: t.model, detail: 'answer model skipped: provider not on the approved list for private data', userEmail: auth.email! });
@@ -2501,9 +2501,7 @@ export async function POST(request: NextRequest) {
           answerAbort = ctrl;
           const connectTimer = setTimeout(() => ctrl.abort(new ChatTimeoutError('answer_connect', deadlines.answerConnectMs)), deadlines.answerConnectMs);
           try {
-            r = t.provider === 'anthropic'
-              ? await anthropicAnswerResponse({ apiKey: answerKey(modelEnv, t) || '', model: t.model, messages: fit.messages, maxTokens: MAX_TOKENS, signal: ctrl.signal })
-              : await streamFrom(ANSWER_ENDPOINTS[t.provider], answerKey(modelEnv, t) || '', t.model, fit.messages, ctrl.signal);
+            r = await streamFrom(ANSWER_ENDPOINTS[t.provider], answerKey(modelEnv, t) || '', t.model, fit.messages, ctrl.signal);
           } catch (e) {
             detail = String((e as Error)?.message || e).slice(0, 300);
           } finally {
@@ -2577,6 +2575,8 @@ export async function POST(request: NextRequest) {
         const decoder = new TextDecoder();
         let leftover = '';
         let finishReason: string | null = null;
+        // Tool-call markup never reaches the customer as answer text (see tool-markup-filter.ts).
+        const markupFilter = createMarkupFilter();
 
         while (true) {
           // Nobody is reading: stop the provider stream instead of generating unread tokens.
@@ -2612,11 +2612,12 @@ export async function POST(request: NextRequest) {
               const delta = parsed?.choices?.[0]?.delta?.content;
               const fr = parsed?.choices?.[0]?.finish_reason;
               if (typeof fr === 'string' && fr) finishReason = fr;
-              if (typeof delta === 'string' && delta.length > 0) {
-                assistantContent += delta;
+              const shown = typeof delta === 'string' && delta.length > 0 ? markupFilter.push(delta) : '';
+              if (shown.length > 0) {
+                assistantContent += shown;
                 // With a verified list on screen, the analysis is checked before it is shown (see below).
                 // When create_document left download paths, buffer until host rewrite runs.
-                if (!renderedRecords.length && !deferAnswerTokens) send({ type: 'token', content: delta });
+                if (!renderedRecords.length && !deferAnswerTokens) send({ type: 'token', content: shown });
               }
               if (parsed?.usage?.total_tokens) {
                 tokensUsed = parsed.usage.total_tokens;
@@ -2630,6 +2631,13 @@ export async function POST(request: NextRequest) {
             } catch {
               // Ignore unparseable lines — Groq occasionally sends keep-alives
             }
+          }
+        }
+        {
+          const tail = markupFilter.end();
+          if (tail) {
+            assistantContent += tail;
+            if (!renderedRecords.length && !deferAnswerTokens) send({ type: 'token', content: tail });
           }
         }
 

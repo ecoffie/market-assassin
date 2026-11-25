@@ -104,7 +104,7 @@ export function anthropicSupportsForcedToolChoice(model: string): boolean {
  * provider:model, providers openai|groq) replaces the default fallbacks when set; set it to
  * the literal 'none' for no fallback. Groq runs only when listed explicitly.
  */
-export type AnswerProvider = 'openai' | 'groq' | 'anthropic';
+export type AnswerProvider = 'openai' | 'groq';
 export interface AnswerTarget { provider: AnswerProvider; model: string }
 
 export const DEFAULT_ANSWER_FALLBACK: AnswerTarget = { provider: 'openai', model: 'gpt-4o-mini' };
@@ -112,24 +112,13 @@ export const DEFAULT_ANSWER_FALLBACK: AnswerTarget = { provider: 'openai', model
 export const ANSWER_ENDPOINTS: Record<AnswerProvider, string> = {
   openai: 'https://api.openai.com/v1/chat/completions',
   groq: 'https://api.groq.com/openai/v1/chat/completions',
-  // Not fetched directly: the route streams Claude through the SDK adapter (src/lib/chat/anthropic-answer-stream.ts).
-  anthropic: 'https://api.anthropic.com/v1/messages',
 };
 
 export function answerKey(env: Env, t: AnswerTarget): string | undefined {
-  return t.provider === 'openai' ? env.OPENAI_API_KEY : t.provider === 'anthropic' ? env.ANTHROPIC_API_KEY : env.GROQ_API_KEY;
+  return t.provider === 'openai' ? env.OPENAI_API_KEY : env.GROQ_API_KEY;
 }
 
-/**
- * Claude as the answer model (CHAT_CLAUDE_ANSWER=true; Eric, 2026-11-25). When on, Claude writes the answer and the
- * configured OpenAI model becomes the first fallback. Off for a downgraded over-budget user (budgetDowngradeActive).
- */
-export function claudeAnswerTarget(env: Env, opts: { downgrade?: boolean } = {}): AnswerTarget | null {
-  if (env.CHAT_CLAUDE_ANSWER !== 'true' || !env.ANTHROPIC_API_KEY || opts.downgrade) return null;
-  return { provider: 'anthropic', model: env.CHAT_CLAUDE_ANSWER_MODEL || 'claude-opus-5-5' };
-}
-
-export function resolveAnswerChain(env: Env, opts: { primaryModel: string; downgrade?: boolean }): AnswerTarget[] {
+export function resolveAnswerChain(env: Env, opts: { primaryModel: string }): AnswerTarget[] {
   const raw = env.CHAT_ANSWER_FALLBACKS;
   const fallbacks: AnswerTarget[] = raw === 'none'
     ? []
@@ -140,8 +129,7 @@ export function resolveAnswerChain(env: Env, opts: { primaryModel: string; downg
       }).filter((t): t is AnswerTarget => !!t && (t.provider === 'openai' || t.provider === 'groq') && !!t.model)
       : [DEFAULT_ANSWER_FALLBACK];
   const seen = new Set<string>();
-  const claude = claudeAnswerTarget(env, { downgrade: opts.downgrade });
-  return [...(claude ? [claude] : []), { provider: 'openai' as const, model: opts.primaryModel }, ...fallbacks].filter((t) => {
+  return [{ provider: 'openai' as const, model: opts.primaryModel }, ...fallbacks].filter((t) => {
     const k = `${t.provider}:${t.model}`;
     if (seen.has(k)) return false;
     seen.add(k);

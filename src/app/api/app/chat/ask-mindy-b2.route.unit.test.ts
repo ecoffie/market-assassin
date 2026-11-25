@@ -33,6 +33,7 @@ const state: {
   extraOffered: string[];
   plannerBodies: Array<Record<string, unknown>>;
   plannerFailModels: Set<string>;
+  answerText?: string;
 } = {} as never;
 const budget = { over: false };
 
@@ -83,6 +84,7 @@ function sse(text: string) {
 }
 
 beforeEach(() => {
+  state.answerText = undefined;
   Object.assign(state, {
     plannerCalls: [], offered: [], executed: [], executedArgs: [], toolContent: '{"ok":true,"results":[]}', toolStatus: 'success',
     answerModels: [], answerUrls: [], failModels: new Set(), answerThrows: false, answerMessages: [], plannerModels: [], plannerBodies: [], plannerFailModels: new Set(), extraOffered: [],
@@ -106,7 +108,7 @@ beforeEach(() => {
     if (state.answerThrows) {
       return new Response(new ReadableStream({ start(c) { c.error(new Error(SECRET)); } }), { status: 200 });
     }
-    return new Response(sse('Review the records above.'), { status: 200 });
+    return new Response(sse(state.answerText ?? 'Review the records above.'), { status: 200 });
   }));
   vi.spyOn(console, 'error').mockImplementation(() => {});
   vi.spyOn(console, 'warn').mockImplementation(() => {});
@@ -560,5 +562,15 @@ describe('F1: a CURRENT_FIND question uses find_opportunities across three horiz
     state.extraOffered = ['find_opportunities'];
     await ask(ERIC_Q.replace('What open opportunities are there for janitorial services in Florida?', 'Which agencies spend the most on facilities here?'));
     expect(state.offered[0]).toEqual(['get_expiring_contracts', 'search_sam_opportunities', 'find_opportunities']);
+  });
+});
+
+describe('B2: tool-call markup never reaches the customer (2026-11-25)', () => {
+  it('markup printed by the answer model is dropped from the streamed tokens; the rest of the answer arrives', async () => {
+    state.answerText = 'Watch it for now. <invoke name="get_award_detail"><parameter name="piid">36C24823P1623</parameter></invoke> I can look it up as an award.';
+    const { events, raw } = await ask('How do I write a capability statement?');
+    const text = events.filter((e) => e.type === 'token').map((e) => e.content).join('');
+    expect(text).toBe('Watch it for now.  I can look it up as an award.');
+    expect(raw).not.toContain('<invoke');
   });
 });
