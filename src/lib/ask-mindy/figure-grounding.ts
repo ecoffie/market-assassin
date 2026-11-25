@@ -71,13 +71,39 @@ export function ungroundedFigures(decision: AnalystDecision, evidence: string): 
   return ungroundedFiguresInText(decisionText(decision), evidence);
 }
 
+/**
+ * Plain numbers in the evidence (tool results carry contract values as JSON numbers: "total_obligation": 1234567.89,
+ * "1,234,567"), as candidate dollar values. Only standalone numbers of 1,000 or more: never digits inside an identifier
+ * (a PIID, UEI or notice id) or a date.
+ */
+export function plainNumbersIn(text: string): number[] {
+  const out: number[] = [];
+  for (const m of text.matchAll(/(?<![\w.\-/])(\d{1,3}(?:,\d{3})+|\d+)(\.\d+)?(?![\w\-/]|\.\d)/g)) {
+    // A quoted run of bare digits is a code (NAICS, PSC, ZIP, an id), not an amount: "541810". A quoted amount keeps its
+    // commas or decimals ("1,234,567", "1234567.89") and still counts.
+    const at = m.index ?? 0;
+    const quoted = text[at - 1] === '"' && text[at + m[0].length] === '"';
+    if (quoted && !m[1].includes(',') && !m[2]) continue;
+    const v = Number(`${m[1].replace(/,/g, '')}${m[2] ?? ''}`);
+    if (Number.isFinite(v) && v >= 1000) out.push(v);
+  }
+  return out;
+}
+
+/** Does an evidence value round to the figure as the answer states it (its unit and decimals)? */
+const roundsTo = (e: number, w: { num: number; unit: number; decimals: number }) => {
+  const scaled = e / w.unit;
+  return Number(scaled.toFixed(w.decimals)) === w.num || (w.decimals === 0 && Math.trunc(scaled) === w.num);
+};
+
 /** The same check on any free text (research mode's answer): figures stated that the evidence does not contain. */
 export function ungroundedFiguresInText(text: string, evidence: string): string[] {
-  const evMoney = moneyIn(evidence).map((x) => x.num * x.unit);
+  // Dollar figures written in the evidence AND plain numbers from tool results (Mindy's own contract values).
+  const evMoney = [...moneyIn(evidence).map((x) => x.num * x.unit), ...plainNumbersIn(evidence)];
   const evDates = datesIn(evidence);
   const bad = new Set<string>();
   for (const w of moneyIn(text)) {
-    const ok = evMoney.some((e) => Number((e / w.unit).toFixed(w.decimals)) === w.num);
+    const ok = evMoney.some((e) => roundsTo(e, w));
     if (!ok) bad.add(w.text);
   }
   for (const w of datesIn(text)) {
