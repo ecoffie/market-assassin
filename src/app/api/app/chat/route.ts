@@ -43,6 +43,7 @@ import { isUserOverBudget, recordLlmUsage } from '@/lib/llm/usage-cost';
 import { makeTier0Tools, TIER0_TOOL_DEFS, TIER0_TOOL_NAMES } from '@/lib/chat/tier0-tools';
 import { makeMyDocumentsTool, MY_DOCUMENTS_TOOL_DEF, FIND_MY_DOCUMENTS } from '@/lib/chat/my-documents-tool';
 import { makeSearchWebTool, SEARCH_WEB_TOOL_DEF, SEARCH_WEB, callerKeyFor } from '@/lib/chat/search-web-tool';
+import { makeReadWebPageTool, READ_WEB_PAGE_TOOL_DEF, READ_WEB_PAGE, urlsInText } from '@/lib/chat/read-web-page';
 import { makeGenerateDocumentTool, CREATE_DOCUMENT_TOOL_DEF, CREATE_DOCUMENT, isDocumentCreationRequest, parseCreateDocumentDeliverables, type CreateDocumentDeliverable } from '@/lib/chat/generate-document-tool';
 import { vaultDocEnabledFor } from '@/lib/vault/flags';
 // Tools run ONLY through the chat tool executor (policy check at offer AND execution,
@@ -50,7 +51,8 @@ import { vaultDocEnabledFor } from '@/lib/vault/flags';
 import { createChatToolExecutor, type ChatExecutionRecord } from '@/lib/chat/chat-tool-executor';
 import { resolveChatActingScope, vaultEmailFor } from '@/lib/chat/chat-acting-scope';
 import type { BidderProfile } from '@/lib/proposal/types';
-import { resolvePlannerChain, plannerKey, anthropicSupportsForcedToolChoice, resolveAnswerChain, answerKey, ANSWER_ENDPOINTS, openAiChatParams, type PlannerTarget } from '@/lib/chat/planner-config';
+import { createMarkupFilter } from '@/lib/chat/tool-markup-filter';
+import { budgetDowngradeActive, resolvePlannerChain, plannerKey, anthropicSupportsForcedToolChoice, resolveAnswerChain, answerKey, ANSWER_ENDPOINTS, openAiChatParams, type PlannerTarget } from '@/lib/chat/planner-config';
 import { fitMessages, inputBudget, type MsgKind } from '@/lib/chat/token-budget';
 import { stagingModelConfig, STAGING_CONFIG_HEADER } from '@/lib/chat/staging-model-config';
 import { customerErrorMessage } from '@/lib/chat/customer-errors';
@@ -1040,7 +1042,7 @@ export async function POST(request: NextRequest) {
         const staging = stagingModelConfig(request.headers.get(STAGING_CONFIG_HEADER), TRACE_EVENTS);
         const overBudgetEarly = staging?.config.overBudget ?? await isUserOverBudget(email).catch(() => false);
         const modelEnv: Record<string, string | undefined> = staging ? { ...process.env, ...staging.config.env } : process.env;
-        const chatModelEarly = overBudgetEarly
+        const chatModelEarly = budgetDowngradeActive(modelEnv, overBudgetEarly)
           ? (modelEnv.LLM_OPENAI_MODEL || 'gpt-4o-mini')
           : (modelEnv.CHAT_OPENAI_MODEL || 'gpt-4o');
 
@@ -1186,8 +1188,14 @@ export async function POST(request: NextRequest) {
             documentText: () => turnDocumentTexts.join('\n'),
             attribution: { callerKey: callerKeyFor(auth.email), sessionId: turnSessionId },
           });
-          const privateDefs = [...TIER0_TOOL_DEFS, SEARCH_WEB_TOOL_DEF, ...(myDocs ? [MY_DOCUMENTS_TOOL_DEF] : []), ...(genDoc ? [CREATE_DOCUMENT_TOOL_DEF] : [])];
-          const privateNames = new Set([...TIER0_TOOL_NAMES, SEARCH_WEB, ...(myDocs ? [FIND_MY_DOCUMENTS] : []), ...(genDoc ? [CREATE_DOCUMENT] : [])]);
+          // read_web_page (research mode only, RM-3): URLs from this turn's search results or the customer's words; page
+          // text joins the document guard so it can never be copied into an outside search query.
+          const turnWebUrls: string[] = [...urlsInText(message)];
+          const readPage = researchTurn
+            ? makeReadWebPageTool({ allowedUrls: () => turnWebUrls, onPageText: (t) => { turnDocumentTexts.push(t); } })
+            : null;
+          const privateDefs = [...TIER0_TOOL_DEFS, SEARCH_WEB_TOOL_DEF, ...(readPage ? [READ_WEB_PAGE_TOOL_DEF] : []), ...(myDocs ? [MY_DOCUMENTS_TOOL_DEF] : []), ...(genDoc ? [CREATE_DOCUMENT_TOOL_DEF] : [])];
+          const privateNames = new Set([...TIER0_TOOL_NAMES, SEARCH_WEB, ...(readPage ? [READ_WEB_PAGE] : []), ...(myDocs ? [FIND_MY_DOCUMENTS] : []), ...(genDoc ? [CREATE_DOCUMENT] : [])]);
           const executor = createChatToolExecutor({
             userEmail: auth.email!,
             ...(actingScope.kind === 'client' ? { vaultEmail: actingScope.vaultEmail } : {}),
@@ -1197,7 +1205,13 @@ export async function POST(request: NextRequest) {
               defs: privateDefs,
               names: privateNames,
               execute: (n, a) => {
-                if (n === SEARCH_WEB) return searchWeb.execute(a);
+                if (n === SEARCH_WEB) {
+                  return searchWeb.execute(a).then((r) => {
+                    for (const x of (r.results as Array<{ url?: string }> | undefined) || []) if (x?.url) turnWebUrls.push(String(x.url));
+                    return r;
+                  });
+                }
+                if (readPage && n === READ_WEB_PAGE) return readPage.execute(a);
                 if (myDocs && n === FIND_MY_DOCUMENTS) {
                   return myDocs.execute(a).then((r) => {
                     try { turnDocumentTexts.push(JSON.stringify(r)); } catch { /* unserializable result: nothing to guard */ }
@@ -2693,6 +2707,8 @@ export async function POST(request: NextRequest) {
         const decoder = new TextDecoder();
         let leftover = '';
         let finishReason: string | null = null;
+        // Tool-call markup never reaches the customer as answer text (see tool-markup-filter.ts).
+        const markupFilter = createMarkupFilter();
 
         while (true) {
           // Nobody is reading: stop the provider stream instead of generating unread tokens.
@@ -2728,11 +2744,12 @@ export async function POST(request: NextRequest) {
               const delta = parsed?.choices?.[0]?.delta?.content;
               const fr = parsed?.choices?.[0]?.finish_reason;
               if (typeof fr === 'string' && fr) finishReason = fr;
-              if (typeof delta === 'string' && delta.length > 0) {
-                assistantContent += delta;
+              const shown = typeof delta === 'string' && delta.length > 0 ? markupFilter.push(delta) : '';
+              if (shown.length > 0) {
+                assistantContent += shown;
                 // With a verified list on screen, the analysis is checked before it is shown (see below).
                 // When create_document left download paths, buffer until host rewrite runs.
-                if (!renderedRecords.length && !deferAnswerTokens) send({ type: 'token', content: delta });
+                if (!renderedRecords.length && !deferAnswerTokens) send({ type: 'token', content: shown });
               }
               if (parsed?.usage?.total_tokens) {
                 tokensUsed = parsed.usage.total_tokens;
@@ -2746,6 +2763,13 @@ export async function POST(request: NextRequest) {
             } catch {
               // Ignore unparseable lines — Groq occasionally sends keep-alives
             }
+          }
+        }
+        {
+          const tail = markupFilter.end();
+          if (tail) {
+            assistantContent += tail;
+            if (!renderedRecords.length && !deferAnswerTokens) send({ type: 'token', content: tail });
           }
         }
 
