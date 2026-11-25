@@ -193,6 +193,82 @@ describe('Map report pane: the preview can be scrolled', () => {
     Object.defineProperty(de, 'clientHeight', { configurable: true, get: () => parseInt(f.style.height, 10) || 0 });
   };
 
+  // Production retest (2026-11-25): after a CLICK in the report, focus is inside the frame, whose document does
+  // not scroll; the keys must still move the pane body.
+  const loadFitted = async (h = 6100) => {
+    const t = boot({ chat: reportTurn() });
+    await t.ask('market report');
+    const f = t.doc.querySelector('.amk-rep-f') as HTMLIFrameElement;
+    const body = t.doc.querySelector('.amk-rep-body') as HTMLElement;
+    const d = f.contentDocument!; d.open(); d.write(HTML); d.close();
+    fakeHeight(f, h);
+    Object.defineProperty(body, 'clientHeight', { configurable: true, get: () => 430 });
+    Object.defineProperty(body, 'scrollHeight', { configurable: true, get: () => h });
+    f.dispatchEvent(new t.w.Event('load'));
+    const key = (k: string, init: Record<string, unknown> = {}) => {
+      const ev = new d.defaultView!.KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true, ...init });
+      (d.body.querySelector('p') ?? d.body).dispatchEvent(ev);
+      return ev.defaultPrevented;
+    };
+    return { t, f, body, d, key };
+  };
+
+  it('keys pressed inside the report (after a click) scroll the pane body: PageDown, ArrowDown, Space, End, Home, PageUp', async () => {
+    const { body, key } = await loadFitted();
+    expect(body.scrollTop).toBe(0);
+    expect(key('PageDown')).toBe(true);
+    expect(body.scrollTop).toBe(376); // 87.5% of the 430px pane
+    key('ArrowDown');
+    expect(body.scrollTop).toBe(416);
+    key(' ');
+    expect(body.scrollTop).toBe(792);
+    key(' ', { shiftKey: true });
+    expect(body.scrollTop).toBe(416);
+    key('End');
+    expect(body.scrollTop).toBe(6100 - 430); // the last section
+    key('PageDown');
+    expect(body.scrollTop).toBe(6100 - 430); // clamped at the end
+    key('PageUp');
+    expect(body.scrollTop).toBe(6100 - 430 - 376);
+    key('Home');
+    expect(body.scrollTop).toBe(0);
+    key('ArrowUp');
+    expect(body.scrollTop).toBe(0); // clamped at the top
+  });
+
+  it('other keys, browser shortcuts and form fields are left alone', async () => {
+    const { body, key, d } = await loadFitted();
+    expect(key('a')).toBe(false);
+    expect(key('Tab')).toBe(false);
+    expect(key('End', { ctrlKey: true })).toBe(false);
+    expect(key('PageDown', { metaKey: true })).toBe(false);
+    expect(key('ArrowDown', { altKey: true })).toBe(false);
+    expect(body.scrollTop).toBe(0);
+    const input = d.createElement('input'); d.body.appendChild(input);
+    const ev = new d.defaultView!.KeyboardEvent('keydown', { key: 'End', bubbles: true, cancelable: true });
+    input.dispatchEvent(ev);
+    expect(ev.defaultPrevented).toBe(false);
+    expect(body.scrollTop).toBe(0);
+  });
+
+  it('a report that is NOT fitted (unreadable size) keeps native in-frame scrolling: keys are not intercepted', async () => {
+    const t = boot({ chat: reportTurn() });
+    await t.ask('market report');
+    const f = t.doc.querySelector('.amk-rep-f') as HTMLIFrameElement;
+    const d = f.contentDocument!; d.open(); d.write(HTML); d.close();
+    f.dispatchEvent(new t.w.Event('load')); // jsdom reports height 0, so the frame is not fitted
+    expect(f.classList.contains('fit')).toBe(false);
+    const ev = new d.defaultView!.KeyboardEvent('keydown', { key: 'PageDown', bubbles: true, cancelable: true });
+    d.body.dispatchEvent(ev);
+    expect(ev.defaultPrevented).toBe(false);
+  });
+
+  it('the handler runs in the parent: the frame stays script-less', async () => {
+    const { f } = await loadFitted();
+    expect(f.getAttribute('sandbox')).toBe('allow-same-origin');
+    expect(MAP).toContain("repKeys(repEls,body);");
+  });
+
   it('a loaded report is sized to its full height, the pane body takes focus, and the report is not a second scroller', async () => {
     const t = boot({ chat: reportTurn() });
     await t.ask('market report');
