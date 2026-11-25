@@ -6,6 +6,7 @@
  * Prices are approximate USD per 1M tokens (update as providers change). Source
  * of truth for the cost dashboard (#37) + the per-user cap.
  */
+import { getStaffRole, INTERNAL_TEAM_EMAILS } from '@/lib/access/staff-role';
 import { createClient } from '@supabase/supabase-js';
 
 type TokenUsage = { prompt_tokens?: number; completion_tokens?: number };
@@ -72,17 +73,36 @@ export async function recordLlmUsage(params: {
   } catch { /* telemetry must never break the request */ }
 }
 
-/** Current-month LLM spend ($) for a user. 0 on any error (fail-open). */
-export async function getUserMonthSpend(userEmail: string): Promise<number> {
+/** Rows per page when summing usage (PostgREST caps a response at 1,000 rows). */
+export const SPEND_PAGE_ROWS = 1000;
+/** Pages read at most (a runaway account still gets a bounded read). */
+export const SPEND_MAX_PAGES = 50;
+
+/**
+ * Current-month LLM spend ($) for a user. 0 on any error (fail-open: a telemetry read never blocks a customer).
+ * Every row of the month is summed: the read is paged, because a single PostgREST response stops at 1,000 rows and a
+ * heavy user's spend was under-counted (2026-11-25).
+ */
+export async function getUserMonthSpend(userEmail: string, db: () => ReturnType<typeof sb> = sb): Promise<number> {
   try {
     const start = new Date();
     const monthStart = `${start.getUTCFullYear()}-${String(start.getUTCMonth() + 1).padStart(2, '0')}-01`;
-    const { data } = await sb()
-      .from('llm_usage_log')
-      .select('cost_usd')
-      .eq('user_email', userEmail)
-      .gte('created_at', monthStart);
-    return (data || []).reduce((sum, r: { cost_usd?: number }) => sum + (r.cost_usd || 0), 0);
+    let total = 0;
+    for (let page = 0; page < SPEND_MAX_PAGES; page++) {
+      const from = page * SPEND_PAGE_ROWS;
+      const { data, error } = await db()
+        .from('llm_usage_log')
+        .select('cost_usd')
+        .eq('user_email', userEmail)
+        .gte('created_at', monthStart)
+        .order('created_at', { ascending: true })
+        .range(from, from + SPEND_PAGE_ROWS - 1);
+      if (error) return total;
+      const rows = (data || []) as Array<{ cost_usd?: number | string | null }>;
+      total += rows.reduce((sum, r) => sum + (Number(r.cost_usd) || 0), 0);
+      if (rows.length < SPEND_PAGE_ROWS) break;
+    }
+    return total;
   } catch { return 0; }
 }
 
@@ -94,6 +114,9 @@ export const USER_MONTHLY_LLM_BUDGET_USD = Number(process.env.USER_MONTHLY_LLM_B
 /** Is the user over their monthly LLM budget? (→ force the cheapest model.) */
 export async function isUserOverBudget(userEmail?: string | null): Promise<boolean> {
   if (!userEmail) return false;
+  // Admin, staff and the internal team are never held to the monthly dollar limit (Eric, 2026-11-25).
+  const e = userEmail.trim().toLowerCase();
+  if (getStaffRole(e) !== 'none' || INTERNAL_TEAM_EMAILS.has(e)) return false;
   const spend = await getUserMonthSpend(userEmail);
   return spend >= USER_MONTHLY_LLM_BUDGET_USD;
 }

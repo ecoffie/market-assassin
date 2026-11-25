@@ -132,16 +132,17 @@ describe('research mode in the chat route', () => {
     expect(JSON.stringify(trace)).not.toContain('obligated $1.2M');
   });
 
-  it('the model is set by env and never swapped; over budget says so plainly and runs no model', async () => {
+  it('the model is set by env and never swapped; the monthly dollar limit does NOT govern research mode (daily caps only)', async () => {
     flagOn();
     process.env.ASK_MINDY_RESEARCH_MODEL = 'claude-sonnet-5-5';
     await ask(Q);
     expect((h.create.mock.calls[0][0] as { model: string }).model).toBe('claude-sonnet-5-5');
     h.create.mockClear(); h.inserts.length = 0; h.overBudget = true;
     const ev = await ask(Q);
-    expect(h.create).not.toHaveBeenCalled();
+    expect(h.create).toHaveBeenCalled();
+    expect((h.create.mock.calls[0][0] as { model: string }).model).toBe('claude-sonnet-5-5');
     expect(openaiCalls).toHaveLength(0);
-    expect(text(ev)).toMatch(/reached this month's research limit/);
+    expect(text(ev)).not.toMatch(/research limit/);
   });
 
   it('an untraceable figure is fixed by one revision, or disclosed first', async () => {
