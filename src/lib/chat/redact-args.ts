@@ -94,7 +94,7 @@ const STRUCTURED: Readonly<Record<string, Validator>> = {
   date_from: DATE, date_to: DATE,
   limit: NUM, offset: NUM, page: NUM, months_window: NUM, months_min: NUM, months_ahead: NUM,
   min_value: NUM, max_value: NUM, lead_months: NUM, days: NUM, days_back: NUM, closingDays: NUM, postedDays: NUM,
-  recompete_months: NUM, open_closing_days: NUM, window_days: NUM, award_limit: NUM, limit_per_horizon: NUM,
+  recompete_months: NUM, open_closing_days: NUM, window_days: NUM, award_limit: NUM, limit_per_horizon: NUM, offset_per_horizon: NUM,
   text_limit: NUM, text_offset: NUM, coverage_target: NUM, n: NUM, e: NUM, s: NUM, w: NUM,
   fiscal_year: FY, from_fy: FY, to_fy: FY, as_of_year: FY,
   alerts_enabled: BOOL, async: BOOL, coming_back: BOOL, coming_soon: BOOL, forecast: BOOL,

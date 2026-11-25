@@ -122,6 +122,11 @@ export interface FindOpportunitiesInput {
   } | null;
   horizons?: Partial<Record<HorizonKey, boolean>> | null;
   limit_per_horizon?: number | null;
+  /**
+   * Paging: 0-based index of the first row to return in EACH horizon, within that horizon's ranked window
+   * (see HorizonResult.page). Use page.next_offset from the previous call with the same query.
+   */
+  offset_per_horizon?: number | null;
   advanced?: {
     naics?: string | null;
     psc?: string | null;
@@ -199,6 +204,11 @@ export interface HorizonResult {
    * compare it with matched_count. Absent when the horizon did not rank rows (unavailable / empty paths).
    */
   window_size?: number;
+  /**
+   * Paging within the ranked window. has_more = more ranked rows remain (call again with next_offset).
+   * When matched_count exceeds window_size, rows beyond the window are reachable only by narrowing the query.
+   */
+  page?: { offset: number; limit: number; returned: number; window_size: number; has_more: boolean; next_offset: number | null };
   items: HorizonItem[];
   source: string;
   as_of: string | null;
@@ -441,6 +451,14 @@ function finiteOrNull(v: unknown): number | null {
   if (v === null || v === undefined || (typeof v === 'string' && v.trim() === '')) return null;
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
+}
+
+/** Paging offset: a non-negative integer, capped inside the largest ranked window (OPEN_FETCH_CAP). */
+export const MAX_OFFSET_PER_HORIZON = OPEN_FETCH_CAP - 25;
+function clampOffset(n: unknown): number {
+  const v = Number(n);
+  if (!Number.isFinite(v) || v < 0) return 0;
+  return Math.min(Math.floor(v), MAX_OFFSET_PER_HORIZON);
 }
 
 function clampLimit(n: unknown): number {
@@ -850,6 +868,7 @@ async function queryOpenNow(
   client: SupabaseClient,
   p: InterpretedQuery,
   limit: number,
+  offset = 0,
 ): Promise<HorizonResult> {
   const source = 'sam_opportunities';
   if (p.plan.status !== 'ok') return blockedHorizon(source, OPEN_HANDOFFS, p.plan);
@@ -876,9 +895,11 @@ async function queryOpenNow(
       'notice_id, title, department, sub_tier, naics_code, psc_code, description, set_aside_code, set_aside_description, notice_type, response_deadline, ui_link, solicitation_number, pop_state, pop_city, pop_country, office_address, map_lat, updated_at';
 
     // Candidate window: deadline-ordered, capped (OPEN_FETCH_CAP measured), then ranked.
-    const fetchCap = Math.max(limit, OPEN_FETCH_CAP);
+    const fetchCap = Math.max(limit + offset, OPEN_FETCH_CAP);
     const { data, count, error } = await inStage(applyOpenPlan(client.from(source).select(COLS, { count: 'exact' }), p.plan))
       .order('response_deadline', { ascending: true, nullsFirst: false })
+      // Tie-break only: rows sharing a deadline keep one order, so pages never repeat or skip a row.
+      .order('notice_id', { ascending: true })
       .limit(fetchCap);
     if (error) {
       // A timed-out search is "too long", with an actionable message; still unavailable, never zero (search-failure.ts).
@@ -914,6 +935,7 @@ async function queryOpenNow(
     if (p.basePlan) {
       const base = await inStage(applyOpenPlan(client.from(source).select(COLS), p.basePlan))
         .order('response_deadline', { ascending: true, nullsFirst: false })
+        .order('notice_id', { ascending: true })
         .limit(fetchCap);
       if (!base.error) baseRows = (base.data || []) as Array<Record<string, unknown>>;
     }
@@ -937,7 +959,7 @@ async function queryOpenNow(
         || a.i - b.i);
     const evidence_counts: EvidenceCounts = openEvidenceCounts(ranked);
     if (p.company) evidence_counts.COMPANY_REGISTERED_CODE = ranked.filter((x) => x.label.tier === OPEN_TIER.COMPANY_CODE).length;
-    const sliced = ranked.slice(0, limit);
+    const sliced = ranked.slice(offset, offset + limit);
     const phrase = p.searchText || 'this work';
 
     const items: HorizonItem[] = sliced.map(({ row: r, cls, label }) => {
@@ -1042,6 +1064,7 @@ async function queryComingBack(
   p: InterpretedQuery,
   limit: number,
   competitionLookup: CompetitionLookup | null = null,
+  offset = 0,
 ): Promise<HorizonResult> {
   const source = 'recompete_opportunities';
   if (p.plan.status !== 'ok') return blockedHorizon(source, BACK_HANDOFFS, p.plan);
@@ -1057,7 +1080,7 @@ async function queryComingBack(
       'contract_id,piid,incumbent_name,incumbent_uei,awarding_agency,awarding_sub_agency,naics_code,naics_description,psc_code,psc_description,description,potential_total_value,total_obligation,period_of_performance_current_end,place_of_performance_state,place_of_performance_city,set_aside_type,recompete_likelihood,map_lat,last_synced_at,contract_type';
 
     // MCP surface policy (unchanged): soonest-ending first; wider window only for related-market.
-    const baseCap = Math.max(limit, related ? 200 : limit);
+    const baseCap = Math.max(limit + offset, related ? 200 : limit + offset);
     // Company-anchored: registered codes can admit hundreds of rows ahead of the text matches in
     // end-date order, so the anchored window is wider (OPEN_FETCH_CAP) and the base plan is unioned.
     const fetchCap = p.basePlan ? Math.max(baseCap, OPEN_FETCH_CAP) : baseCap;
@@ -1069,6 +1092,7 @@ async function queryComingBack(
     const { data, count, error } = await applyRecompetePlan(client.from(source).select(COLS, { count: 'exact' }), p.plan)
       .or(NOT_ORDER_UNDER_VEHICLE_OR)
       .order('period_of_performance_current_end', { ascending: true })
+      .order('contract_id', { ascending: true })
       .limit(fetchCap);
     if (error) return unavailable(source, BACK_HANDOFFS, error.message, unsupported);
 
@@ -1091,6 +1115,7 @@ async function queryComingBack(
       const base = await applyRecompetePlan(client.from(source).select(COLS), p.basePlan)
         .or(NOT_ORDER_UNDER_VEHICLE_OR)
         .order('period_of_performance_current_end', { ascending: true })
+        .order('contract_id', { ascending: true })
         .limit(baseCap);
       if (!base.error) baseRows = (base.data || []) as Array<Record<string, unknown>>;
     }
@@ -1127,9 +1152,11 @@ async function queryComingBack(
       const sa = scores.get(a.row); const sb2 = scores.get(b.row);
       return (sb2?.breadth ?? 0) - (sa?.breadth ?? 0) || a.i - b.i; // then soonest end (fetch order)
     });
-    const sliced = classified.slice(0, limit);
+    const sliced = classified.slice(offset, offset + limit);
 
-    if (!sliced.length) {
+    // Empty only when nothing was ranked. A page past the end of a non-empty window is grounded with no
+    // rows (see page.has_more), never "no matching recompetes".
+    if (!classified.length) {
       const excluded = ordersExcluded === null ? null : ordersExcluded + ordersDroppedInJs;
       const msg = excluded
         ? 'No standalone future recompetes under these filters — only task/delivery orders under existing vehicles matched, and those are not re-competed on their own.'
@@ -1267,6 +1294,7 @@ async function queryComingSoon(
   client: SupabaseClient,
   p: InterpretedQuery,
   limit: number,
+  offset = 0,
 ): Promise<HorizonResult> {
   const source = 'agency_forecasts';
   if (p.plan.status !== 'ok') return blockedHorizon(source, SOON_HANDOFFS, p.plan);
@@ -1311,7 +1339,7 @@ async function queryComingSoon(
     const COLS =
       'id, title, description, department, source_agency, naics_code, naics_description, set_aside_type, estimated_value_min, estimated_value_max, estimated_value_range, anticipated_quarter, fiscal_year, anticipated_award_date, solicitation_date, pop_state, pop_city, map_lat, status, last_synced_at, updated_at, source_url, external_id, contracting_office, incumbent_name';
 
-    const { data, count, error } = await applyForecastPlan(client.from(source).select(COLS, { count: 'exact' }), p.plan).limit(Math.max(limit, p.basePlan ? OPEN_FETCH_CAP : 200));
+    const { data, count, error } = await applyForecastPlan(client.from(source).select(COLS, { count: 'exact' }), p.plan).order('id', { ascending: true }).limit(Math.max(limit + offset, p.basePlan ? OPEN_FETCH_CAP : 200));
     if (error) return unavailable(source, SOON_HANDOFFS, error.message, unsupported);
 
     let unmapped: number | null = null;
@@ -1323,7 +1351,7 @@ async function queryComingSoon(
     type Row = Record<string, unknown>;
     let baseRows: Row[] | null = null;
     if (p.basePlan) {
-      const base = await applyForecastPlan(client.from(source).select(COLS), p.basePlan).limit(Math.max(limit, 200));
+      const base = await applyForecastPlan(client.from(source).select(COLS), p.basePlan).order('id', { ascending: true }).limit(Math.max(limit + offset, 200));
       if (!base.error) baseRows = (base.data || []) as Row[];
     }
     // The same listing ingested twice (`GW-L:FHWA-2026-167` + legacy `FHWA_2026_167`) is ONE forecast —
@@ -1345,6 +1373,7 @@ async function queryComingSoon(
       return da.localeCompare(db);
     });
     const forecastWindow = rows.length;
+    rows.splice(0, offset);
     rows.splice(limit);
 
     // Partial coverage: the count measures ONLY the covered buyers; the missing ones are named, never zero.
@@ -1356,7 +1385,8 @@ async function queryComingSoon(
       : null;
     if (partial) unsupported.push(`forecast publisher not established for: ${gaps.map((x) => x.requested).join(', ')}`);
 
-    if (!rows.length) {
+    // Empty only when nothing was ranked; a page past the end of a non-empty window is grounded with no rows.
+    if (!forecastWindow) {
       const empty = emptyHorizon(
         source,
         SOON_HANDOFFS,
@@ -1672,6 +1702,7 @@ export async function findOpportunities(
   ).filter((k) => hz[k] !== false);
 
   const limit = clampLimit(input.limit_per_horizon);
+  const offset = clampOffset(input.offset_per_horizon);
   // Company-anchored FIND: resolve BEFORE the plan so registered codes can widen recall. A failed
   // lookup never blocks FIND — it runs unanchored and every item's eligibility says why it is UNKNOWN.
   const uei = String(input.uei || '').trim();
@@ -1692,10 +1723,14 @@ export async function findOpportunities(
       );
     }
     const h = key === 'open_now'
-      ? await queryOpenNow(client, interpreted, limit)
+      ? await queryOpenNow(client, interpreted, limit, offset)
       : key === 'coming_back'
-        ? await queryComingBack(client, interpreted, limit, deps.competitionLookup === undefined ? usaspendingCompetitionLookup : deps.competitionLookup)
-        : await queryComingSoon(client, interpreted, limit);
+        ? await queryComingBack(client, interpreted, limit, deps.competitionLookup === undefined ? usaspendingCompetitionLookup : deps.competitionLookup, offset)
+        : await queryComingSoon(client, interpreted, limit, offset);
+    if (typeof h.window_size === 'number') {
+      const hasMore = offset + h.items.length < h.window_size;
+      h.page = { offset, limit, returned: h.items.length, window_size: h.window_size, has_more: hasMore, next_offset: hasMore ? offset + h.items.length : null };
+    }
     return annotateHorizon(key, h, interpreted);
   };
 

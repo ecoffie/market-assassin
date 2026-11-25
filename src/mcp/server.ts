@@ -596,6 +596,7 @@ server.registerTool(
         })
         .optional(),
       limit_per_horizon: z.number().int().min(1).max(25).optional(),
+      offset_per_horizon: z.number().int().min(0).optional(),
       advanced: z
         .object({
           naics: z.string().optional(),

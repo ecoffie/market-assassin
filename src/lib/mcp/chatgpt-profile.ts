@@ -190,6 +190,7 @@ export const CHATGPT_PARAM_COPY: Readonly<Partial<Record<ChatgptToolName, Readon
       'Optional state, as a name or 2-letter code ("Florida" or "FL"). Each horizon applies it slightly differently; the result says how.',
     agency: 'Optional government customer the user wants to sell to ("Navy", "VA", "Department of Defense").',
     limit_per_horizon: 'Maximum items returned for each horizon (default 5, max 25). Each horizon is limited separately.',
+    offset_per_horizon: 'Paging: the first item to return in each horizon, starting at 0. For the next page, pass the next_offset value from the previous result with the same query.',
     advanced: 'Optional specialist codes (for example NAICS or PSC). Prefer a plain-English query.',
     uei:
       'Optional 12-character SAM.gov UEI of the user\'s company, only if the user already gave it (do not ask for it before showing results). When provided, the company\'s registered NAICS and PSC codes widen the search (shown as a company-registration match, never as a direct match), and each item is marked eligible, not eligible (with the reason) or unknown, based on the company\'s size standard for that notice\'s NAICS code.',
