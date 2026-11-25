@@ -875,7 +875,8 @@ const EXPIRING_CONTRACTS_TOOL_DEF = {
         min_value: { type: 'number', description: 'Minimum obligated dollars.' },
         max_value: { type: 'number', description: 'Maximum obligated dollars.' },
         likelihood: { type: 'string', enum: ['high', 'medium', 'low'], description: 'Recompete-likelihood filter.' },
-        limit: { type: 'number', description: 'Max results (default 50, max 200). Local table — a larger set has no per-call cost.' },
+        limit: { type: 'number', description: 'Records per page (default 25, max 200). Keep the default and page with offset: about 1,500 characters per record, so large pages flood the context.' },
+        offset: { type: 'number', description: '0-based index of the first record (paging). Pass _meta.page.next_offset from the previous call to get the next page; same filters.' },
       },
     },
   },
@@ -2562,6 +2563,7 @@ async function dispatchMcpTool(
       max_value: typeof args.max_value === 'number' ? args.max_value : undefined,
       likelihood: args.likelihood === 'high' || args.likelihood === 'medium' || args.likelihood === 'low' ? args.likelihood : undefined,
       limit: typeof args.limit === 'number' ? args.limit : undefined,
+      offset: typeof args.offset === 'number' ? args.offset : undefined,
     })) as unknown as Record<string, unknown>;
     return { result, credits };
   }

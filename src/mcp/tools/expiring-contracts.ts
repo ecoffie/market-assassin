@@ -17,6 +17,15 @@ import { mcpFlags } from '@/lib/mcp/flags';
 import { normalizeStateCode } from '@/lib/utils/us-states';
 import type { IgnoredArg } from '@/lib/mcp/result-contract';
 
+/**
+ * Default page size when the caller names no limit (Ask Mindy Backend Spec, Nov 21 2026: "default to a
+ * summary plus the top 25 rows; page the rest"). Measured 2026-11-21 with production-shaped rows: the old
+ * 50-row default returned 74–107K characters of text and limit=200 returned 292–355K (about 1,470 per row),
+ * before the hosted transport repeats the result as structuredContent. An explicit limit (max 200) is
+ * still honoured: Ask Mindy chat fetches the whole matched set on purpose and renders its own pages.
+ */
+export const EXPIRING_DEFAULT_PAGE_SIZE = 25;
+
 /** An order under a vehicle, listed at top level so an in-window order is never only nested. */
 export type ExpiringOrderInWindow = ExpiringContract & {
   parent_vehicle_piid: string | null;
@@ -81,6 +90,8 @@ export interface ExpiringContractsToolInput {
    */
   eligible_set_asides?: string[];
   limit?: number;
+  /** 0-based index of the first matched record (paging). Use _meta.page.next_offset to continue. */
+  offset?: number;
 }
 
 export interface ExpiringContractsToolResult {
@@ -128,6 +139,11 @@ export interface ExpiringContractsToolResult {
     window?: { after: string; through: string; as_of: string; months: number };
     /** Set when more rows matched than were returned. */
     incomplete_reason?: string;
+    /**
+     * Paging over the matched DB records (before rollup). `next_offset` is null on the last page.
+     * `total` is the matched count (an upper bound by at most a few collapsed duplicates).
+     */
+    page?: { offset: number; limit: number; returned: number; total: number; has_more: boolean; next_offset: number | null };
     result_state?: 'filter_not_applied';
   };
 }
@@ -169,6 +185,8 @@ export async function expiringContracts(
       },
     };
   }
+  const pageLimit = Math.min(Math.max(Math.floor(Number(input.limit) || EXPIRING_DEFAULT_PAGE_SIZE), 1), 200);
+  const pageOffset = Math.max(Math.floor(Number(input.offset) || 0), 0);
   const res = await queryExpiringContracts({
     naicsCodes: naicsArg.codes.length ? naicsArg.codes : undefined,
     agency: input.agency,
@@ -179,7 +197,8 @@ export async function expiringContracts(
     maxValue: input.max_value,
     likelihood: input.likelihood,
     eligibleSetAsides: input.eligible_set_asides,
-    limit: input.limit,
+    limit: pageLimit,
+    offset: pageOffset,
   });
   // B2 — orders under a vehicle are rolled up, not listed as recompetes. The parent's ordering
   // end is looked up (shared award-detail fetch, cached); failures stay UNKNOWN.
@@ -216,8 +235,10 @@ export async function expiringContracts(
   if (input.likelihood) applied.likelihood = input.likelihood;
   if (input.eligible_set_asides?.length) applied.eligible_set_asides = input.eligible_set_asides;
   const rowsReturned = res.contracts.length;
-  const incomplete = !res.degraded && res.total > rowsReturned
-    ? `returned ${rowsReturned} of ${res.total} matching records (row limit); raise limit (max 200) or narrow the filters before saying this is the full list`
+  const hasMore = !res.degraded && res.total > pageOffset + rowsReturned;
+  const nextOffset = hasMore ? pageOffset + rowsReturned : null;
+  const incomplete = hasMore
+    ? `returned records ${pageOffset + 1}-${pageOffset + rowsReturned} of ${res.total} matching; call again with offset=${nextOffset} for the next page, or narrow the filters, before saying this is the full list`
     : undefined;
   const result: ExpiringContractsToolResult = {
     queried,
@@ -241,6 +262,9 @@ export async function expiringContracts(
       ignored_args: ignored,
       ...(res.window ? { window: res.window } : {}),
       ...(incomplete ? { incomplete_reason: incomplete } : {}),
+      ...(!res.degraded ? {
+        page: { offset: pageOffset, limit: pageLimit, returned: rowsReturned, total: res.total, has_more: hasMore, next_offset: nextOffset },
+      } : {}),
     },
   };
   if (mcpFlags.aiHint) {

@@ -239,8 +239,8 @@ describe('/chatgpt/mcp — parameter descriptions (owner decision 2)', () => {
       ((tools!.inputSchema as { properties: Record<string, { description?: string }> }).properties[p]).description;
     const myLimit = prop(mine.find((t) => t.name === 'get_expiring_contracts'), 'limit');
     const theirLimit = prop(claude.get('get_expiring_contracts'), 'limit');
-    expect(myLimit).toBe('Maximum results (default 50, max 200).');
-    expect(theirLimit).toMatch(/no per-call cost/);
+    expect(myLimit).toBe('Records per page (default 25, max 200). Keep the default and page with offset.');
+    expect(theirLimit).toMatch(/flood the context/);
     expect(prop(claude.get('find_opportunities'), 'uei')).toMatch(/company_registered_psc/);
     expect(prop(mine.find((t) => t.name === 'find_opportunities'), 'uei')).not.toMatch(/company_registered_psc/);
   });

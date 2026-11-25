@@ -103,6 +103,12 @@ export interface ExpiringContractsInput {
   eligibleSetAsides?: string[];
   limit?: number;
   /**
+   * 0-based index of the first matched record to return (paging). Pages are stable: rows are
+   * ordered with `contract_id` as the tie-break, so a page never repeats or skips a row that
+   * shares an end date with its neighbour. Anchored rows (anchorPiidPrefixes) join page 1 only.
+   */
+  offset?: number;
+  /**
    * Sort order. Default 'expiry' (soonest-first) — the panel + MCP rely on this. Pass
    * 'value' to get the BIGGEST across the whole window instead (so a caller showing a
    * teaser can span the window rather than only see the imminent ones).
@@ -193,6 +199,7 @@ export async function queryExpiringContracts(input: ExpiringContractsInput): Pro
   // default costs nothing. Every real caller passes an explicit limit; this
   // default only applies when omitted (the MCP get_expiring_contracts tool).
   const limit = Math.min(Math.max(Number(input.limit) || 50, 1), 200);
+  const offset = Math.max(Math.floor(Number(input.offset) || 0), 0);
   const months = Math.min(Math.max(Number(input.monthsWindow) || 18, 1), 60);
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
@@ -284,10 +291,13 @@ export async function queryExpiringContracts(input: ExpiringContractsInput): Pro
       const inList = elig.map((s) => `"${s.replace(/"/g, '')}"`).join(',');
       q = q.or(`set_aside_enriched.in.(${inList}),set_aside_enriched.is.null`);
     }
-    const ordered = input.orderBy === 'value'
+    const ordered = (input.orderBy === 'value'
       ? q.order('total_obligation', { ascending: false, nullsFirst: false })
-      : q.order('period_of_performance_current_end', { ascending: true });
-    return ordered.limit(limit + DEDUPE_HEADROOM);
+      : q.order('period_of_performance_current_end', { ascending: true }))
+      // Tie-break only: rows sharing an end date (or value) otherwise come back in any order, so
+      // page 2 could repeat or skip page 1's boundary rows.
+      .order('contract_id', { ascending: true });
+    return ordered.range(offset, offset + limit + DEDUPE_HEADROOM - 1);
   };
 
   let res = await build(true);
@@ -313,7 +323,7 @@ export async function queryExpiringContracts(input: ExpiringContractsInput): Pro
   const anchors = (input.anchorPiidPrefixes || [])
     .map((p) => String(p || '').trim().toUpperCase())
     .filter((p) => /^[A-Z0-9]{4,10}$/.test(p));
-  if (anchors.length) {
+  if (anchors.length && offset === 0) {
     const seen = new Set(rawContracts.map((c) => c.contract_id));
     for (const prefix of anchors.slice(0, 5)) {
       const scoped = await (async () => {
