@@ -101,3 +101,15 @@ describe('provenanceRecords', () => {
     ]);
   });
 });
+
+describe('the document subtitle reads the data date inside a source-date label', () => {
+  const recs = (asOf: string) => [{ retrievedAt: '2026-11-22T15:04:00Z', asOf, url: 'https://www.usaspending.gov/award/CONT_AWD_W9124D26D0005', recordIds: ['W9124D26D0005'] }];
+  const d = doc([{ id: 's1', kind: 'usaspending', label: 'A', recordId: 'W9124D26D0005' }]);
+  it('"data through" and "source dated" labels give their date', () => {
+    expect(applySourceProvenance(d, recs('FY2024–FY2026 · data through 2026-11-20')).model.subtitle).toBe('Data as of 2026-11-20');
+    expect(applySourceProvenance(d, recs('source dated 2026-09-30')).model.subtitle).toBe('Data as of 2026-09-30');
+  });
+  it('a SAM registration record date never becomes the document\'s data date', () => {
+    expect(applySourceProvenance(d, recs('SAM registration record from 2026-08-25')).model.subtitle).toBeUndefined();
+  });
+});
