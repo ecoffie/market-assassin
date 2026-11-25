@@ -64,7 +64,7 @@ beforeEach(() => {
   h.create.mockReset();
   let step = 0;
   h.create.mockImplementation(async () => (++step === 1
-    ? reply([{ type: 'text', text: 'Looking.' }, { type: 'tool_use', id: 'tu1', name: 'find_opportunities', input: { query: 'digital marketing' } }, { type: 'tool_use', id: 'tu2', name: 'get_contractor_award_history', input: { uei: 'ABC123DEF456' } }], 'tool_use')
+    ? reply([{ type: 'text', text: 'Looking.' }, { type: 'tool_use', id: 'tu1', name: 'find_opportunities', input: { query: 'digital marketing' } }, { type: 'tool_use', id: 'tu2', name: 'search_contractors', input: { keyword: 'Ridgeline' } }], 'tool_use')
     : reply([{ type: 'text', text: 'Start with the Navy recruiting campaign ($1.2M awarded so far).' }], 'end_turn')));
   vi.stubGlobal('fetch', vi.fn(async (url: string, init: RequestInit) => {
     openaiCalls.push(String(url));
@@ -105,16 +105,16 @@ describe('research mode in the chat route', () => {
     expect(first.model).toBe('claude-opus-5-5');
     expect(first.system).toContain('IDENTITY FIRST');
     const names = first.tools.map((t) => t.name);
-    expect(names).toEqual(expect.arrayContaining(['find_opportunities', 'get_contractor_award_history', 'search_web']));
-    expect(names).not.toContain('lookup_sam_entity');
-    expect(h.runMcpTool.mock.calls.map((c) => c[0])).toEqual(expect.arrayContaining(['find_opportunities', 'get_contractor_award_history']));
+    expect(names).toEqual(expect.arrayContaining(['find_opportunities', 'search_contractors', 'search_web']));
+    for (const live of ['lookup_sam_entity', 'get_contractor_award_history', 'get_solicitation_incumbent', 'get_solicitation_documents']) expect(names).not.toContain(live);
+    expect(h.runMcpTool.mock.calls.map((c) => c[0])).toEqual(expect.arrayContaining(['find_opportunities', 'search_contractors']));
     expect(text(ev)).toBe('Start with the Navy recruiting campaign ($1.2M awarded so far).');
     expect(ev.filter((e) => e.type === 'progress').length).toBeGreaterThanOrEqual(2);
     expect(openaiCalls).toHaveLength(0);
     const trace = await savedTrace();
     expect(trace).toMatchObject({ engine: 'research_mode', model: 'claude-opus-5-5', stop: 'done', call_count: 2, figure_check: { untraceable: [], disclosed: false } });
     const calls = (trace?.calls as Array<Record<string, unknown>>);
-    expect(calls.map((c) => c.tool).sort()).toEqual(['find_opportunities', 'get_contractor_award_history']);
+    expect(calls.map((c) => c.tool).sort()).toEqual(['find_opportunities', 'search_contractors']);
     expect(JSON.stringify(trace)).not.toContain(EMAIL);
     expect(JSON.stringify(trace)).not.toContain('obligated $1.2M');
   });
@@ -155,5 +155,17 @@ describe('research mode in the chat route', () => {
     const ev = await ask(Q);
     expect(text(ev)).toMatch(/could not finish this research/);
     expect(openaiCalls).toHaveLength(0);
+  });
+
+  it('find_opportunities with a uei runs without it (its company anchor would call live SAM), and the trace says so', async () => {
+    flagOn();
+    let step = 0;
+    h.create.mockImplementation(async () => (++step === 1
+      ? reply([{ type: 'tool_use', id: 'tu1', name: 'find_opportunities', input: { query: 'digital marketing', uei: 'ABC123DEF456' } }], 'tool_use')
+      : reply([{ type: 'text', text: 'Done.' }], 'end_turn')));
+    await ask(Q);
+    const call = h.runMcpTool.mock.calls.find((c) => c[0] === 'find_opportunities');
+    expect(JSON.stringify(call)).not.toContain('ABC123DEF456');
+    expect(await savedTrace()).toMatchObject({ live_sam_args_dropped: ['find_opportunities:uei'] });
   });
 });

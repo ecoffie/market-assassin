@@ -122,7 +122,7 @@ import { intelligenceGateEnabledFor, runIntelligenceGate, type GateResult } from
 import Anthropic from '@anthropic-ai/sdk';
 import {
   researchModeEnabledFor, researchModel, researchSystemPrompt, toAnthropicTools, runResearchLoop, groundAnswer, progressLine,
-  RESEARCH_TURN_MS, RESEARCH_DEADLINE_MS, RESEARCH_NO_ANSWER, researchToolDefs, type ResearchCall,
+  RESEARCH_TURN_MS, RESEARCH_DEADLINE_MS, RESEARCH_NO_ANSWER, researchToolDefs, stripLiveSamArgs, type ResearchCall,
 } from '@/lib/ask-mindy/research-mode';
 import { toolLabel } from '@/lib/chat/context-sources';
 import { gateEligible, extractWorkPhrase, profileForGate } from '@/lib/ask-mindy/gate-intent';
@@ -1250,13 +1250,17 @@ export async function POST(request: NextRequest) {
               { role: 'user' as const, content: message },
             ];
             const callLog: Array<{ tool: string; status: string; ms: number; args: unknown }> = [];
+            const liveSamArgsDropped: string[] = [];
             let rmReport: { report_id: string | null; url: string | null; title: string; html: string } | null = null;
             const rmDeliverables: Array<{ format: string; document_id: string; file_name?: string; version?: number | null }> = [];
             const rmSources: typeof turnSources = [];
             const planner = { model, provider: 'anthropic' };
             const isWrite = (n: string) => executor.policyFor(n).decision === 'allowed_write';
             const execOne = async (c: ResearchCall) => {
-              const [r] = await executor.executeRound([{ id: c.id, function: { name: c.name, arguments: JSON.stringify(c.input ?? {}) } }], planner, { deadlineAt: rmStarted + RESEARCH_DEADLINE_MS });
+              // Zero live SAM: an argument that would switch this tool onto a live SAM path is dropped (and traced).
+              const safe = stripLiveSamArgs(c.name, c.input ?? {});
+              if (safe.dropped.length) liveSamArgsDropped.push(`${c.name}:${safe.dropped.join(',')}`);
+              const [r] = await executor.executeRound([{ id: c.id, function: { name: c.name, arguments: JSON.stringify(safe.input) } }], planner, { deadlineAt: rmStarted + RESEARCH_DEADLINE_MS });
               callLog.push({ tool: c.name, status: r.record.status, ms: r.record.latency_ms ?? 0, args: r.argsRedacted });
               if (r.record.tool === CREATE_DOCUMENT && r.record.status === 'success') {
                 const d = parseCreateDocumentDeliverables(r.content);
@@ -1299,7 +1303,7 @@ export async function POST(request: NextRequest) {
                 },
               });
               void recordLlmUsage({ userEmail: auth.email, tool: 'chat', job: 'research_mode', provider: 'anthropic', model, usage: { prompt_tokens: loop.usage.input, completion_tokens: loop.usage.output } });
-              Object.assign(rmTrace, { stop: loop.stop, steps: loop.steps, call_count: loop.calls, calls: callLog, results_cut: loop.resultsCut });
+              Object.assign(rmTrace, { stop: loop.stop, steps: loop.steps, call_count: loop.calls, calls: callLog, results_cut: loop.resultsCut, ...(liveSamArgsDropped.length ? { live_sam_args_dropped: liveSamArgsDropped } : {}) });
               if (!loop.text) { finish(RESEARCH_NO_ANSWER, {}, rmSources); return; }
               const grounded = await groundAnswer({
                 text: loop.text,

@@ -38,9 +38,31 @@ export const RESULT_CEILING_CHARS = 120_000;
 
 /**
  * Catalog tools withheld from research mode until they read from Mindy's caches only (Eric: zero live SAM calls).
- * RM-2 swaps lookup_sam_entity for Data Core's cache-only variant and removes it from this list.
+ * Data Core's code trace (2026-11-25) found these reach live SAM. Each comes back when it has a cache-only mode
+ * (RM-2 starts with lookup_sam_entity).
  */
-export const RESEARCH_WITHHELD_TOOLS: ReadonlySet<string> = new Set(['lookup_sam_entity']);
+export const RESEARCH_WITHHELD_TOOLS: ReadonlySet<string> = new Set([
+  'lookup_sam_entity', // live legal + DBA search first
+  'get_contractor_award_history', // resolve-uei calls live getEntityByUEI
+  'get_solicitation_incumbent', // live SAM opportunities search
+  'get_solicitation_documents', // live notice descriptions and attachments
+  'match_company_to_pathways', // recipient certifications can call live SAM
+]);
+
+/**
+ * Arguments dropped on research turns because they switch a tool onto a live SAM path (find_opportunities `uei`
+ * runs the company anchor through live lookup_sam_entity). The tool still runs without them.
+ */
+export const RESEARCH_LIVE_SAM_ARGS: Readonly<Record<string, readonly string[]>> = { find_opportunities: ['uei'] };
+
+export function stripLiveSamArgs(name: string, input: Record<string, unknown>): { input: Record<string, unknown>; dropped: string[] } {
+  const keys = RESEARCH_LIVE_SAM_ARGS[name] ?? [];
+  const dropped = keys.filter((k) => input[k] !== undefined && input[k] !== null && input[k] !== '');
+  if (!dropped.length) return { input, dropped };
+  const out = { ...input };
+  for (const k of dropped) delete out[k];
+  return { input: out, dropped };
+}
 
 /**
  * The research spec (how Eric's Claude + Mindy MCP session produced the reference reports) and the output standard.

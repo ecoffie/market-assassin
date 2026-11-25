@@ -5,7 +5,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import {
   researchModeEnabledFor, toAnthropicTools, runResearchLoop, groundAnswer, fullResult, progressLine, researchSystemPrompt,
-  RESEARCH_INSTRUCTIONS, RESEARCH_WITHHELD_TOOLS, RESULT_CEILING_CHARS, FINAL_RESERVE_MS, researchToolDefs,
+  RESEARCH_INSTRUCTIONS, RESEARCH_WITHHELD_TOOLS, RESULT_CEILING_CHARS, FINAL_RESERVE_MS, researchToolDefs, stripLiveSamArgs,
 } from './research-mode';
 import { MCP_CONNECTOR_INSTRUCTIONS } from '@/lib/mcp/schedule-discovery';
 import { listPublicMcpTools } from '@/lib/mcp/public-catalog';
@@ -147,7 +147,7 @@ describe('tool parity with the MCP catalog', () => {
         continue;
       }
       const policy = chatToolPolicy(f.name, true);
-      exceptions[f.name] = RESEARCH_WITHHELD_TOOLS.has(f.name) ? 'withheld: live SAM (Eric, zero live SAM calls) until RM-2'
+      exceptions[f.name] = RESEARCH_WITHHELD_TOOLS.has(f.name) ? 'withheld: live SAM (Eric, zero live SAM calls) until it has a cache-only mode'
         : !isChatOfferable(policy) ? `chat policy: ${policy.decision}` : 'UNEXPLAINED';
     }
     expect(Object.entries(exceptions).filter(([, why]) => why === 'UNEXPLAINED')).toEqual([]);
@@ -156,5 +156,16 @@ describe('tool parity with the MCP catalog', () => {
     // The other direction: nothing outside the public catalog except Ask Mindy's private tools.
     const pub = new Set(listPublicMcpTools().map((d) => fn(d).name));
     expect(research.map((t) => t.name).filter((n) => !pub.has(n))).toEqual(['search_web']);
+  });
+});
+
+describe('zero live SAM in research mode', () => {
+  it('every tool Data Core traced to live SAM is withheld', () => {
+    for (const t of ['lookup_sam_entity', 'get_contractor_award_history', 'get_solicitation_incumbent', 'get_solicitation_documents', 'match_company_to_pathways']) expect(RESEARCH_WITHHELD_TOOLS.has(t), t).toBe(true);
+  });
+  it('find_opportunities runs without the uei that would start its live company anchor', () => {
+    expect(stripLiveSamArgs('find_opportunities', { query: 'x', uei: 'ABC123DEF456' })).toEqual({ input: { query: 'x' }, dropped: ['uei'] });
+    expect(stripLiveSamArgs('find_opportunities', { query: 'x' })).toEqual({ input: { query: 'x' }, dropped: [] });
+    expect(stripLiveSamArgs('search_contractors', { keyword: 'x', uei: 'u' }).dropped).toEqual([]);
   });
 });
