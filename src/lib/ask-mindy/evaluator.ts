@@ -8,6 +8,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import type { AnalystDecision } from './analyst';
 import type { RecordCheck } from './evidence-checks';
+import { ungroundedFigures } from './figure-grounding';
 
 export const EVALUATOR_MODEL_DEFAULT = 'claude-sonnet-5-5';
 /** Per-call ceiling when the caller gives none; the gate always passes the time it has left. */
@@ -118,6 +119,14 @@ export async function evaluateDecision(
       clear.pass = true;
       clear.reason = `Reviewer's clarity objection cited only words that are not in the answer; not supported. (${clear.reason})`;
     }
+  }
+  // Software, not judgment: every dollar amount and calendar date in the answer must be in the evidence.
+  const reasoned = judged.find((r) => r.criterion === 'reasoned');
+  const unfounded = ungroundedFigures(args.decision, args.evidence);
+  if (reasoned && unfounded.length) {
+    const named = `These figures could not be traced to the data: ${unfounded.join(', ')}.`;
+    reasoned.reason = reasoned.pass ? named : `${named} ${reasoned.reason}`;
+    reasoned.pass = false;
   }
   const results = [...software, ...judged];
   // Eric 2026-11-24: factual grounding (relevant, pursuable, reasoned) and actionability block; clarity is ADVISORY.
