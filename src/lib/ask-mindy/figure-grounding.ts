@@ -45,7 +45,12 @@ function datesIn(text: string): CalDate[] {
   for (const m of text.matchAll(new RegExp(`\\b${MON}\\.?\\s+(\\d{1,2})(?:st|nd|rd|th)?,?\\s+(\\d{4})\\b`, 'gi'))) add(m.index!, m[0].length, { text: m[0], y: +m[3], m: monthNo(m[1]), d: +m[2] });
   for (const m of text.matchAll(new RegExp(`\\b(\\d{1,2})\\s+${MON}\\.?,?\\s+(\\d{4})\\b`, 'gi'))) add(m.index!, m[0].length, { text: m[0], y: +m[3], m: monthNo(m[2]), d: +m[1] });
   for (const m of text.matchAll(new RegExp(`\\b${MON}\\.?,?\\s+(\\d{4})\\b`, 'gi'))) add(m.index!, m[0].length, { text: m[0], y: +m[2], m: monthNo(m[1]), d: null });
-  for (const m of text.matchAll(new RegExp(`\\b${MON}\\.?\\s+(\\d{1,2})(?:st|nd|rd|th)?\\b`, 'gi'))) add(m.index!, m[0].length, { text: m[0], y: null, m: monthNo(m[1]), d: +m[2] });
+  // A bare month and day ("Dec 5") counts only with a capitalised month or an abbreviation with a period, so
+  // ordinary words ("you may 3 times", "march 2 crews") are never read as dates.
+  for (const m of text.matchAll(new RegExp(`\\b${MON}(\\.?)\\s+(\\d{1,2})(?:st|nd|rd|th)?\\b`, 'gi'))) {
+    if (!/^[A-Z]/.test(m[1]) && !m[2]) continue;
+    add(m.index!, m[0].length, { text: m[0], y: null, m: monthNo(m[1]), d: +m[3] });
+  }
   return out.filter((x) => x.m >= 1 && x.m <= 12 && (x.d === null || (x.d >= 1 && x.d <= 31)));
 }
 

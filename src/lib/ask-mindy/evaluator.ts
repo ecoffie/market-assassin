@@ -30,6 +30,8 @@ export interface Evaluation {
   results: CriterionResult[];
   /** What to fix, for the one bounded retry. Empty on pass. */
   fix: string[];
+  /** Dollar figures and dates the answer states that the evidence does not contain (the figure text only). */
+  untraceableFigures?: string[];
 }
 
 /**
@@ -133,5 +135,5 @@ export async function evaluateDecision(
   // A clarity-only failure neither triggers the retry nor withholds a grounded, actionable answer.
   const pass = results.filter((r) => BLOCKING.has(r.criterion)).every((r) => r.pass);
   const fix = pass ? [] : [...results.filter((r) => !r.pass && BLOCKING.has(r.criterion)).map((r) => `${r.criterion}: ${r.reason}`), ...(j.fix || [])];
-  return { pass, results, fix, usage: { input: msg.usage.input_tokens, output: msg.usage.output_tokens }, model };
+  return { pass, results, fix, untraceableFigures: unfounded.map((f) => f.slice(0, 40)).slice(0, 10), usage: { input: msg.usage.input_tokens, output: msg.usage.output_tokens }, model };
 }
