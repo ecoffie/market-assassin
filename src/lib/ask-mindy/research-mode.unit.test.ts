@@ -4,7 +4,7 @@
  */
 import { describe, it, expect, vi } from 'vitest';
 import {
-  researchModeEnabledFor, toAnthropicTools, runResearchLoop, groundAnswer, fullResult, progressLine, researchSystemPrompt,
+  researchModeEnabledFor, toAnthropicTools, runResearchLoop, billedInputTokens, groundAnswer, fullResult, progressLine, researchSystemPrompt,
   RESEARCH_INSTRUCTIONS, RESEARCH_WITHHELD_TOOLS, RESEARCH_EXTRA_TOOLS, RESULT_CEILING_CHARS, FINAL_RESERVE_MS, researchToolDefs,
 } from './research-mode';
 import { MCP_CONNECTOR_INSTRUCTIONS } from '@/lib/mcp/schedule-discovery';
@@ -185,5 +185,43 @@ describe('zero live SAM in research mode (samCacheOnly, #2458)', () => {
   it('the instructions fill gaps from official public sources and settle AbilityOne themselves', () => {
     expect(RESEARCH_INSTRUCTIONS).toMatch(/official public source with search_web and read_web_page/);
     expect(RESEARCH_INSTRUCTIONS).toMatch(/AbilityOne Procurement List, check abilityone\.gov yourself/);
+  });
+});
+
+describe('prompt caching (766K input tokens on one answer)', () => {
+  it('system prompt and tool definitions are cache breakpoints; exactly one moving breakpoint on the newest message; history is never mutated', async () => {
+    const { client, create } = scripted([
+      msg([toolUse('t1', 'find_opportunities')], 'tool_use'),
+      msg([toolUse('t2', 'find_opportunities')], 'tool_use'),
+      msg([text('Done.')], 'end_turn'),
+    ]);
+    const tools = [{ name: 'a', description: 'd', input_schema: { type: 'object' } }, { name: 'find_opportunities', description: 'd', input_schema: { type: 'object' } }];
+    await runResearchLoop({ ...base, tools, client, execute: async (cs) => cs.map((c) => ({ id: c.id, content: 'r' })) });
+    for (const call of create.mock.calls) {
+      const body = (call as never[])[0] as { system: Array<{ cache_control?: unknown }>; tools: Array<{ cache_control?: unknown }>; messages: Array<{ content: unknown }> };
+      expect(body.system[0].cache_control).toEqual({ type: 'ephemeral' });
+      expect(body.tools.map((t) => !!t.cache_control)).toEqual([false, true]);
+      const marks = JSON.stringify(body.messages).match(/"cache_control"/g) ?? [];
+      expect(marks).toHaveLength(1);
+      const last = body.messages[body.messages.length - 1].content as Array<{ cache_control?: unknown }>;
+      expect(last[last.length - 1].cache_control).toEqual({ type: 'ephemeral' });
+    }
+  });
+  it('cache reads and writes are counted and priced (reads 0.1x, writes 1.25x)', async () => {
+    const create = vi.fn(async () => ({ content: [{ type: 'text', text: 'ok' }], stop_reason: 'end_turn', usage: { input_tokens: 100, output_tokens: 10, cache_read_input_tokens: 9000, cache_creation_input_tokens: 400 } }));
+    const r = await runResearchLoop({ ...base, client: { messages: { create } } as never, execute: async () => [] });
+    expect(r.usage).toEqual({ input: 100, output: 10, cacheRead: 9000, cacheWrite: 400 });
+    expect(billedInputTokens(r.usage)).toBe(100 + 900 + 500);
+  });
+  it('modelled on an EFS-sized run (24 steps, 30k system+tools, ~8k new per step): billed input falls by over 75%', () => {
+    const steps = 24, fixed = 30_000, perStep = 8_000;
+    let before = 0, after = 0, prefix = fixed;
+    for (let i = 0; i < steps; i++) {
+      const prompt = prefix + (i === 0 ? 0 : perStep);
+      before += prompt;
+      after += i === 0 ? fixed * 1.25 : prefix * 0.1 + perStep * 1.25;
+      prefix = prompt;
+    }
+    expect(after / before).toBeLessThan(0.25);
   });
 });

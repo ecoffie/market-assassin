@@ -147,13 +147,41 @@ export interface LoopResult {
   stop: StopReason;
   calls: number;
   steps: number;
-  usage: { input: number; output: number };
+  /** input = uncached input tokens; cacheRead / cacheWrite = prompt-cache reads and writes (billed 0.1x / 1.25x). */
+  usage: { input: number; output: number; cacheRead: number; cacheWrite: number };
   /** Everything the answer may rest on: the conversation plus every tool result (full). */
   evidence: string[];
   resultsCut: Array<{ tool: string; chars: number }>;
 }
 
 type Msg = { role: 'user' | 'assistant'; content: string | Array<Record<string, unknown>> };
+
+const EPHEMERAL = { type: 'ephemeral' } as const;
+
+/** The tool list with a cache breakpoint on the last definition (caches every definition before it too). */
+export function withCachedTools(tools: AnthropicToolDef[]): Array<AnthropicToolDef & { cache_control?: typeof EPHEMERAL }> {
+  return tools.map((t, i) => (i === tools.length - 1 ? { ...t, cache_control: EPHEMERAL } : t));
+}
+
+/**
+ * A snapshot of the conversation with ONE cache breakpoint, on the newest message's last block, so the next step reads
+ * everything before it from the cache. The stored history is never mutated (breakpoints must not pile up: at most 4
+ * per request, and system + tools already use 2).
+ */
+export function withCachedTail(msgs: Msg[]): Msg[] {
+  if (!msgs.length) return [];
+  const out = msgs.slice(0, -1);
+  const last = msgs[msgs.length - 1];
+  const blocks = typeof last.content === 'string' ? [{ type: 'text', text: last.content }] : last.content;
+  if (!blocks.length) return [...out, last];
+  const tail = { ...blocks[blocks.length - 1], cache_control: EPHEMERAL };
+  return [...out, { role: last.role, content: [...blocks.slice(0, -1), tail] }];
+}
+
+/** Input tokens priced as plain input (for cost logging): cache reads cost 0.1x, cache writes 1.25x. */
+export function billedInputTokens(u: { input: number; cacheRead: number; cacheWrite: number }): number {
+  return Math.round(u.input + u.cacheRead * 0.1 + u.cacheWrite * 1.25);
+}
 
 class StepDeadline extends Error {}
 function within<T>(p: Promise<T>, ms: number): Promise<T> {
@@ -191,7 +219,7 @@ export async function runResearchLoop(a: {
   const msgs: Msg[] = [...a.conversation];
   const evidence: string[] = a.conversation.map((m) => (typeof m.content === 'string' ? m.content : JSON.stringify(m.content)));
   const resultsCut: LoopResult['resultsCut'] = [];
-  const usage = { input: 0, output: 0 };
+  const usage = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
   let calls = 0;
   let steps = 0;
   let forced: StopReason | null = null;
@@ -215,11 +243,13 @@ export async function runResearchLoop(a: {
       res = await within(a.client.messages.create({
         model: a.model,
         max_tokens: STEP_MAX_TOKENS,
-        system: a.system,
-        tools: a.tools as unknown as Anthropic.Tool[],
+        // Prompt caching: the system prompt and the tool definitions are the same every step, and the conversation only
+        // grows, so each step re-reads the cached prefix (0.1x) instead of paying for it again.
+        system: [{ type: 'text', text: a.system, cache_control: { type: 'ephemeral' } }],
+        tools: withCachedTools(a.tools) as unknown as Anthropic.Tool[],
         tool_choice: forced ? { type: 'none' } : { type: 'auto' },
         // A snapshot per request: the loop keeps appending to msgs after this call.
-        messages: [...msgs] as unknown as Anthropic.MessageParam[],
+        messages: withCachedTail(msgs) as unknown as Anthropic.MessageParam[],
         ...(a.effort ? { output_config: { effort: a.effort } } : {}),
       } as unknown as Anthropic.MessageCreateParamsNonStreaming, { timeout: stepMs, maxRetries: 0 }), stepMs);
     } catch (err) {
@@ -231,6 +261,8 @@ export async function runResearchLoop(a: {
     steps++;
     usage.input += res.usage?.input_tokens ?? 0;
     usage.output += res.usage?.output_tokens ?? 0;
+    usage.cacheRead += (res.usage as { cache_read_input_tokens?: number | null } | undefined)?.cache_read_input_tokens ?? 0;
+    usage.cacheWrite += (res.usage as { cache_creation_input_tokens?: number | null } | undefined)?.cache_creation_input_tokens ?? 0;
     const uses = (res.content as Array<{ type: string; id?: string; name?: string; input?: unknown }>).filter((b) => b.type === 'tool_use');
     if (res.stop_reason === 'tool_use' && uses.length && !forced) {
       const room = Math.max(0, maxCalls - calls);
