@@ -11,7 +11,7 @@
  * says "$0 today" (the charge only comes after 14 days).
  * The credit-only MCP plans keep their own page at /mcp/pricing.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import MemberProof from '@/components/public-site/MemberProof';
 import LogoMarquee from '@/components/public-site/LogoMarquee';
@@ -25,7 +25,12 @@ import {
   PRO_ANNUAL_USD, PRO_MONTHLY_USD, PRO_TRIAL_ANNUAL, PRO_TRIAL_MONTHLY, SALES_URL,
   TEAM_ANNUAL_PER_MONTH, TEAM_ANNUAL_USD, TEAM_MONTHLY_USD, TEAM_TRIAL_ANNUAL, TEAM_TRIAL_MONTHLY, pctOff,
 } from './app-plan-links';
-import { TEAM_SEAT_COUNTS, TEAM_SEAT_PRICING_ON, teamSeatPlan, type TeamSeatCount } from '@/lib/billing/team-seat-plans';
+// Team seat card (owner mockup 2026-11-25) — DISPLAY ONLY, PROPOSED, off unless
+// NEXT_PUBLIC_TEAM_SEAT_PRICING === 'on'. Never reads billing; see team-seat-pricing.ts.
+import {
+  TEAM_SEAT_PRICING, isTeamSeatPricingEnabled, teamSeatCtaHref, teamSeatOption, teamSeatTakesPayment,
+  type TeamSeatOptionId,
+} from '@/lib/public-site/team-seat-pricing';
 
 type Feature = [title: string, detail: React.ReactNode];
 type Plan = {
@@ -33,7 +38,10 @@ type Plan = {
   price: string | null; was?: string; per: string; trial: boolean;
   cta: string; href: string; outline?: boolean;
   lead: string; base: string; features: Feature[];
-  usage: [title: string, detail: string];
+  /** Omitted = no allowance to show (never a made-up number). */
+  usage?: [title: string, detail: string];
+  /** A non-trial button that still takes money (gets the no-refund note). */
+  takesPayment?: boolean;
   footer?: React.ReactNode;
   /** Set for signed-in users: this card is the plan they are on now. */
   current?: boolean;
@@ -154,6 +162,41 @@ function CreditPlansDropdown({ plans, annual }: { plans: CreditPlan[]; annual: b
   );
 }
 
+/**
+ * "2 | 3 | 4 | 5 users" on the Team card (seat variant only). A radio group: one tab stop, arrow
+ * keys move and select, aria-checked carries the state. Server-renders the default (2 users), so
+ * without JavaScript the card is complete and correct; the toggle only changes the price, button
+ * and first feature.
+ */
+export function TeamSeatToggle({ value, onChange }: { value: TeamSeatOptionId; onChange: (id: TeamSeatOptionId) => void }) {
+  const opts = TEAM_SEAT_PRICING.options;
+  const refs = useRef<Array<HTMLButtonElement | null>>([]);
+  const move = (from: number, step: number) => {
+    const i = (from + step + opts.length) % opts.length;
+    onChange(opts[i].id);
+    refs.current[i]?.focus();
+  };
+  return (
+    <div className="seat-pick" role="radiogroup" aria-label="Team size" data-testid="team-seat-toggle">
+      {opts.map((o, i) => {
+        const on = o.id === value;
+        return (
+          <button
+            key={o.id} type="button" role="radio" aria-checked={on} tabIndex={on ? 0 : -1}
+            className={on ? 'on' : ''} data-seat={o.id}
+            ref={(el) => { refs.current[i] = el; }}
+            onClick={() => onChange(o.id)}
+            onKeyDown={(e) => {
+              if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); move(i, 1); }
+              else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.preventDefault(); move(i, -1); }
+            }}
+          >{o.label}</button>
+        );
+      })}
+    </div>
+  );
+}
+
 type Cell = boolean | string;
 type CompareGroup = [group: string, rows: Array<[label: React.ReactNode, pro: Cell, team: Cell, ent: Cell]>];
 
@@ -162,9 +205,10 @@ export default function SimplePricing({ proCredits, teamCredits, forecastsLabel,
   creditPlans?: CreditPlan[];
 }) {
   const [annual, setAnnual] = useState(false);
-  // Team by seats (held behind NEXT_PUBLIC_TEAM_SEAT_PRICING until Eric approves).
-  const [teamSeats, setTeamSeats] = useState<TeamSeatCount>(2);
-  const seatPlan = TEAM_SEAT_PRICING_ON ? teamSeatPlan(teamSeats) : null;
+  // Team seat card (held behind NEXT_PUBLIC_TEAM_SEAT_PRICING until Eric approves). Display only.
+  const seatOn = isTeamSeatPricingEnabled();
+  const [seatId, setSeatId] = useState<TeamSeatOptionId>(TEAM_SEAT_PRICING.defaultOption);
+  const seatOpt = seatOn ? teamSeatOption(seatId) : null;
   // Same token every Mindy page sends; /api/app/me verifies it server-side. Any failure leaves the
   // public page as is (never guesses a plan).
   const [me, setMe] = useState<MePlan | null>(null);
@@ -199,7 +243,8 @@ export default function SimplePricing({ proCredits, teamCredits, forecastsLabel,
 
   const basePlans: Plan[] = [
     {
-      name: 'Pro', tag: 'For solo contractors and small firms going after federal work.', featured: true,
+      // The seat variant moves "Most popular" + the highlighted border to Team (owner mockup).
+      name: 'Pro', tag: 'For solo contractors and small firms going after federal work.', featured: !seatOn,
       price: annual ? `$${fmt(Math.round(PRO_ANNUAL_USD / 12))}` : `$${PRO_MONTHLY_USD}`,
       was: annual ? `$${PRO_MONTHLY_USD}` : undefined,
       per: annual ? '/ mo, billed annually' : '/ mo, billed monthly', trial: true,
@@ -243,20 +288,24 @@ export default function SimplePricing({ proCredits, teamCredits, forecastsLabel,
     },
   ];
 
-  // Team by seats: the chosen size sets the Team card's price, button, users line and credits.
-  const withSeats = (p: Plan): Plan => (p.name !== 'Team' || !seatPlan ? p : {
+  // Team seat card (owner mockup): the chosen size sets the Team card's price, button and first
+  // feature. Monthly only, no trial line, no credit allowance (none approved — never a made-up
+  // number). The button goes to its configured checkout, or to sales while that is empty.
+  const withSeats = (p: Plan): Plan => (p.name !== 'Team' || !seatOpt ? p : {
     ...p,
-    price: `$${fmt(annual ? seatPlan.annualPerMonthUsd : seatPlan.monthlyUsd)}`,
+    featured: true,
+    price: `$${fmt(seatOpt.monthlyUsd)}`,
     was: undefined,
-    per: annual ? '/ mo, billed annually. Add seats any time.' : '/ mo, billed monthly. Add seats any time.',
-    cta: `Start with ${seatPlan.seats} seats`,
-    href: `/api/checkout/team-seats?seats=${seatPlan.seats}&billing=${annual ? 'annual' : 'monthly'}`,
-    features: [
-      [`${seatPlan.seats} users included`, seatPlan.seats < 5 ? 'Add up to 5 as the team grows, at any time.' : 'Room for the whole team on one plan.'],
-      ['Everyone gets their own alerts', 'Saved searches and a daily briefing per person, not one shared inbox.'],
-      ...p.features.slice(1),
-    ],
-    usage: ['Monthly usage included', `${fmt(seatPlan.credits)} credits / month, shared by the team`],
+    per: seatOpt.per,
+    trial: false,
+    takesPayment: teamSeatTakesPayment(seatOpt),
+    cta: seatOpt.cta,
+    href: teamSeatCtaHref(seatOpt),
+    lead: TEAM_SEAT_PRICING.lead,
+    base: TEAM_SEAT_PRICING.base,
+    features: [seatOpt.firstFeature, ...TEAM_SEAT_PRICING.features],
+    usage: undefined,
+    footer: undefined,
   });
   const plans = applyCurrentPlan(basePlans.map(withSeats), me);
   const byName = Object.fromEntries(plans.map((p) => [p.name, p]));
@@ -280,7 +329,9 @@ export default function SimplePricing({ proCredits, teamCredits, forecastsLabel,
     ]],
     ['Mindy in your AI', [
       ['Use Mindy in Claude, ChatGPT or Cursor', true, true, true],
-      ['Monthly credits', `${fmt(proCredits)}`, `${fmt(teamCredits)}, shared`, 'Custom'],
+      // Seat variant: today's Team allowance belongs to today's $499 plan, and no per-seat allowance
+      // is approved, so the Team cell says so instead of showing a number (unknown is never zero).
+      ['Monthly credits', `${fmt(proCredits)}`, seatOn ? 'To be confirmed' : `${fmt(teamCredits)}, shared`, 'Custom'],
       ['High-volume API and data feeds', false, false, true],
     ]],
     ['Team', [
@@ -302,6 +353,17 @@ export default function SimplePricing({ proCredits, teamCredits, forecastsLabel,
   return (
     <main className="sp">
       <style dangerouslySetInnerHTML={{ __html: CSS }} />
+      {seatOn ? (
+        <>
+          {/* Own style tag, so the live page's CSS (and its rendered output) is untouched when off. */}
+          <style dangerouslySetInnerHTML={{ __html: SEAT_CSS }} />
+          <section className="hero" data-testid="seat-pricing-header">
+            <h1>{TEAM_SEAT_PRICING.header.title}</h1>
+            <p className="sub">{TEAM_SEAT_PRICING.header.sub}</p>
+            {me && <p className="you">You&apos;re on the <b>{PLAN_NAME[me]}</b> plan.{me !== 'free' && <> <a href={BILLING_URL}>Manage billing</a></>}</p>}
+          </section>
+        </>
+      ) : (
       <section className="hero">
         <h1>Try Mindy Pro free for 14 days</h1>
         {(!me || me === 'free') && (
@@ -316,24 +378,22 @@ export default function SimplePricing({ proCredits, teamCredits, forecastsLabel,
           <p className="you">You&apos;re on the <b>{PLAN_NAME[me]}</b> plan.{me !== 'free' && <> <a href={BILLING_URL}>Manage billing</a></>}</p>
         ) : <MemberProof />}
       </section>
+      )}
 
+      {/* The seat variant is monthly only (owner mockup: "Monthly. Annual plans include training and onboarding."). */}
+      {!seatOn && (
       <div className="toggle" role="group" aria-label="Billing period">
         <button type="button" className={!annual ? 'on' : ''} aria-pressed={!annual} onClick={() => setAnnual(false)}>Monthly</button>
         <button type="button" className={annual ? 'on' : ''} aria-pressed={annual} onClick={() => setAnnual(true)}>Annual (up to {maxPct}% off)</button>
       </div>
+      )}
 
       <section className="cards" id="plans">
         {plans.map((p) => (
           <article key={p.name} className={`card ${p.featured ? 'featured' : ''} ${p.current ? 'current' : ''}`}>
             <h2>{p.name}{p.current ? <span className="mine">Your plan</span> : p.featured && <span className="pop">Most popular</span>}</h2>
             <p className="tag">{p.tag}</p>
-            {p.name === 'Team' && seatPlan && !p.current && (
-              <div className="seat-pick" role="group" aria-label="Team size">
-                {TEAM_SEAT_COUNTS.map((n) => (
-                  <button key={n} type="button" aria-pressed={teamSeats === n} className={teamSeats === n ? 'on' : ''} onClick={() => setTeamSeats(n)}>{n} users</button>
-                ))}
-              </div>
-            )}
+            {p.name === 'Team' && seatOpt && !p.current && <TeamSeatToggle value={seatOpt.id} onChange={setSeatId} />}
             {p.price ? (
               <div className="price"><span className="now">{p.price}</span>{p.was && <span className="was">{p.was}</span>}</div>
             ) : (
@@ -350,7 +410,7 @@ export default function SimplePricing({ proCredits, teamCredits, forecastsLabel,
               return offer ? <TrialUpgradeBox offer={offer} email={session.email} token={session.token} onDone={() => { setUpgraded(true); setOffers([]); }} /> : null;
             })()}
             {/* Next to every button that takes money (Eric 2026-11-12: "add the no refunds line under each trial button"). */}
-            {p.trial && <NoRefundNote style={{ margin: '-14px 0 18px' }} />}
+            {(p.trial || (p.takesPayment && !p.current)) && <NoRefundNote style={{ margin: '-14px 0 18px' }} />}
             <p className="lead">{p.lead}</p>
             <p className="base">{p.base}</p>
             <ul>
@@ -358,11 +418,15 @@ export default function SimplePricing({ proCredits, teamCredits, forecastsLabel,
                 <li key={t}><span className="tick" aria-hidden="true">✓</span><span><b>{t}</b><small>{d}</small></span></li>
               ))}
             </ul>
-            <div className="usage"><span className="ul">{p.usage[0]}</span><b>{p.usage[1]}</b></div>
+            {p.usage && <div className="usage"><span className="ul">{p.usage[0]}</span><b>{p.usage[1]}</b></div>}
             {p.footer && <p className="foot">{p.footer}</p>}
           </article>
         ))}
       </section>
+
+      {seatOn && (
+        <p className="seat-foot">{TEAM_SEAT_PRICING.footer} <a href={`mailto:${TEAM_SEAT_PRICING.contactEmail}`}>{TEAM_SEAT_PRICING.contactEmail}</a></p>
+      )}
 
       <p className="fine">
         Card required for the trial. No charge for 14 days, and you can cancel anytime before it ends.
@@ -397,7 +461,7 @@ export default function SimplePricing({ proCredits, teamCredits, forecastsLabel,
                       {p.current
                         ? <span className="cta is-current" aria-current="true">Current plan</span>
                         : <a className={`cta ${p.outline ? 'outline' : ''}`} href={p.href} onClick={p.trial ? () => trackTrialClick(n === 'Team' ? 'team' : 'pro', annual ? 'annual' : 'monthly', 'table') : undefined}>{p.cta}</a>}
-                      {p.trial && <NoRefundNote />}
+                      {(p.trial || (p.takesPayment && !p.current)) && <NoRefundNote />}
                     </td>
                   );
                 })}</tr>
@@ -513,4 +577,14 @@ const CSS = `
 .sp details:last-child{border-bottom:1px solid var(--mp-line)}
 .sp summary{cursor:pointer;font-weight:600}
 .sp details p{color:var(--mp-body);line-height:1.6;margin:10px 0 0}
+`;
+
+/** Seat variant only (rendered in its own <style> tag when NEXT_PUBLIC_TEAM_SEAT_PRICING is on). */
+const SEAT_CSS = `
+.sp .seat-pick{display:flex;gap:4px;margin:0 0 18px;padding:4px;width:100%;max-width:none;box-sizing:border-box;border:1px solid var(--mp-line);border-radius:999px;background:var(--mp-wash)}
+.sp .seat-pick button{flex:1 1 0;min-width:0;min-height:40px;border:0;background:transparent;padding:8px 4px;border-radius:999px;font:500 14px var(--mp-font-sans);color:var(--mp-muted);cursor:pointer;white-space:nowrap}
+.sp .seat-pick button.on{background:var(--mp-navy);color:var(--mp-surface)}
+.sp .seat-pick button:focus-visible{outline:2px solid var(--mp-navy);outline-offset:2px}
+.sp .seat-foot{text-align:center;margin:28px 0 0;font-size:15px;color:var(--mp-body)}
+.sp .seat-foot a{color:var(--mp-navy);font-weight:600;overflow-wrap:anywhere}
 `;
