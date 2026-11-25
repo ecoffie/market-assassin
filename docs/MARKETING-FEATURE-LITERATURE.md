@@ -7841,11 +7841,11 @@ the notices. Test: `federal-events-ranking.unit.test.ts`.
 
 ## Use a file from your Google Drive or OneDrive in Ask Mindy (coming, flag off), 2026-11-24
 
-**What:** Pick your capability statement or a past-performance write-up straight from your connected Google Drive or OneDrive, in Ask Mindy on the Map or in the app, and Mindy reads that file every time you ask, to tailor its answer. It quotes only what the file says and names the file it came from. A certification your file claims is treated as your statement, not verified eligibility.
+**What:** Pick your capability statement or a past-performance write-up straight from your connected Google Drive or OneDrive, and Ask Mindy reads that one file to tailor its answer. It quotes only what the file says and names the file it came from.
 
 **Why:** Your best proof of capability already lives in your drive. Re-uploading it every time is friction, and copy-pasting it loses the source.
 
 **SEO:** use capability statement with AI, government contracting capability statement Google Drive, federal BD AI assistant OneDrive.
 
-**Proof:** Not yet customer-visible. Mindy reads only the file you pick: the selection is signed for your workspace and expires after 24 hours, and Mindy cannot browse or search your drive. File text is treated as reference data, never as instructions, and is not saved with the conversation. A file that cannot be read is named as unreadable, never guessed. Source: `src/lib/connected-apps/files.ts`, `read-file-tool.ts`, Map drawer in `src/app/opportunity-map/route.ts`. Behind `CONNECTED_APPS` (off).
+**Proof:** Not yet customer-visible. Mindy reads only the file you pick: the selection is signed for your workspace and expires after 24 hours, and Mindy cannot browse or search your drive. File text is treated as reference data, never as instructions. Source: `src/lib/connected-apps/files.ts`, `read-file-tool.ts`. Behind `CONNECTED_APPS` (off).
 

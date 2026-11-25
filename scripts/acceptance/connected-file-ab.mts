@@ -22,7 +22,7 @@
  *                        is relevant to the opportunity it changes (green-cleaning products CAN matter to a
  *                        janitorial solicitation). Unchanged passes; an irrelevant or unquoted change fails.
  *
- * Fixtures (synthetic test company, clearly labelled): scripts/acceptance/fixtures/connected-files/
+ * Fixtures (synthetic test company; the warning is in that folder's README, not in the file text): scripts/acceptance/fixtures/connected-files/
  *   material-cap-statement.txt   SDVOSB + 8(a) claims, Florida VA past performance, 120-staff capacity
  *   overview-cap-statement.txt   history, values, green products, training
  * Question: "What open opportunities are there for janitorial services in Florida?"
