@@ -29,8 +29,12 @@ export interface Evaluation {
   fix: string[];
 }
 
-/** Checks 1 and 2 in software: every pursuit cites a record that passed; "none found" is only honest when none passed. */
-export function softwareChecks(decision: AnalystDecision, checks: RecordCheck[]): CriterionResult[] {
+/**
+ * Checks 1 and 2 in software: every pursuit cites a record that passed; "none found" is only honest when none passed.
+ * `dropped`: pursuits software already removed (enforceDecision). The headline was written for the full list, so it
+ * can name a contract that is no longer there: that fails relevance until the answer is rewritten.
+ */
+export function softwareChecks(decision: AnalystDecision, checks: RecordCheck[], dropped: string[] = []): CriterionResult[] {
   const passing = new Set(checks.filter((c) => c.verdict === 'pursue').map((c) => c.contract_id));
   const cited = decision.pursuits.map((p) => p.contract_id);
   const allPassing = cited.every((id) => passing.has(id));
@@ -39,12 +43,15 @@ export function softwareChecks(decision: AnalystDecision, checks: RecordCheck[])
     : decision.pursuits.length === 0
       ? { criterion: 'relevant', pass: false, reason: `${passing.size} record(s) passed the checks but none is recommended.` }
       : { criterion: 'relevant', pass: allPassing, reason: allPassing ? 'Every pursuit is a record that passed the relevance checks.' : 'A pursuit cites a record that did not pass.' };
+  const relevantChecked: CriterionResult = dropped.length && relevant.pass
+    ? { criterion: 'relevant', pass: false, reason: `${dropped.length} recommended contract(s) could not be verified and were removed, so the summary may not match the list.` }
+    : relevant;
   const pursuable: CriterionResult = {
     criterion: 'pursuable',
     pass: allPassing && decision.pursuits.every((p) => !!p.next_move?.trim()),
     reason: allPassing ? 'Every pursuit passed the pursuability checks and has a move.' : 'A pursuit failed the pursuability checks.',
   };
-  return [relevant, pursuable];
+  return [relevantChecked, pursuable];
 }
 
 const RUBRIC = `You are an independent reviewer for Mindy, a federal contracting intelligence product. You grade an answer written for a small-business owner. You do not rewrite it.
@@ -80,10 +87,10 @@ export function verifyQuotedTerms(reason: string, decision: AnalystDecision): 'n
 }
 
 export async function evaluateDecision(
-  args: { question: string; evidence: string; decision: AnalystDecision; checks: RecordCheck[] },
+  args: { question: string; evidence: string; decision: AnalystDecision; checks: RecordCheck[]; dropped?: string[] },
   opts: { client?: Anthropic; model?: string } = {},
 ): Promise<Evaluation & { usage: { input: number; output: number }; model: string }> {
-  const software = softwareChecks(args.decision, args.checks);
+  const software = softwareChecks(args.decision, args.checks, args.dropped || []);
   const client = opts.client ?? new Anthropic();
   const model = opts.model ?? process.env.ASK_MINDY_EVALUATOR_MODEL ?? EVALUATOR_MODEL_DEFAULT;
   const msg = await client.messages.create({
