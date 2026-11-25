@@ -260,3 +260,24 @@ describe('eight-case hygiene matrix (regression for evaluation set)', () => {
     }
   });
 });
+
+describe('second round: recovery and decision questions (2026-11-25)', () => {
+  it('a seed lookup that found nothing gets one recovery round (award number looked up as a solicitation)', () => {
+    expect(decideSecondToolRound([
+      { tool: 'get_solicitation_incumbent', status: 'success', empty: true },
+      { tool: 'lookup_solicitation', status: 'success', empty: true },
+    ], { customerText: 'Should my company pursue the VA janitorial contract 36C24823P1623 when it comes back?' })).toEqual({ offer: true });
+  });
+  it('a decision question after a successful seed gets the follow-on round', () => {
+    expect(decideSecondToolRound([{ tool: 'search_past_contracts', status: 'success' }], { customerText: 'Is this worth pursuing for us?' })).toEqual({ offer: true });
+  });
+  it('a decision question whose round 1 found facts (non-seed tool) still gets the follow-on round', () => {
+    expect(decideSecondToolRound([{ tool: 'get_award_detail', status: 'success' }], { customerText: 'Should we bid on 36C24823P1623?' })).toEqual({ offer: true });
+  });
+  it('unchanged: a plain lookup with a found seed and no decision or hop cue still skips', () => {
+    expect(decideSecondToolRound([{ tool: 'lookup_solicitation', status: 'success' }], { customerText: 'When is FA805127R0001 due?' })).toEqual({ offer: false, reason: 'no_hop_cue' });
+  });
+  it('unchanged: a list question with no seed skips', () => {
+    expect(decideSecondToolRound([{ tool: 'find_opportunities', status: 'success' }], { customerText: 'What janitorial opportunities are open in Florida?' })).toEqual({ offer: false, reason: 'no_seed' });
+  });
+});

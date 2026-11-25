@@ -50,7 +50,17 @@ export const SECOND_ROUND_HOP_CUE =
 export interface SecondRoundSeed {
   tool: string;
   status: string;
+  /** True when the tool answered but found nothing (grounded:false / no_result), e.g. an award number looked up as a solicitation. */
+  empty?: boolean;
 }
+
+/**
+ * Decision questions (bid / pursue / worth it / fit) need the follow-on facts Claude + MCP fetches on its own
+ * (Eric, 2026-11-25: a bid/no-bid answer scored 4/10 vs 9/10 because round 1 stopped at an empty solicitation
+ * lookup and never looked the number up as an award).
+ */
+export const SECOND_ROUND_DECISION_CUE =
+  /\b(should (?:i|we|my company|our company)|pursue|go[ /-]?no[ /-]?go|bid[ /-]?no[ /-]?bid|worth (?:it|pursuing|bidding)|is it a fit|good fit|can (?:i|we) win|chances?|position (?:ourselves|my company|us))\b/i;
 
 export type SecondRoundSkipReason =
   | 'empty'
@@ -86,14 +96,22 @@ export function decideSecondToolRound(
   if (!round1.length) return { offer: false, reason: 'empty' };
 
   const success = round1.filter((r) => r.status === 'success');
+  const text0 = String(opts.customerText || '').trim();
+  // Recovery: a seed lookup that found nothing (wrong identifier type, typo) gets one more planner pass, so the
+  // planner can try the right tool (an award number → get_award_detail) instead of asking the customer to.
+  if (success.some((r) => SECOND_ROUND_SEED_TOOLS.has(r.tool) && r.empty) && !success.some((r) => SECOND_ROUND_SEED_TOOLS.has(r.tool) && !r.empty)) {
+    return { offer: true };
+  }
   if (!success.some((r) => SECOND_ROUND_SEED_TOOLS.has(r.tool))) {
+    // A decision question whose round 1 found facts still gets the follow-on hop (incumbent, competitors, contacts).
+    if (text0 && SECOND_ROUND_DECISION_CUE.test(text0) && success.some((r) => !r.empty)) return { offer: true };
     return { offer: false, reason: 'no_seed' };
   }
   if (success.some((r) => SECOND_ROUND_COMPLETE_TOOLS.has(r.tool))) {
     return { offer: false, reason: 'already_complete' };
   }
-  const text = String(opts.customerText || '').trim();
-  if (!text || !SECOND_ROUND_HOP_CUE.test(text)) {
+  const text = text0;
+  if (!text || !(SECOND_ROUND_HOP_CUE.test(text) || SECOND_ROUND_DECISION_CUE.test(text))) {
     return { offer: false, reason: 'no_hop_cue' };
   }
   // Document-only questions: if R1 already pulled solicitation documents, do not
