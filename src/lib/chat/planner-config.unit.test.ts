@@ -87,7 +87,7 @@ describe('chat route wiring (source assertions)', () => {
   it('applies the private-data provider allow-list to the planner and the answer fallback', () => {
     expect(code).toMatch(/resolved\.filter\(\(t\) => providerApprovedForPrivate\(t\.provider\)\)/);
     // B2: every answer model (primary and fallbacks) passes the same allow-list.
-    expect(code).toMatch(/resolveAnswerChain\(modelEnv, \{ primaryModel: staging\?\.config\.answerPrimary \?\? chatModel \}\)\s*\.filter\(\(t\) => \{\s*if \(providerApprovedForPrivate\(t\.provider\)\) return true;/);
+    expect(code).toMatch(/resolveAnswerChain\(modelEnv, \{ primaryModel: staging\?\.config\.answerPrimary \?\? chatModel, downgrade: budgetDowngradeActive\(modelEnv, overBudgetEarly\) \}\)\s*\.filter\(\(t\) => \{\s*if \(providerApprovedForPrivate\(t\.provider\)\) return true;/);
   });
 
   it('streams verification traces only behind ASK_MINDY_TRACE_EVENTS', () => {
