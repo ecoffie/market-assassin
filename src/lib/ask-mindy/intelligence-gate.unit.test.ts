@@ -75,6 +75,13 @@ describe('runIntelligenceGate', () => {
     expect(r.answer).toMatch(/not a sign the market is small/);
   });
 
+  it('passes the pursuits software removed to the evaluator', async () => {
+    const a = vi.fn(async () => ({ decision, dropped: ['notice:gone'], usage: { input: 1, output: 1 }, model: 'm' }));
+    const evaluate = vi.fn(async () => ({ pass: true, results: [] as never, fix: [], usage: { input: 0, output: 0 }, model: 'e' }));
+    await runIntelligenceGate({ ...base, deps: { findOpen: async () => null, findNationalForecasts: async () => null, findTargeted: async () => null, gather: async () => evidence(), publish: async (x: any) => x, analyst: a, evaluate } });
+    expect((evaluate.mock.calls[0] as any)[0].dropped).toEqual(['notice:gone']);
+  });
+
   it('record checks run on the real fixture: 3 pass', async () => {
     const r = await runIntelligenceGate({ ...base, deps: { findOpen: async () => null, findNationalForecasts: async () => null, findTargeted: async () => null, gather: async () => evidence(), publish: async (x: any) => x, analyst, evaluate: async () => ({ pass: true, results: [] as never, fix: [], usage: { input: 0, output: 0 }, model: 'e' }) } });
     expect(r.checks.filter((c) => c.verdict === 'pursue')).toHaveLength(3);
@@ -104,6 +111,42 @@ describe('openNoticesAsRecords', () => {
     ]);
     expect(recs.map((r) => r.contract_id)).toEqual(['notice:a', 'notice:c']);
     expect(recs.every((r) => r.kind === 'open')).toBe(true);
+  });
+});
+
+describe('openNoticesAsRecords: a shared title is not a shared solicitation', () => {
+  it('keeps distinct bids that share a generic title but no solicitation number', async () => {
+    const { openNoticesAsRecords } = await import('./intelligence-gate');
+    const recs = openNoticesAsRecords([
+      { notice_id: 'a', solicitation_number: null, title: 'Janitorial Services', sub_agency: 'Dept of the Air Force', location_label: 'Eglin AFB, FL', response_deadline: '2026-12-04' },
+      { notice_id: 'b', solicitation_number: null, title: 'Janitorial Services', sub_agency: 'Dept of the Navy', location_label: 'NAS Jacksonville, FL', response_deadline: '2026-12-10' },
+    ]);
+    expect(recs.map((r) => r.contract_id)).toEqual(['notice:a', 'notice:b']);
+  });
+  it('still collapses a repost whose every field agrees', async () => {
+    const { openNoticesAsRecords } = await import('./intelligence-gate');
+    const row = { solicitation_number: null, title: 'Janitorial Services', sub_agency: 'Dept of the Navy', location_label: 'NAS Jacksonville, FL', response_deadline: '2026-12-10', notice_type: 'Solicitation' };
+    expect(openNoticesAsRecords([{ notice_id: 'a', ...row }, { notice_id: 'b', ...row }]).map((r) => r.contract_id)).toEqual(['notice:a']);
+  });
+  it('a title with nothing else to compare is its own solicitation', async () => {
+    const { openNoticesAsRecords } = await import('./intelligence-gate');
+    expect(openNoticesAsRecords([{ notice_id: 'a', title: 'Janitorial Services' }, { notice_id: 'b', title: 'Janitorial Services' }])).toHaveLength(2);
+  });
+});
+
+describe('open-bid count line', () => {
+  const evalPass = async () => ({ pass: true, results: [] as never, fix: [], usage: { input: 0, output: 0 }, model: 'e' });
+  const item = (id: string, sol: string) => ({ notice_id: id, solicitation_number: sol, title: `Cleaning ${sol}`, sub_agency: 'Navy', location_label: 'FL' });
+  it('counts repeat postings within the open search only, and reports the industry-code additions apart', async () => {
+    const a = vi.fn(async () => ({ decision, dropped: [], usage: { input: 1, output: 1 }, model: 'm' }));
+    const findOpen = async () => ({ horizons: { open_now: { status: 'grounded', matched_count: 3, items: [item('1', 'S1'), item('2', 'S1'), item('3', 'S2')] } } }) as never;
+    const findTargeted = async () => ({ horizons: { open_now: { status: 'grounded', items: [item('4', 'S3'), item('5', 'S4')] }, coming_back: { items: [] } } }) as never;
+    // A gather whose market-size names the work so the targeted industry-code search runs.
+    const gather = async () => { const e = evidence() as any; e.sections.market_size = { topPscList: [], allNaics: [{ code: '561720', name: 'Janitorial Services', pct: 90 }] }; return e; };
+    await runIntelligenceGate({ ...base, deps: { findOpen, findTargeted, findNationalForecasts: async () => null, gather, publish: async (x: any) => x, analyst: a, evaluate: evalPass } });
+    const line = (a.mock.calls[0] as any)[0].market.openNowLine as string;
+    expect(line).toContain('1 were repeat postings of the same solicitation, leaving 2 distinct bid(s)');
+    expect(line).toContain('added 2 more distinct bid(s)');
   });
 });
 

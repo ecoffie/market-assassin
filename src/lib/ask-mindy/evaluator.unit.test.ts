@@ -52,4 +52,12 @@ describe('blocking vs advisory criteria (Eric 2026-11-24)', () => {
     expect([...BLOCKING].sort()).toEqual(['actionable', 'pursuable', 'reasoned', 'relevant']);
     expect(BLOCKING.has('clear')).toBe(false);
   });
+  it('a pursuit software removed fails relevance even though the rest passed (the headline was written for it)', () => {
+    const checks = [chk('A', 'pursue'), chk('B', 'out_of_scope')];
+    const r = softwareChecks(dec(['A']), checks, ['B']);
+    expect(byName(r)).toEqual({ relevant: false, pursuable: true });
+    expect(r[0].reason).toMatch(/could not be verified and were removed/);
+    expect(r[0].reason).not.toMatch(/record|check/i);
+    expect(byName(softwareChecks(dec(['A']), checks, [])).relevant).toBe(true);
+  });
 });

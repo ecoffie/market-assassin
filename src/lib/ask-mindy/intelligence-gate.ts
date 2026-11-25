@@ -70,6 +70,20 @@ export function marketContext(ev: MarketReportResult, state?: string | null): An
   };
 }
 
+/**
+ * Which open notices are the same solicitation. The solicitation number when there is one; without it, every
+ * descriptive field must agree (title alone is not identity: "Janitorial Services" is posted by many bases);
+ * with fewer than two of those fields, the notice is its own solicitation.
+ */
+export function openNoticeKey(it: Record<string, unknown>): string {
+  const sol = String(it.solicitation_number ?? '').trim().toUpperCase();
+  if (sol) return `sol:${sol}`;
+  const norm = (v: unknown) => String(v ?? '').trim().toUpperCase().replace(/\s+/g, ' ');
+  const fields = [it.title, it.sub_agency ?? it.buyer, it.response_deadline ?? it.relevant_date, it.location_label, it.notice_type].map(norm);
+  if (fields.filter(Boolean).length >= 2) return `fields:${fields.join('|')}`;
+  return `id:${String(it.notice_id || (it.identity as { id?: string } | undefined)?.id)}`;
+}
+
 /** Open-now items from find_opportunities as checkable records (id prefixed so it never collides with an award id). */
 export function openNoticesAsRecords(items: Array<Record<string, unknown>>): CandidateRecord[] {
   // One solicitation is often posted several times (amendments, reposts): keep the first of each.
@@ -77,7 +91,7 @@ export function openNoticesAsRecords(items: Array<Record<string, unknown>>): Can
   return items
     .filter((it) => it && (it.notice_id || (it.identity as { id?: string } | undefined)?.id))
     .filter((it) => {
-      const key = String(it.solicitation_number || it.title || it.notice_id).trim().toUpperCase();
+      const key = openNoticeKey(it);
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
@@ -305,8 +319,11 @@ export async function runIntelligenceGate(args: {
     : (() => {
         const items = (openH.items || []).length;
         const matched = openH.matched_count ?? items;
-        const dupes = items - openRecs.length;
-        return `${matched} open SAM.gov notice(s) matched the search${dupes > 0 ? `; ${dupes} were repeat postings of the same solicitation, leaving ${openRecs.length} distinct bid(s)` : ''}${matched > items ? `; the top ${items} were returned and ${matched - items} were not` : `; all were checked`}`;
+        // Repeats are counted within THIS search's results; the targeted industry-code search is reported apart.
+        const distinct = openNoticesAsRecords(openH.items || []).length;
+        const dupes = items - distinct;
+        const added = openRecs.length - distinct;
+        return `${matched} open SAM.gov notice(s) matched the search${dupes > 0 ? `; ${dupes} were repeat postings of the same solicitation, leaving ${distinct} distinct bid(s)` : ''}${matched > items ? `; the top ${items} were returned and ${matched - items} were not` : `; all were checked`}${added > 0 ? `; a second search on the customer's industry code added ${added} more distinct bid(s), also checked` : ''}`;
       })();
   market.forecastsLine = await forecastsLine({ horizon: soonH, shown: soonRecs.length, state: scope.state, query, national: findNationalForecasts });
   const input: AnalystInput = { question: args.question, profile: args.profile, market, records: recs, checks, customerUei: eligibility.uei ?? null };
@@ -324,7 +341,7 @@ export async function runIntelligenceGate(args: {
     const a = await analyst(asked);
     cost.analystIn += a.usage.input; cost.analystOut += a.usage.output;
     decision = a.decision;
-    const e = await evaluate({ question: args.question, evidence, decision, checks });
+    const e = await evaluate({ question: args.question, evidence, decision, checks, dropped: a.dropped });
     cost.evalIn += e.usage.input; cost.evalOut += e.usage.output;
     evaluation = { pass: e.pass, results: e.results, fix: e.fix };
     if (e.pass) break;
