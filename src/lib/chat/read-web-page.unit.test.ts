@@ -147,3 +147,24 @@ describe('the per-turn tool', () => {
     expect(htmlToText('<p>A &amp; B<!-- hidden --> &#8212; C</p>').text).toBe('A & B — C');
   });
 });
+
+describe('htmlToText runs in linear time on hostile markup', () => {
+  const fast = (html: string) => { const t = performance.now(); htmlToText(html); return performance.now() - t; };
+  it('many unclosed skip-element openers followed by a long tail', () => {
+    expect(fast('<script'.repeat(60_000) + 'x'.repeat(200_000))).toBeLessThan(200);
+    expect(fast('<style>'.repeat(60_000) + 'x'.repeat(200_000))).toBeLessThan(200);
+    expect(fast('<!--'.repeat(100_000))).toBeLessThan(200);
+  });
+  it('a random 1.5 MB tag soup', () => {
+    let seed = 7;
+    const rnd = () => (seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+    const bits = ['<script', '</script>', '<style>', '<div>', '</p>', '<!--', '-->', '<', '>', '&amp;', 'text ', '<br/>', '</', '<svg', '&#', '"'];
+    let soup = '';
+    while (soup.length < 1_500_000) soup += bits[Math.floor(rnd() * bits.length)];
+    expect(fast(soup)).toBeLessThan(200);
+  });
+  it('an unclosed script drops the rest; text stops at the cap', () => {
+    expect(htmlToText('<p>Keep</p><script>evil(); never closed <p>gone</p>').text).toBe('Keep');
+    expect(htmlToText('<p>' + 'word '.repeat(50_000) + '</p>').text.length).toBeLessThanOrEqual(MAX_TEXT_CHARS * 2);
+  });
+});

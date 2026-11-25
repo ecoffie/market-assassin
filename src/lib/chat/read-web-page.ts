@@ -179,21 +179,73 @@ const defaultFetchOnce: ReadDeps['fetchOnce'] = (url, address, family, signal) =
 // ---- text --------------------------------------------------------------------------------------------------
 
 const ENTITIES: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', ndash: '-', mdash: '-', rsquo: "'", lsquo: "'", rdquo: '"', ldquo: '"' };
-export function htmlToText(html: string): { title: string | null; text: string } {
-  const title = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]?.replace(/\s+/g, ' ').trim() || null;
-  const text = html
-    .replace(/<!--[\s\S]*?-->/g, ' ')
-    .replace(/<(script|style|noscript|template|svg|iframe|object|head)\b[\s\S]*?<\/\1\s*>/gi, ' ')
-    .replace(/<(br|\/p|\/div|\/li|\/h[1-6]|\/tr|\/section|\/article)\b[^>]*>/gi, '\n')
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/&(#\d+|#x[0-9a-f]+|[a-z]+);/gi, (m, e: string) => {
-      if (e[0] === '#') { const n = e[1].toLowerCase() === 'x' ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10); return Number.isFinite(n) && n > 31 && n < 0x110000 ? String.fromCodePoint(n) : ' '; }
-      return ENTITIES[e.toLowerCase()] ?? m;
-    })
+const SKIP_ELEMENTS = new Set(['script', 'style', 'noscript', 'template', 'svg', 'iframe', 'object', 'head']);
+const BLOCK_ENDS = new Set(['br', 'p', 'div', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'tr', 'section', 'article']);
+
+function decodeEntities(t: string): string {
+  return t.replace(/&(#\d{1,7}|#x[0-9a-f]{1,6}|[a-z]{2,8});/gi, (m, e: string) => {
+    if (e[0] === '#') { const n = e[1].toLowerCase() === 'x' ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10); return Number.isFinite(n) && n > 31 && n < 0x110000 ? String.fromCodePoint(n) : ' '; }
+    return ENTITIES[e.toLowerCase()] ?? m;
+  });
+}
+
+/**
+ * HTML to text in ONE forward scan (linear time on any input, including unclosed tags): markup is skipped, the
+ * contents of script/style/... are skipped up to their closing tag (found with indexOf; none -> the rest is dropped),
+ * and scanning stops once enough text has been produced.
+ */
+export function htmlToText(html: string, maxChars = MAX_TEXT_CHARS): { title: string | null; text: string } {
+  const lower = html.toLowerCase();
+  let title: string | null = null;
+  const t0 = lower.indexOf('<title');
+  if (t0 >= 0) {
+    const t1 = lower.indexOf('>', t0);
+    const t2 = t1 >= 0 ? lower.indexOf('</title', t1) : -1;
+    if (t2 > t1) title = decodeEntities(html.slice(t1 + 1, Math.min(t2, t1 + 1 + 500)).replace(/<[^>]{0,200}>/g, ' ')).replace(/\s+/g, ' ').trim() || null;
+  }
+  const parts: string[] = [];
+  let produced = 0;
+  const budget = maxChars * 2; // raw text before whitespace collapse
+  let i = 0;
+  const n = html.length;
+  while (i < n && produced < budget) {
+    const lt = html.indexOf('<', i);
+    const end = lt < 0 ? n : lt;
+    if (end > i) {
+      const take = Math.min(end - i, budget - produced);
+      parts.push(html.slice(i, i + take));
+      produced += take;
+      if (take < end - i) break;
+    }
+    if (lt < 0) break;
+    if (html.startsWith('<!--', lt)) {
+      const end = html.indexOf('-->', lt + 4);
+      if (end < 0) break;
+      i = end + 3;
+      continue;
+    }
+    const gt = html.indexOf('>', lt + 1);
+    if (gt < 0) break;
+    const m = /^(\/?)\s*([a-z][a-z0-9]{0,15})/.exec(lower.slice(lt + 1, Math.min(gt, lt + 24)));
+    const closing = !!m?.[1];
+    const name = m?.[2] ?? '';
+    if (!closing && SKIP_ELEMENTS.has(name) && !lower.slice(Math.max(lt, gt - 1), gt).endsWith('/')) {
+      const close = lower.indexOf(`</${name}`, gt + 1);
+      if (close < 0) break;
+      const closeEnd = lower.indexOf('>', close);
+      if (closeEnd < 0) break;
+      i = closeEnd + 1;
+      parts.push(' ');
+      continue;
+    }
+    parts.push(BLOCK_ENDS.has(name) && (closing || name === 'br') ? '\n' : ' ');
+    i = gt + 1;
+  }
+  const text = decodeEntities(parts.join(''))
     .replace(/[ \t\f\v\r]+/g, ' ')
-    .replace(/\n\s*\n+/g, '\n')
+    .replace(/ ?\n[ \n]*/g, '\n')
     .trim();
-  return { title: title ? htmlToText(title.replace(/<[^>]+>/g, '')).text || title : null, text };
+  return { title, text };
 }
 
 // ---- read --------------------------------------------------------------------------------------------------
