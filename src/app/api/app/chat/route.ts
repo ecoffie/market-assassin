@@ -50,7 +50,7 @@ import { vaultDocEnabledFor } from '@/lib/vault/flags';
 import { createChatToolExecutor, type ChatExecutionRecord } from '@/lib/chat/chat-tool-executor';
 import { resolveChatActingScope, vaultEmailFor } from '@/lib/chat/chat-acting-scope';
 import type { BidderProfile } from '@/lib/proposal/types';
-import { resolvePlannerChain, plannerKey, anthropicSupportsForcedToolChoice, resolveAnswerChain, answerKey, ANSWER_ENDPOINTS, openAiChatParams, type PlannerTarget } from '@/lib/chat/planner-config';
+import { budgetDowngradeActive, resolvePlannerChain, plannerKey, anthropicSupportsForcedToolChoice, resolveAnswerChain, answerKey, ANSWER_ENDPOINTS, openAiChatParams, type PlannerTarget } from '@/lib/chat/planner-config';
 import { fitMessages, inputBudget, type MsgKind } from '@/lib/chat/token-budget';
 import { stagingModelConfig, STAGING_CONFIG_HEADER } from '@/lib/chat/staging-model-config';
 import { customerErrorMessage } from '@/lib/chat/customer-errors';
@@ -1029,7 +1029,7 @@ export async function POST(request: NextRequest) {
         const staging = stagingModelConfig(request.headers.get(STAGING_CONFIG_HEADER), TRACE_EVENTS);
         const overBudgetEarly = staging?.config.overBudget ?? await isUserOverBudget(email).catch(() => false);
         const modelEnv: Record<string, string | undefined> = staging ? { ...process.env, ...staging.config.env } : process.env;
-        const chatModelEarly = overBudgetEarly
+        const chatModelEarly = budgetDowngradeActive(modelEnv, overBudgetEarly)
           ? (modelEnv.LLM_OPENAI_MODEL || 'gpt-4o-mini')
           : (modelEnv.CHAT_OPENAI_MODEL || 'gpt-4o');
 
