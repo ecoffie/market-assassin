@@ -31,10 +31,12 @@ import unzipper from 'unzipper';
 import { Storage } from '@google-cloud/storage';
 import { execSync } from 'node:child_process';
 import { archiveSamZip, snapshotDate, SAM_ARCHIVE_BUCKET, ArchiveChecksumConflict } from './lib/sam-archive.mjs';
+import { registrationColumns } from './lib/sam-registration-dates.mjs';
 
 // Bump when the parser's FIELD MAPPING changes, so a backfill can target only rows
 // produced by superseded logic. v2 = added per-NAICS sbaSmallBusiness (P0-3).
-const PARSER_VERSION = 'v2-naics-sb';
+// v3 = purpose_of_registration + initial/current registration + activation dates.
+const PARSER_VERSION = 'v3-registration-dates';
 import { createClient } from '@supabase/supabase-js';
 
 // Load .env.local explicitly (dotenv default only reads .env).
@@ -202,6 +204,8 @@ function parseRecord(fields) {
     primary_naics: primaryNaics || naicsCodes[0] || null,
     naics_codes: naicsCodes, certifications: Array.from(certs),
     registration_status: status, registration_expiry: regExpiry,
+    // Purpose (Z1 grants-only vs Z2 all awards) + registration dates — the "new to SAM" signal.
+    ...registrationColumns(fields),
     sam_url: `https://sam.gov/entity/${uei}`,
     // P0-3 provenance: observed_at is the SNAPSHOT date, not import time.
     naics_small_business: naicsSb,

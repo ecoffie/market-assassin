@@ -311,6 +311,7 @@ export default function AdminDashboard() {
     { href: '/admin/customer-health', label: 'Customer Health', icon: '❤️' },
     { href: '/admin/purchases', label: 'Purchases', icon: '💳' },
     { href: '/admin/data-inventory', label: 'Mindy Data Core', icon: '🧠' },
+    { href: '/admin/new-contractors', label: 'New Contractors', icon: '🆕' },
     { href: '/admin/emails', label: 'Email History', icon: '📧' },
     { href: '/admin/feedback', label: 'Feedback', icon: '💬' },
   ];
