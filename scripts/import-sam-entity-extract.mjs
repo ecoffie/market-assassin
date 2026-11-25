@@ -13,6 +13,9 @@
  *   node scripts/import-sam-entity-extract.mjs --file /tmp/sam-extract/entities.zip
  *   NAICS=541512,541611 node scripts/import-sam-entity-extract.mjs
  *   node scripts/import-sam-entity-extract.mjs --all-naics     # import everything (big)
+ *   node scripts/import-sam-entity-extract.mjs --file <zip> --all-naics --dry   # ZERO writes: parse, reconcile,
+ *        count would-update vs would-insert (read-only probe), print sample rows. No archive upload, no upsert,
+ *        no checkpoint, no dead-letter file.
  *
  * The extract is a ZIP of a pipe-delimited .dat. Fields are 1-indexed; the
  * NAICS-list and SBA-types fields are variable-width (a counter followed by
@@ -54,6 +57,10 @@ const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
 //                     mode — covers whole industries, e.g. all construction)
 //   NAICS=541512,...  keep only these exact 6-digit codes (default seed set)
 const ALL_NAICS = process.argv.includes('--all-naics');
+// --dry: ZERO persistent writes (no GCS archive, no upsert, no checkpoint / dead-letter files). Reads only:
+// the local ZIP and a pre-existence probe per batch, so the would-update vs would-insert split is real.
+const DRY = process.argv.includes('--dry');
+const DRY_SAMPLE_ROWS = 3;
 const SECTORS = (process.env.SECTORS || '')
   .split(',').map(s => s.trim()).filter(Boolean);
 const SEED_NAICS = new Set((process.env.NAICS ||
@@ -265,8 +272,11 @@ async function archiveOrRefuse(zipPath) {
 
 async function main() {
   await downloadIfNeeded();
-  // STEP 1-5: archive and verify BEFORE a single row is written.
-  const archive = await archiveOrRefuse(ZIP_PATH);
+  if (DRY) console.log('\n=== DRY RUN — no archive upload, no upsert, no checkpoint ===');
+  // STEP 1-5: archive and verify BEFORE a single row is written. A dry run writes no rows, so it archives nothing.
+  const archive = DRY
+    ? { key: '(dry run: not archived)', sha256: '-', storedSha: '-', generation: '-', size: 0, bytes: 0, skipped: true, codeVersion: '' }
+    : await archiveOrRefuse(ZIP_PATH);
   console.log(`\n=== ARCHIVE CONFIRMED ===`);
   console.log(`  object:     gs://${SAM_ARCHIVE_BUCKET}/${archive.key}`);
   console.log(`  sha256:     ${archive.sha256}`);
@@ -303,7 +313,8 @@ async function main() {
   //   • updated vs inserted split, so we know how much of the universe changed
   const CKPT = `${ZIP_PATH}.checkpoint.json`;
   const DEADLETTER = `${ZIP_PATH}.failed.jsonl`;
-  const RESUME = process.argv.includes('--resume');
+  const RESUME = process.argv.includes('--resume') && !DRY;
+  const samples = [];
   let resumeFrom = 0;
   if (RESUME && existsSync(CKPT)) {
     try {
@@ -337,6 +348,14 @@ async function main() {
     if (exErr) console.warn('  [warn] pre-existence probe failed:', exErr.message);
     else preExisting = new Set((existing || []).map(r => r.uei));
 
+    if (DRY) {
+      // Same accounting as a real batch, with no write: would-update / would-insert from the read-only probe.
+      upserted += rows.length;
+      for (const u of ueis) (preExisting.has(u) ? updated++ : inserted++);
+      for (const r of rows) if (samples.length < DRY_SAMPLE_ROWS) samples.push({ ...r, _would: preExisting.has(r.uei) ? 'update' : 'insert' });
+      batch = [];
+      return;
+    }
     const { error } = await sb.from('sam_entities')
       .upsert(rows, { onConflict: 'uei', ignoreDuplicates: false });
     if (error) {
@@ -394,11 +413,15 @@ kept (matched filter)   ${kept.toLocaleString()}
   failed (dead-letter)  ${failed.toLocaleString()}
   accounted             ${keptAccounted.toLocaleString()}  ${keptAccounted === kept ? 'BALANCES' : 'MISMATCH — investigate'}
 
-REGISTRY CHANGE
-  updated existing      ${updated.toLocaleString()}
-  newly inserted        ${inserted.toLocaleString()}
-  sam_entities total    ${count?.toLocaleString?.() ?? count}
+REGISTRY CHANGE${DRY ? ' (DRY RUN — nothing written; "upserted" = would upsert)' : ''}
+  ${DRY ? 'would update' : 'updated existing'}      ${updated.toLocaleString()}
+  ${DRY ? 'would insert' : 'newly inserted'}        ${inserted.toLocaleString()}
+  sam_entities total    ${count?.toLocaleString?.() ?? count}${DRY ? ' (unchanged)' : ''}
 ${failed ? `\n  ${failed} rows dead-lettered to ${DEADLETTER} — re-run with --resume after investigating.` : ''}`);
+  if (DRY) {
+    console.log(`\n=== SAMPLE ROWS (first ${samples.length} kept, as they WOULD be written) ===`);
+    for (const r of samples) console.log(JSON.stringify(r, null, 2));
+  }
 }
 
 main().catch(e => { console.error('FATAL', e); process.exit(1); });
