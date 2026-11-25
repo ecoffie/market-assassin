@@ -178,4 +178,20 @@ describe('ConnectedFiles', () => {
     await mount();
     expect(el.textContent).toContain('Mindy could not finish connecting because of a setup problem on our side. Nothing was connected.');
   });
+
+  it('the outcome is not consumed while the session is still loading: it shows once the control appears', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      document.cookie = 'mindy_ca_result=ok.microsoft.; Path=/';
+      h.list = { status: 401, body: { error: 'unauthorized' } };
+      await mount();
+      // Not shown yet, and not thrown away: a remount after sign-in must still find it.
+      expect(document.cookie).toContain('mindy_ca_result=ok.microsoft.');
+      h.list = { status: 200, body: { connections: [], providers: [{ provider: 'microsoft', available: true }] } };
+      await act(async () => { vi.advanceTimersByTime(1600); });
+      await tick();
+      expect(el.textContent).toContain('OneDrive is connected. Pick a file to use it in this conversation.');
+      expect(document.cookie).not.toContain('mindy_ca_result=ok');
+    } finally { vi.useRealTimers(); }
+  });
 });
