@@ -39,6 +39,8 @@ import {
 // Meaning + eligibility come from the plan; this file owns only MCP surface policy + presentation.
 import {
   buildDiscoveryPlan,
+  contextFor,
+  OPEN_TEXT_COLS,
   applyOpenPlan,
   applyRecompetePlan,
   applyForecastPlan,
@@ -226,6 +228,12 @@ export interface HorizonResult {
    * own awards (forecast-awarded-to-company.ts). Flagged rows carry `already_awarded_to_company`.
    */
   company_award_check?: { status: 'checked' | 'unavailable'; flagged: number; rule: string; note: string } | null;
+  /**
+   * Open now only: the full search timed out, so it was re-run over fewer text columns. The columns actually
+   * searched and the ones skipped are named; a match only in a skipped column (e.g. the statement of work) can
+   * be missing from this answer.
+   */
+  narrowed_search?: { searched_columns: string[]; skipped_columns: string[]; reason: 'statement_timeout' };
 }
 
 export interface HorizonStage {
@@ -543,6 +551,8 @@ type InterpretedQuery = {
    * capped, date-ordered fetch window by the (often much larger) registered-code population.
    */
   basePlan: DiscoveryPlan | null;
+  /** The same request re-planned with fewer Open-now text columns (timeout retry only; see queryOpenNow). */
+  narrowOpenPlan?: (cols: readonly string[]) => DiscoveryPlan;
 };
 
 /**
@@ -690,6 +700,7 @@ function interpretQuery(input: FindOpportunitiesInput, company: CompanyAnchorRes
     market,
     company,
     basePlan,
+    narrowOpenPlan: (cols) => buildDiscoveryPlan(mcpDiscoveryInput(input, company?.anchor), policy, { ...contextFor(), openTextCols: cols }),
     region: resolveRegion(input),
     stage: parseStageGroup(input.stage),
     interpreted: {
@@ -846,10 +857,21 @@ function eligibilityCounts(items: HorizonItem[], company: CompanyAnchorResolutio
   return out;
 }
 
+/**
+ * Open-now timeout retry ladder (Eric's Claude + Mindy EFS Digital run, 2026-11-25: a long query failed outright
+ * with search_too_long). The cost is the regex clauses × text columns; the statement of work is the large one.
+ * Each step searches fewer columns; the result names what was skipped. Only reached after a statement timeout.
+ */
+export const OPEN_TIMEOUT_RETRY_COLUMNS: readonly (readonly string[])[] = [
+  ['title', 'description', 'department', 'solicitation_number'],
+  ['title', 'department', 'solicitation_number'],
+];
+
 async function queryOpenNow(
   client: SupabaseClient,
   p: InterpretedQuery,
   limit: number,
+  attempt = 0,
 ): Promise<HorizonResult> {
   const source = 'sam_opportunities';
   if (p.plan.status !== 'ok') return blockedHorizon(source, OPEN_HANDOFFS, p.plan);
@@ -883,6 +905,20 @@ async function queryOpenNow(
     if (error) {
       // A timed-out search is "too long", with an actionable message; still unavailable, never zero (search-failure.ts).
       const f = classifySearchFailure(error);
+      const cols = OPEN_TIMEOUT_RETRY_COLUMNS[attempt];
+      if (f.code === 'search_too_long' && cols && p.narrowOpenPlan) {
+        const narrowed = await queryOpenNow(client, { ...p, plan: p.narrowOpenPlan(cols) }, limit, attempt + 1);
+        if (narrowed.narrowed_search || narrowed.error?.class === 'search_too_long') return narrowed;
+        const skipped = OPEN_TEXT_COLS.filter((c) => !cols.includes(c));
+        return {
+          ...narrowed,
+          narrowed_search: { searched_columns: [...cols], skipped_columns: skipped, reason: 'statement_timeout' },
+          semantics_note: [
+            `The full search was too long to finish, so Mindy re-ran it over ${cols.join(', ')} only; ${skipped.join(', ')} ${skipped.length === 1 ? 'was' : 'were'} not searched. A notice that matches only there can be missing.`,
+            narrowed.semantics_note,
+          ].filter(Boolean).join(' '),
+        };
+      }
       const u = unavailable(source, OPEN_HANDOFFS, f.message, unsupported);
       return f.code === 'search_too_long' ? { ...u, error: { class: 'search_too_long', message: f.message } } : u;
     }
