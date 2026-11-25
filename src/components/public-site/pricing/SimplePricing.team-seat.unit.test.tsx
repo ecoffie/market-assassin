@@ -56,9 +56,11 @@ describe('/pricing with the seat switch OFF renders exactly as today', () => {
 });
 
 describe('team seat display config (PROPOSED, display only)', () => {
-  it('offers exactly 2 and 5 users, 2 by default, at $249 and $599', () => {
+  it('offers 2, 3, 4 and 5 users, 2 by default, at $249 / $366 / $482 / $599', () => {
     expect(TEAM_SEAT_PRICING.options.map((o) => [o.id, o.seats, o.label, o.monthlyUsd, o.cta])).toEqual([
       ['2', 2, '2 users', 249, 'Start with 2 seats'],
+      ['3', 3, '3 users', 366, 'Start with 3 seats'],
+      ['4', 4, '4 users', 482, 'Start with 4 seats'],
       ['5', 5, '5 users', 599, 'Start with 5 seats'],
     ]);
     expect(TEAM_SEAT_PRICING.defaultOption).toBe('2');
@@ -119,7 +121,7 @@ describe('/pricing with the seat switch ON (server render)', () => {
     expect(group.getAttribute('aria-label')).toBe('Team size');
     const radios = [...group.querySelectorAll('[role="radio"]')];
     expect(radios.map((r) => [r.textContent, r.getAttribute('aria-checked'), r.getAttribute('tabindex')])).toEqual([
-      ['2 users', 'true', '0'], ['5 users', 'false', '-1'],
+      ['2 users', 'true', '0'], ['3 users', 'false', '-1'], ['4 users', 'false', '-1'], ['5 users', 'false', '-1'],
     ]);
   });
 
@@ -205,12 +207,15 @@ describe('/pricing seat toggle (client)', () => {
   it('moves with the arrow keys and keeps focus on the selected option', async () => {
     radio('2 users').focus();
     await act(async () => { radio('2 users').dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true })); });
-    expect(state().price).toBe('$599');
-    expect(document.activeElement?.textContent).toBe('5 users');
-    expect(radio('5 users').tabIndex).toBe(0);
+    expect(state().price).toBe('$366');
+    expect(document.activeElement?.textContent).toBe('3 users');
+    expect(radio('3 users').tabIndex).toBe(0);
     expect(radio('2 users').tabIndex).toBe(-1);
-    await act(async () => { radio('5 users').dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true })); });
+    await act(async () => { radio('3 users').dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true })); });
     expect(state().price).toBe('$249');
+    // wraps from first to last
+    await act(async () => { radio('2 users').dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true })); });
+    expect(state().price).toBe('$599');
   });
 
   it('only changes the Team card (Pro and Enterprise stay put)', async () => {

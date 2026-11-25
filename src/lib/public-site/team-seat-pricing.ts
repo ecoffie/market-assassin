@@ -2,7 +2,9 @@
  * Team seat card on /pricing — DISPLAY ONLY. PROPOSED. Needs Eric's approval AND Stripe prices.
  *
  * Content is the owner's (Branden) "Team card" mockup, 2026-11-25: a "2 users | 5 users" toggle on
- * the Team card, $249 for 2 users and $599 for 5, monthly.
+ * the Team card, $249 for 2 users and $599 for 5, monthly. 3 and 4 users added on the owner's
+ * request (2026-11-25) at the prices #2430 already holds in src/lib/billing/team-seat-plans.ts
+ * ($366 / $482).
  *
  * ⛔ Nothing in billing reads this file. It never sets a price, a credit allowance or a seat limit:
  *    - the prices here are LABELS on the page; Stripe, the webhook and POOLED_PLAN_DEFAULTS are
@@ -25,7 +27,7 @@ export function isTeamSeatPricingEnabled(): boolean {
   return process.env.NEXT_PUBLIC_TEAM_SEAT_PRICING === 'on';
 }
 
-export type TeamSeatOptionId = '2' | '5';
+export type TeamSeatOptionId = '2' | '3' | '4' | '5';
 
 export interface TeamSeatOption {
   id: TeamSeatOptionId;
@@ -57,6 +59,20 @@ export const TEAM_SEAT_PRICING = {
       per: '/ mo, billed monthly. Add seats any time.',
       cta: 'Start with 2 seats',
       firstFeature: ['2 users included', 'Add up to 5 as the team grows, at any time.'],
+      checkoutUrl: '',
+    },
+    {
+      id: '3', seats: 3, label: '3 users', monthlyUsd: 366,
+      per: '/ mo, billed monthly. Add seats any time.',
+      cta: 'Start with 3 seats',
+      firstFeature: ['3 users included', 'Add up to 5 as the team grows, at any time.'],
+      checkoutUrl: '',
+    },
+    {
+      id: '4', seats: 4, label: '4 users', monthlyUsd: 482,
+      per: '/ mo, billed monthly. Add seats any time.',
+      cta: 'Start with 4 seats',
+      firstFeature: ['4 users included', 'Add up to 5 as the team grows, at any time.'],
       checkoutUrl: '',
     },
     {

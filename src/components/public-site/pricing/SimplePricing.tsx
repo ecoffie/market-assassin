@@ -163,7 +163,7 @@ function CreditPlansDropdown({ plans, annual }: { plans: CreditPlan[]; annual: b
 }
 
 /**
- * "2 users | 5 users" on the Team card (seat variant only). A radio group: one tab stop, arrow
+ * "2 | 3 | 4 | 5 users" on the Team card (seat variant only). A radio group: one tab stop, arrow
  * keys move and select, aria-checked carries the state. Server-renders the default (2 users), so
  * without JavaScript the card is complete and correct; the toggle only changes the price, button
  * and first feature.
@@ -581,7 +581,7 @@ const CSS = `
 
 /** Seat variant only (rendered in its own <style> tag when NEXT_PUBLIC_TEAM_SEAT_PRICING is on). */
 const SEAT_CSS = `
-.sp .seat-pick{display:flex;gap:4px;margin:0 0 18px;padding:4px;width:100%;max-width:280px;border:1px solid var(--mp-line);border-radius:999px;background:var(--mp-wash)}
+.sp .seat-pick{display:flex;gap:4px;margin:0 0 18px;padding:4px;width:100%;max-width:380px;border:1px solid var(--mp-line);border-radius:999px;background:var(--mp-wash)}
 .sp .seat-pick button{flex:1 1 0;min-height:40px;border:0;background:transparent;padding:8px 12px;border-radius:999px;font:500 14px var(--mp-font-sans);color:var(--mp-muted);cursor:pointer;white-space:nowrap}
 .sp .seat-pick button.on{background:var(--mp-navy);color:var(--mp-surface)}
 .sp .seat-pick button:focus-visible{outline:2px solid var(--mp-navy);outline-offset:2px}
