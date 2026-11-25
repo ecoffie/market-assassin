@@ -1284,11 +1284,8 @@ export async function POST(request: NextRequest) {
                 latencyMs: Date.now() - startedAt, trace: { ...rmTrace, ...extra, total_ms: Date.now() - rmStarted },
               }).catch((err) => console.error('[chat] persist failed:', err));
             };
-            // Never a silent model swap: if a budget limit applies, say so plainly and stop.
-            if (await isUserOverBudget(email).catch(() => false)) {
-              await finish('You have reached this month\'s research limit, so I can\'t run a full research answer right now. Your saved conversations and reports are unaffected.', { stop: 'over_budget' });
-              return;
-            }
+            // Research mode is governed ONLY by the plan-based daily caps (ASK_MINDY_RESEARCH_CAPS, checked before this
+            // turn started); the monthly dollar limit does not apply (Eric, 2026-11-25). The model is never swapped.
             const rmTools = toAnthropicTools(researchToolDefs(executor.offeredToolDefs(), privateNames));
             const conversation = [
               ...history.filter((h) => h.role === 'user' || h.role === 'assistant').slice(-12).map((h) => ({ role: h.role as 'user' | 'assistant', content: String(h.content || '').slice(0, 12_000) || '(empty)' })),
