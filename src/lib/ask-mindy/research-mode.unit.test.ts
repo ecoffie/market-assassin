@@ -206,21 +206,39 @@ describe('the writing budget (Eric: 30 calls of breadth and no report)', () => {
     expect(r).toMatchObject({ stop: 'deadline', text: 'Written.' });
     expect(r.calls).toBe(3);
   });
-  it('asked for a report: a run that hits the limit still writes the report document, then the answer', async () => {
-    const create = vi.fn(async (body: { tool_choice: { type: string; name?: string }; max_tokens: number }) => {
-      if (body.tool_choice.type === 'tool') return msg([toolUse('doc1', 'create_document', { doc_model: { title: 'Assessment' } }), toolUse('x', 'find_opportunities')], 'tool_use');
+  const isReportStep = (body: { tool_choice: { type: string; disable_parallel_tool_use?: boolean } }) => body.tool_choice.type === 'auto' && body.tool_choice.disable_parallel_tool_use === true;
+  it('asked for a report: a run that hits the limit still writes the report document, then the answer (tool_choice auto, never forced)', async () => {
+    const create = vi.fn(async (body: { tool_choice: { type: string; disable_parallel_tool_use?: boolean }; max_tokens: number }) => {
+      if (isReportStep(body)) return msg([toolUse('doc1', 'create_document', { doc_model: { title: 'Assessment' } }), toolUse('x', 'find_opportunities')], 'tool_use');
       if (body.tool_choice.type === 'none') return msg([text('Here is the decision. The report is ready.')], 'end_turn');
       return msg(many(3, `r${create.mock.calls.length}-`), 'tool_use');
     });
     const executed: string[] = [];
     const r = await runResearchLoop({ ...base, client: { messages: { create } } as never, maxCalls: 6, reportTool: 'create_document', execute: async (cs) => { executed.push(...cs.map((c) => c.name)); return cs.map((c) => ({ id: c.id, content: 'ok' })); } });
-    const choices = create.mock.calls.map((c) => ((c as never[])[0] as { tool_choice: { type: string; name?: string } }).tool_choice);
-    expect(choices.slice(-2)).toEqual([{ type: 'tool', name: 'create_document' }, { type: 'none' }]);
-    const reportStep = create.mock.calls.find((c) => ((c as never[])[0] as { tool_choice: { type: string } }).tool_choice.type === 'tool')![0] as { max_tokens: number };
+    const bodies = create.mock.calls.map((c) => (c as never[])[0] as { tool_choice: { type: string; disable_parallel_tool_use?: boolean }; max_tokens: number; messages: Array<{ content: unknown }> });
+    expect(bodies.slice(-2).map((b) => b.tool_choice)).toEqual([{ type: 'auto', disable_parallel_tool_use: true }, { type: 'none' }]);
+    const reportStep = bodies.find(isReportStep)!;
     expect(reportStep.max_tokens).toBe(32_000);
+    expect(JSON.stringify(reportStep.messages[reportStep.messages.length - 1].content)).toMatch(/Call create_document now, once, with the full report\. Call no other tool\./);
     expect(executed.filter((n) => n === 'create_document')).toHaveLength(1);
     expect(executed.at(-1)).toBe('create_document'); // the extra find_opportunities in the report step is not run
     expect(r.text).toBe('Here is the decision. The report is ready.');
+  });
+  it('the research model only accepts auto or none: no request ever forces a tool', async () => {
+    const create = vi.fn(async (body: { tool_choice: { type: string } }) => (body.tool_choice.type === 'none' ? msg([text('A.')], 'end_turn') : msg(many(4, `q${create.mock.calls.length}-`), 'tool_use')));
+    await runResearchLoop({ ...base, client: { messages: { create } } as never, maxCalls: 8, reportTool: 'create_document', execute: async (cs) => cs.map((c) => ({ id: c.id, content: 'ok' })) });
+    for (const c of create.mock.calls) expect(['auto', 'none']).toContain(((c as never[])[0] as { tool_choice: { type: string } }).tool_choice.type);
+  });
+  it('a report step that does not call the report tool degrades to the answer, never an error', async () => {
+    const create = vi.fn(async (body: { tool_choice: { type: string; disable_parallel_tool_use?: boolean } }) => {
+      if (isReportStep(body)) return msg([toolUse('w', 'search_web', { query: 'x' })], 'tool_use');
+      if (body.tool_choice.type === 'none') return msg([text('The decision, without a document.')], 'end_turn');
+      return msg(many(2, `p${create.mock.calls.length}-`), 'tool_use');
+    });
+    const executed: string[] = [];
+    const r = await runResearchLoop({ ...base, client: { messages: { create } } as never, maxCalls: 2, reportTool: 'create_document', execute: async (cs) => { executed.push(...cs.map((c) => c.name)); return cs.map((c) => ({ id: c.id, content: 'ok' })); } });
+    expect(executed).not.toContain('search_web');
+    expect(r.text).toBe('The decision, without a document.');
   });
   it('a report already written before the limit is not forced again', async () => {
     let step = 0;
@@ -230,7 +248,7 @@ describe('the writing budget (Eric: 30 calls of breadth and no report)', () => {
       return step === 1 ? msg([toolUse('d', 'create_document')], 'tool_use') : msg(many(3, `z${step}-`), 'tool_use');
     });
     await runResearchLoop({ ...base, client: { messages: { create } } as never, maxCalls: 4, reportTool: 'create_document', execute: async (cs) => cs.map((c) => ({ id: c.id, content: 'ok' })) });
-    expect(create.mock.calls.some((c) => ((c as never[])[0] as { tool_choice: { type: string } }).tool_choice.type === 'tool')).toBe(false);
+    expect(create.mock.calls.some((c) => ((c as never[])[0] as { tool_choice: { disable_parallel_tool_use?: boolean } }).tool_choice.disable_parallel_tool_use === true)).toBe(false);
   });
 });
 

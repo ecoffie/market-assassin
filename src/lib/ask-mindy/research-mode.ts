@@ -245,8 +245,14 @@ export async function runResearchLoop(a: {
         else msgs.push({ role: 'user', content: [note] });
       }
     }
-    // When research stopped before the report was written: one step that must call the report tool.
+    // When research stopped before the report was written: one step that asks for the report tool (and only it).
     const forceReport = !!forced && !!a.reportTool && !reportDone && !reportForced;
+    if (forceReport) {
+      const ask = { type: 'text', text: `[Call ${a.reportTool} now, once, with the full report. Call no other tool.]` };
+      const last = msgs[msgs.length - 1];
+      if (last?.role === 'user' && Array.isArray(last.content)) last.content.push(ask);
+      else msgs.push({ role: 'user', content: [ask] });
+    }
     const stepMs = Math.max(5_000, Math.min(STEP_MAX_MS, forced ? left() - 2_000 : left() - FINAL_RESERVE_MS + 30_000));
     let res: Anthropic.Message;
     try {
@@ -255,7 +261,10 @@ export async function runResearchLoop(a: {
         max_tokens: forceReport ? REPORT_STEP_MAX_TOKENS : STEP_MAX_TOKENS,
         system: a.system,
         tools: a.tools as unknown as Anthropic.Tool[],
-        tool_choice: forceReport ? { type: 'tool', name: a.reportTool } : forced ? { type: 'none' } : { type: 'auto' },
+        // The research model accepts only tool_choice 'auto' or 'none' (forced 'tool' / 'any' return HTTP 400 while
+        // thinking is on). The report step therefore runs on 'auto', one call at a time, with a note to call only the
+        // report tool; only that tool is executed, and if it is not called the turn goes on to the answer.
+        tool_choice: forceReport ? { type: 'auto', disable_parallel_tool_use: true } : forced ? { type: 'none' } : { type: 'auto' },
         // A snapshot per request: the loop keeps appending to msgs after this call.
         messages: [...msgs] as unknown as Anthropic.MessageParam[],
         ...(a.effort ? { output_config: { effort: a.effort } } : {}),
