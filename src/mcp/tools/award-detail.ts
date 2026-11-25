@@ -13,7 +13,7 @@
  * Data-first: `_meta` (grounded/degraded) ALWAYS ships. `_ai_hint` is OFF by default
  * (mcpFlags.aiHint). credits: 10 (a resolve + a detail fetch; both free upstream).
  */
-import { fetchAwardDetail, resolvePiidToId, type AwardDetail } from '@/lib/usaspending/award-detail';
+import { fetchAwardDetailChecked, resolvePiidToIdChecked, type AwardDetail } from '@/lib/usaspending/award-detail';
 import { mcpFlags } from '@/lib/mcp/flags';
 import {
   computeAwardStatus,
@@ -67,9 +67,29 @@ export async function getAwardDetail(
   let id: string | null = rawId || null;
   let award: AwardDetail | null = null;
 
+  // #2432: an upstream failure is UNAVAILABLE (degraded, non-billable), never "no such award". A transient failure
+  // gets one immediate retry, the same request the customer would otherwise have to re-ask for.
+  let unavailableReason: string | null = null;
+  const lookup = async (): Promise<void> => {
+    unavailableReason = null;
+    if (!rawId && piid) {
+      const r = await resolvePiidToIdChecked(piid);
+      if (r.state === 'unavailable') { unavailableReason = r.reason; return; }
+      id = r.state === 'found' ? r.value : null;
+    }
+    if (id) {
+      const d = await fetchAwardDetailChecked(id);
+      if (d.state === 'unavailable') { unavailableReason = d.reason; return; }
+      award = d.state === 'found' ? d.value : null;
+    }
+  };
   try {
-    if (!id && piid) id = await resolvePiidToId(piid);
-    if (id) award = await fetchAwardDetail(id);
+    await lookup();
+    if (unavailableReason) await lookup();
+    if (unavailableReason) {
+      degraded = true;
+      console.error('[mcp:get_award_detail] USASpending unavailable:', unavailableReason);
+    }
   } catch (err) {
     degraded = true;
     console.error('[mcp:get_award_detail] lookup failed:', err);
