@@ -224,7 +224,7 @@ function pickUniqueEntity(
   return { entity: null, status: 'not_found' };
 }
 
-export async function lookupSamEntity(input: SamEntityInput): Promise<SamEntityResult> {
+export async function lookupSamEntity(input: SamEntityInput, opts: { cacheOnly?: boolean } = {}): Promise<SamEntityResult> {
   const uei = String(input.uei ?? '').trim().toUpperCase();
   const name = String(input.name ?? '').trim();
   const state = String(input.state ?? '').trim().toUpperCase();
@@ -244,48 +244,8 @@ export async function lookupSamEntity(input: SamEntityInput): Promise<SamEntityR
   let localHits = 0;
   let localStatus: 'ok' | 'unavailable' | 'skipped' = 'skipped';
 
-  try {
-    if (mode === 'uei') {
-      entity = await getEntityByUEI(uei);
-      if (entity) lookupStatus = 'found';
-    } else if (mode === 'name') {
-      const legal = await searchEntities({ legalBusinessName: name, stateCode: state || undefined, size: limit });
-      liveLegalHits = (legal.entities || []).length;
-      let dbaEntities: SAMEntity[] = [];
-      try {
-        const dba = await searchEntities({ dbaName: name, stateCode: state || undefined, size: limit });
-        dbaEntities = dba.entities || [];
-        liveDbaHits = dbaEntities.length;
-        liveDbaStatus = 'ok';
-      } catch (dbaErr) {
-        liveDbaStatus = 'unavailable';
-        console.warn('[mcp:lookup_sam_entity] DBA live search failed; legal-name results still used:', dbaErr);
-      }
-      matches = mergeEntities([legal.entities || [], dbaEntities]);
-      const picked = pickUniqueEntity(name, matches);
-      lookupStatus = picked.status;
-      entity = picked.entity;
-      const topUei = String(entity?.ueiSAM || '').trim();
-      if (topUei) {
-        const detail = await getEntityByUEI(topUei).catch(() => null);
-        if (detail) {
-          entity = detail;
-          matches = matches.map((m) => (m.ueiSAM === topUei ? detail : m));
-        }
-      }
-    }
-  } catch (err) {
-    degraded = true;
-    console.error('[mcp:lookup_sam_entity] live SAM failed:', err);
-
-    // ── LOCAL REGISTRY FALLBACK (DEFECT-7) ────────────────────────────────────────────────
-    // Live SAM is down/throttled/rejected. We hold ~910K SAM entities locally, so a basic
-    // identity lookup must not become unusable because SAM is having a bad day. Measured on
-    // the failing case: the live path returned nothing while EIGHT matching rows sat in
-    // `sam_entities`. Live SAM should ENRICH the record, not be its single point of failure.
-    //
-    // ⚠️ `degraded` STAYS TRUE on this path. The data is a CACHED registration, not a live
-    // one — the caller must be able to say "as of <date>" instead of implying a fresh check.
+  // The mirror lookup, shared by the live-failure fallback and research mode's cache-only path.
+  const localLookup = async (): Promise<void> => {
     try {
       if (mode === 'uei') {
         const looked = await lookupLocalEntityByUEI(uei);
@@ -316,6 +276,59 @@ export async function lookupSamEntity(input: SamEntityInput): Promise<SamEntityR
       localStatus = 'unavailable';
       console.error('[mcp:lookup_sam_entity] local fallback also failed:', fallbackErr);
     }
+  };
+
+  if (opts.cacheOnly) {
+    // Research mode (Eric, 2026-11-25: "we have sam cache no need to make live calls"): the mirror only. A miss is a
+    // cached-source miss; an unreadable mirror is lookup_failed + degraded, never "unregistered".
+    await localLookup();
+    if ((localStatus as string) === 'unavailable') degraded = true; // set inside localLookup (TS cannot see closure writes)
+    usedLocal = true; // every answer on this path, including a miss, is the cache's
+  } else {
+    try {
+      if (mode === 'uei') {
+        entity = await getEntityByUEI(uei);
+        if (entity) lookupStatus = 'found';
+      } else if (mode === 'name') {
+        const legal = await searchEntities({ legalBusinessName: name, stateCode: state || undefined, size: limit });
+        liveLegalHits = (legal.entities || []).length;
+        let dbaEntities: SAMEntity[] = [];
+        try {
+          const dba = await searchEntities({ dbaName: name, stateCode: state || undefined, size: limit });
+          dbaEntities = dba.entities || [];
+          liveDbaHits = dbaEntities.length;
+          liveDbaStatus = 'ok';
+        } catch (dbaErr) {
+          liveDbaStatus = 'unavailable';
+          console.warn('[mcp:lookup_sam_entity] DBA live search failed; legal-name results still used:', dbaErr);
+        }
+        matches = mergeEntities([legal.entities || [], dbaEntities]);
+        const picked = pickUniqueEntity(name, matches);
+        lookupStatus = picked.status;
+        entity = picked.entity;
+        const topUei = String(entity?.ueiSAM || '').trim();
+        if (topUei) {
+          const detail = await getEntityByUEI(topUei).catch(() => null);
+          if (detail) {
+            entity = detail;
+            matches = matches.map((m) => (m.ueiSAM === topUei ? detail : m));
+          }
+        }
+      }
+    } catch (err) {
+      degraded = true;
+      console.error('[mcp:lookup_sam_entity] live SAM failed:', err);
+
+      // ── LOCAL REGISTRY FALLBACK (DEFECT-7) ────────────────────────────────────────────────
+      // Live SAM is down/throttled/rejected. We hold ~910K SAM entities locally, so a basic
+      // identity lookup must not become unusable because SAM is having a bad day. Measured on
+      // the failing case: the live path returned nothing while EIGHT matching rows sat in
+      // `sam_entities`. Live SAM should ENRICH the record, not be its single point of failure.
+      //
+      // ⚠️ `degraded` STAYS TRUE on this path. The data is a CACHED registration, not a live
+      // one — the caller must be able to say "as of <date>" instead of implying a fresh check.
+      await localLookup();
+    }
   }
 
   // ── CHAIN-1 (2026-08-25) + DBA uniqueness (2026-09-20) ────────────────────────────────
@@ -323,7 +336,7 @@ export async function lookupSamEntity(input: SamEntityInput): Promise<SamEntityR
   // absence of a DBA: "Monarch Yachts" can return several Monarch* legal names while
   // the DBA sits on one local/live row. Reconcile the mirror whenever the lookup
   // did not uniquely pick — never only when matches.length === 0.
-  if (!degraded && lookupStatus !== 'found' && !usedLocal && mode !== 'empty') {
+  if (!opts.cacheOnly && !degraded && lookupStatus !== 'found' && !usedLocal && mode !== 'empty') {
     try {
       if (mode === 'uei') {
         const looked = await lookupLocalEntityByUEI(uei);
@@ -445,7 +458,14 @@ export async function lookupSamEntity(input: SamEntityInput): Promise<SamEntityR
     : undefined;
 
   const reconciliation: SamEntityReconciliation | undefined =
-    mode === 'name' && lookupStatus === 'not_found'
+    mode === 'name' && lookupStatus === 'not_found' && opts.cacheOnly
+      ? {
+          outcome: 'not_found',
+          sources_checked: [{ source: 'local_registry', hits: localHits, status: localStatus === 'skipped' ? 'unavailable' : localStatus }],
+          note: 'Mindy\'s SAM cache (legal and DBA names, whole words) returned no unique match. Live SAM was not consulted (research mode). '
+            + 'The business may be registered under a different legal name, or not registered.',
+        }
+      : mode === 'name' && lookupStatus === 'not_found'
       ? {
           outcome: 'not_found',
           sources_checked: [
@@ -491,7 +511,9 @@ export async function lookupSamEntity(input: SamEntityInput): Promise<SamEntityR
         ...(pocSource === 'sam_api_cache' ? { points_of_contact_as_of: pocAsOf } : {}),
         ...(pocSource !== 'none' ? { points_of_contact_label: REGISTERED_POC_LABEL } : {}),
       } : {}),
-      ...(usedLocal ? { as_of: localAsOf, source_note: 'Live SAM was unavailable; served from Mindy\'s local SAM mirror. Registration details are as of the date shown, not re-verified just now.' } : {}),
+      ...(opts.cacheOnly
+        ? { as_of: localAsOf, source_note: 'Served from Mindy\'s SAM cache (research mode: no live SAM call). Registration details are as of the date shown, not re-verified just now.' }
+        : usedLocal ? { as_of: localAsOf, source_note: 'Live SAM was unavailable; served from Mindy\'s local SAM mirror. Registration details are as of the date shown, not re-verified just now.' } : {}),
       ...(reconciliation ? { reconciliation } : {}),
     },
   };
