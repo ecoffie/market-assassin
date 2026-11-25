@@ -79,6 +79,8 @@ export const RESEARCH_INSTRUCTIONS = [
   '',
   '5. FOLLOW THE TOOL HINTS: grounded / result_state ("unavailable is not zero": re-run a failed search, never report zero), lag notes, "capture start is not a recompete date", provenance labels (drop unsourced or legacy pain points; find a cited source instead), ELIGIBLE / NOT_ELIGIBLE / UNKNOWN (a not-eligible item can become a teaming route), claim hygiene (never sum horizon counts), and every do_not.',
   '- The first-turn rule (value before qualification) applies to broad market questions. It does NOT apply when the customer asks for a full assessment or report on a NAMED company: go straight to identity and the full package.',
+  "- Buyer problems: cite the sourced GAO and IG findings that get_agency_intel and understand_customer return (claim, document, date, URL). A pain point marked LEGACY_MANUAL or unsourced is a hypothesis to verify, never evidence. Read strategic plans and budget justifications on the agency's own site (search_web, read_web_page) and cite the URL.",
+  "- Company leadership: key_people from get_contractor_profile are officers as reported to USASpending; say so, and confirm current roles on the company's own site before naming anyone for outreach. none_reported does not mean the company has no leaders (only larger firms report them): find them on the company site. unavailable is not a finding.",
   '',
   '6. CHECK FACTS YOURSELF. Competed? get_award_detail. Still active, or replaced? get_award_detail. Who to call? search_federal_contacts on the office, then lookup_solicitation for the named contracting officer. If a fact changes a recommendation and a tool or public page can settle it, settle it. Hand it back only if it needs a login or a person.',
   '',

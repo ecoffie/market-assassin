@@ -131,6 +131,12 @@ describe('instructions', () => {
     expect(sys).toContain('No homework');
     expect(sys).toContain('Lead with the decision');
   });
+  it('buyer problems come from cited sources; reported officers are worded as reported and verified', () => {
+    expect(RESEARCH_INSTRUCTIONS).toMatch(/LEGACY_MANUAL or unsourced is a hypothesis to verify, never evidence/);
+    expect(RESEARCH_INSTRUCTIONS).toMatch(/strategic plans and budget justifications on the agency's own site/);
+    expect(RESEARCH_INSTRUCTIONS).toMatch(/officers as reported to USASpending/);
+    expect(RESEARCH_INSTRUCTIONS).toMatch(/none_reported does not mean the company has no leaders/);
+  });
   it('the spec is generic: no reference-case company, person or identifier', () => {
     expect(RESEARCH_INSTRUCTIONS).not.toMatch(/\bEFS\b|Norwich|Colon|X6PKH4P1T124|UConn/i);
   });
