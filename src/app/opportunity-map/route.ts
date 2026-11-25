@@ -10937,6 +10937,16 @@ const ASK_MINDY_CSS =
   + '.amk-attach{margin-bottom:6px}.amk-attach-bar{display:flex;align-items:center;gap:8px}.amk-clip{flex:none;border:1px solid #dde3ec;background:#fff;color:#334155;cursor:pointer;font:600 11.5px Inter,system-ui,sans-serif;border-radius:7px;padding:4px 9px}.amk-clip:disabled{opacity:.5;cursor:default}'
   + '.amk-priv{font:500 11px Inter,system-ui,sans-serif;color:#6b7787}.amk-docs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:4px}.amk-doc{display:inline-flex;align-items:center;gap:6px;max-width:100%;border:1px solid #dde3ec;border-radius:7px;padding:2px 4px 2px 8px;font:500 11.5px Inter,system-ui,sans-serif;color:#334155}'
   + '.amk-doc button{border:0;background:none;color:#6b7787;cursor:pointer;font:600 12px Inter;padding:0 4px}.amk-attach-err{font:500 11.5px Inter,system-ui,sans-serif;color:#b91c1c}.amk-attach-err:empty{display:none}'
+  // Connected files row (Drive / OneDrive picks for this conversation).
+  + '.amk-cf{margin-bottom:6px;position:relative}.amk-cf-msg{font:500 11.5px Inter,system-ui,sans-serif;color:#334155}.amk-cf-msg:empty{display:none}'
+  + '.amk-cf-bar{display:flex;align-items:center;gap:8px}.amk-cf-btn{flex:none;border:1px solid #dde3ec;background:#fff;color:#334155;cursor:pointer;font:600 11.5px Inter,system-ui,sans-serif;border-radius:7px;padding:4px 9px}'
+  + '.amk-cf-chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:4px}.amk-cf-chips:empty{display:none}.amk-cf-chip{display:inline-flex;align-items:center;gap:6px;max-width:100%;border:1px solid #dde3ec;border-radius:7px;padding:2px 4px 2px 8px;font:500 11.5px Inter,system-ui,sans-serif;color:#334155}.amk-cf-chip button{border:0;background:none;color:#6b7787;cursor:pointer;font:600 12px Inter;padding:0 4px}'
+  + '.amk-cf-menu{display:flex;flex-direction:column;gap:2px;margin-top:4px;border:1px solid #dde3ec;border-radius:8px;background:#fff;padding:4px;box-shadow:0 6px 18px rgba(16,24,40,.12)}.amk-cf-menu button{border:0;background:none;text-align:left;cursor:pointer;font:500 12px Inter,system-ui,sans-serif;color:#1e293b;padding:6px 8px;border-radius:6px}.amk-cf-menu button:hover{background:#f1f5f9}'
+  + '.amk-cf-note{margin-top:6px;border:1px solid #bfdbfe;background:#eff6ff;border-radius:8px;padding:8px 10px;font:500 12px Inter,system-ui,sans-serif;color:#1e3a8a}.amk-cf-note button{margin:6px 8px 0 0;border-radius:7px;font:600 11.5px Inter,system-ui,sans-serif;padding:4px 10px;cursor:pointer}.amk-cf-go{border:0;background:#2563eb;color:#fff}.amk-cf-no{border:1px solid #dde3ec;background:#fff;color:#334155}'
+  + '.amk-cf-od{margin-top:6px;border:1px solid #dde3ec;border-radius:8px;background:#fff;padding:8px;font:500 12px Inter,system-ui,sans-serif}.amk-cf-od-hd{display:flex;align-items:center;gap:6px;margin-bottom:6px}.amk-cf-acct{color:#64748b}.amk-cf-x{margin-left:auto;border:0;background:none;cursor:pointer;font-size:15px;color:#64748b}'
+  + '.amk-cf-od-q{display:flex;gap:6px;margin-bottom:6px}.amk-cf-od-q input{flex:1;border:1px solid #dde3ec;border-radius:6px;padding:4px 6px;font:500 12px Inter,system-ui,sans-serif}.amk-cf-od-q button{border:1px solid #dde3ec;background:#fff;border-radius:6px;cursor:pointer;font:600 11.5px Inter,system-ui,sans-serif}'
+  + '.amk-cf-crumbs button{border:0;background:none;cursor:pointer;color:#2563eb;font:500 11.5px Inter,system-ui,sans-serif;padding:0 2px}.amk-cf-crumbs button:disabled{color:#334155;cursor:default}'
+  + '.amk-cf-list{max-height:220px;overflow:auto;display:flex;flex-direction:column}.amk-cf-list button{border:0;background:none;text-align:left;cursor:pointer;padding:5px 6px;border-radius:6px;font:500 12px Inter,system-ui,sans-serif;color:#1e293b}.amk-cf-list button:hover{background:#f1f5f9}'
   + '.amk-in textarea{flex:1;resize:none;border:1px solid #dde3ec;border-radius:12px;padding:10px 12px;font:400 13.5px Inter;color:#111c26;max-height:120px;outline:none}'
   + '.amk-in textarea:focus{border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.12)}'
   + '.amk-send{flex:none;width:40px;height:40px;border:0;border-radius:11px;background:#2563eb;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center}'
@@ -11106,7 +11116,7 @@ const ASK_MINDY_JS = `<script>(function(){
   function cardKey(id){ return 'mindy_card_chat:'+id; }
   function loadCard(id){ try{ var j=JSON.parse(localStorage.getItem(cardKey(id))||'null'); if(j&&typeof j==='object'){ var pd=(j.pending&&typeof j.pending.turnId==='string'&&typeof j.pending.q==='string')?{turnId:j.pending.turnId,q:j.pending.q}:null; return {sessionId:String(j.sessionId||''),history:Array.isArray(j.history)?j.history.slice(-8):[],pending:pd}; } }catch(e){} return {sessionId:'',history:[],pending:null}; }
   function saveCard(){ if(!oppCtx)return; try{ localStorage.setItem(cardKey(oppCtx.id),JSON.stringify({sessionId:sessionId,history:history.slice(-8),pending:pendingTurn})); }catch(e){} }
-  function leaveCard(){ if(!oppCtx)return; saveCard(); oppCtx=null; pendingTurn=null; sessionId=viewState.sessionId; history=viewState.history; if(amkDocs) amkDocs.reload(); drawer.classList.remove('amk-card'); if(input)input.placeholder=viewPlaceholder; body.innerHTML=''; }
+  function leaveCard(){ if(!oppCtx)return; saveCard(); oppCtx=null; pendingTurn=null; sessionId=viewState.sessionId; history=viewState.history; if(amkDocs) amkDocs.reload(); cfRender(); drawer.classList.remove('amk-card'); if(input)input.placeholder=viewPlaceholder; body.innerHTML=''; }
   // ── The GROUNDED view context (approved vision: "Context: N open opps in view \\u00b7 FL \\u00b7 NAICS 236220").
   // Read fresh from the map's bridge every time the drawer opens — never a stale snapshot, never fabricated.
   function viewCtx(){ try{ if(typeof window.__mindyViewCtx==='function') return window.__mindyViewCtx()||{}; }catch(e){} return {}; }
@@ -11148,7 +11158,7 @@ const ASK_MINDY_JS = `<script>(function(){
   // display:'narrow_panel'. The server adds the presentation rule (answer first, short sections) to the answer
   // prompt as a SYSTEM note (src/lib/chat/display-hint.ts). It is never part of the message, so it is never
   // stored as the customer's words or read as their intent (review F3).
-  function setOpen(o){ ov.classList.toggle('show',o); drawer.classList.toggle('show',o); drawer.setAttribute('aria-hidden',o?'false':'true'); if(o){ syncAttached(); if(!body.children.length){ if(oppCtx)greetCard(); else greet(); } setTimeout(function(){ if(input&&!repIsOpen()) input.focus(); },220);
+  function setOpen(o){ ov.classList.toggle('show',o); drawer.classList.toggle('show',o); drawer.setAttribute('aria-hidden',o?'false':'true'); if(o){ if(typeof cf!=='undefined'&&cf&&!cf.tried){ cf.tried=true; try{ cfLoad(0); }catch(e){} } syncAttached(); if(!body.children.length){ if(oppCtx)greetCard(); else greet(); } setTimeout(function(){ if(input&&!repIsOpen()) input.focus(); },220);
     // Return later: the report left open comes back with the drawer (view mode only; card chat is about one notice).
     if(oppCtx){ repHide(false); } else { var rs=repRead(); if(rs){ rep=Object.assign({},rep||{},rs); if(rs.open) repOpen(rs.id); } syncRepBtn(); } }
     else { repHide(false); } }
@@ -11168,7 +11178,7 @@ const ASK_MINDY_JS = `<script>(function(){
     if(!/^[0-9a-f]{32}$/.test(id)||busy) return;
     if(!oppCtx) viewState={sessionId:sessionId,history:history.slice()}; else saveCard();
     oppCtx={id:id,title:String(op.title||''),deadline:String(op.deadline||'')};
-    var st=loadCard(id); sessionId=st.sessionId; history=st.history; pendingTurn=st.pending; if(amkDocs) amkDocs.reload();
+    var st=loadCard(id); sessionId=st.sessionId; history=st.history; pendingTurn=st.pending; if(amkDocs) amkDocs.reload(); cfRender();
     drawer.classList.add('amk-card'); if(input)input.placeholder='Ask about this opportunity\\u2026'; body.innerHTML=''; renderAttached();
     if(history.length){ history.forEach(function(m){ addMsg(m.role==='user'?'user':'assistant', m.content); }); }
     try{ if(window.__track) window.__track('tool_use','card_chat_open',{has_history:history.length>0,pending:!!pendingTurn}); }catch(e){}
@@ -11202,6 +11212,7 @@ const ASK_MINDY_JS = `<script>(function(){
   function newChat(){
     if(busy||oppCtx) return;
     sessionId=''; history=[]; viewState={sessionId:'',history:[]}; saveView(); clearFollowups(); greet(); hideHistory();
+    cf.files=[]; cfRender();
     if(input){ input.value=''; input.focus(); }
     try{ if(window.__track) window.__track('tool_use','map_chat_new',{}); }catch(e){}
   }
@@ -11347,6 +11358,148 @@ const ASK_MINDY_JS = `<script>(function(){
         .then(function(d){ if(d && d.uploads===true && !amkDocs) buildAttach(); },function(){});
     }catch(e){}
   }
+  // ── Connected files (CONNECTED_APPS, default off): use a file from the customer's own Google Drive or OneDrive in
+  // THIS conversation. Same contract as the /app panel (src/components/app/chat/ConnectedFiles.tsx):
+  // - shown only when GET /api/app/connected-apps answers (404 while the flag is off for this account); a 401 right
+  //   after sign-in is retried briefly;
+  // - Connect shows what the provider grant allows (the server's access_note) and leaves Mindy only on Continue;
+  // - Google: Google's own Picker (drive.file, Mindy opens only what is picked). OneDrive: Mindy's own chooser over
+  //   the server (POST /browse), so no Microsoft token reaches the browser;
+  // - a pick is exchanged for a signed file handle (POST /selections) and sent with each question as connectedFiles;
+  //   the server reads the file for the turn. Never in card turns. New chat clears the picks.
+  var cf={files:[],conns:[],providers:[],el:null,ready:false,tried:false};
+  var CF_LABEL={google:'Google Drive',microsoft:'OneDrive'};
+  var CF_REASON={access_denied:'You cancelled the connection. Nothing was connected.',browser_mismatch:'Finish connecting in the same browser window where you started. Nothing was connected.',invalid_state:'That connection link expired. Please try again.',consent_required:'Your organization requires an administrator to approve Mindy first.',not_configured:'Connecting accounts is not set up yet.'};
+  var CF_PICK_ERR={unsupported_type:'Mindy can read PDF, Word, Excel, text, Google Docs and Google Sheets files.',too_large:'That file is larger than 15 MB.',reauth_needed:'Please reconnect this account, then pick the file again.',no_access:'Mindy no longer has access to that account. Please reconnect it.',picker_not_configured:'The Google file picker is not set up yet.'};
+  var CF_MIME=['application/pdf','application/vnd.openxmlformats-officedocument.wordprocessingml.document','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','application/vnd.ms-excel','text/plain','application/vnd.google-apps.document','application/vnd.google-apps.spreadsheet'].join(',');
+  function cfHdrs(json){ var h={'x-mi-auth-token':tok()||'','x-user-email':email()}; if(json) h['Content-Type']='application/json'; return withWorkspace(h); }
+  function cfPost(path,body){ var b={email:email()}; for(var k in body) b[k]=body[k];
+    return fetch('/api/app/connected-apps/'+path,{method:'POST',headers:cfHdrs(true),body:JSON.stringify(b)}).then(function(r){ return r.json().then(function(d){ return {ok:r.ok,d:d||{}}; },function(){ return {ok:r.ok,d:{}}; }); }); }
+  function cfMsg(t){ if(cf.el){ var m=cf.el.querySelector('.amk-cf-msg'); m.textContent=t||''; } }
+  function cfAdd(f){ for(var i=0;i<cf.files.length;i++){ if(cf.files[i].handle===f.handle) return; } cf.files.push(f); if(cf.files.length>5) cf.files=cf.files.slice(-5); cfRender(); }
+  function cfRender(){
+    if(!cf.el) return;
+    cf.el.hidden=!!oppCtx;
+    var chips=cf.el.querySelector('.amk-cf-chips'); chips.innerHTML='';
+    cf.files.forEach(function(f,i){ var c=document.createElement('span'); c.className='amk-cf-chip'; c.setAttribute('data-testid','amk-cf-file');
+      var n=document.createElement('span'); n.textContent=f.name; n.title=CF_LABEL[f.provider]||''; c.appendChild(n);
+      var x=document.createElement('button'); x.type='button'; x.setAttribute('aria-label','Remove '+f.name); x.textContent='×'; x.onclick=function(){ cf.files.splice(i,1); cfRender(); }; c.appendChild(x); chips.appendChild(c); });
+  }
+  function cfMenu(){
+    var menu=cf.el.querySelector('.amk-cf-menu'); if(!menu.hidden){ menu.hidden=true; return; }
+    menu.innerHTML='';
+    ['google','microsoft'].forEach(function(p){
+      var avail=false; cf.providers.forEach(function(x){ if(x.provider===p&&x.available) avail=true; }); if(!avail) return;
+      var conn=null; cf.conns.forEach(function(c){ if(c.provider===p&&!conn) conn=c; });
+      var b=document.createElement('button'); b.type='button';
+      if(conn&&conn.status==='connected'){ b.textContent='Pick from '+CF_LABEL[p]+' ('+conn.connected_email+')'; b.onclick=function(){ menu.hidden=true; if(p==='google') cfPickGoogle(conn); else cfChooseOneDrive(conn); }; }
+      else { b.textContent=(conn?'Reconnect ':'Connect ')+CF_LABEL[p]; b.onclick=function(){ menu.hidden=true; cfConnect(p); }; }
+      menu.appendChild(b);
+    });
+    menu.hidden=!menu.children.length;
+  }
+  function cfConnect(p){
+    cfMsg('');
+    cfPost('start',{provider:p,capabilities:['file'],returnTo:location.pathname+location.search}).then(function(res){
+      if(!res.ok||!res.d.authorize_url){ cfMsg(CF_REASON[res.d.error]||'Connecting is not available right now.'); return; }
+      var box=cf.el.querySelector('.amk-cf-note'); box.hidden=false; box.innerHTML='';
+      var t=document.createElement('div'); t.textContent=res.d.access_note||''; box.appendChild(t);
+      var go=document.createElement('button'); go.type='button'; go.className='amk-cf-go'; go.textContent='Continue to '+(p==='google'?'Google':'Microsoft');
+      go.onclick=function(){ location.assign(res.d.authorize_url); };
+      var no=document.createElement('button'); no.type='button'; no.className='amk-cf-no'; no.textContent='Cancel'; no.onclick=function(){ box.hidden=true; };
+      box.appendChild(go); box.appendChild(no);
+    },function(){ cfMsg('Connecting is not available right now.'); });
+  }
+  var cfPickerLoad=null;
+  function cfLoadPicker(){
+    if(cfPickerLoad) return cfPickerLoad;
+    cfPickerLoad=new Promise(function(resolve,reject){
+      function done(){ window.gapi.load('picker',function(){ resolve(); }); }
+      if(window.gapi) return done();
+      var sc=document.createElement('script'); sc.src='https://apis.google.com/js/api.js'; sc.async=true; sc.onload=done; sc.onerror=function(){ cfPickerLoad=null; reject(new Error('picker_script')); };
+      document.head.appendChild(sc);
+    });
+    return cfPickerLoad;
+  }
+  function cfSelect(conn,fileId,provider,fallbackName){
+    return cfPost('selections',{connection_id:conn.id,file_id:fileId}).then(function(res){
+      if(!res.ok||!res.d.file_handle){ cfMsg(CF_PICK_ERR[res.d.error]||'That file could not be used.'); return false; }
+      cfAdd({handle:res.d.file_handle,name:(res.d.file&&res.d.file.name)||fallbackName||'file',provider:provider}); cfMsg(''); return true;
+    });
+  }
+  function cfPickGoogle(conn){
+    cfMsg('');
+    cfPost('picker-token',{connection_id:conn.id}).then(function(res){
+      if(!res.ok){ cfMsg(CF_PICK_ERR[res.d.error]||'The file picker could not open.'); return; }
+      return cfLoadPicker().then(function(){
+        var g=window.google.picker;
+        var view=new g.DocsView(g.ViewId.DOCS).setIncludeFolders(false).setMimeTypes(CF_MIME);
+        new g.PickerBuilder().addView(view).setOAuthToken(res.d.access_token).setDeveloperKey(res.d.developer_key).setAppId(res.d.app_id)
+          .setTitle('Pick a file for Mindy to read')
+          .setCallback(function(data){ if(data[g.Response.ACTION]!==g.Action.PICKED) return; var doc=(data[g.Response.DOCUMENTS]||[])[0]; if(doc) cfSelect(conn,doc[g.Document.ID],'google',doc[g.Document.NAME]); })
+          .build().setVisible(true);
+      });
+    }).catch(function(){ cfMsg('The file picker could not open.'); });
+  }
+  function cfChooseOneDrive(conn){
+    var dlg=cf.el.querySelector('.amk-cf-od'); dlg.hidden=false;
+    var path=[{id:null,name:'My files'}], q='';
+    dlg.innerHTML='<div class="amk-cf-od-hd"><b>OneDrive</b> <span class="amk-cf-acct"></span><button type="button" class="amk-cf-x" aria-label="Close">×</button></div>'
+      +'<form class="amk-cf-od-q"><input type="search" maxlength="100" placeholder="Search your OneDrive by file name"><button type="submit">Search</button></form>'
+      +'<div class="amk-cf-crumbs"></div><div class="amk-cf-list" role="list"></div>';
+    dlg.querySelector('.amk-cf-acct').textContent='('+conn.connected_email+')';
+    dlg.querySelector('.amk-cf-x').onclick=function(){ dlg.hidden=true; dlg.innerHTML=''; };
+    var list=dlg.querySelector('.amk-cf-list'), crumbs=dlg.querySelector('.amk-cf-crumbs'), qin=dlg.querySelector('input');
+    dlg.querySelector('form').onsubmit=function(e){ e.preventDefault(); q=String(qin.value||'').trim(); load(); };
+    function load(){
+      list.textContent='Loading…';
+      crumbs.innerHTML=''; if(!q){ path.forEach(function(c,i){ var b=document.createElement('button'); b.type='button'; b.textContent=(i?'› ':'')+c.name; b.disabled=i===path.length-1; b.onclick=function(){ path=path.slice(0,i+1); load(); }; crumbs.appendChild(b); }); }
+      var cur=path[path.length-1], body=q?{connection_id:conn.id,q:q}:(cur.id?{connection_id:conn.id,folder_id:cur.id}:{connection_id:conn.id});
+      cfPost('browse',body).then(function(res){
+        list.innerHTML='';
+        if(!res.ok){ list.textContent=CF_PICK_ERR[res.d.error]||'OneDrive did not respond. Please try again.'; return; }
+        var items=res.d.items||[]; if(!items.length){ list.textContent=q?'No readable files match that name.':'No folders or readable files here.'; return; }
+        items.forEach(function(it){ var b=document.createElement('button'); b.type='button'; b.setAttribute('role','listitem'); b.className=it.kind==='folder'?'amk-cf-folder':'amk-cf-file'; b.textContent=(it.kind==='folder'?'📁 ':'📄 ')+it.name;
+          b.onclick=function(){ if(it.kind==='folder'){ q=''; qin.value=''; path.push({id:it.id,name:it.name}); load(); } else { list.textContent='Adding…'; cfSelect(conn,it.id,'microsoft',it.name).then(function(ok){ if(ok){ dlg.hidden=true; dlg.innerHTML=''; } else load(); }); } };
+          list.appendChild(b); });
+      },function(){ list.textContent='OneDrive did not respond. Please try again.'; });
+    }
+    load();
+  }
+  function cfBuild(){
+    var foot=drawer.querySelector('.amk-foot'); if(!foot||cf.el) return;
+    var row=document.createElement('div'); row.className='amk-cf'; row.setAttribute('data-testid','amk-connected-files');
+    row.innerHTML='<div class="amk-cf-chips"></div><div class="amk-cf-bar"><button type="button" class="amk-cf-btn">Use a file from Drive or OneDrive</button></div>'
+      +'<div class="amk-cf-menu" hidden></div><div class="amk-cf-note" hidden></div><div class="amk-cf-od" hidden></div><div class="amk-cf-msg" role="status"></div>';
+    foot.insertBefore(row, foot.firstChild);
+    cf.el=row; row.querySelector('.amk-cf-btn').onclick=cfMenu; cfRender();
+  }
+  function cfLoad(attempt){
+    if(!drawer||!tok()||!email()) return;
+    fetch('/api/app/connected-apps?email='+encodeURIComponent(email()),{headers:cfHdrs(false)})
+      .then(function(r){
+        if(r.status===401&&(attempt||0)<3){ setTimeout(function(){ cfLoad((attempt||0)+1); },1500); return null; }
+        return r.ok?r.json():null;
+      },function(){ return null; })
+      .then(function(d){
+        if(!d||!Array.isArray(d.providers)) return;
+        cf.conns=(d.connections||[]).filter(function(c){ return c.status==='connected'||c.status==='reauth_needed'; }); cf.providers=d.providers||[];
+        cfBuild(); cf.ready=true;
+        // Back from the provider: say what happened once, reopen the drawer, clean the address bar.
+        try{
+          var u=new URL(location.href), st=u.searchParams.get('connect');
+          if(st){ var pv=u.searchParams.get('provider'), rs=u.searchParams.get('reason')||'';
+            cfMsg(st==='ok'?((CF_LABEL[pv]||'Your account')+' is connected. Pick a file to use it in this conversation.'):(CF_REASON[rs]||'The account could not be connected. Please try again.'));
+            ['connect','reason','provider','connection'].forEach(function(k){ u.searchParams.delete(k); });
+            window.history.replaceState(null,'',u.pathname+u.search+u.hash);
+            setOpen(true);
+          }
+        }catch(e){}
+      },function(){});
+  }
+  // Loaded when the drawer first opens (no request for a Map visit that never opens Ask Mindy), or at once when
+  // coming back from a provider consent.
+  try{ if(/[?&]connect=/.test(location.search)){ cf.tried=true; cfLoad(0); } }catch(e){}
   // ── REPORT PANE. A document Mindy just saved (create_document) opens HERE, in the chat, as a readable page:
   // no download needed. Reuses the Vault: GET /api/app/vault/documents/preview renders the stored DocModel with
   // the same engine that made the PDF/Word, owner-scoped. Export (PDF/Word/Excel/CSV) is a menu in the open pane.
@@ -11697,6 +11850,7 @@ const ASK_MINDY_JS = `<script>(function(){
     // the oldest assistant turn (the server verifies the signature and the owner; a forged one is ignored).
     if(!oppCtx&&!history.length&&rep&&rep.ledger&&rep.email===em){ history.push({role:'assistant',content:'I saved your report'+(rep.title?' "'+rep.title+'"':'')+' to your Vault.',sources:rep.ledger}); }
     var payload={email:em,message:sendMsg,sessionId:sessionId||undefined,history:history.slice(-8).map(function(h){ return h.sources?{role:h.role,content:h.content,sources:h.sources}:{role:h.role,content:h.content}; }),display:'narrow_panel'};
+    if(!oppCtx&&cf.files.length) payload.connectedFiles=cf.files.map(function(f){ return f.handle; });
     if(attAtSend){ payload.context={kind:'opportunity',notice_id:attAtSend.id}; try{ if(window.__track) window.__track('tool_use','ask_mindy_with_notice',{}); }catch(e){} }
     if(oppCtx){ payload.context={kind:'opportunity',notice_id:oppCtx.id}; payload.turn_id=turnId; if(opts.replay)payload.replay_only=true;
       if(!opts.turnId){ try{ if(window.__track) window.__track('tool_use','card_chat_ask',{turn:Math.floor(history.length/2)+1}); }catch(e){} } }

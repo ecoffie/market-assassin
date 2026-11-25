@@ -89,9 +89,12 @@ export function ConnectedFiles({ email, files, onChange, disabled }: {
   const [pendingConnect, setPendingConnect] = useState<{ provider: 'google' | 'microsoft'; url: string; note: string } | null>(null);
   const [browsing, setBrowsing] = useState<Connection | null>(null);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (attempt = 0): Promise<void> => {
     try {
       const res = await authedFetch(`/api/app/connected-apps?email=${encodeURIComponent(email)}`, email);
+      // Right after sign-in the session token can land a moment after this first call: retry a 401 briefly
+      // instead of hiding the control until the next page load (live acceptance 2026-11-24).
+      if (res.status === 401 && attempt < 3) { setTimeout(() => { void load(attempt + 1); }, 1500); return; }
       if (!res.ok) { setEnabled(false); return; }
       const j = await res.json();
       setEnabled(true);

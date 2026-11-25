@@ -53,7 +53,8 @@ function boot(opts: { session?: Store; local?: Store; chat?: Array<Array<Record<
     calls.push({ url, method: init.method || 'GET', body: init.body });
     let p: Promise<unknown>;
     const js = (status: number, json: unknown = {}) => Promise.resolve({ ok: status < 300, status, json: async () => json });
-    if (url.startsWith('/api/app/vault/')) p = js(200, { uploads: false, generate: true, success: true, title: 'R', version: 1, html: '<p>R</p>', files: [] });
+    if (url.startsWith('/api/app/connected-apps')) p = js(404, { error: 'not_enabled' });
+    else if (url.startsWith('/api/app/vault/')) p = js(200, { uploads: false, generate: true, success: true, title: 'R', version: 1, html: '<p>R</p>', files: [] });
     else if (url.startsWith('/api/app/chat/suggestions')) p = js(200, { suggestions: [] });
     else if (url.startsWith('/reports/')) {
       const h = opts.hosted ?? { status: 200, html: HOSTED_HTML };

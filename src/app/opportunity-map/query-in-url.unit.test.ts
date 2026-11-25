@@ -138,7 +138,11 @@ describe('wiring — only USER actions (and keep-in-sync for an existing intent 
     expect(between('window.setMapMode=function(mode){', 'function syncHorizonBarVis(mode){')).not.toContain('__syncQueryUrl');
   });
   it('no other history write exists on the page', () => {
-    expect(MAP.match(/history\.(replaceState|pushState)\(/g) || []).toHaveLength(1);
+    // Exactly two: __syncQueryUrl, and the connected-files return cleanup (back from a provider consent the user
+    // started), which deletes only its own four params and nothing else.
+    expect(MAP.match(/history\.(replaceState|pushState)\(/g) || []).toHaveLength(2);
+    const cleanup = between("['connect','reason','provider','connection'].forEach(function(k){ u.searchParams.delete(k); });", 'setOpen(true);');
+    expect(cleanup).toContain('window.history.replaceState(null,\'\',u.pathname+u.search+u.hash);');
   });
 });
 

@@ -83,7 +83,7 @@ Ask Mindy (same existing conversation and acting workspace)
     │      ├── Provider adapters: Google | Microsoft
     │      └── Normalized files / drafts / calendar responses
     └── Existing chat tool executor + policy
-            ├── read_connected_file            [read; selected file only]
+            ├── connected file read            [read by the server; selected file only]
             ├── create_outreach_draft            [write; explicit approval]
             └── create_followup_event           [write; explicit approval]
 ```
