@@ -53,8 +53,6 @@ import { createChatToolExecutor, type ChatExecutionRecord } from '@/lib/chat/cha
 import { resolveChatActingScope, vaultEmailFor } from '@/lib/chat/chat-acting-scope';
 import type { BidderProfile } from '@/lib/proposal/types';
 import { anthropicAnswerResponse } from '@/lib/chat/anthropic-answer-stream';
-/** A tool that answered but found nothing: grounded:false or an explicit no-result state (never a failure). */
-const toolResultEmpty = (content: unknown): boolean => /"grounded"\s*:\s*false|"result_state"\s*:\s*"(?:no_result|empty|not_found)"/.test(String(content ?? '').slice(0, 4000));
 import { budgetDowngradeActive, resolvePlannerChain, plannerKey, anthropicSupportsForcedToolChoice, resolveAnswerChain, answerKey, ANSWER_ENDPOINTS, openAiChatParams, type PlannerTarget } from '@/lib/chat/planner-config';
 import { fitMessages, inputBudget, type MsgKind } from '@/lib/chat/token-budget';
 import { stagingModelConfig, STAGING_CONFIG_HEADER } from '@/lib/chat/staging-model-config';
@@ -149,7 +147,6 @@ import { chatDeadlines, toolTimeoutMs, readWithIdleTimeout, incompleteToolNotice
 import {
   decideSecondToolRound,
   dropDuplicateRound2Calls,
-  SECOND_ROUND_RECOVERY_NOTE,
 } from '@/lib/chat/second-tool-round';
 
 // Every Ask Mindy turn carries customer-private context (the user's profile; often Vault or
@@ -2204,7 +2201,7 @@ export async function POST(request: NextRequest) {
               // already complete the hop. Same executor budgets, policy, timeouts; R2 is read-only
               // and uses tool_choice:auto (even under OPP_INTENT). Never a third round.
               const secondRound = decideSecondToolRound(
-                results.map((r) => ({ tool: r.record.tool, status: r.record.status, empty: toolResultEmpty(r.content) })),
+                results.map((r) => ({ tool: r.record.tool, status: r.record.status })),
                 {
                   turnTimedOut,
                   // Hop cues must ignore the map view preamble (same as other customerText sites).
@@ -2236,7 +2233,6 @@ export async function POST(request: NextRequest) {
                     + '(e.g. competitors after an incumbent, contacts after a notice). Do not re-call a tool '
                     + 'that already appears above with the same arguments. Do not write or create anything '
                     + 'in this second pass. If you can answer from these results, call no tools.\n\n'
-                    + (secondRound.recovery ? `${SECOND_ROUND_RECOVERY_NOTE}\n\n` : '')
                     + fenceUntrusted(round1Digest, {
                       name: 'round-1-tool-results',
                       chars: round1Digest.length,
