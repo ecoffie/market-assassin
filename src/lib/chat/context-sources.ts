@@ -169,7 +169,10 @@ function asOfFrom(parsed: Record<string, unknown> | null): string | null {
   if (!parsed) return null;
   const meta = (parsed._meta && typeof parsed._meta === 'object' ? parsed._meta : {}) as Record<string, unknown>;
   const win = (meta.window && typeof meta.window === 'object' ? meta.window : {}) as Record<string, unknown>;
-  const cand = meta.as_of ?? win.as_of ?? meta.data_as_of ?? parsed.as_of ?? null;
+  // data_current_through is the source's own freshness clock; prefer it over as_of, which some tools bound to a
+  // query window (get_buying_offices: as_of = the last fiscal year's end, shown as "as of 2026-09-30" while the
+  // warehouse held actions through 2026-11-20).
+  const cand = meta.data_current_through ?? meta.as_of ?? win.as_of ?? meta.data_as_of ?? parsed.as_of ?? null;
   return typeof cand === 'string' && cand ? cand.slice(0, 32) : null;
 }
 
