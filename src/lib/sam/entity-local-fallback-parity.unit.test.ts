@@ -43,7 +43,7 @@ const NORTH_STAR_ROW = {
 
 function stubRow(row: unknown) {
   const chain = {
-    select: () => chain, eq: () => chain, ilike: () => chain,
+    select: () => chain, eq: () => chain, ilike: () => chain, filter: () => chain,
     limit: () => Promise.resolve({ data: row ? [row] : [], error: null }),
   };
   mockFrom.mockReturnValue(chain);
@@ -162,6 +162,7 @@ describe('DBA lookup — a trade name is not "unregistered"', () => {
         select: () => chain,
         eq: () => chain,
         ilike: (c: string) => { col = c; return chain; },
+        filter: () => chain,
         limit: () => Promise.resolve({
           data: col === 'dba_name' ? dba : legal,
           error: null,
@@ -186,6 +187,7 @@ describe('DBA lookup — a trade name is not "unregistered"', () => {
         select: () => chain,
         eq: () => chain,
         ilike: () => chain,
+        filter: () => chain,
         limit: () => Promise.resolve({ data: null, error: { message: 'column does not exist' } }),
       };
       return chain;

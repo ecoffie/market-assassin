@@ -23,6 +23,8 @@ export interface SAMEntity {
   cageCode: string;
   legalBusinessName: string;
   dbaName?: string;
+  /** SAM coreData.entityInformation.entityURL, verbatim (the company's self-reported website). Absent = not stated. */
+  entityUrl?: string;
   registrationStatus: 'Active' | 'Inactive' | 'Expired' | 'Unknown';
   registrationExpirationDate?: string;
   /** SAM purposeOfRegistrationDesc, verbatim (e.g. "All Awards", "Federal Assistance Awards"). */
@@ -167,6 +169,12 @@ function selfCertLabel(entry: unknown): string | null {
 /**
  * Transform raw API response to our SAMEntity type
  */
+function entityUrlOf(core: Record<string, unknown>): string | undefined {
+  const info = (core.entityInformation as Record<string, unknown>) || {};
+  const u = typeof info.entityURL === 'string' ? info.entityURL.trim() : '';
+  return u || undefined;
+}
+
 export function transformEntity(raw: Record<string, unknown>): SAMEntity {
   // SAM v3 Entity API response shape is nested:
   //   entityRegistration: { ueiSAM, legalBusinessName, registrationStatus, ... }
@@ -301,6 +309,9 @@ export function transformEntity(raw: Record<string, unknown>): SAMEntity {
     cageCode: String(er.cageCode || raw.cageCode || ''),
     legalBusinessName: String(er.legalBusinessName || raw.legalBusinessName || ''),
     dbaName: er.dbaName ? String(er.dbaName) : raw.dbaName ? String(raw.dbaName) : undefined,
+    // Website as identity evidence (Agent 4, 2026-11-25). The gov-buyer sync already writes `entity_url` from
+    // e.entityUrl, which this transformer never set, so the cache column stayed empty.
+    ...(entityUrlOf(core) ? { entityUrl: entityUrlOf(core) } : {}),
     registrationStatus: status as SAMEntity['registrationStatus'],
     registrationExpirationDate: expirationDate,
     purposeOfRegistration: er.purposeOfRegistrationDesc ? String(er.purposeOfRegistrationDesc) : undefined,
