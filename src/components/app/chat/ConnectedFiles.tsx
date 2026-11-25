@@ -88,6 +88,7 @@ export function ConnectedFiles({ email, files, onChange, disabled }: {
   const [message, setMessage] = useState<string | null>(null);
   const [pendingConnect, setPendingConnect] = useState<{ provider: 'google' | 'microsoft'; url: string; note: string } | null>(null);
   const [browsing, setBrowsing] = useState<Connection | null>(null);
+  const [confirmDisconnect, setConfirmDisconnect] = useState<Connection | null>(null);
 
   const load = useCallback(async (attempt = 0): Promise<void> => {
     try {
@@ -175,6 +176,23 @@ export function ConnectedFiles({ email, files, onChange, disabled }: {
     } finally { setBusy(false); }
   }, [email, files, onChange]);
 
+  // Disconnect: the server revokes when the provider supports it and discards the tokens. Picks from that account
+  // stop working, so their chips are removed here too.
+  const disconnect = useCallback(async (c: Connection) => {
+    setBusy(true); setMessage(null);
+    try {
+      const res = await authedFetch('/api/app/connected-apps', email, {
+        method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, id: c.id }),
+      });
+      if (!res.ok) { setMessage(`${PROVIDER_LABEL[c.provider]} could not be disconnected. Please try again.`); return; }
+      onChange(files.filter((f) => f.provider !== c.provider));
+      setMessage(`${PROVIDER_LABEL[c.provider]} (${c.connected_email}) is disconnected. Mindy no longer has access to it.`);
+      await load();
+    } catch {
+      setMessage(`${PROVIDER_LABEL[c.provider]} could not be disconnected. Please try again.`);
+    } finally { setBusy(false); setConfirmDisconnect(null); }
+  }, [email, files, onChange, load]);
+
   if (!enabled) return null;
   const connectedProviders = new Set(connections.map((c) => c.provider));
 
@@ -194,7 +212,15 @@ export function ConnectedFiles({ email, files, onChange, disabled }: {
         </div>
       )}
 
-      {pendingConnect ? (
+      {confirmDisconnect ? (
+        <div className="rounded-lg border border-hairline bg-ground px-3 py-2 text-white" role="alertdialog" aria-label="Disconnect account">
+          <p className="mb-2">Disconnect {PROVIDER_LABEL[confirmDisconnect.provider]} ({confirmDisconnect.connected_email})? Mindy will delete its access, and files you picked from it will stop working in your questions. You can connect it again any time.</p>
+          <div className="flex gap-2">
+            <button type="button" disabled={busy} className="rounded-md bg-red-600 px-2.5 py-1 text-white hover:bg-red-500 disabled:opacity-50" onClick={() => void disconnect(confirmDisconnect)}>Disconnect</button>
+            <button type="button" className="rounded-md px-2.5 py-1 text-faint hover:text-white" onClick={() => setConfirmDisconnect(null)}>Cancel</button>
+          </div>
+        </div>
+      ) : pendingConnect ? (
         <div className="rounded-lg border border-purple-500/30 bg-purple-500/10 px-3 py-2 text-purple-100">
           <p className="mb-2">{pendingConnect.note}</p>
           <div className="flex gap-2">
@@ -231,6 +257,12 @@ export function ConnectedFiles({ email, files, onChange, disabled }: {
               {providers.filter((p) => p.available && !connectedProviders.has(p.provider)).map((p) => (
                 <button key={p.provider} type="button" className="block w-full rounded px-2 py-1.5 text-left text-white hover:bg-white/5" onClick={() => startConnect(p.provider)}>
                   Connect {PROVIDER_LABEL[p.provider]}
+                </button>
+              ))}
+              {connections.length > 0 && <div className="my-1 border-t border-hairline" />}
+              {connections.map((c) => (
+                <button key={`dc-${c.id}`} type="button" className="block w-full rounded px-2 py-1.5 text-left text-faint hover:bg-white/5 hover:text-white" onClick={() => { setOpen(false); setConfirmDisconnect(c); }}>
+                  Disconnect {PROVIDER_LABEL[c.provider]} ({c.connected_email})
                 </button>
               ))}
               {!connections.length && !providers.some((p) => p.available) && (
