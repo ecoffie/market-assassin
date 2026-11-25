@@ -164,11 +164,11 @@ describe('flag on', () => {
 });
 
 describe('route wiring (static)', () => {
-  it('is gated on the flag and never runs in card chat', async () => {
+  it('is gated on the flag and never runs on a reduced (billed) card turn', async () => {
     const { readFileSync } = await import('node:fs');
     const { join } = await import('node:path');
     const route = readFileSync(join(__dirname, 'route.ts'), 'utf8');
-    expect(route).toMatch(/const fitRankingOn = !cardCtx && askMindyRecipesEnabledFor\(auth\.email\);/);
+    expect(route).toMatch(/const fitRankingOn = !reducedCardTurn && askMindyRecipesEnabledFor\(auth\.email\);/);
     expect(route).toMatch(/const fitProfileP = fitRankingOn \? loadCompanyProfile\(actingScope\)\.catch\(\(\) => null\) : null;/);
     expect(route).toMatch(/if \(fitProfileP && findResult(?: && !strategyFitNotePushed)?\) \{/);
   });

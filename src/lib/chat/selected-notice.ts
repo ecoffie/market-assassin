@@ -249,3 +249,25 @@ export async function loadSolicitationFactsBlock(
     finding: facts.incumbent.finding,
   };
 }
+
+/**
+ * The selected notice in the shape find_opportunities returns an open item, so the intelligence gate checks and
+ * ranks it with the other candidates on a card turn (openNoticesAsRecords reads these fields). Only fields the
+ * record holds; nothing is filled in.
+ */
+export function cardRecordAsFindItem(rec: OpportunityRecord): Record<string, unknown> {
+  return {
+    notice_id: rec.notice_id,
+    title: rec.title,
+    solicitation_number: rec.solicitation_number,
+    sub_agency: rec.sub_tier ?? rec.department,
+    buyer: rec.department,
+    response_deadline: rec.response_deadline,
+    notice_type: rec.notice_type,
+    set_aside: rec.set_aside_description,
+    naics_code: rec.naics_code,
+    psc_code: rec.psc_code,
+    location_label: [rec.pop_city, rec.pop_state].filter(Boolean).join(', ') || null,
+    sam_url: rec.ui_link,
+  };
+}

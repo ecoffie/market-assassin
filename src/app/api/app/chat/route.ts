@@ -169,7 +169,7 @@ import {
   isCardChatEnabled, cardChatTurnCredits, parseOpportunityContext, cardChatAccess, isBillableTurn,
   CARD_CHAT_TOOLS, buildOpportunityContextBlock, toolBillingOutcome, unbillableToolReason, type ToolBillingOutcome,
 } from '@/lib/chat/card-chat';
-import { SELECTED_NOTICE_COLUMNS, loadSelectedNoticeFacts, formatSelectedNoticeFacts, type SelectedNoticeRecord } from '@/lib/chat/selected-notice';
+import { SELECTED_NOTICE_COLUMNS, loadSelectedNoticeFacts, formatSelectedNoticeFacts, type SelectedNoticeRecord, cardRecordAsFindItem } from '@/lib/chat/selected-notice';
 import { isVaultChatDocumentsEnabled, loadChatDocumentTexts } from '@/lib/vault/chat-store';
 import { buildDocumentContext, buildPlannerDocumentContext, type DocumentBlock } from '@/lib/chat/document-context';
 import { resolveMentionedNotice, answerUsesNotice, type MentionedNoticeResult } from '@/lib/chat/mentioned-notice';
@@ -554,6 +554,12 @@ export async function POST(request: NextRequest) {
     }), { status: access.status, headers: { 'Content-Type': 'application/json' } });
   }
   const cardBillable = access.billable;
+  // Eric (2026-11-25): Ask Mindy on the Map is the Claude MCP replacement, so a card turn runs the FULL pipeline
+  // (intelligence gate, fit ranking, research workflow, strategy plan, documents, every private tool), with the
+  // selected notice as an added context block; every feature flag still applies exactly as on a plain turn.
+  // EXCEPT a BILLED card turn (a non-Pro caller paying cardChatTurnCredits per answer): its reduced pipeline is
+  // kept unchanged, because giving paid-tier capabilities for the flat card price is a pricing decision for Eric.
+  const reducedCardTurn = !!cardCtx && cardBillable;
   // A billable card question must carry its turn id: without one a retry could not be recognized, and the
   // route would have no saved copy to replay.
   if (cardBillable && !turnId) return jsonResponse({ error: 'turn_id_required' }, 400);
@@ -707,7 +713,7 @@ export async function POST(request: NextRequest) {
         // Market questions: gather evidence -> record checks -> analyst -> independent evaluator -> publish only on
         // pass, else disclose. The chat answer and the report brief come from the same decision. Any other turn, or a
         // turn where the customer's own words name no work, falls through to the existing path unchanged.
-        if (!cardCtx && intelligenceGateEnabledFor(auth.email)) {
+        if (!reducedCardTurn && intelligenceGateEnabledFor(auth.email)) {
           const ask = splitViewPreamble(message).rest || message;
           const eligible = gateEligible(ask);
           const work = eligible.ok ? await extractWorkPhrase(ask).catch(() => null) : null;
@@ -718,6 +724,8 @@ export async function POST(request: NextRequest) {
             try {
               gate = await runIntelligenceGate({
                 question: ask,
+                // A card turn: the notice the customer is looking at is a known candidate, checked and ranked with the rest.
+                ...(cardCtx && cardRecord ? { knownOpenItems: [cardRecordAsFindItem(cardRecord)] } : {}),
                 reportInput: { keyword: work, state: eligible.state ?? undefined, userEmail: profileEmail || undefined } as Parameters<typeof runIntelligenceGate>[0]['reportInput'],
                 states: eligible.states,
                 profile: gateProfile.text,
@@ -736,6 +744,16 @@ export async function POST(request: NextRequest) {
               send({ type: 'citations', sources: [] });
               send({ type: 'done' });
               closeStream();
+              // A claimed card turn is completed here too, so a retry replays this answer (charge-once unchanged:
+              // only a non-billed card turn reaches the gate, so the credits are always 0).
+              if (claimToken && turnId && !cardBillable) {
+                try {
+                  await completeCardTurn({ turnId, claimToken, email: auth.email!, answer: gate.answer, citedSources: [], sessionId, credits: 0 });
+                  turnSettled = true;
+                } catch (completeErr) {
+                  console.error('[chat] card turn completion (gate) failed:', (completeErr as Error)?.message);
+                }
+              }
               const { analystIn, analystOut, evalIn, evalOut } = gate.cost;
               void recordLlmUsage({ userEmail: auth.email, tool: 'chat', job: 'intelligence_gate_analyst', provider: 'anthropic', model: process.env.ASK_MINDY_ANALYST_MODEL || 'claude-opus-5-5', usage: { prompt_tokens: analystIn, completion_tokens: analystOut } });
               void recordLlmUsage({ userEmail: auth.email, tool: 'chat', job: 'intelligence_gate_evaluator', provider: 'anthropic', model: process.env.ASK_MINDY_EVALUATOR_MODEL || 'claude-sonnet-5-5', usage: { prompt_tokens: evalIn, completion_tokens: evalOut } });
@@ -766,7 +784,7 @@ export async function POST(request: NextRequest) {
         // Ask Mindy fit ranking (ASK_MINDY_RECIPES, default off; src/lib/ask-mindy/compose.ts). Off → nothing is
         // loaded and no note is added. On → the company profile loads in parallel through the strict acting
         // scope only (never a raw email); a refused or failed load just means no ranking note (value first).
-        const fitRankingOn = !cardCtx && askMindyRecipesEnabledFor(auth.email);
+        const fitRankingOn = !reducedCardTurn && askMindyRecipesEnabledFor(auth.email);
         const fitProfileP = fitRankingOn ? loadCompanyProfile(actingScope).catch(() => null) : null;
         // The profile's STATUS is kept (2026-11-22): a failed read used to look exactly like an empty profile, so
         // the answer treated a known company as unknown and asked again for details given earlier.
@@ -793,12 +811,12 @@ export async function POST(request: NextRequest) {
         // Sections the customer named for the document ("executive summary, risks, actions and sources"): the planner
         // is told to carry them and create_document completes any it left out from the document's own statements.
         const requestedSections = requestedDocSections(customerAskForContract);
-        const fmpTextAsk = !cardCtx && isFederalMarketProfileRequest(customerAskForContract);
+        const fmpTextAsk = !reducedCardTurn && isFederalMarketProfileRequest(customerAskForContract);
         // Federal Strategy Plan (ASK_MINDY_STRATEGY_PLAN, default off; src/lib/ask-mindy/strategy-plan.ts): a plan for
         // this company runs the EXISTING Federal Market Profile research workflow (phase machine, write-up validator,
         // create_document preview/export) with the general strategy contract and the saved company profile as its
         // first input. Off -> this turn is exactly as before.
-        const strategyPlanAsk = !cardCtx && !fmpTextAsk && askMindyStrategyPlanEnabledFor(auth.email) && isStrategyPlanRequest(customerAskForContract);
+        const strategyPlanAsk = !reducedCardTurn && !fmpTextAsk && askMindyStrategyPlanEnabledFor(auth.email) && isStrategyPlanRequest(customerAskForContract);
         const federalMarketProfileAsk = fmpTextAsk || strategyPlanAsk;
         const strategyProfile: StrategyProfileInput | null = strategyPlanAsk
           ? await loadCompanyProfile(actingScope)
@@ -807,7 +825,7 @@ export async function POST(request: NextRequest) {
           : null;
         const strategyCompany: FmpCompanyContext | null = strategyProfile ? strategyCompanyContext(strategyProfile) : null;
         const findContract = rulesLayer ? rulesLayerFindContract() : CURRENT_FIND_CHAT_CONTRACT;
-        const hostContract = cardCtx
+        const hostContract = reducedCardTurn
           ? ''
           : strategyPlanAsk
             ? `\n\n${STRATEGY_PLAN_CHAT_CONTRACT}`
@@ -863,7 +881,7 @@ export async function POST(request: NextRequest) {
         const sectionedRoute = routeSectionedReport({
           requested: requestedSections,
           asksForReport: !federalMarketProfileAsk && (isDocumentCreationRequest(customerWords) || isMarketResearchRequest(customerWords)),
-          createAvailable: !cardCtx && vaultDocEnabledFor('generate', auth.email),
+          createAvailable: !reducedCardTurn && vaultDocEnabledFor('generate', auth.email),
           hasPriorResearch: (Array.isArray(body.history) ? body.history : []).some((h: { role?: string; content?: unknown }) => h?.role === 'assistant' && String(h.content ?? '').trim().length > 0),
         });
         const sectionedDocument = sectionedRoute.route === 'document';
@@ -905,7 +923,7 @@ export async function POST(request: NextRequest) {
         // find_my_documents stays the right call. Never in card chat (create_document is not offered there).
         const turnTrace0: string[] = []; // notices recorded before the turn trace exists
         let revision: (RevisionTarget & { block: string }) | null = null;
-        const revisionTarget = !cardCtx && profileEmail && vaultDocEnabledFor('generate', auth.email)
+        const revisionTarget = !reducedCardTurn && profileEmail && vaultDocEnabledFor('generate', auth.email)
           ? resolveRevisionTarget(customerWords, priorLedgers) : null;
         if (revisionTarget) {
           const { data: doc, error: docErr } = await getSupabase().from('user_boilerplate_docs')
@@ -1200,8 +1218,9 @@ export async function POST(request: NextRequest) {
                 return tier0Runtime.execute(n, a);
               },
             },
-            // Card chat offers only its opportunity tools (narrowing; the policy still applies).
-            ...(cardCtx ? { allowedToolNames: CARD_CHAT_TOOLS } : {}),
+            // A billed card turn offers only the card's opportunity tools (narrowing; the policy still applies). Every
+            // other turn, including a non-billed card turn, gets the full private tool set.
+            ...(reducedCardTurn ? { allowedToolNames: CARD_CHAT_TOOLS } : {}),
             toolTimeoutMs: (n) => toolTimeoutMs(n, deadlines),
           });
           // Offered tools are filtered by the chat tool policy (blocked tools are never shown).
@@ -1318,9 +1337,9 @@ export async function POST(request: NextRequest) {
             : TOOL_ROUND_MAX_TOKENS;
           const forceCreate = (!!revision || sectionedDocument) && createOffered;
           if (sectionedDocument && createOffered) toolRoundMessages.splice(1, 0, { role: 'system', content: sectionedReportPlannerNote(requestedSections) });
-          const forceMarketReport = !forceCreate && !cardCtx && toolOffer.marketResearch && marketReportOffered;
+          const forceMarketReport = !forceCreate && !reducedCardTurn && toolOffer.marketResearch && marketReportOffered;
           // FMP phase machine owns the forced tool (usually award history on round 1).
-          const forceAwardHistory = !forceCreate && !forceMarketReport && !cardCtx && !!fmpPhaseForce && awardHistoryOffered && fmpPhaseForce === AWARD_HISTORY_TOOL;
+          const forceAwardHistory = !forceCreate && !forceMarketReport && !reducedCardTurn && !!fmpPhaseForce && awardHistoryOffered && fmpPhaseForce === AWARD_HISTORY_TOOL;
           if (forceCreate) turnTrace.notices.push(revision ? 'revision:create_document_forced' : 'sectioned_report:create_document_forced');
           if (forceMarketReport) turnTrace.notices.push('market_research:generate_market_report_forced');
           if (fmpPhaseForce) turnTrace.notices.push(`federal_market_profile:phase_forced:${fmpPhaseForce}`);
