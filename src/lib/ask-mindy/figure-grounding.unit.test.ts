@@ -56,3 +56,27 @@ describe('the review fails `reasoned` on an untraceable figure, even when the mo
     expect(e.pass).toBe(true);
   });
 });
+
+describe('ordinary words are not dates', () => {
+  it('a lowercase month word followed by a number is not a date', () => {
+    expect(ungroundedFigures(dec('You may 3 times ask the buyer; march 2 crews to the site.'), EVIDENCE)).toEqual([]);
+  });
+  it('a capitalised month or an abbreviation with a period still counts', () => {
+    expect(ungroundedFigures(dec('Due May 3.'), EVIDENCE)).toEqual(['May 3']);
+    expect(ungroundedFigures(dec('Due dec. 5.'), EVIDENCE)).toEqual(['dec. 5']);
+    expect(ungroundedFigures(dec('Due Dec 4.'), EVIDENCE)).toEqual([]);
+  });
+});
+
+describe('the review returns the untraceable figures (figure text only)', () => {
+  const client = () => ({ messages: { create: async () => { const ok = { pass: true, reason: 'ok' }; return { stop_reason: 'end_turn', content: [{ type: 'text', text: JSON.stringify({ reasoned: ok, actionable: ok, clear: ok, fix: [] }) }], usage: { input_tokens: 1, output_tokens: 1 } }; } } }) as never;
+  const checks = [{ contract_id: 'A', verdict: 'pursue' as const, exclusions: [], barriers: [], actions: [] }];
+  it('names exactly the figures, nothing around them', async () => {
+    const e = await evaluateDecision({ question: 'q', evidence: EVIDENCE, decision: dec('Go after the $4.2M contract, due June 1, 2027, in a $426M market'), checks }, { client: client() });
+    expect(e.untraceableFigures).toEqual(['$4.2M', 'June 1, 2027']);
+  });
+  it('an answer with only traceable figures returns none', async () => {
+    const e = await evaluateDecision({ question: 'q', evidence: EVIDENCE, decision: dec('Go after the $1.2M contract'), checks }, { client: client() });
+    expect(e.untraceableFigures).toEqual([]);
+  });
+});

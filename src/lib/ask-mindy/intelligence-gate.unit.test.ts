@@ -242,3 +242,15 @@ describe('disclosure first', () => {
     expect(t.split('\n').slice(0, 3)).toEqual(['I could not fully verify this answer, so treat it as a starting point, not a final recommendation:', '- A point.', '']);
   });
 });
+
+describe('untraceable figures per review round', () => {
+  it('records each round\'s figures (a retry that fixed them shows an empty second round)', async () => {
+    let n = 0;
+    const evaluate = async () => (++n === 1
+      ? { pass: false, results: [{ criterion: 'reasoned', pass: false, reason: 'These figures could not be traced to the data: $4.2M.' }] as never, fix: ['reasoned'], untraceableFigures: ['$4.2M'], usage: { input: 1, output: 1 }, model: 'e' }
+      : { pass: true, results: [] as never, fix: [], untraceableFigures: [], usage: { input: 1, output: 1 }, model: 'e' });
+    const r = await runIntelligenceGate({ ...base, deps: { findOpen: async () => null, findNationalForecasts: async () => null, findTargeted: async () => null, gather: async () => evidence(), publish: async (x: any) => x, analyst, evaluate: evaluate as never } });
+    expect(r.attempts).toBe(2);
+    expect(r.untraceableFigures).toEqual([['$4.2M'], []]);
+  });
+});

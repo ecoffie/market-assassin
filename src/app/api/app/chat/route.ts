@@ -755,6 +755,8 @@ export async function POST(request: NextRequest) {
                   attempts: gate.attempts,
                   gate_timings_ms: gate.timings,
                   gate_deadline_hit: gate.deadlineHit,
+                  // Figure text only (no surrounding answer text): shows whether the figure check over-fires.
+                  gate_untraceable_figures: gate.untraceableFigures,
                   work,
                   states: eligible.states,
                   checks: gate.checks.map((c) => ({ id: c.contract_id, verdict: c.verdict, codes: [...c.exclusions, ...c.barriers, ...c.actions].map((x) => x.code) })),

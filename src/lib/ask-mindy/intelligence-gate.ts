@@ -70,6 +70,8 @@ export interface GateResult {
   /** Per-step wall time in ms, plus whether the deadline cut the run short (counts and ms only; for the trace). */
   timings: Record<string, number>;
   deadlineHit: boolean;
+  /** Per review round: the dollar figures and dates the answer stated that the evidence does not contain (figure text only). */
+  untraceableFigures: string[][];
 }
 
 function money(n: unknown): string {
@@ -289,6 +291,7 @@ export async function runIntelligenceGate(args: {
   const left = () => deadline - now();
   const timings: Record<string, number> = {};
   let deadlineHit = false;
+  const untraceableFigures: string[][] = [];
   const timed = async <T>(name: string, f: () => Promise<T>): Promise<T> => {
     const s0 = now();
     try { return await f(); } finally { timings[name] = now() - s0; }
@@ -296,7 +299,7 @@ export async function runIntelligenceGate(args: {
   const progress = (m: string) => { try { args.onProgress?.(m); } catch { /* progress is best effort */ } };
   const outOfTime = (report: MarketReportResult, checks: RecordCheck[] = []): GateResult => {
     timings.total = now() - t0;
-    return { status: 'out_of_time', decision: null, evaluation: null, attempts: 0, checks, report, cost, integrity: [], removed: { recompetes: 0, contacts: 0 }, answer: GATE_OUT_OF_TIME_ANSWER, timings, deadlineHit: true };
+    return { status: 'out_of_time', decision: null, evaluation: null, attempts: 0, checks, report, cost, integrity: [], removed: { recompetes: 0, contacts: 0 }, answer: GATE_OUT_OF_TIME_ANSWER, timings, deadlineHit: true, untraceableFigures };
   };
 
   const query = String(args.reportInput.keyword || args.reportInput.naics || '').trim();
@@ -329,7 +332,7 @@ export async function runIntelligenceGate(args: {
     return {
       status: 'measurement_failure', decision: null, evaluation: null, attempts: 0, checks: [], report: ev, cost, integrity: [], removed: { recompetes: 0, contacts: 0 },
       answer: `I could not measure this market right now (the data source did not respond), so I can't recommend anything yet. This is not a sign the market is small. Please try again in a few minutes.`,
-      timings: { ...timings, total: now() - t0 }, deadlineHit: false,
+      timings: { ...timings, total: now() - t0 }, deadlineHit: false, untraceableFigures: [],
     };
   }
 
@@ -430,6 +433,7 @@ export async function runIntelligenceGate(args: {
     }
     cost.evalIn += e.usage.input; cost.evalOut += e.usage.output;
     evaluation = { pass: e.pass, results: e.results, fix: e.fix };
+    untraceableFigures.push(e.untraceableFigures ?? []);
     if (e.pass) break;
     feedback = e.fix;
   }
@@ -460,7 +464,7 @@ export async function runIntelligenceGate(args: {
     : undefined;
   timings.total = now() - t0;
   return {
-    status, decision, evaluation, attempts, checks, report, cost, integrity, removed, timings, deadlineHit,
+    status, decision, evaluation, attempts, checks, report, cost, integrity, removed, timings, deadlineHit, untraceableFigures,
     answer: decision ? renderDecisionAnswer(decision, { reportUrl: report.deliverable?.url, disclosed }) : 'I could not produce a recommendation from this evidence.',
   };
 }
