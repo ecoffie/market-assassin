@@ -56,7 +56,7 @@ function db() {
 const LOCAL_ENTITY_COLUMNS =
   'uei, cage_code, legal_business_name, dba_name, physical_city, physical_state, physical_zip, '
   + 'physical_country, primary_naics, naics_codes, certifications, certification_records, '
-  + 'registration_status, registration_expiry, exclusion_flag, sam_url, points_of_contact, synced_at';
+  + 'registration_status, registration_expiry, exclusion_flag, sam_url, entity_url, points_of_contact, synced_at';
 
 /**
  * Shape a `sam_entities` row into the same SAMEntity the live API returns.
@@ -145,6 +145,7 @@ function toSamEntity(r: Record<string, unknown>): SAMEntity {
     cageCode: str(r.cage_code),
     legalBusinessName: str(r.legal_business_name),
     dbaName: str(r.dba_name) || undefined,
+    ...(str(r.entity_url).trim() ? { entityUrl: str(r.entity_url).trim() } : {}),
     // Honest provenance: derived from registration_expiry when present, so an
     // Active flag with a past expiry never reads Active (157k-row class, 2026-11-18).
     // Still AS OF `synced_at` — the caller receives `as_of` alongside it.
@@ -279,6 +280,35 @@ export async function lookupLocalEntitiesByName(name: string, limit = 10, state?
   }
   if (byUei.size === 0) return { status: 'absent' };
   return { status: 'found', hits: [...byUei.values()] };
+}
+
+/**
+ * Registrations whose SAM entityURL is on `domain` (bare host, e.g. "efsdigital.com"). The ILIKE is a prefilter;
+ * the caller confirms the exact host. Most mirror rows hold no entityURL today: absence proves nothing.
+ */
+export async function lookupLocalEntitiesByWebsite(domain: string, limit = 10): Promise<
+  | { status: 'found'; hits: LocalEntityHit[] }
+  | { status: 'absent' }
+  | { status: 'unavailable'; detail: string }
+> {
+  const sb = db();
+  if (!sb) return { status: 'unavailable', detail: 'Supabase client unavailable' };
+  const d = domain.replace(/[%_]/g, '').trim();
+  if (!d) return { status: 'absent' };
+  const { data, error } = await sb
+    .from('sam_entities')
+    .select(LOCAL_ENTITY_COLUMNS)
+    .ilike('entity_url', `%${d}%`)
+    .limit(Math.min(Math.max(limit, 1), 25));
+  if (error) {
+    console.error('[sam-local-fallback] website query failed:', error.message);
+    return { status: 'unavailable', detail: error.message };
+  }
+  const hits = ((data || []) as unknown as Record<string, unknown>[]).map((row) => ({
+    entity: toSamEntity(row),
+    asOf: typeof row.synced_at === 'string' ? row.synced_at : null,
+  }));
+  return hits.length ? { status: 'found', hits } : { status: 'absent' };
 }
 
 export async function localEntitiesByName(name: string, limit = 10, state?: string): Promise<LocalEntityHit[]> {
