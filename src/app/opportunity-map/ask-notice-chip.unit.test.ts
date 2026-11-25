@@ -163,7 +163,8 @@ describe('Start a proposal (user click only)', () => {
     const calls = withPipeline(t, 200, { opportunity: { id: 'p-1' } });
     t.open();
     await flush();
-    expect(calls).toHaveLength(0);
+    // Reads may happen on open (e.g. the connected-files check); nothing is WRITTEN.
+    expect(calls.filter((c) => c.url === '/api/pipeline' || (c.init?.method && c.init.method !== 'GET'))).toHaveLength(0);
   });
   it('new pursuit: one pipeline POST with only the notice facts, then opens Proposals', async () => {
     const t = boot();
