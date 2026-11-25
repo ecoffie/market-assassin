@@ -134,13 +134,22 @@ jobs:
           node scripts/import-sam-entity-extract.mjs --file "$RUNNER_TEMP/sam/$SAM_EXTRACT_FILE" --all-naics 2>&1 | tee "$RUNNER_TEMP/sam/apply.log"
           node scripts/sam-extract-dry-run-gate.mjs "$RUNNER_TEMP/sam/apply.log" --real
 
-      - name: Upload logs (no ZIP)
+      # Public repo → public artifact: upload ONLY the summary blocks (reconciliation, NULL-SAFETY, REGISTRY CHANGE).
+      - name: Extract the summary blocks
+        if: always() && steps.gate.outputs.run == 'yes'
+        run: |
+          for f in "$RUNNER_TEMP"/sam/*.log; do
+            [ -f "$f" ] || continue
+            sed -n '/=== IMPORT RECONCILIATION ===/,/sam_entities total/p' "$f" > "${f%.log}.summary.txt"
+          done
+
+      - name: Upload summaries (no ZIP, no row data)
         if: always() && steps.gate.outputs.run == 'yes'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: sam-entity-extract-logs
+          name: sam-entity-extract-summary
           path: |
-            ${{ runner.temp }}/sam/*.log
+            ${{ runner.temp }}/sam/*.summary.txt
           if-no-files-found: ignore
           retention-days: 14
 

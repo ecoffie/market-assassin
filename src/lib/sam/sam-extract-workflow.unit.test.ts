@@ -60,7 +60,16 @@ describe('workflow safety', () => {
     expect(wf).not.toMatch(/echo[^\n]*\$SAM_API_KEY(?!")/);
     expect(wf.match(/--all-naics/g)?.length).toBeGreaterThanOrEqual(2);
   });
-  it('the uploaded artifact is logs only, never the ZIP', () => {
-    expect(wf).toMatch(/runner\.temp \}\}\/sam\/\*\.log/);
+  it('the uploaded artifact is the summary blocks only (public repo): never the ZIP, never full logs', () => {
+    expect(wf).toMatch(/runner\.temp \}\}\/sam\/\*\.summary\.txt/);
+    expect(wf).not.toMatch(/runner\.temp \}\}\/sam\/\*\.log/);
+    expect(wf).toMatch(/sed -n '\/=== IMPORT RECONCILIATION ===\/,\/sam_entities total\/p'/);
+  });
+  it('in CI the importer prints no sample rows and withholds database error text', () => {
+    const imp = readFileSync(join(process.cwd(), 'scripts/import-sam-entity-extract.mjs'), 'utf8');
+    expect(imp).toMatch(/const PUBLIC_LOG = process\.env\.CI === 'true' \|\| process\.env\.GITHUB_ACTIONS === 'true';/);
+    expect(imp).toMatch(/if \(DRY && !PUBLIC_LOG\) \{/);
+    expect(imp).toMatch(/logErr\(exErr\.message\)/);
+    expect(imp).toMatch(/logErr\(error\.message\)/);
   });
 });
