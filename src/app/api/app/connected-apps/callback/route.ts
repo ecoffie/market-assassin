@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { connectedAppsEnabledFor, connectedAppsSecrets } from '@/lib/connected-apps/config';
 import { BINDING_COOKIE, BINDING_COOKIE_PATH, exchangeCode, fetchIdentity, OAuthError, verifyState } from '@/lib/connected-apps/oauth';
 import { saveConnection } from '@/lib/connected-apps/store';
+import { RESULT_COOKIE, resultCookieValue } from '@/lib/connected-apps/result-cookie';
 
 function back(request: NextRequest, path: string, params: Record<string, string>): NextResponse {
   const u = new URL(path, request.nextUrl.origin);
@@ -14,6 +15,8 @@ function back(request: NextRequest, path: string, params: Record<string, string>
   const res = NextResponse.redirect(u, 303);
   // One use: the binding cookie is cleared on every outcome.
   res.cookies.set(BINDING_COOKIE, '', { httpOnly: true, secure: true, sameSite: 'lax', path: BINDING_COOKIE_PATH, maxAge: 0 });
+  // The outcome also rides in a short-lived cookie the file control reads once (see result-cookie.ts).
+  res.cookies.set(RESULT_COOKIE, resultCookieValue(params), { httpOnly: false, secure: true, sameSite: 'lax', path: '/', maxAge: 300 });
   return res;
 }
 
