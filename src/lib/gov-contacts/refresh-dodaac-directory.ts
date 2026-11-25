@@ -17,6 +17,7 @@
  *
  * Do NOT "simplify" this into an upsert — see the never-overwrite guard below.
  */
+import { voteOfficeIdentity, conflictEvidenceSample } from './office-identity';
 import { createClient } from '@supabase/supabase-js';
 import { bqQuery, BQ_TABLES } from '@/lib/bigquery/client';
 
@@ -34,7 +35,70 @@ function cleanName(code: string, raw: string): string {
   return n || raw || code;
 }
 
-export async function refreshDodaacDirectory(): Promise<{ offices: number; written: number }> {
+/**
+ * Collapse per-(code, name, agency, sub_agency) rows into one directory record per code. Counts and
+ * obligations are summed over EVERY row of the code; agency / sub_agency / name come from the vote
+ * and are null when the code's rows conflict (explicit unknown, never the minority agency).
+ */
+export function buildDirectoryRecords(
+  rows: Array<{ dodaac: string; office_name: string | null; agency: string | null; sub_agency: string | null; award_count: number | string; total_obligated: number | string | null }>,
+  updatedAt: string,
+  /** Filled with the codes whose rows conflict (no agency pair >= OFFICE_IDENTITY_MIN_SHARE). */
+  conflictingOut?: Set<string>,
+) {
+  const ids = voteOfficeIdentity(rows.map((r) => ({ code: r.dodaac, name: r.office_name, agency: r.agency, sub_agency: r.sub_agency, n: r.award_count })));
+  const totals = new Map<string, { count: number; obligated: number; anyName: string | null }>();
+  for (const r of rows) {
+    const t = totals.get(r.dodaac) ?? { count: 0, obligated: 0, anyName: null };
+    t.count += Number(r.award_count || 0);
+    t.obligated += Number(r.total_obligated || 0);
+    t.anyName = t.anyName ?? r.office_name;
+    totals.set(r.dodaac, t);
+  }
+  return [...ids.values()].map((id) => {
+    const t = totals.get(id.code)!;
+    // department_only nulls the sub-agency, so an authoritative (SAM/curated) row is protected the same way.
+    if (id.identity_basis !== 'majority') conflictingOut?.add(id.code);
+    return {
+      dodaac: id.code,
+      office_name: cleanName(id.code, id.name ?? t.anyName ?? id.code),
+      agency: id.agency,
+      sub_agency: id.sub_agency,
+      award_count: t.count,
+      total_obligated: t.obligated,
+      source: 'fpds_awards',
+      updated_at: updatedAt,
+    };
+  });
+}
+
+export type DirectoryRecord = ReturnType<typeof buildDirectoryRecords>[number];
+export interface ExistingDirectoryRow { dodaac: string; source: string | null; agency: string | null; sub_agency: string | null }
+
+/**
+ * A conflicting vote must not erase attribution from a MORE authoritative source. Pass 1 upserts
+ * dodaac, office_name, agency, sub_agency, award_count, total_obligated, source, updated_at; it never
+ * writes sam_office_name or any other column. For a code whose award rows conflict, an existing row
+ * whose source is NOT fpds_awards (the SAM hierarchy fill, or anything curated) keeps its agency,
+ * sub_agency and source; only the counts are refreshed. An existing fpds_awards agency was an
+ * ANY_VALUE pick — not evidence — and becomes unknown (Eric, 2026-11-22: option A).
+ */
+export function preserveAuthoritativeAgency(
+  records: DirectoryRecord[],
+  conflicting: Set<string>,
+  existing: Map<string, ExistingDirectoryRow>,
+): DirectoryRecord[] {
+  return records.map((r) => {
+    if (!conflicting.has(r.dodaac)) return r;
+    const prev = existing.get(r.dodaac);
+    if (!prev || !prev.source || prev.source === 'fpds_awards' || !prev.agency) return r;
+    return { ...r, agency: prev.agency, sub_agency: prev.sub_agency, source: prev.source };
+  });
+}
+
+export async function refreshDodaacDirectory(): Promise<{ offices: number; written: number; conflicting: number; conflict_evidence: ReturnType<typeof conflictEvidenceSample> }> {
+  // One row per (code, name, agency, sub_agency): the office's agency is decided by majority vote
+  // (office-identity.ts), never ANY_VALUE — that let one miskeyed transaction label CBP's 70B01C the FTC.
   const rows = await bqQuery<{
     dodaac: string; office_name: string; agency: string | null;
     sub_agency: string | null; award_count: number; total_obligated: number;
@@ -42,33 +106,36 @@ export async function refreshDodaacDirectory(): Promise<{ offices: number; writt
     query: `
       SELECT
         awarding_office_code AS dodaac,
-        ANY_VALUE(awarding_office) AS office_name,
-        ANY_VALUE(awarding_agency) AS agency,
-        ANY_VALUE(awarding_sub_agency) AS sub_agency,
+        awarding_office AS office_name,
+        awarding_agency AS agency,
+        awarding_sub_agency AS sub_agency,
         COUNT(*) AS award_count,
         SUM(obligation_amount) AS total_obligated
       FROM ${BQ_TABLES.awards}
       WHERE awarding_office_code IS NOT NULL
         AND awarding_office IS NOT NULL
         AND LENGTH(awarding_office_code) = 6
-      GROUP BY awarding_office_code
-      HAVING award_count > 0
+      GROUP BY 1, 2, 3, 4
     `,
     maximumBytesBilled: String(20 * 1024 * 1024 * 1024),
   });
 
-  const records = rows.map(r => ({
-    dodaac: r.dodaac,
-    office_name: cleanName(r.dodaac, r.office_name),
-    agency: r.agency || null,
-    sub_agency: r.sub_agency || null,
-    award_count: Number(r.award_count || 0),
-    total_obligated: Number(r.total_obligated || 0),
-    source: 'fpds_awards',
-    updated_at: new Date().toISOString(),
-  }));
+  const conflicting = new Set<string>();
+  const voted = buildDirectoryRecords(rows, new Date().toISOString(), conflicting);
 
   const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+  // Read the existing rows of conflicting codes only, so a more authoritative agency survives.
+  const existing = new Map<string, ExistingDirectoryRow>();
+  const conflictCodes = [...conflicting];
+  for (let i = 0; i < conflictCodes.length; i += 500) {
+    const { data, error } = await sb.from('dodaac_directory')
+      .select('dodaac, source, agency, sub_agency')
+      .in('dodaac', conflictCodes.slice(i, i + 500));
+    // Unreadable → refuse to write rather than risk nulling an authoritative agency.
+    if (error) throw new Error(`dodaac existing read: ${error.message}`);
+    for (const row of (data ?? []) as ExistingDirectoryRow[]) existing.set(row.dodaac, row);
+  }
+  const records = preserveAuthoritativeAgency(voted, conflicting, existing);
   let written = 0;
   for (let i = 0; i < records.length; i += 500) {
     const batch = records.slice(i, i + 500);
@@ -76,7 +143,13 @@ export async function refreshDodaacDirectory(): Promise<{ offices: number; writt
     if (error) throw new Error(`dodaac upsert: ${error.message}`);
     written += batch.length;
   }
-  return { offices: rows.length, written };
+  // Bounded evidence for later correction (no schema change, Eric 2026-11-22): <= 25 codes, office codes
+  // and agency names only, in this result body and one runtime log line — never persisted to a table.
+  const conflict_evidence = conflictEvidenceSample(
+    voteOfficeIdentity(rows.map((r) => ({ code: r.dodaac, name: r.office_name, agency: r.agency, sub_agency: r.sub_agency, n: r.award_count }))),
+  );
+  console.log(`[refresh-dodaac-directory] ${conflicting.size} conflicting office codes of ${records.length}; sample: ${JSON.stringify(conflict_evidence)}`);
+  return { offices: records.length, written, conflicting: conflicting.size, conflict_evidence };
 }
 
 /**
