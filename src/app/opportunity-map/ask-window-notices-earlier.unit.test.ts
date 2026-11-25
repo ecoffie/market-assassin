@@ -76,7 +76,7 @@ const LONG = 'A long enough answer to earn suggestions, with more than eighty ch
 const notices = (doc: Document) => [...doc.querySelectorAll('[data-testid="amk-notices"] .amk-notice')].map((n) => n.textContent);
 
 describe('Map Ask Mindy window: server status lines', () => {
-  it('notice and progress events appear under the answer, as text, in order', async () => {
+  it('notice events appear under the answer as text; progress events are research steps, not warnings', async () => {
     const t = boot([{ events: [
       { type: 'progress', message: 'Searching federal awards…' },
       { type: 'notice', message: 'Forecast data is temporarily unavailable, so Coming soon may be incomplete.' },
@@ -84,7 +84,8 @@ describe('Map Ask Mindy window: server status lines', () => {
     ] }]);
     t.send('Who buys drones?');
     await t.settle();
-    expect(notices(t.doc)).toEqual(['Searching federal awards…', 'Forecast data is temporarily unavailable, so Coming soon may be incomplete.']);
+    expect(notices(t.doc)).toEqual(['Forecast data is temporarily unavailable, so Coming soon may be incomplete.']);
+    expect(t.doc.querySelector('[data-testid="amk-research-summary"]')?.textContent).toMatch(/^Researched · 1 step · /);
     expect(t.doc.querySelector('[data-testid="amk-notices"]')?.getAttribute('role')).toBe('status');
   });
 
@@ -97,7 +98,7 @@ describe('Map Ask Mindy window: server status lines', () => {
   });
 
   it('a runaway stream shows at most 6 status lines; empty ones are skipped', async () => {
-    const evs = Array.from({ length: 10 }, (_, i) => ({ type: 'progress', message: `step ${i}` }));
+    const evs = Array.from({ length: 10 }, (_, i) => ({ type: 'notice', message: `status ${i}` }));
     const t = boot([{ events: [...evs, { type: 'notice', message: '  ' }, { type: 'token', content: 'A' }, { type: 'done' }] }]);
     t.send('q');
     await t.settle();
