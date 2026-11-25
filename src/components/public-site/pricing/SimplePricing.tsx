@@ -375,14 +375,15 @@ export default function SimplePricing({ proCredits, teamCredits, forecastsLabel,
 
       <section className="cmp" aria-labelledby="cmp-h">
         <h2 id="cmp-h">A plan to suit every need</h2>
-        <div className="cmp-scroll">
+        <p className="cmp-hint" id="cmp-hint">Swipe to compare Team and Enterprise <span aria-hidden="true">→</span></p>
+        <div className="cmp-scroll" role="region" aria-labelledby="cmp-h" aria-describedby="cmp-hint" tabIndex={0}>
           <table>
             <thead>
               <tr><th scope="col"><span className="sr">Feature</span></th><th scope="col">Pro</th><th scope="col" className="hl">Team</th><th scope="col">Enterprise</th></tr>
             </thead>
             {compare.map(([group, rows]) => (
               <tbody key={group}>
-                <tr className="grp"><th scope="rowgroup" colSpan={4}>{group}</th></tr>
+                <tr className="grp"><th scope="rowgroup" colSpan={4}><span className="gl">{group}</span></th></tr>
                 {rows.map(([label, a, b, c], i) => (
                   <tr key={i}><th scope="row">{label}</th><td>{cell(a)}</td><td className="hl">{cell(b)}</td><td>{cell(c)}</td></tr>
                 ))}
@@ -506,6 +507,13 @@ const CSS = `
 .sp .cmp .no{color:var(--mp-faint)}
 .sp .cmp tfoot td,.sp .cmp tfoot th{border-bottom:0;padding:20px 14px}
 .sp .cmp tfoot .cta{margin:0}
+.sp .cmp-hint{display:none;margin:-12px 0 12px;text-align:center;font-size:14px;font-weight:600;color:var(--mp-muted)}
+@media (max-width:640px){
+.sp .cmp-hint{display:block}
+.sp .cmp th,.sp .cmp td{padding:14px 12px}
+.sp .cmp thead th:first-child,.sp .cmp th[scope=row]{position:sticky;left:0;z-index:1;background:var(--mp-surface);width:140px;min-width:140px;box-shadow:1px 0 0 var(--mp-hair)}
+.sp .cmp .grp .gl{position:sticky;left:12px}
+}
 .sp .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
 .sp .faq{max-width:760px;margin:64px auto 0}
 .sp .faq h2{font-family:var(--mp-font-serif);font-size:32px;font-weight:700;text-align:center;margin:0 0 20px}
