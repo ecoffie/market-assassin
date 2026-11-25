@@ -28,6 +28,7 @@ export type SolicitationIncumbentToolResult = SolicitationIncumbentResult & {
 
 export async function getSolicitationIncumbent(
   input: SolicitationIncumbentInput,
+  opts: { samCacheOnly?: boolean } = {},
 ): Promise<SolicitationIncumbentToolResult> {
   const q = String(input.solicitation_number || input.notice_id || '').trim();
   if (!q) {
@@ -48,7 +49,15 @@ export async function getSolicitationIncumbent(
     };
   }
 
-  const result = (await resolveSolicitationIncumbent(q)) as SolicitationIncumbentToolResult;
+  const result = (await resolveSolicitationIncumbent(q, opts)) as SolicitationIncumbentToolResult;
+  if (opts.samCacheOnly) {
+    // Research mode: say where the notice came from. A miss here is Mindy's cache, not SAM's answer.
+    const meta = result._meta as unknown as Record<string, unknown>;
+    meta.sam_cache_only = true;
+    if (!result.notice) {
+      meta.cache_only_note = `${q} is not in Mindy's SAM notice cache. Live SAM was not consulted (research mode), so this is not evidence the solicitation does not exist.`;
+    }
+  }
 
   if (mcpFlags.aiHint) {
     const { notice, incumbent, _meta } = result;

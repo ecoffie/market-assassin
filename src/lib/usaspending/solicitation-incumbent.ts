@@ -413,7 +413,14 @@ async function fromSamPublic(q: string): Promise<ResolvedNotice | null> {
   }
 }
 
-export async function resolveSamNotice(query: string): Promise<{ notice: ResolvedNotice | null; degraded: boolean }> {
+/**
+ * `samCacheOnly` (Ask Mindy research mode, Eric 2026-11-25): Mindy's SAM notice cache only, never the live SAM search
+ * or public endpoints. A cache miss is then "not in Mindy's cache", not "no such solicitation".
+ */
+export async function resolveSamNotice(
+  query: string,
+  opts: { samCacheOnly?: boolean } = {},
+): Promise<{ notice: ResolvedNotice | null; degraded: boolean }> {
   const q = query.trim();
   if (!q) return { notice: null, degraded: false };
   let degraded = false;
@@ -423,6 +430,7 @@ export async function resolveSamNotice(query: string): Promise<{ notice: Resolve
   } catch {
     degraded = true;
   }
+  if (opts.samCacheOnly) return { notice: null, degraded };
   try {
     const live = await fromSamApi(q);
     if (live) return { notice: live, degraded };
@@ -801,9 +809,12 @@ export function summarizeSolicitationIncumbent(
 /**
  * Main entry: solicitation # or notice UUID → notice + likely incumbent.
  */
-export async function resolveSolicitationIncumbent(query: string): Promise<SolicitationIncumbentResult> {
+export async function resolveSolicitationIncumbent(
+  query: string,
+  opts: { samCacheOnly?: boolean } = {},
+): Promise<SolicitationIncumbentResult> {
   const q = query.trim();
-  const { notice, degraded: noticeDegraded } = await resolveSamNotice(q);
+  const { notice, degraded: noticeDegraded } = await resolveSamNotice(q, opts);
   const identity = notice ? noticeIdentity(q, notice) : undefined;
   if (notice && identity === 'mentioned_only') {
     // The queried id is not this notice: never run the prior-award guess for it, never name an incumbent.
