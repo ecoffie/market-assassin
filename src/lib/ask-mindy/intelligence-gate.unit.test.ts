@@ -207,3 +207,38 @@ describe('forecastsLine (none is never confused with not covered)', () => {
     expect(await forecastsLine({ horizon: { status: 'grounded', matched_count: 7 }, shown: 7, state: 'VA', query: 'q', national: async () => null })).toMatch(/7 agency forecast\(s\) matched in VA/);
   });
 });
+
+describe('disclosure first', () => {
+  const evalWith = (failing: string[]) => async () => ({ pass: false, results: ['relevant', 'pursuable', 'reasoned', 'actionable', 'clear'].map((c) => failing.includes(c) ? { criterion: c, pass: false, reason: `${c} is not supported by the evidence.` } : pass(c)) as never, fix: ['fix it'], usage: { input: 1, output: 1 }, model: 'e' });
+  const runWith = (failing: string[]) => runIntelligenceGate({ ...base, deps: { findOpen: async () => null, findNationalForecasts: async () => null, findTargeted: async () => null, gather: async () => evidence(), publish: vi.fn(), analyst, evaluate: evalWith(failing) as never } });
+
+  it('a disclosed answer opens with the plain lead line and the unverified points, BEFORE the headline', async () => {
+    const r = await runWith(['reasoned']);
+    expect(r.status).toBe('disclosed');
+    const lines = r.answer.split('\n');
+    expect(lines[0]).toBe('I could not fully verify this answer, so treat it as a starting point, not a final recommendation:');
+    expect(lines[1]).toBe('- reasoned is not supported by the evidence.');
+    expect(r.answer.indexOf('Go after West Palm Beach')).toBeGreaterThan(r.answer.indexOf('- reasoned is not supported'));
+  });
+
+  it('an actionable-only failure is disclosed too, saying the next steps are not specific enough yet', async () => {
+    const r = await runWith(['actionable']);
+    expect(r.status).toBe('disclosed');
+    const lines = r.answer.split('\n');
+    expect(lines[0]).toMatch(/^I could not fully verify this answer/);
+    expect(lines[1]).toBe('- The next steps below are not specific enough yet.');
+    expect(r.answer).not.toContain('actionable is not supported');
+  });
+
+  it('a complete answer has no disclosure at all and still leads with the headline', async () => {
+    const r = await runIntelligenceGate({ ...base, deps: { findOpen: async () => null, findNationalForecasts: async () => null, findTargeted: async () => null, gather: async () => evidence(), publish: async (x: any) => x, analyst, evaluate: async () => ({ pass: true, results: [] as never, fix: [], usage: { input: 1, output: 1 }, model: 'e' }) } });
+    expect(r.status).toBe('complete');
+    expect(r.answer.startsWith('Go after West Palm Beach')).toBe(true);
+    expect(r.answer).not.toContain('could not fully verify');
+  });
+
+  it('rendering adds no facts: only the given points and the fixed lead line', () => {
+    const t = renderDecisionAnswer(decision, { disclosed: ['A point.'] });
+    expect(t.split('\n').slice(0, 3)).toEqual(['I could not fully verify this answer, so treat it as a starting point, not a final recommendation:', '- A point.', '']);
+  });
+});
