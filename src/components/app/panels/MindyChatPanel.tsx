@@ -22,7 +22,7 @@ import type { AppTier, AppPanel } from '../UnifiedSidebar';
 import { authedFetch } from '../authHeaders';
 import { ChatAttachments } from '../chat/ChatAttachments';
 import type { GeneratedDownloadFile } from '../chat/GeneratedDownloadChips';
-import { ChatReportPreview, type ChatInlineReport } from '../chat/ChatReportPreview';
+import { ChatReportPreview, validReportId, type ChatInlineReport, type ChatSavedReport } from '../chat/ChatReportPreview';
 import { useVaultCapabilities } from '../chat/useVaultCapabilities';
 import { UpgradeModal } from '../UpgradeModal';
 import { renderSafeMarkdown } from '@/lib/chat/safe-markdown';
@@ -83,6 +83,8 @@ interface ChatMessage {
   deliverablePdfNote?: string | null;
   /** Packaged generate_market_report: the rendered report HTML, read in the chat (not persisted in History). */
   report?: ChatInlineReport;
+  /** A packaged market report in a reopened conversation: History keeps its id and title; the pane reloads it. */
+  savedReport?: ChatSavedReport;
 }
 
 
@@ -314,6 +316,7 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
                 html: evt.html,
                 title: typeof evt.title === 'string' && evt.title ? evt.title : 'Market report',
                 url: typeof evt.url === 'string' ? evt.url : null,
+                reportId: validReportId(evt.report_id) ? evt.report_id : null,
               };
               setMessages(prev => prev.map(m => m.id === assistantMsg.id ? { ...m, report } : m));
             } else if (evt.type === 'sources' && evt.ledger && typeof evt.ledger === 'object') {
@@ -412,6 +415,7 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
           content: string;
           cited_sources?: CitedSource[];
           deliverables?: { files?: GeneratedDownloadFile[]; pdf_note?: string };
+          market_report?: { report_id?: unknown; title?: unknown };
         }) => {
           const files = Array.isArray(m.deliverables?.files)
             ? m.deliverables!.files!.filter((f) => f && typeof f.document_id === 'string' && typeof f.format === 'string')
@@ -423,6 +427,9 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
             citations: Array.isArray(m.cited_sources) ? m.cited_sources : undefined,
             ...(files?.length ? { deliverables: files } : {}),
             ...(typeof m.deliverables?.pdf_note === 'string' ? { deliverablePdfNote: m.deliverables.pdf_note } : {}),
+            ...(m.role === 'assistant' && validReportId(m.market_report?.report_id)
+              ? { savedReport: { id: m.market_report!.report_id as string, title: typeof m.market_report?.title === 'string' && m.market_report.title ? m.market_report.title.slice(0, 160) : 'Market report' } }
+              : {}),
           };
         }));
         setSessionId(sid);
@@ -715,7 +722,10 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
                   {msg.role === 'assistant' && !msg.isStreaming && !msg.errored && email && msg.report && (
                     <ChatReportPreview email={email} inline={msg.report} files={msg.deliverables} pdfNote={msg.deliverablePdfNote} />
                   )}
-                  {msg.role === 'assistant' && !msg.isStreaming && !msg.errored && email && !msg.report && !!msg.deliverables?.length && (
+                  {msg.role === 'assistant' && !msg.isStreaming && !msg.errored && email && !msg.report && msg.savedReport && (
+                    <ChatReportPreview email={email} savedReport={msg.savedReport} files={msg.deliverables} pdfNote={msg.deliverablePdfNote} />
+                  )}
+                  {msg.role === 'assistant' && !msg.isStreaming && !msg.errored && email && !msg.report && !msg.savedReport && !!msg.deliverables?.length && (
                     <ChatReportPreview email={email} files={msg.deliverables} pdfNote={msg.deliverablePdfNote} />
                   )}
                   <div className={`text-[14.5px] leading-relaxed ${msg.errored ? 'text-red-300' : msg.role === 'user' ? 'text-slate-100' : 'text-slate-200'}`}>
