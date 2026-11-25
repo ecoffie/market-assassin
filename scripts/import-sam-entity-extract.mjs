@@ -34,6 +34,7 @@ import unzipper from 'unzipper';
 import { Storage } from '@google-cloud/storage';
 import { execSync } from 'node:child_process';
 import { archiveSamZip, snapshotDate, SAM_ARCHIVE_BUCKET, ArchiveChecksumConflict } from './lib/sam-archive.mjs';
+import { resolveExtractFileName, findDatEntry } from './lib/sam-extract-input.mjs';
 
 // Bump when the parser's FIELD MAPPING changes, so a backfill can target only rows
 // produced by superseded logic. v2 = added per-NAICS sbaSmallBusiness (P0-3).
@@ -85,7 +86,11 @@ function naicsMatches(codes) {
 
 const fileArgIdx = process.argv.indexOf('--file');
 const ZIP_PATH = fileArgIdx > -1 ? process.argv[fileArgIdx + 1] : '/tmp/sam-extract/entities.zip';
-const EXTRACT_FILENAME = process.env.SAM_EXTRACT_FILE || 'SAM_PUBLIC_MONTHLY_V2_20260503.ZIP';
+// The provenance label names the file actually imported: the --file basename, which SAM_EXTRACT_FILE must match.
+let EXTRACT_FILENAME;
+try {
+  EXTRACT_FILENAME = resolveExtractFileName({ fileArg: fileArgIdx > -1 ? ZIP_PATH : null, envName: process.env.SAM_EXTRACT_FILE });
+} catch (e) { console.error(e.message); process.exit(1); }
 
 // ── SBA business-type code → normalized label (matches entity-api.ts) ──
 function sbaLabel(code) {
@@ -422,8 +427,9 @@ async function main() {
 
   // Stream the ZIP → the .dat entry → line by line (never load it all).
   const directory = await unzipper.Open.file(ZIP_PATH);
-  const datEntry = directory.files.find(f => /\.dat$/i.test(f.path)) || directory.files[0];
-  console.log('Reading entry:', datEntry.path);
+  // SAM wrapped the November 2026 extract in a second zip: open nested single-zip archives (≤2 levels) to the .dat.
+  const { entry: datEntry, nesting } = await findDatEntry(directory, (buf) => unzipper.Open.buffer(buf));
+  console.log('Reading entry:', datEntry.path, nesting ? `(inside ${nesting} nested zip layer${nesting > 1 ? 's' : ''})` : '');
 
   const rl = createInterface({ input: datEntry.stream(), crlfDelay: Infinity });
   for await (const line of rl) {
