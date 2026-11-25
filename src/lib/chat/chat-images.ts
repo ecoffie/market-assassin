@@ -8,6 +8,11 @@
  */
 export const MAX_IMAGES = 3;
 export const MAX_IMAGE_BYTES = Math.floor(3.5 * 1024 * 1024);
+/**
+ * All images together, as base64 characters. Vercel refuses request bodies over ~4.5 MB BEFORE the route runs (a
+ * raw platform error), so the server's own friendly 413 must fire well below that, with room for the JSON around it.
+ */
+export const MAX_TOTAL_BASE64_CHARS = 4_000_000;
 
 export type ImageType = 'image/png' | 'image/jpeg' | 'image/webp';
 export interface ChatImage { media_type: ImageType; data: string; bytes: number }
@@ -97,6 +102,8 @@ export function parseChatImages(raw: unknown): ImageCheck {
   const bad = (message: string): ImageCheck => ({ ok: false, status: 400, error: 'images_invalid', message });
   if (!Array.isArray(raw)) return bad('The screenshot could not be read. Please paste it again.');
   if (raw.length > MAX_IMAGES) return bad(`Please attach at most ${MAX_IMAGES} screenshots at a time.`);
+  const total = raw.reduce((n: number, item) => n + (typeof (item as { data?: unknown })?.data === 'string' ? String((item as { data: string }).data).length : 0), 0);
+  if (total > MAX_TOTAL_BASE64_CHARS) return { ok: false, status: 413, error: 'image_too_large', message: 'Those screenshots are too large together. Please attach fewer or smaller ones.' };
   const images: ChatImage[] = [];
   for (const item of raw) {
     const data = typeof (item as { data?: unknown })?.data === 'string' ? String((item as { data: string }).data).replace(/\s+/g, '') : '';

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseChatImages, sniffImageType, stripImageMetadata, imageContentBlocks, MAX_IMAGE_BYTES } from './chat-images';
+import { parseChatImages, sniffImageType, stripImageMetadata, imageContentBlocks, MAX_IMAGE_BYTES, MAX_TOTAL_BASE64_CHARS } from './chat-images';
 
 const seg = (marker: number, payload: Buffer) => { const h = Buffer.alloc(4); h[0] = 0xff; h[1] = marker; h.writeUInt16BE(payload.length + 2, 2); return Buffer.concat([h, payload]); };
 const JPEG = Buffer.concat([
@@ -41,8 +41,20 @@ describe('refusals (customer-safe)', () => {
     expect(parseChatImages([{ data: '!!!not base64!!!' }])).toMatchObject({ ok: false, status: 400 });
   });
   it('413: over 3.5 MB', () => {
-    const big = Buffer.concat([PNG.subarray(0, 8), Buffer.alloc(MAX_IMAGE_BYTES + 10)]);
+    const big = Buffer.concat([PNG.subarray(0, 8), Buffer.alloc(MAX_IMAGE_BYTES + 10)]); // also over the total cap
     expect(parseChatImages([{ media_type: 'image/png', data: b64(big) }])).toMatchObject({ ok: false, status: 413 });
+  });
+  it('413: all images together over the ~4 MB payload cap (below the platform\'s 4.5 MB body limit), even when each one is under 3.5 MB', () => {
+    const each = Buffer.concat([PNG.subarray(0, 8), Buffer.alloc(1_100_000)]);
+    expect(b64(each).length * 3).toBeGreaterThan(MAX_TOTAL_BASE64_CHARS);
+    expect(each.length).toBeLessThan(MAX_IMAGE_BYTES);
+    const r = parseChatImages([1, 2, 3].map(() => ({ media_type: 'image/png', data: b64(each) })));
+    expect(r).toMatchObject({ ok: false, status: 413, message: 'Those screenshots are too large together. Please attach fewer or smaller ones.' });
+    expect(MAX_TOTAL_BASE64_CHARS + 50_000).toBeLessThan(4.5 * 1024 * 1024);
+  });
+  it('a typical downscaled set (3 x ~600 KB) is accepted', () => {
+    const each = Buffer.concat([PNG.subarray(0, 8), Buffer.alloc(600_000)]);
+    expect(parseChatImages([1, 2, 3].map(() => ({ media_type: 'image/png', data: b64(each) })))).toMatchObject({ ok: true });
   });
   it('415: not PNG, JPEG or WebP', () => {
     expect(parseChatImages([{ media_type: 'image/png', data: b64(Buffer.from('%PDF-1.7 hello')) }])).toMatchObject({ ok: false, status: 415 });
