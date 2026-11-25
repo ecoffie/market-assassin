@@ -137,6 +137,9 @@ describe('instructions', () => {
     expect(RESEARCH_INSTRUCTIONS).toMatch(/officers as reported to USASpending/);
     expect(RESEARCH_INSTRUCTIONS).toMatch(/none_reported does not mean the company has no leaders/);
   });
+  it('CUI- or classification-marked screenshots and pasted text are not used (guidance line; not an enforcement control)', () => {
+    expect(RESEARCH_INSTRUCTIONS).toContain("If a screenshot or pasted text carries a CUI or classification marking, do not read or use its contents; tell the customer Mindy can't process controlled material.");
+  });
   it('the spec is generic: no reference-case company, person or identifier', () => {
     expect(RESEARCH_INSTRUCTIONS).not.toMatch(/\bEFS\b|Norwich|Colon|X6PKH4P1T124|UConn/i);
   });
