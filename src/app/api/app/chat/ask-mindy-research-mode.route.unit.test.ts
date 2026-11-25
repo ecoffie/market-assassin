@@ -15,6 +15,7 @@ const h = vi.hoisted(() => ({
   extract: vi.fn(),
   create: vi.fn(),
   overBudget: false,
+  liveSam: [] as string[],
   inserts: [] as Array<Record<string, unknown>>,
 }));
 
@@ -42,6 +43,12 @@ vi.mock('@/lib/ask-mindy/company-profile', async (orig) => ({ ...(await orig<typ
 vi.mock('@/lib/ask-mindy/intelligence-gate', async (orig) => ({ ...(await orig<typeof import('@/lib/ask-mindy/intelligence-gate')>()), runIntelligenceGate: h.runGate }));
 vi.mock('@/lib/ask-mindy/gate-intent', async (orig) => ({ ...(await orig<typeof import('@/lib/ask-mindy/gate-intent')>()), extractWorkPhrase: h.extract }));
 
+// ANY live SAM call fails the test (Eric: research mode makes zero live SAM calls).
+vi.mock('@/lib/sam/entity-api', async (orig) => {
+  const real = await orig<typeof import('@/lib/sam/entity-api')>();
+  const live = (name: string) => vi.fn(async () => { h.liveSam.push(name); throw new Error(`LIVE SAM CALL: ${name}`); });
+  return { ...real, searchEntities: live('searchEntities'), getEntityByUEI: live('getEntityByUEI'), getEntityByCAGE: live('getEntityByCAGE'), verifySAMStatus: live('verifySAMStatus'), getCertifications: live('getCertifications') };
+});
 vi.mock('@anthropic-ai/sdk', () => ({ default: class { messages = { create: (...a: unknown[]) => h.create(...a) }; } }));
 
 const ENV_KEYS = ['OPENAI_API_KEY', 'SUPABASE_SERVICE_ROLE_KEY', 'ASK_MINDY_INTELLIGENCE_GATE', 'ASK_MINDY_INTELLIGENCE_GATE_ALLOWLIST', 'ASK_MINDY_RESEARCH_MODE', 'ASK_MINDY_RESEARCH_MODE_ALLOWLIST', 'ASK_MINDY_RESEARCH_MODEL'] as const;
@@ -57,7 +64,7 @@ beforeEach(() => {
   process.env.OPENAI_API_KEY = 'sk-test';
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'srk-test';
   for (const k of ENV_KEYS.slice(2)) delete process.env[k];
-  openaiCalls.length = 0; h.inserts.length = 0; h.overBudget = false;
+  openaiCalls.length = 0; h.inserts.length = 0; h.overBudget = false; h.liveSam.length = 0;
   h.runMcpTool.mockReset();
   h.runMcpTool.mockImplementation(async (name: string) => ({ result: { ok: true, grounded: true, tool: name, note: 'obligated $1.2M' }, credits: 0 }));
   h.runGate.mockReset(); h.extract.mockReset(); h.extract.mockImplementation(async () => 'digital marketing');
@@ -106,7 +113,8 @@ describe('research mode in the chat route', () => {
     expect(first.system).toContain('IDENTITY FIRST');
     const names = first.tools.map((t) => t.name);
     expect(names).toEqual(expect.arrayContaining(['find_opportunities', 'search_contractors', 'search_web']));
-    for (const live of ['lookup_sam_entity', 'get_contractor_award_history', 'get_solicitation_incumbent', 'get_solicitation_documents']) expect(names).not.toContain(live);
+    for (const live of ['get_contractor_award_history', 'get_solicitation_incumbent', 'get_solicitation_documents']) expect(names).not.toContain(live);
+    expect(names).toContain('lookup_sam_entity');
     expect(h.runMcpTool.mock.calls.map((c) => c[0])).toEqual(expect.arrayContaining(['find_opportunities', 'search_contractors']));
     expect(text(ev)).toBe('Start with the Navy recruiting campaign ($1.2M awarded so far).');
     expect(ev.filter((e) => e.type === 'progress').length).toBeGreaterThanOrEqual(2);
@@ -167,5 +175,25 @@ describe('research mode in the chat route', () => {
     const call = h.runMcpTool.mock.calls.find((c) => c[0] === 'find_opportunities');
     expect(JSON.stringify(call)).not.toContain('ABC123DEF456');
     expect(await savedTrace()).toMatchObject({ live_sam_args_dropped: ['find_opportunities:uei'] });
+  });
+
+  it('lookup_sam_entity runs CACHE-ONLY on research turns: zero live SAM calls, by name and by UEI', async () => {
+    flagOn();
+    let step = 0;
+    h.create.mockImplementation(async () => (++step === 1
+      ? reply([
+          { type: 'tool_use', id: 's1', name: 'lookup_sam_entity', input: { name: 'Ridgeline Digital', state: 'VA' } },
+          { type: 'tool_use', id: 's2', name: 'lookup_sam_entity', input: { uei: 'ABC123DEF456' } },
+        ], 'tool_use')
+      : reply([{ type: 'text', text: 'No federal registration found in Mindy\'s SAM records.' }], 'end_turn')));
+    await ask(Q);
+    expect(h.liveSam).toEqual([]);
+    expect(h.runMcpTool.mock.calls.some((c) => c[0] === 'lookup_sam_entity')).toBe(false);
+    const second = h.create.mock.calls[1][0] as { messages: Array<{ role: string; content: Array<Record<string, unknown>> }> };
+    const results = second.messages[second.messages.length - 1].content.map((b) => String(b.content));
+    expect(results).toHaveLength(2);
+    for (const r of results) expect(r).toContain('local_registry');
+    const trace = await savedTrace();
+    expect((trace?.calls as Array<{ tool: string }>).filter((c) => c.tool === 'lookup_sam_entity')).toHaveLength(2);
   });
 });

@@ -151,7 +151,6 @@ describe('tool parity with the MCP catalog', () => {
         : !isChatOfferable(policy) ? `chat policy: ${policy.decision}` : 'UNEXPLAINED';
     }
     expect(Object.entries(exceptions).filter(([, why]) => why === 'UNEXPLAINED')).toEqual([]);
-    expect(exceptions.lookup_sam_entity).toMatch(/withheld: live SAM/);
     expect(byName.has('search_web')).toBe(true);
     // The other direction: nothing outside the public catalog except Ask Mindy's private tools.
     const pub = new Set(listPublicMcpTools().map((d) => fn(d).name));
@@ -160,8 +159,9 @@ describe('tool parity with the MCP catalog', () => {
 });
 
 describe('zero live SAM in research mode', () => {
-  it('every tool Data Core traced to live SAM is withheld', () => {
-    for (const t of ['lookup_sam_entity', 'get_contractor_award_history', 'get_solicitation_incumbent', 'get_solicitation_documents', 'match_company_to_pathways']) expect(RESEARCH_WITHHELD_TOOLS.has(t), t).toBe(true);
+  it('every tool Data Core traced to live SAM is withheld until it has a cache-only mode (lookup_sam_entity runs cache-only)', () => {
+    expect(RESEARCH_WITHHELD_TOOLS.has('lookup_sam_entity')).toBe(false);
+    for (const t of ['get_contractor_award_history', 'get_solicitation_incumbent', 'get_solicitation_documents', 'match_company_to_pathways']) expect(RESEARCH_WITHHELD_TOOLS.has(t), t).toBe(true);
   });
   it('find_opportunities runs without the uei that would start its live company anchor', () => {
     expect(stripLiveSamArgs('find_opportunities', { query: 'x', uei: 'ABC123DEF456' })).toEqual({ input: { query: 'x' }, dropped: ['uei'] });

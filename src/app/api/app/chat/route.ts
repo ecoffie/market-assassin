@@ -125,6 +125,8 @@ import {
   RESEARCH_TURN_MS, RESEARCH_DEADLINE_MS, RESEARCH_NO_ANSWER, researchToolDefs, stripLiveSamArgs, type ResearchCall,
 } from '@/lib/ask-mindy/research-mode';
 import { toolLabel } from '@/lib/chat/context-sources';
+import { listPublicMcpTools } from '@/lib/mcp/public-catalog';
+import { lookupSamEntity as lookupSamEntityCached, type SamEntityInput } from '@/mcp/tools/sam-entity';
 import { gateEligible, extractWorkPhrase, profileForGate } from '@/lib/ask-mindy/gate-intent';
 import { fitRankingNote, rankFindResult } from '@/lib/ask-mindy/compose';
 import { provenanceRecords } from '@/lib/chat/doc-provenance';
@@ -1186,8 +1188,13 @@ export async function POST(request: NextRequest) {
             documentText: () => turnDocumentTexts.join('\n'),
             attribution: { callerKey: callerKeyFor(auth.email), sessionId: turnSessionId },
           });
-          const privateDefs = [...TIER0_TOOL_DEFS, SEARCH_WEB_TOOL_DEF, ...(myDocs ? [MY_DOCUMENTS_TOOL_DEF] : []), ...(genDoc ? [CREATE_DOCUMENT_TOOL_DEF] : [])];
-          const privateNames = new Set([...TIER0_TOOL_NAMES, SEARCH_WEB, ...(myDocs ? [FIND_MY_DOCUMENTS] : []), ...(genDoc ? [CREATE_DOCUMENT] : [])]);
+          // Research mode: lookup_sam_entity keeps its MCP definition (taken from the public catalog, so it is identical)
+          // but runs CACHE-ONLY (Eric: zero live SAM calls). As a private tool it shadows the registry version.
+          const rmSamDef = researchTurn
+            ? (listPublicMcpTools().find((d) => (d as { function?: { name?: string } }).function?.name === 'lookup_sam_entity') as typeof SEARCH_WEB_TOOL_DEF | undefined) ?? null
+            : null;
+          const privateDefs = [...TIER0_TOOL_DEFS, SEARCH_WEB_TOOL_DEF, ...(rmSamDef ? [rmSamDef] : []), ...(myDocs ? [MY_DOCUMENTS_TOOL_DEF] : []), ...(genDoc ? [CREATE_DOCUMENT_TOOL_DEF] : [])];
+          const privateNames = new Set([...TIER0_TOOL_NAMES, SEARCH_WEB, ...(rmSamDef ? ['lookup_sam_entity'] : []), ...(myDocs ? [FIND_MY_DOCUMENTS] : []), ...(genDoc ? [CREATE_DOCUMENT] : [])]);
           const executor = createChatToolExecutor({
             userEmail: auth.email!,
             ...(actingScope.kind === 'client' ? { vaultEmail: actingScope.vaultEmail } : {}),
@@ -1198,6 +1205,7 @@ export async function POST(request: NextRequest) {
               names: privateNames,
               execute: (n, a) => {
                 if (n === SEARCH_WEB) return searchWeb.execute(a);
+                if (rmSamDef && n === 'lookup_sam_entity') return lookupSamEntityCached(a as SamEntityInput, { cacheOnly: true }) as unknown as Promise<Record<string, unknown>>;
                 if (myDocs && n === FIND_MY_DOCUMENTS) {
                   return myDocs.execute(a).then((r) => {
                     try { turnDocumentTexts.push(JSON.stringify(r)); } catch { /* unserializable result: nothing to guard */ }

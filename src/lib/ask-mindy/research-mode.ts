@@ -42,7 +42,7 @@ export const RESULT_CEILING_CHARS = 120_000;
  * (RM-2 starts with lookup_sam_entity).
  */
 export const RESEARCH_WITHHELD_TOOLS: ReadonlySet<string> = new Set([
-  'lookup_sam_entity', // live legal + DBA search first
+  // lookup_sam_entity is NOT here: research turns run it cache-only (route: rmSamDef, #2454 cacheOnly).
   'get_contractor_award_history', // resolve-uei calls live getEntityByUEI
   'get_solicitation_incumbent', // live SAM opportunities search
   'get_solicitation_documents', // live notice descriptions and attachments
