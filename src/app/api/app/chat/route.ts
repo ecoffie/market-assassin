@@ -124,7 +124,7 @@ import { intelligenceGateEnabledFor, runIntelligenceGate, type GateResult } from
 import Anthropic from '@anthropic-ai/sdk';
 import {
   researchModeEnabledFor, researchModel, researchSystemPrompt, toAnthropicTools, runResearchLoop, groundAnswer, progressLine,
-  RESEARCH_TURN_MS, RESEARCH_DEADLINE_MS, RESEARCH_NO_ANSWER, researchToolDefs, type ResearchCall,
+  RESEARCH_TURN_MS, RESEARCH_DEADLINE_MS, RESEARCH_NO_ANSWER, researchToolDefs, wantsReport, type ResearchCall,
 } from '@/lib/ask-mindy/research-mode';
 import { toolLabel } from '@/lib/chat/context-sources';
 import { researchCapDecision } from '@/lib/ask-mindy/research-caps';
@@ -1334,6 +1334,8 @@ export async function POST(request: NextRequest) {
                 conversation,
                 tools: rmTools,
                 effort: process.env.ASK_MINDY_RESEARCH_EFFORT || 'high',
+                // Asked for a report: if research stops before it was written, the report is written from what was gathered.
+                reportTool: genDoc && rmTools.some((t) => t.name === CREATE_DOCUMENT) && wantsReport(splitViewPreamble(message).rest || message) ? CREATE_DOCUMENT : null,
                 onCalls: (cs) => { for (const c of cs) send({ type: 'progress', message: progressLine(toolLabel(c.name)) }); },
                 onFinalStep: () => send({ type: 'progress', message: 'Writing the answer.', phase: 'writing' }),
                 // Independent reads run in parallel; writes (documents, reports) run one at a time after them.
