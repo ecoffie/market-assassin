@@ -54,6 +54,10 @@ export interface DiligenceTxn {
   pricing: string | null;
   description: string | null;
   solicitation_identifier: string | null;
+  /** FPDS "contracting officer's determination of business size" on this action. */
+  co_business_size: string | null;
+  /** FPDS 8(a) program participant flag on this action ("t"/"f" in the download). */
+  c8a_participant: string | null;
 }
 
 /** Columns this module refuses to read. Exported so a test can assert they never appear. */
@@ -134,5 +138,7 @@ export function parseTxnRow(r: Record<string, string>): DiligenceTxn {
     pricing: str(r.type_of_contract_pricing),
     description: str(r.prime_award_base_transaction_description) ?? str(r.transaction_description),
     solicitation_identifier: str(r.solicitation_identifier),
+    co_business_size: str(r.contracting_officers_determination_of_business_size),
+    c8a_participant: str(r.c8a_program_participant),
   };
 }
