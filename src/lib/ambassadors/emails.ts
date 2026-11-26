@@ -34,7 +34,7 @@ export function renderApplicationReceived(name: string): { subject: string; html
 /** The exact disclosure wording from Section 6 of the program document. */
 export const DISCLOSURE_WORDING = 'Mindy gives me free access to their platform as part of their ambassador program.';
 
-export function renderApproved(name: string, referralLink: string): { subject: string; html: string; text: string } {
+export function renderApproved(name: string): { subject: string; html: string; text: string } {
   const subject = "You're a Mindy Ambassador";
   const btn = (href: string, label: string) => `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:6px 0 18px;"><tr><td style="border-radius:9px;background:${NAVY};"><a href="${href}" style="display:inline-block;padding:12px 24px;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;">${label}</a></td></tr></table>`;
   const html = shell(subject, `
@@ -44,9 +44,8 @@ ${btn('https://getmindy.ai/opportunity-map', 'Open Mindy')}
 <p style="margin:0 0 8px;"><strong>Every month:</strong> four public posts, one a week, each showing a real action you took in Mindy and what came of it. Tag Mindy on every post.</p>
 <p style="margin:0 0 8px;"><strong>Disclose on every post</strong>, near the top, in plain words:</p>
 <p style="margin:0 0 14px;padding:12px 14px;background:#f4f6fa;border-radius:8px;font-style:italic;">"${DISCLOSURE_WORDING}"</p>
-<p style="margin:0 0 14px;">If you link to Mindy in a post, you can use your own link: <a href="${esc(referralLink)}" style="color:${NAVY};">${esc(referralLink)}</a></p>
 <p style="margin:0;">The full program, including the claim limits and terms, is at <a href="https://getmindy.ai/ambassadors" style="color:${NAVY};">getmindy.ai/ambassadors</a>.</p>`);
-  const text = `Welcome aboard, ${first(name)}.\n\nYou are now a Mindy Ambassador. Your twelve months start today. Sign in with this email address: https://getmindy.ai/opportunity-map\n\nEvery month: four public posts, one a week, each showing a real action you took in Mindy and what came of it. Tag Mindy on every post.\n\nDisclose on every post, near the top, in plain words:\n"${DISCLOSURE_WORDING}"\n\nIf you link to Mindy in a post, you can use your own link: ${referralLink}\n\nThe full program, including the claim limits and terms: https://getmindy.ai/ambassadors\n\nQuestions? ${SUPPORT_EMAIL}\nGovCon Giants AI · getmindy.ai`;
+  const text = `Welcome aboard, ${first(name)}.\n\nYou are now a Mindy Ambassador. Your twelve months start today. Sign in with this email address: https://getmindy.ai/opportunity-map\n\nEvery month: four public posts, one a week, each showing a real action you took in Mindy and what came of it. Tag Mindy on every post.\n\nDisclose on every post, near the top, in plain words:\n"${DISCLOSURE_WORDING}"\n\nThe full program, including the claim limits and terms: https://getmindy.ai/ambassadors\n\nQuestions? ${SUPPORT_EMAIL}\nGovCon Giants AI · getmindy.ai`;
   return { subject, html, text };
 }
 
@@ -60,4 +59,20 @@ async function send(to: string, r: { subject: string; html: string; text: string
 }
 
 export const sendApplicationReceivedEmail = (to: string, name: string) => send(to, renderApplicationReceived(name), 'ambassador_application_received');
-export const sendApprovedEmail = (to: string, name: string, referralLink: string) => send(to, renderApproved(name, referralLink), 'ambassador_approved');
+export const sendApprovedEmail = (to: string, name: string) => send(to, renderApproved(name), 'ambassador_approved');
+
+/** Day-335 notice: the twelve months end on `endsAt`. The month-13 rate is not set yet (owner,
+ *  2026-11-16: "deal with later"), so this email names no price; it asks them to reply. */
+export function renderTermEnding(name: string, endsAt: Date): { subject: string; html: string; text: string } {
+  const date = endsAt.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+  const subject = `Your Mindy Ambassador term ends on ${date}`;
+  const html = shell(subject, `
+<h1 style="margin:0 0 12px;font-size:22px;color:#12161d;">Thank you, ${esc(first(name))}.</h1>
+<p style="margin:0 0 14px;">Your twelve months as a Mindy Ambassador end on <strong>${esc(date)}</strong>.</p>
+<p style="margin:0 0 14px;">After that your account moves to Mindy Free, and calls are billed from your credit balance like anyone's.</p>
+<p style="margin:0;">If you want to keep going on Pro at your ambassador discount, reply to this email before ${esc(date)} and we will set it up.</p>`);
+  const text = `Thank you, ${first(name)}.\n\nYour twelve months as a Mindy Ambassador end on ${date}.\n\nAfter that your account moves to Mindy Free, and calls are billed from your credit balance like anyone's.\n\nIf you want to keep going on Pro at your ambassador discount, reply to this email before ${date} and we will set it up.\n\nQuestions? ${SUPPORT_EMAIL}\nGovCon Giants AI · getmindy.ai`;
+  return { subject, html, text };
+}
+
+export const sendTermEndingEmail = (to: string, name: string, endsAt: Date) => send(to, renderTermEnding(name, endsAt), 'ambassador_term_ending');

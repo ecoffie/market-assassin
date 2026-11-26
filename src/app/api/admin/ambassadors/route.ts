@@ -6,20 +6,21 @@
  *   POST /api/admin/ambassadors?password=…   { action: 'approve'|'reject'|'remove', email, note? }
  *
  * Approve: grants free Pro (the same member-grants path as a staff grant), makes metered MCP calls
- * cost 0 credits (src/lib/mcp/metered.ts), creates their referral code and emails them the welcome.
- * Remove: revokes the Pro grant and the zero-cost calls.
+ * cost 0 credits up to the monthly cap (src/lib/mcp/metered.ts) and emails them the welcome. It
+ * creates NO referral link: the referral program is separate (owner, 2026-11-16).
+ * Remove: revokes the Pro grant and the zero-cost calls. The term ends on its own at twelve months
+ * (/api/cron/ambassador-terms), which marks the row `ended`.
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdminPassword } from '@/lib/admin-auth';
-import { ambassadorReferralLink, getAmbassador, listAmbassadors, setDecision, type AmbassadorRow, type AmbassadorStatus } from '@/lib/ambassadors/store';
+import { AMBASSADOR_MONTHLY_CREDIT_CAP, TERM_DAYS, termStatus, getAmbassador, listAmbassadors, setDecision, type AmbassadorRow, type AmbassadorStatus } from '@/lib/ambassadors/store';
 import { applyMemberGrant } from '@/lib/admin/member-grants';
-import { getOrCreateReferralCode } from '@/lib/mcp/referrals';
 import { sendApprovedEmail } from '@/lib/ambassadors/emails';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
-const STATUSES: AmbassadorStatus[] = ['pending', 'approved', 'rejected', 'removed'];
+const STATUSES: AmbassadorStatus[] = ['pending', 'approved', 'rejected', 'removed', 'ended'];
 
 export async function GET(req: NextRequest) {
   const sp = req.nextUrl.searchParams;
@@ -67,18 +68,24 @@ export async function POST(req: NextRequest) {
     if (!grant.success) {
       return NextResponse.json({ success: false, message: `Pro grant failed, nothing changed: ${grant.error || grant.message}` }, { status: 502 });
     }
-    const code = await getOrCreateReferralCode(email);
-    const row = await setDecision(email, 'approved', actor, note, code);
-    const emailed = await sendApprovedEmail(email, app.name, ambassadorReferralLink(code));
+    const row = await setDecision(email, 'approved', actor, note);
+    const emailed = await sendApprovedEmail(email, app.name);
     return NextResponse.json({
       success: true,
       message: `Approved ${email}${emailed ? '' : ' (welcome email NOT sent — send it by hand)'}`,
-      data: { ...row, referralLink: ambassadorReferralLink(code), welcomeEmailSent: emailed },
+      data: { ...row, welcomeEmailSent: emailed },
       errors: grant.warning ? [grant.warning] : undefined,
     });
   } catch (err) {
     return NextResponse.json({ success: false, message: (err as Error).message }, { status: 500 });
   }
+}
+
+function termLine(decidedAt: string | null): string {
+  const t = termStatus(decidedAt);
+  if (!t) return '';
+  const ends = t.endsAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  return `<p class="muted">Term: day ${Math.max(0, t.day)} of ${TERM_DAYS} · ends ${ends}</p>`;
 }
 
 const esc = (s: string | null | undefined) => (s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -94,7 +101,7 @@ function renderReview(rows: AmbassadorRow[], status?: AmbassadorStatus): string 
   ${para('Last event attended', r.last_event)}${para('Pursuit in motion', r.pursuit)}${para('Wants to find out', r.want_to_find)}
   ${r.attested_at ? '<p class="muted">Attested: meets all six requirements and will disclose on every post.</p>' : ''}
   ${para('Who they reach', r.audience)}${para('Why', r.why)}${para('How they would share Mindy', r.promote_plan)}
-  ${r.referral_code ? `<p class="muted">Referral link: getmindy.ai/pricing?ref=${esc(r.referral_code)}</p>` : ''}
+  ${r.status === 'approved' ? termLine(r.decided_at) : ''}
   ${r.decision_note ? `<p class="muted">Note: ${esc(r.decision_note)}</p>` : ''}
   <div class="acts" data-email="${esc(r.email)}">
     ${r.status !== 'approved' ? '<button data-a="approve" class="pri">Approve</button>' : ''}
@@ -107,9 +114,9 @@ function renderReview(rows: AmbassadorRow[], status?: AmbassadorStatus): string 
 h1{font:400 32px Georgia,serif;margin:0}.tabs{display:flex;gap:6px;flex-wrap:wrap}.tab{padding:6px 12px;border-radius:999px;border:1px solid #e8e6dc;color:#1f1e1d;text-decoration:none;background:#fff}.tab.on{background:#1b3a6b;color:#fff;border-color:#1b3a6b}
 .card{background:#fff;border:1px solid #e8e6dc;border-radius:12px;padding:18px;display:grid;gap:8px}.card header{display:flex;justify-content:space-between;gap:12px}.card p{margin:0}
 .muted{color:#73716b;font-size:13px}.links{display:flex;gap:12px;font-size:14px}.links a{color:#1b3a6b}.st{font-size:12px;padding:2px 8px;border-radius:999px;background:#f0eee6;margin-left:6px}
-.st-approved{background:#e6f4ea;color:#2f7d4f}.st-rejected,.st-removed{background:#fdecea;color:#b42318}.acts{display:flex;gap:8px;align-items:center;margin-top:4px}
+.st-approved{background:#e6f4ea;color:#2f7d4f}.st-rejected,.st-removed,.st-ended{background:#fdecea;color:#b42318}.acts{display:flex;gap:8px;align-items:center;margin-top:4px}
 button{font:inherit;padding:8px 16px;border-radius:8px;border:1px solid #d6d3c8;background:#fff;cursor:pointer}button.pri{background:#1b3a6b;color:#fff;border-color:#1b3a6b}.msg{font-size:13px;color:#73716b}</style></head>
-<body><div class="wrap"><h1>Mindy Ambassadors</h1><p class="muted">${rows.length} application${rows.length === 1 ? '' : 's'}${status ? ` · ${status}` : ''}. Approving grants free Pro (MCP calls cost 0 credits), creates a referral link and emails the welcome. Check the requirements against their post link and SAM record before approving.</p>
+<body><div class="wrap"><h1>Mindy Ambassadors</h1><p class="muted">${rows.length} application${rows.length === 1 ? '' : 's'}${status ? ` · ${status}` : ''}. Approving grants free Pro for twelve months (MCP calls cost 0 credits up to ${AMBASSADOR_MONTHLY_CREDIT_CAP.toLocaleString('en-US')} a month) and emails the welcome. Check the requirements against their post link and SAM record before approving.</p>
 <nav class="tabs">${tab()}${STATUSES.map(tab).join('')}</nav>
 ${rows.length ? rows.map(card).join('') : '<p class="muted">No applications here yet.</p>'}
 </div><script>
