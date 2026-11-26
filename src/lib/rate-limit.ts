@@ -1,11 +1,44 @@
 import { kv } from '@vercel/kv';
 import { NextResponse } from 'next/server';
+import { isKvQuotaError, signalKvFailure } from '@/lib/kv-ops-signal';
 
 export interface RateLimitResult {
   allowed: boolean;
   remaining: number;
   limit: number;
   resetAt: number; // Unix timestamp in seconds
+}
+
+// ============================================
+// Per-instance fallback limiter (KV failure only)
+// ============================================
+// When KV errors (outage / Upstash quota), rate limiting used to disappear
+// entirely (`allowed: true`). Now each instance keeps its own fixed window with
+// the SAME limit/window per key. Weaker than global limiting (N instances ⇒ up to
+// N× the limit) but never "unlimited". Bounded: oldest key evicted past the cap.
+const LOCAL_WINDOW_MAX_KEYS = 5000;
+const localWindows = new Map<string, { count: number; resetAtMs: number }>();
+
+function checkLocalRateLimit(kvKey: string, limit: number, windowSeconds: number): RateLimitResult {
+  const now = Date.now();
+  let entry = localWindows.get(kvKey);
+  if (!entry || now >= entry.resetAtMs) {
+    entry = { count: 0, resetAtMs: now + windowSeconds * 1000 };
+  }
+  entry.count += 1;
+  // refresh LRU position
+  localWindows.delete(kvKey);
+  localWindows.set(kvKey, entry);
+  if (localWindows.size > LOCAL_WINDOW_MAX_KEYS) {
+    const oldest = localWindows.keys().next().value;
+    if (oldest !== undefined) localWindows.delete(oldest);
+  }
+  return {
+    allowed: entry.count <= limit,
+    remaining: Math.max(0, limit - entry.count),
+    limit,
+    resetAt: Math.floor(entry.resetAtMs / 1000),
+  };
 }
 
 /**
@@ -36,13 +69,12 @@ export async function checkRateLimit(
       resetAt,
     };
   } catch (error) {
-    console.warn(`[RateLimit] KV unavailable for ${kvKey}; allowing request without rate limit`, error);
-    return {
-      allowed: true,
-      remaining: limit,
-      limit,
-      resetAt: Math.floor(Date.now() / 1000) + windowSeconds,
-    };
+    console.warn(`[RateLimit] KV unavailable for ${kvKey}; using per-instance fallback limiter`, error);
+    signalKvFailure(
+      isKvQuotaError(error) ? 'quota_exceeded' : 'kv_error',
+      `rate-limit KV call failed: ${error instanceof Error ? error.message : String(error)}`,
+    );
+    return checkLocalRateLimit(kvKey, limit, windowSeconds);
   }
 }
 
