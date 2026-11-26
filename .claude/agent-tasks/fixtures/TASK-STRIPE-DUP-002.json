@@ -1,0 +1,38 @@
+{
+  "id": "TASK-STRIPE-DUP-002",
+  "title": "Fix Stripe customer dedupe and the missing user_profiles write",
+  "priority": "high",
+  "state": "proposed",
+  "authorizedScope": "Reuse an existing Stripe customer for a known email instead of minting a new one, and make the triple-write actually write user_profiles. The failing test from TASK-STRIPE-DUP-001 must go green. No Stripe API writes against live customers, no refunds, no cancellations, no backfill of existing rows.",
+  "allowedPaths": [
+    "tests/**",
+    "src/lib/supabase/user-profiles.ts",
+    "src/lib/products.ts",
+    "src/app/api/stripe-webhook/**",
+    "src/app/checkout/**"
+  ],
+  "forbiddenPaths": [
+    ".env*",
+    "**/credentials*",
+    "supabase/migrations/**",
+    "src/app/api/admin/**"
+  ],
+  "dependencies": ["TASK-STRIPE-DUP-001"],
+  "assignedRole": null,
+  "branch": null,
+  "worktree": null,
+  "baseSha": "ee8b2a929592b636a9c88253085057f5ebee64ed",
+  "lease": null,
+  "verificationProfile": ["ma-skills", "oracles"],
+  "allowSameAgentVerification": false,
+  "checkpoints": [],
+  "auditLog": [],
+  "prRef": null,
+  "mergeSha": null,
+  "deploymentRef": null,
+  "deploySha": null,
+  "allowedMutations": ["read_only", "repo_files", "git_commit"],
+  "approvalRequired": "human_review",
+  "createdAt": "2026-08-31T13:00:00.000Z",
+  "updatedAt": "2026-08-31T13:00:00.000Z"
+}
