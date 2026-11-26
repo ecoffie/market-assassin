@@ -1,12 +1,13 @@
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 import PublicShell from '@/components/public-site/PublicShell';
+import { COURSE_LIVE } from '@/lib/course/course-live';
 
 /**
  * The free course is not public yet (owner decision 2026-11-18). Every /course page shows a
- * "Coming soon" placeholder instead of its lessons. Flip COURSE_LIVE to true to launch it.
+ * "Coming soon" placeholder instead of its lessons. The switch is COURSE_LIVE in
+ * src/lib/course/course-live.ts, shared with every page that links here.
  */
-const COURSE_LIVE = false;
 
 export const metadata: Metadata = COURSE_LIVE ? {} : { robots: { index: false, follow: false } };
 
