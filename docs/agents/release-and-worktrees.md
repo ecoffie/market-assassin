@@ -61,39 +61,31 @@ conflicted pop does not drop it.
 
 ## ⚠️ `vercel --prod` from a worktree — link `.vercel` in THAT worktree first
 
-> **[Release control 2026-11-17]** `vercel --prod` is a covered action under root CLAUDE.md rule 15. This section is the release coordinator's technical reference for an authorized deploy. Builders never run it; they open a draft PR and stop.
+> **[Release control 2026-11-21]** Production deploys only from `main` through Vercel Git. Agents must not run `vercel --prod`, promote, rollback, redeploy, or a production deploy hook. Builders never run it; they open a PR and stop. A preview is `npm run deploy:preview` (`vercel deploy`, no `--prod`).
 
-`vercel --prod` uploads the directory that owns the nearest `.vercel/project.json`,
+The old CLI upload used the directory that owns the nearest `.vercel/project.json`,
 not "the branch your shell is on." A fresh worktree under `.claude/worktrees/<slug>`
 does **not** inherit the main checkout's `.vercel/`. Without a local link, the CLI
-walks up to the parent checkout, builds **that** tree (often stale `main`), aliases
-production, and reports READY while the feature branch never shipped. Measured
-2026-09-14 on the Ralph confirm-path ship (PR #1514): two green prod deploys served
-the old Confirm UI until `.vercel/` was copied into the worktree and redeployed.
+walked up to the parent checkout and could alias production to the wrong tree.
+Measured 2026-09-14 on PR #1514, and again 2026-11-20 when an unmerged branch
+overwrote getmindy.ai. That path is closed: do not add `--prod` to "fix" a preview.
 
-**Worktree bootstrap (after `git worktree add`):**
+**Worktree bootstrap (after `git worktree add`), for env and previews only:**
 
 ```bash
 npm run env:link-worktree -- .claude/worktrees/<slug>
-cp -R .vercel .claude/worktrees/<slug>/.vercel   # from the main checkout
-# or, from inside the worktree: vercel link --yes --project market-assassin
 ```
 
-**Before every worktree deploy:** `test -f .vercel/project.json` in the worktree
-cwd. A green READY is not proof — grep the live URL for a string that exists only
-on the feature branch. Full rule: `.cursor/rules/ship-after-fix.mdc`.
+A green preview READY is not production. Production evidence is the deployment
+Vercel built from the merge to `main`.
 
 ---
 
 ## Pre-Deploy QA
 
-**ALWAYS run before a change is released** (builders: before marking a PR ready; **[Release control 2026-11-17]** the deploy itself is a covered action under root CLAUDE.md rule 15, so `npm run deploy` is coordinator-only):
+**ALWAYS run before a change is released** (builders: before marking a PR ready). Merging to `main` is what deploys production. `npm run deploy` is a preview and refuses `--prod`.
 
 ```bash
-# Safe deploy (runs tests first, blocks on failure)
-npm run deploy
-
-# Or run tests manually
 npm run test:pre-deploy
 ```
 

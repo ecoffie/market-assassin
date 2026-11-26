@@ -392,7 +392,7 @@
    "text": "8. **Always run QA tests before deploying.** Use `npm run deploy` (runs tests first) or `npm run test:pre-deploy`.",
    "location": "docs/agents/project-rules.md",
    "status": "reworded",
-   "now": "8. **Always run QA tests before a change is released.** Use `npm run test:pre-deploy`. **[Release control 2026-11-17]** `npm run deploy` runs `vercel --prod`, a direct production upload of the local tree that bypasses GitHub review. It is a covered action under root CLAUDE.md rule 15: builders never run it."
+   "now": "8. **Always run QA tests before a change is released.** Use `npm run test:pre-deploy`. **[Release control 2026-11-21]** `npm run deploy` is a preview (`vercel deploy`). It refuses `--prod`. Production deploys only when the PR merges to `main`. Builders never run a production upload."
   },
   {
    "kind": "numbered-rule",
@@ -434,7 +434,8 @@
    "kind": "numbered-rule",
    "text": "15. **Release control (Eric, updated 2026-11-17).** A session MAY merge a PR to `main` when Eric explicitly says so in that session for that specific PR (e.g. \"merge #2131\") and its CI `verify` check is green. Independent review (Agent 4) and coordinator sequencing (Agent 5) are STILL required — no exceptions, even if Eric asks in chat — for changes to payments/Stripe, auth or access control, production env vars or feature flags, and database migrations (`npm run migrate -- --go`). A session must NEVER run `vercel --prod`, `vercel promote`, `vercel rollback` or `vercel redeploy` against production without Eric's explicit OK. **Why:** on 2026-11-17 an unattributed production Redeploy rolled back 19 merges, including two access-control fixes.",
    "location": "CLAUDE.md",
-   "status": "moved"
+   "status": "reworded",
+   "now": "15. **Release control (Eric, updated 2026-11-21).**"
   },
   {
    "kind": "warning",

@@ -25,7 +25,8 @@ npx tsx scripts/proposal-eval/score.ts               # → out/report.md
 #    → re-run steps 1-2. Repeat until: avg ≥ 90 AND fabrications = 0.
 
 # 4. ship — the prompts are already in the libs the app calls, so:
-#    git commit && git push && vercel --prod   (the release IS the deploy)
+#    git commit && git push, then open a PR. Production is the merge to main.
+#    A preview is `npm run deploy:preview`. `vercel --prod` is forbidden.
 ```
 
 ## Scoring
