@@ -1,6 +1,7 @@
 # Incident: 11,772 contractor pages published a zero they could not prove
 
-**Opened:** 2026-08-24 · **Status:** Option A built (PR pending) · cache warm **NOT executed**
+**Opened:** 2026-08-24 · **Technical recovery completed:** 2026-08-25
+**Status:** ✅ cause fixed and verified · ⏳ search visibility recovery **pending measurement**
 
 ---
 
@@ -370,3 +371,86 @@ more is one click away.
 
 The BigQuery side (~$0.11, ≤20 GB billed) stays approved. **The write side is not cleared
 until the storage metric is defined.**
+
+
+---
+
+# CLOSING SUMMARY (2026-08-25)
+
+## Status: technical recovery complete, traffic recovery unmeasured
+
+> **Technical recovery completed.** Exactly **9,639** eligible `/contracts` pages now serve
+> verified durable data and appear in the sitemap. Another **2,361** candidate URLs are
+> correctly excluded. **Search visibility recovery is pending measurement.**
+
+### Two corrections to earlier statements in this record
+
+**1. It is 9,639 pages, not 11,772.** 11,772 was the count of *broken* URLs in the sitemap
+at the time of discovery. The *served* population — recipients with at least one
+positive-obligation action and a live page-1 row — is **9,639**. The remaining 2,361
+candidates are correctly excluded: 54 whose every action is zero-dollar or negative, and
+2,307 with no serving row.
+
+**2. The 86% impression loss has NOT "recovered."** The cause is fixed; Google's response
+is a separate thing that happens on its own schedule and must be measured. Saying
+"recovered" would be the same category of overclaim this incident was about — asserting a
+result we have not observed. **Repair date: 2026-08-25.**
+
+## What was actually fixed
+
+| Layer | Before | After |
+|---|---|---|
+| Truth | Redis only, 90-day TTL | durable table; Redis is an accelerator |
+| Cache miss | `[]`, indistinguishable from zero | marked `unavailable`, four explicit states |
+| A page that cannot prove its data | published "0 contracts" | `noindex` + honest state |
+| Sitemap | asserted URLs regardless | per-recipient, only live page-1 rows |
+| Counts | one number, unnamed | three named measures + definitions |
+| BigQuery on a web request | possible | structurally impossible |
+
+**The result that outlives this incident:** the site can no longer confuse *"our serving
+layer failed"* with *"the government has no contract data."*
+
+## Verified in production, 2026-08-25
+
+- Title carries **zero numbers**: `Senture LLC Federal Contracts & Award History | Mindy`
+- Four labels render: Contracts with positive obligations · Funded award actions shown ·
+  Obligations shown · Awarding agencies
+- Provenance line: "Award data as of August 3, 2026"
+- All four testable cohorts return **200 / `index,follow`** with correct row counts
+- Sitemap emits **exactly 9,639**; `min_row_count = 1`, so no emitted URL is empty
+- One `data_version`, one `lifecycle` — no mixed-generation exposure
+
+## Next priorities, in order
+
+### 1. Finish and test the durable-table refresh cron ⚠️ HIGHEST
+**Durability is not freshness.** `source_as_of` is **2026-08-03** — already three weeks
+stale, and nothing currently refreshes it. A durable table that never updates is a
+different failure than a cache that empties, but it is still a failure.
+
+Must test: staging build · validation · atomic promotion · **rollback** · byte limits ·
+failure alerts · **overlapping-run prevention**.
+
+### 2. Fix the four remaining hard-locked cache-only call sites
+`all-naics` · `all-agencies` · `similar` · `canonical-of` — each still returns a bare `[]`
+on a cold miss. They are warm today, which is luck, not design. A future TTL expiry or
+`DATA_VERSION` bump reproduces this incident on a different surface. Give each the same
+explicit `hit | empty | unavailable | failed` contract.
+
+### 3. Assign ownership to `gfd:`
+24,609 keys, ~28 MB, **no TTL at all**. Inventory producer, consumers, purpose, growth rate
+and retention requirement **before** adding a TTL or deleting anything.
+
+### 4. Measure SEO recovery — separate milestone
+**Repair date: 2026-08-25.** Compare against it at **+7 / +14 / +28 days**: GSC impressions,
+indexed page count, crawl behaviour, clicks.
+
+Baseline to beat (28-day windows):
+
+| Window | Impressions | Clicks |
+|---|---:|---:|
+| May 29 – Jun 26 (peak) | 36,257 | 206 |
+| Jun 26 – Jul 24 | 20,665 | 120 |
+| **Jul 24 – Aug 21 (trough)** | **5,100** | **71** |
+
+Technical recovery and traffic recovery are **separate milestones**. This one is closed;
+that one is open.
