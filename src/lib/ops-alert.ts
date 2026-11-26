@@ -52,8 +52,23 @@ export async function sendOpsAlert(args: OpsAlertArgs): Promise<{ ok: boolean; e
   // this exact path (SLACK_BOT_TOKEN → SEO_SLACK_CHANNEL). Point ops at a dedicated
   // channel by setting SLACK_OPS_CHANNEL (e.g. #mindy-alerts) — no code change.
   const token = process.env.SLACK_BOT_TOKEN;
-  const channel = process.env.SLACK_OPS_CHANNEL || process.env.SEO_SLACK_CHANNEL || '#seo';
-  if (token) {
+  /**
+   * NEVER fall back to #seo. That default sent every ops alert — 18 callers,
+   * including watch-key-accounts and check-briefing-health, which name CUSTOMERS —
+   * into a 14-member content channel. On 2026-08-21 it posted a list of paying
+   * customers with their email addresses and purchase amounts ($6,000, $2,997,
+   * $1,497 …) where contractors and collaborators could read it.
+   *
+   * SEO_SLACK_CHANNEL is also dropped from this chain: it is the SEO report's channel,
+   * and inheriting it is how ops alerts ended up there in the first place.
+   *
+   * Ops alerts now go ONLY where they are explicitly addressed. If SLACK_OPS_CHANNEL
+   * is unset we fall through to the webhook below, and if that is unset too the alert
+   * is logged and dropped — loudly. Dropping an alert is bad; leaking customer PII to
+   * the wrong audience is worse, and it cannot be un-sent.
+   */
+  const channel = process.env.SLACK_OPS_CHANNEL;
+  if (token && channel) {
     try {
       const res = await fetch('https://slack.com/api/chat.postMessage', {
         method: 'POST',
@@ -72,7 +87,11 @@ export async function sendOpsAlert(args: OpsAlertArgs): Promise<{ ok: boolean; e
   // Fallback: a dedicated ops webhook if set, else the shared leads webhook.
   const url = process.env.SLACK_OPS_WEBHOOK_URL || process.env.SLACK_LEAD_WEBHOOK_URL;
   if (!url) {
-    console.warn('[ops-alert] no bot-token channel post and no webhook — alert dropped:', args.subject);
+    console.error(
+      '[ops-alert] DROPPED — no SLACK_OPS_CHANNEL and no ops webhook configured. '
+      + 'Set SLACK_OPS_CHANNEL (e.g. #mindy-alerts) or SLACK_OPS_WEBHOOK_URL. Subject: '
+      + args.subject,
+    );
     return { ok: false, error: 'no slack target' };
   }
   try {
