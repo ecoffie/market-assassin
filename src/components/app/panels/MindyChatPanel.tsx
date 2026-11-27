@@ -737,7 +737,7 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
                 <span className="text-[10px] font-semibold tracking-wider px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">BETA</span>
               </div>
               <p className="text-xs text-faint mt-0.5 [@media(max-height:500px)]:hidden">
-                Ask anything about federal contracting. Mindy cites her sources from your 8-year knowledge base.
+                Ask anything about federal contracting. Mindy cites her sources from live federal data.
               </p>
             </div>
           </div>
@@ -790,8 +790,8 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
               <h2 className="text-xl font-semibold text-white mb-1">Mindy Chat is a Pro feature</h2>
               <p className="text-sm text-muted max-w-lg mx-auto">
                 Ask Mindy anything about federal contracting and get a straight answer,
-                grounded in 743 podcast interviews, real proposal templates, and 8 years
-                of teaching — with her sources cited.
+                grounded in live federal data (open opportunities, award history, recompetes
+                and forecasts), with her sources cited.
               </p>
             </div>
             <div className="text-center">

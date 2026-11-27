@@ -12,6 +12,7 @@ import type Anthropic from '@anthropic-ai/sdk';
 import { MCP_CONNECTOR_INSTRUCTIONS } from '@/lib/mcp/schedule-discovery';
 import { ungroundedFiguresInText } from './figure-grounding';
 import { DISCLOSED_LEAD } from './intelligence-gate';
+import { COMPETITION_AND_START_PLAYBOOK } from './competition-playbook';
 import { listPublicMcpTools } from '@/lib/mcp/public-catalog';
 import { isDocumentCreationRequest } from '@/lib/chat/generate-document-tool';
 
@@ -114,6 +115,8 @@ export const RESEARCH_INSTRUCTIONS = [
   QUESTION_OVER_PROFILE,
   '',
   OUTREACH_AND_PLAN_RULES,
+  '',
+  COMPETITION_AND_START_PLAYBOOK,
   '',
   'OUTPUT STANDARD:',
   "1. No homework. If a check can be done with Mindy tools or the web, do it and state the result. Never tell the customer to \"check\", \"research\" or \"use USASpending\". Work the customer would have to do is a defect, not a section.",

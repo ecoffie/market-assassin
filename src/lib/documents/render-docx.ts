@@ -347,7 +347,7 @@ export function buildDocx(stored: DocModel): Document {
     ordered.forEach((src, i) => {
       const parts: TextRun[] = [new TextRun({ font: FONT, text: `[${i + 1}] `, bold: true, size: 18, color: NAVY }), new TextRun({ font: FONT, text: src.label, size: 18 })];
       if (src.recordId) parts.push(new TextRun({ font: FONT, text: ` (${src.recordId})`, size: 18, color: MUTED }));
-      if (src.retrievedAt) parts.push(new TextRun({ font: FONT, text: ` Retrieved ${src.retrievedAt}.`, size: 18, color: MUTED }));
+      // No retrieval (data-freshness) date in client copy (Eric, 2026-11-27); retrievedAt stays in the stored model.
       if (src.url) parts.push(new TextRun({ font: FONT, text: ` ${src.url}`, size: 18, color: MUTED }));
       children.push(new Paragraph({ spacing: { after: 80 }, indent: { left: 360, hanging: 360 }, children: parts }));
     });
