@@ -33,7 +33,7 @@ export const TAB_ASK_CHAT_EVENT = 'mindy:tab-ask-chat';
 /** The chat panel's existing seed key (MindyChatPanel reads it once on mount and sends it). */
 export const CHAT_SEED_KEY = 'mindy_chat_seed';
 
-export type TabAskTab = 'forecasts' | 'recompetes' | 'contractors' | 'decision_makers' | 'saved_searches' | 'pipeline' | 'contacts' | 'grants' | 'dibbs' | 'partner_finder' | 'pricing' | 'alerts' | 'dashboard';
+export type TabAskTab = 'forecasts' | 'recompetes' | 'contractors' | 'decision_makers' | 'saved_searches' | 'pipeline' | 'contacts' | 'grants' | 'dibbs' | 'partner_finder' | 'pricing' | 'alerts' | 'dashboard' | 'knowledge_base' | 'osbp_smb';
 
 export interface ParsedTabAsk {
   question: string;
