@@ -116,7 +116,11 @@ describe('research mode in the chat route', () => {
     expect(h.create).toHaveBeenCalledTimes(2);
     const first = h.create.mock.calls[0][0] as { model: string; system: string; tools: Array<{ name: string }> };
     expect(first.model).toBe('claude-opus-5-5');
-    expect(first.system).toContain('IDENTITY FIRST');
+    expect(JSON.stringify(first.system)).toContain('IDENTITY FIRST');
+    const sys = first.system as unknown as Array<{ text: string; cache_control?: unknown }>;
+    expect(sys[0].cache_control).toEqual({ type: 'ephemeral' });
+    expect(sys[0].text).not.toMatch(/Today is/);
+    expect(sys[1].text).toMatch(/Today is/);
     const names = first.tools.map((t) => t.name);
     expect(names).toEqual(expect.arrayContaining(['find_opportunities', 'search_contractors', 'search_web', 'read_web_page']));
     for (const t of ['lookup_sam_entity', 'get_contractor_award_history', 'get_solicitation_incumbent', 'get_solicitation_documents', 'get_buying_offices']) expect(names).toContain(t);

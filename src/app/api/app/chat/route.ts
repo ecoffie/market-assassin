@@ -124,7 +124,7 @@ import { intelligenceGateEnabledFor, runIntelligenceGate, type GateResult } from
 import Anthropic from '@anthropic-ai/sdk';
 import {
   researchModeEnabledFor, researchModel, researchSystemPrompt, toAnthropicTools, runResearchLoop, groundAnswer, progressLine,
-  RESEARCH_TURN_MS, RESEARCH_DEADLINE_MS, RESEARCH_NO_ANSWER, researchToolDefs, wantsReport, type ResearchCall,
+  RESEARCH_TURN_MS, RESEARCH_DEADLINE_MS, RESEARCH_NO_ANSWER, researchToolDefs, billedInputTokens, RESEARCH_SYSTEM_STATIC, researchSystemDynamic, wantsReport, type ResearchCall,
 } from '@/lib/ask-mindy/research-mode';
 import { toolLabel } from '@/lib/chat/context-sources';
 import { researchCapDecision } from '@/lib/ask-mindy/research-caps';
@@ -1327,7 +1327,9 @@ export async function POST(request: NextRequest) {
             try {
               const loop = await runResearchLoop({
                 client, model,
-                system: researchSystemPrompt({ today, profileBlock: userProfileBlock }),
+                // Fixed prompt first (cached across steps and turns), then today's date and the profile after the breakpoint.
+                system: RESEARCH_SYSTEM_STATIC,
+                systemDynamic: researchSystemDynamic({ today, profileBlock: userProfileBlock }),
                 conversation,
                 tools: rmTools,
                 effort: process.env.ASK_MINDY_RESEARCH_EFFORT || 'high',
@@ -1344,7 +1346,9 @@ export async function POST(request: NextRequest) {
                   return out;
                 },
               });
-              void recordLlmUsage({ userEmail: auth.email, tool: 'chat', job: 'research_mode', provider: 'anthropic', model, usage: { prompt_tokens: loop.usage.input, completion_tokens: loop.usage.output } });
+              // Cost: cached input priced as billed (reads 0.1x, writes 1.25x); the raw counts go to the trace.
+              void recordLlmUsage({ userEmail: auth.email, tool: 'chat', job: 'research_mode', provider: 'anthropic', model, usage: { prompt_tokens: billedInputTokens(loop.usage), completion_tokens: loop.usage.output } });
+              rmTrace.usage = { input: loop.usage.input, cache_read: loop.usage.cacheRead, cache_write: loop.usage.cacheWrite, output: loop.usage.output };
               Object.assign(rmTrace, { stop: loop.stop, steps: loop.steps, call_count: loop.calls, calls: callLog, results_cut: loop.resultsCut, sam_cache_only: true });
               if (!loop.text) { await finish(RESEARCH_NO_ANSWER, {}, rmSources); return; }
               send({ type: 'progress', message: 'Checking every figure against the sources.', phase: 'checking' });
