@@ -76,6 +76,9 @@ import {
   holderSignalWhy,
   buyerNameWhy,
   relatedCodeWhy,
+  designServiceWhy,
+  purchaseTypeFor,
+  productNote,
   companyCodeWhy,
   type ComingBackClass,
   type MatchBasis,
@@ -92,6 +95,7 @@ import {
   ACQUISITION_STAGE_GROUPS,
   type AcquisitionStageGroup,
 } from '@/lib/opportunities/acquisition-stage';
+import { respondEarlyFor, respondEarlySummary, HOST_RULES_RESPOND_EARLY, type RespondEarly, type RespondEarlySummary } from '@/lib/opportunities/respond-early';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -193,6 +197,8 @@ export interface HorizonItemBase {
   match_basis?: MatchBasis[];
   /** Company-anchored FIND only (input.uei). Separate from relevance. */
   eligibility?: EligibilityVerdict;
+  /** Open now only: early-stage notice (sources sought / RFI / presolicitation), from the structured notice_type. */
+  respond_early?: RespondEarly;
 }
 
 export type HorizonItem = HorizonItemBase & Record<string, unknown>;
@@ -323,6 +329,8 @@ export interface FindOpportunitiesResult {
       holder_signal: number | null;
     };
     coming_soon: { status: HorizonStatus; matched_count: number | null };
+    /** Early-stage Open items among those RETURNED (presentation only; never a market-wide count). */
+    respond_early: RespondEarlySummary;
     headline: string;
     claim_hygiene: string;
   };
@@ -420,11 +428,12 @@ export const HOST_RULES_REGION = [
 
 export function buildFindPresentation(
   companyAnchored = false,
-  extra: { stage?: boolean; regionUnresolved?: boolean } = {},
+  extra: { stage?: boolean; regionUnresolved?: boolean; respondEarly?: boolean } = {},
 ): FindOpportunitiesResult['presentation'] {
   return {
     host_rules: [
       ...HOST_RULES_FIND_FIRST_VALUE,
+      ...(extra.respondEarly ? HOST_RULES_RESPOND_EARLY : []),
       ...(companyAnchored ? HOST_RULES_COMPANY_ANCHORED : []),
       ...(extra.stage ? HOST_RULES_STAGE : []),
       ...(extra.regionUnresolved ? HOST_RULES_REGION : []),
@@ -1013,6 +1022,7 @@ async function queryOpenNow(
       const eligibility = eligibilityFor(p.company, 'notice', r);
       const st = String(r.pop_state || office?.state || '');
       const city = String(r.pop_city || office?.city || '');
+      const early = respondEarlyFor(r.notice_type);
       return {
         horizon: 'open_now',
         title: String(r.title || 'Untitled opportunity'),
@@ -1022,19 +1032,21 @@ async function queryOpenNow(
         relevant_date_label: 'response_deadline',
         value_label: null,
         source,
-        why_this_matched: loc === 'description' || loc === 'statement_of_work' ? BODY_ONLY_WHY(phrase, loc) : openWhy(label, phrase, r),
+        why_this_matched: (loc === 'description' || loc === 'statement_of_work' ? BODY_ONLY_WHY(phrase, loc) : openWhy(label, phrase, r)) + productNote(r.psc_code),
         identity: { kind: 'notice_id', id: String(r.notice_id || '') },
         evidence_class: cls === 'WEAK_NON_MARKET' ? undefined : cls,
         match_basis: label.basis,
         ...(loc ? { match_location: loc } : {}),
         ...(eligibility ? { eligibility } : {}),
         ...(stage ? { acquisition_stage: stageMatchFor(r, stage) } : {}),
+        ...(early ? { respond_early: early } : {}),
         notice_id: String(r.notice_id || ''),
         solicitation_number: String(r.solicitation_number || '') || null,
         response_deadline: (r.response_deadline as string) || null,
         set_aside: (r.set_aside_description as string) || (r.set_aside_code as string) || null,
         sam_url: (r.ui_link as string) || null,
         notice_type: (r.notice_type as string) || null,
+        purchase_type: purchaseTypeFor(r.psc_code),
         naics_code: (r.naics_code as string) || null,
         psc_code: (r.psc_code as string) || null,
         sub_agency: (r.sub_tier as string) || null,
@@ -1231,7 +1243,8 @@ async function queryComingBack(
           ? holderSignalWhy(phraseBack, r as { incumbent_name?: string; naics_code?: string; psc_code?: string })
           : basis[0] === 'buyer_name' ? buyerNameWhy(phraseBack)
           : basis[0] === 'related_market_code' ? relatedCodeWhy(phraseBack, r as { naics_code?: string; naics_description?: string })
-          : evidenceWhy(cls, phraseBack),
+          : basis[0] === 'design_service_code' ? designServiceWhy(phraseBack, r as { psc_code?: string })
+          : evidenceWhy(cls, phraseBack) + productNote(r.psc_code),
       identity: { kind: 'contract_id', id: String(r.contract_id || '') },
       ...(cls ? { evidence_class: cls } : {}),
       match_basis: basis,
@@ -1248,6 +1261,7 @@ async function queryComingBack(
       set_aside_type: (r.set_aside_type as string) || null,
       naics_code: (r.naics_code as string) || null,
       psc_code: (r.psc_code as string) || null,
+      purchase_type: purchaseTypeFor(r.psc_code),
       description: (r.description as string) || null,
       awarding_sub_agency: (r.awarding_sub_agency as string) || null,
       // Structured place of performance for the shared fit scorer (#2252); null = USASpending reported none.
@@ -1718,6 +1732,7 @@ export async function findOpportunities(
           holder_signal: null,
         },
         coming_soon: { status: 'unavailable', matched_count: null },
+        respond_early: { returned_count: 0, notice_ids: [] },
         headline: 'query required',
         claim_hygiene:
           'Counts are per-horizon matches under this query — not unique procurements across horizons.',
@@ -1797,6 +1812,7 @@ export async function findOpportunities(
     ? 'Related-market rows are labeled RELATED_MARKET_CANDIDATE and are not confirmed capability demand. '
     : '';
 
+  const respondEarly = respondEarlySummary(open_now.items);
   return {
     query_summary: {
       query: interpreted.searchText,
@@ -1825,6 +1841,7 @@ export async function findOpportunities(
       open_now: { status: open_now.status, matched_count: open_now.matched_count },
       coming_back: comingBackSummary(coming_back),
       coming_soon: { status: coming_soon.status, matched_count: coming_soon.matched_count },
+      respond_early: respondEarly,
       headline: headlineFor(horizons),
       claim_hygiene:
         relatedNote +
@@ -1853,6 +1870,7 @@ export async function findOpportunities(
     presentation: buildFindPresentation(!!company, {
       stage: !!interpreted.stage && interpreted.stage !== 'invalid',
       regionUnresolved: !!interpreted.region?.unresolved.length,
+      respondEarly: respondEarly.returned_count > 0,
     }),
   };
 }

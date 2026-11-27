@@ -13,6 +13,21 @@ Authoritative counts (never trust a grep — tools register via two paths: expli
 
 ---
 
+## November 2026 — `find_opportunities` respond early + evidence labels (no recall or price change)
+
+- **Respond early:** Open items whose structured SAM notice type is Sources Sought, Request for
+  Information or Presolicitation carry `respond_early` (what it means, what to do).
+  `summary.respond_early` counts them among RETURNED items only, and a host rule (added only when
+  there are any) tells the host to point them out first. Title keywords never trigger it.
+- **Design-services codes:** on Coming back, a text match found ONLY in an architect-engineering PSC
+  title (all "C" codes) is `RELATED_MARKET_CANDIDATE` with basis `design_service_code`. Live case:
+  "landscaping" + VA returned a lab-design contract (PSC C211) as DIRECT_MATCH. A query that asks
+  for design / architecture / engineering keeps it DIRECT.
+- **Purchase type:** Open and Coming back items carry `purchase_type` (`product` when the PSC starts
+  with a digit, `service` when it starts with a letter); a product row's `why_this_matched` says so.
+
+---
+
 ## November 2026 — search_govcon_jobs (public 53 → 54, internal 64 → 65)
 
 **`search_govcon_jobs`** (5 credits) — federal contracting job openings from USAJobs (default OPM

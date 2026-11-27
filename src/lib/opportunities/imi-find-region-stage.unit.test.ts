@@ -38,6 +38,7 @@ import {
   HOST_RULES_REGION,
   type FindOpportunitiesInput,
 } from './find-opportunities';
+import { HOST_RULES_RESPOND_EARLY } from './respond-early';
 import type { SamEntityResult } from '@/mcp/tools/sam-entity';
 
 type Row = Record<string, unknown>;
@@ -368,7 +369,9 @@ describe('findOpportunities — region + stage end-to-end', () => {
     expect(ty.filter((i) => /TYONEK/.test(String(i.incumbent_name)))).toHaveLength(0);
     expect(ty.some((i) => i.award_kind === 'order_under_vehicle')).toBe(false);
     expect(res.horizons.coming_back.orders_excluded).toBe(6);
-    expect(res.presentation.host_rules).toEqual([...HOST_RULES_FIND_FIRST_VALUE, ...HOST_RULES_COMPANY_ANCHORED, ...HOST_RULES_STAGE]);
+    // The frozen fixtures carry real Sources Sought / Presolicitation notices → the respond-early rule is present.
+    expect(res.summary.respond_early.returned_count).toBeGreaterThan(0);
+    expect(res.presentation.host_rules).toEqual([...HOST_RULES_FIND_FIRST_VALUE, ...HOST_RULES_RESPOND_EARLY, ...HOST_RULES_COMPANY_ANCHORED, ...HOST_RULES_STAGE]);
   });
 
   it('(1) re-asserted: Shaw MACC under VEHICLE_SOLICITATIONS in SC is NOT_ELIGIBLE, labelled a title-keyword vehicle', async () => {
@@ -390,6 +393,7 @@ describe('findOpportunities — region + stage end-to-end', () => {
     for (const k of ['open_now', 'coming_back', 'coming_soon'] as const) {
       expect(res.horizons[k].filters_unsupported.join(' ')).toMatch(/"Robins AFB".*nothing searched/);
     }
+    expect(res.summary.respond_early.returned_count).toBe(0); // failed closed: nothing returned
     expect(res.presentation.host_rules).toEqual([...HOST_RULES_FIND_FIRST_VALUE, ...HOST_RULES_REGION]);
     // Open's state predicate is the no-match sentinel, not absent.
     const open = calls.find((c) => c.table === 'sam_opportunities' && c.ops.some(([m, a]) => m === 'select' && String(a[0]).includes('notice_type')))!;
@@ -407,6 +411,8 @@ describe('findOpportunities — region + stage end-to-end', () => {
     expect(res.query_summary.region).toBeUndefined();
     expect(res.query_summary.stage).toBeUndefined();
     expect(res.horizons.open_now.stage).toBeUndefined();
-    expect(res.presentation.host_rules).toEqual([...HOST_RULES_FIND_FIRST_VALUE]);
+    // The frozen fixtures carry real Sources Sought / Presolicitation notices → the respond-early rule is present.
+    expect(res.summary.respond_early.returned_count).toBeGreaterThan(0);
+    expect(res.presentation.host_rules).toEqual([...HOST_RULES_FIND_FIRST_VALUE, ...HOST_RULES_RESPOND_EARLY]);
   });
 });

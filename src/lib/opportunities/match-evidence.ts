@@ -34,6 +34,8 @@ export type MatchBasis =
   | 'buyer_name'
   /** The row's NAICS is in the capability's related market (same industry family), not its direct codes. */
   | 'related_market_code'
+  /** The words appear only in an architect-engineering PSC title: it buys DESIGN of that subject, not the work. */
+  | 'design_service_code'
   | CompanyRecallBasis;
 
 /** Coming back classes: the two FIND evidence classes + the holder-name signal. */
@@ -78,6 +80,30 @@ function planCodeHit(row: RecompeteEvidenceRow, plan: DiscoveryPlan, cap: Capabi
 const buySide = (r: RecompeteEvidenceRow) => [r.description, r.psc_description, r.naics_description];
 
 /**
+ * PSC "C" codes (all 101 of them) are ARCHITECT-ENGINEERING services: design OF a subject.
+ * Measured 2026-11-23: FIND "landscaping" + VA returned a lab-design contract (PSC C211
+ * "ARCHITECT AND ENGINEERING- GENERAL: LANDSCAPING, INTERIOR LAYOUT, AND DESIGNING") as a
+ * DIRECT_MATCH — the only evidence was the word in that PSC title. A word that appears ONLY
+ * there means design of that subject: a related market, unless the customer asked for design.
+ */
+export function isDesignServicePsc(code: string | null | undefined): boolean {
+  return /^C[0-9A-Z]{3}$/i.test(String(code || '').trim());
+}
+const DESIGN_INTENT = /\b(design\w*|architect\w*|engineer\w*|a\/?e)\b/i;
+
+/** PSC first character: a digit = supplies/equipment (product); a letter = a service (incl. R&D, construction). */
+export function purchaseTypeFor(psc: unknown): 'product' | 'service' | null {
+  const c = String(psc || '').trim();
+  if (/^[0-9]{4}$/.test(c)) return 'product';
+  if (/^[A-Z][0-9A-Z]{3}$/i.test(c)) return 'service';
+  return null;
+}
+
+export function productNote(psc: unknown): string {
+  return purchaseTypeFor(psc) === 'product' ? ' It buys equipment or supplies (a product), not a service.' : '';
+}
+
+/**
  * Evidence class for one Coming back (recompete) row.
  *   cyber plans   → classifyRecord (buy-side blob only), then holder-name → HOLDER_SIGNAL
  *   no text query → every admitted row IS the requested structured scope (DIRECT)
@@ -117,7 +143,16 @@ export function classifyComingBackEvidence(
 
   if (plan.matcher.mode === 'none') return { cls: 'DIRECT_MATCH', basis: ['structured_scope', ...basis] };
   if (planCodeHit(row, plan, cap)) return { cls: 'DIRECT_MATCH', basis: ['buy_side_code', ...basis] };
-  if (matchesText(plan.matcher, buySide(row))) return { cls: 'DIRECT_MATCH', basis: ['buy_side_text', ...basis] };
+  if (matchesText(plan.matcher, buySide(row))) {
+    if (
+      isDesignServicePsc(row.psc_code)
+      && !DESIGN_INTENT.test(plan.matcher.normalized || '')
+      && !matchesText(plan.matcher, [row.description, row.naics_description])
+    ) {
+      return { cls: 'RELATED_MARKET_CANDIDATE', basis: ['design_service_code', ...basis] };
+    }
+    return { cls: 'DIRECT_MATCH', basis: ['buy_side_text', ...basis] };
+  }
   if (cap.related_market && codeIn(cap.related_market.naics, row.naics_code)) {
     return { cls: 'RELATED_MARKET_CANDIDATE', basis: ['related_market_code', ...basis] };
   }
@@ -140,6 +175,11 @@ export function relatedCodeWhy(phrase: string, row: { naics_code?: string | null
   const code = row.naics_code ? `NAICS ${row.naics_code}${title ? ` ${title}` : ''}` : 'its industry code';
   return `Related-market candidate for “${phrase}”: this contract is in the same industry family (${code}), `
     + `but the record does not say it includes ${phrase}. Check the scope before treating it as ${phrase} work.`;
+}
+
+export function designServiceWhy(phrase: string, row: { psc_code?: string | null }): string {
+  return `Related-market candidate for “${phrase}”: the words appear only in this contract's design-services code`
+    + `${row.psc_code ? ` (PSC ${row.psc_code})` : ''}. It buys architect-engineering design, not ${phrase} work itself.`;
 }
 
 export function buyerNameWhy(phrase: string): string {
