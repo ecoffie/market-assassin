@@ -1243,7 +1243,7 @@ describe('reference layout (Design & Output, 2026-11-25)', () => {
   it('the default theme opens with a letterhead: brand, contact lines, title, byline and the metadata table', () => {
     const html = renderHtml({ ...SAMPLE_REPORT, meta: { ...SAMPLE_REPORT.meta, attention: 'A. Reader' } });
     expect(html).toContain('<section class="cover letterhead">');
-    expect(html).toMatch(/<p class="byline">Prepared for Example Company \(fixture\) · November 17, 2026<\/p>/);
+    expect(html).toMatch(/<p class="byline">Prepared for Example Company \(fixture\)<\/p>/);
     expect(html).toContain('<dt>Attention</dt><dd>A. Reader</dd>');
   });
   it('a checklist bullets block renders as checkboxes; ordered lists and plain bullets are unchanged', () => {
@@ -1308,5 +1308,53 @@ describe('research report launch (Design & Output, 2026-11-27)', () => {
     const firstHeading = doc.indexOf('Executive summary');
     expect(firstHeading).toBeGreaterThan(0);
     expect(doc.slice(0, firstHeading)).not.toContain('w:type="page"');
+  });
+});
+
+describe('sources list carries no retrieval date (Eric, 2026-11-27)', () => {
+  const m = () => {
+    const x = clone();
+    x.sources = [
+      { id: 's1', kind: 'web', label: 'GAO-25-106719, Nov 20 2024: Federal Real Property', url: 'https://www.gao.gov/products/gao-25-106719', retrievedAt: '2026-11-27' },
+      { id: 's2', kind: 'usaspending', label: 'Award record', recordId: 'HE125425CE002', retrievedAt: '2026-11-26' },
+    ];
+    for (const sec of x.sections) for (const b of sec.blocks) if ('cites' in b && Array.isArray(b.cites)) b.cites = b.cites.filter((c) => c === 's1' || c === 's2').length ? b.cites.filter((c) => c === 's1' || c === 's2') : ['s1'];
+    x.sections[0].blocks.unshift({ type: 'paragraph', id: 'cite2', text: 'Cited award.', claim: 'fact', cites: ['s2'] });
+    return x;
+  };
+  it('HTML/PDF: title, link and record id are kept; no "Retrieved" date; a date in the title is kept', () => {
+    const html = renderHtml(m());
+    const sources = html.slice(html.indexOf('<h2>Sources</h2>'));
+    expect(sources).not.toMatch(/Retrieved/i);
+    expect(sources).not.toContain('2026-11-27');
+    expect(sources).not.toContain('2026-11-26');
+    expect(sources).toContain('GAO-25-106719, Nov 20 2024: Federal Real Property');
+    expect(sources).toContain('https://www.gao.gov/products/gao-25-106719');
+    expect(sources).toContain('(HE125425CE002)');
+  });
+  it('Word: same', async () => {
+    const doc = strFromU8(unzipSync(new Uint8Array(await renderDocx(m())))['word/document.xml']);
+    expect(doc).not.toMatch(/Retrieved/i);
+    expect(doc).not.toContain('2026-11-27');
+    expect(doc).toContain('GAO-25-106719, Nov 20 2024: Federal Real Property');
+    expect(doc).toContain('HE125425CE002');
+  });
+});
+
+describe('document cover carries no date (Eric, 2026-11-27)', () => {
+  it('HTML/PDF and Word covers show no Date row and no date in the byline', async () => {
+    const m = { ...clone(), date: '2026-11-17' };
+    const html = renderHtml(m);
+    const cover = html.slice(html.indexOf('<section class="cover'), html.indexOf('</section>', html.indexOf('<section class="cover')));
+    expect(cover).not.toContain('<dt>Date</dt>');
+    expect(cover).not.toContain('November 17, 2026');
+    const doc = strFromU8(unzipSync(new Uint8Array(await renderDocx(m)))['word/document.xml']);
+    expect(doc).not.toContain('November 17, 2026');
+    expect(doc).not.toMatch(/>Date</);
+  });
+  it('a dated cited title or an opportunity deadline in the body still renders', () => {
+    const m = clone();
+    m.sections[0].blocks.unshift({ type: 'paragraph', id: 'dl', text: 'Responses are due December 17, 2026.', claim: 'recommendation' });
+    expect(renderHtml(m)).toContain('Responses are due December 17, 2026.');
   });
 });

@@ -95,7 +95,7 @@ export function formatSizeStandard(s: SizeStandard): string {
       ? `$${s.value.toFixed(1)} million in average annual receipts`
       : `${s.value.toLocaleString('en-US')} employees`;
   if (s.source === 'ecfr') {
-    return `${amount} (13 CFR 121.201 on eCFR, current as of ${s.asOf}${s.lastAmended ? `; section last amended ${s.lastAmended}` : ''})${s.footnote ? `. ${s.footnote}` : ''}`;
+    return `${amount} (13 CFR 121.201 on eCFR${s.lastAmended ? `; section last amended ${s.lastAmended}` : ''})${s.footnote ? `. ${s.footnote}` : ''}`;
   }
   const fx = loadFixture();
   const caveat = fx.table.verification.primarySourceRetrieved ? '' : ' [secondary-sourced]';
@@ -140,17 +140,17 @@ export async function resolveSizeStandard(
   try {
     const table = await loadTable();
     const ev = evidence(
-      `eCFR 13 CFR 121.201 (current as of ${table.asOf})`,
+      'eCFR 13 CFR 121.201',
       { naics, as_of: table.asOf, last_amended: table.lastAmended },
       ECFR_SECTION_URL,
     );
     const citation =
       `U.S. Small Business Administration, Table of Small Business Size Standards, 13 CFR 121.201, ` +
-      `read from eCFR (current as of ${table.asOf}${table.lastAmended ? `; section last amended ${table.lastAmended}` : ''}). ${ECFR_SECTION_URL}`;
+      `read from eCFR${table.lastAmended ? ` (section last amended ${table.lastAmended})` : ''}. ${ECFR_SECTION_URL}`;
     const row = table.rows[naics];
     if (!row) {
       return {
-        field: unknown(`NAICS ${naics} does not appear in 13 CFR 121.201 as published on eCFR (current as of ${table.asOf})`, [ev]),
+        field: unknown(`NAICS ${naics} does not appear in 13 CFR 121.201 as published on eCFR`, [ev]),
         citation,
       };
     }

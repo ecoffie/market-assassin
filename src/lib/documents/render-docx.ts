@@ -274,7 +274,7 @@ export function buildDocx(stored: DocModel): Document {
     if (typeof model.meta?.attention === 'string' && model.meta.attention.trim()) card.push(['Attention', model.meta.attention]);
     card.push(['Prepared by', brand.name]);
     if (model.subtitle) card.push(['What this is', model.subtitle]);
-    card.push(['Date', formatDocDate(model.date)]);
+    // No document date on the cover (Eric, 2026-11-27).
     if (ordered.length) card.push(['Sources', `${ordered.length} cited source${ordered.length === 1 ? '' : 's'}`]);
     children.push(kvTable(card, NAVY, INK, true));
   } else {
@@ -283,7 +283,6 @@ export function buildDocx(stored: DocModel): Document {
     if (model.subtitle) children.push(new Paragraph({ spacing: { after: 360 }, children: [new TextRun({ font: FONT, text: model.subtitle, size: 26, color: T.colors.meta })] }));
     const meta: Array<[string, string]> = [];
     if (model.preparedFor) meta.push(['Prepared for', model.preparedFor]);
-    meta.push(['Date', formatDocDate(model.date)]);
     meta.push(['Prepared with', T.brand.name]);
     if (ordered.length) meta.push(['Sources', `${ordered.length} cited source${ordered.length === 1 ? '' : 's'}`]);
     children.push(kvTable(meta, T.colors.meta, T.colors.meta, false));
@@ -347,7 +346,7 @@ export function buildDocx(stored: DocModel): Document {
     ordered.forEach((src, i) => {
       const parts: TextRun[] = [new TextRun({ font: FONT, text: `[${i + 1}] `, bold: true, size: 18, color: NAVY }), new TextRun({ font: FONT, text: src.label, size: 18 })];
       if (src.recordId) parts.push(new TextRun({ font: FONT, text: ` (${src.recordId})`, size: 18, color: MUTED }));
-      if (src.retrievedAt) parts.push(new TextRun({ font: FONT, text: ` Retrieved ${src.retrievedAt}.`, size: 18, color: MUTED }));
+      // No retrieval (data-freshness) date in client copy (Eric, 2026-11-27); retrievedAt stays in the stored model.
       if (src.url) parts.push(new TextRun({ font: FONT, text: ` ${src.url}`, size: 18, color: MUTED }));
       children.push(new Paragraph({ spacing: { after: 80 }, indent: { left: 360, hanging: 360 }, children: parts }));
     });
