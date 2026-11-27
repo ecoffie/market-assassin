@@ -22,6 +22,9 @@ import StaleDataBanner from '@/components/app/StaleDataBanner';
 import { resolveEligibleSetAsides } from '@/lib/vault/certifications';
 import { mapLinkForRecompete } from '@/lib/maps/map-links';
 import MindyLoader from '@/components/app/MindyLoader';
+import TabAskBox from '@/components/app/TabAskBox';
+import { isTabAskEnabled, type TabAskCount } from '@/lib/app/tab-ask';
+import { recompetesAskAdapter, type RecompetesAskParams } from '@/lib/app/tab-ask-adapters/recompetes';
 
 interface RecompetesPanelProps {
   email: string | null;
@@ -410,6 +413,7 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
         contract.locationMatch === 'hq' || contract.locationMatch === 'service' || contract.locationMatch === 'neighbor'
       ).length,
     });
+    return mappedContracts.length;
   }, []);
 
   // Search the LIVE recompete_opportunities table via /api/recompete.
@@ -425,7 +429,10 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
     months: string,
     competition: string,
     defaults?: SavedProfileDefaults | null,
-  ) => {
+    // Ask Mindy only (OFF unless NEXT_PUBLIC_TAB_ASK=on): the route's existing `state` param and the
+    // asked set-aside lanes. Absent on every other call, so those requests are unchanged.
+    ask?: { state: string; eligibleFor: string[] },
+  ): Promise<TabAskCount> => {
     setSearching(true);
     setError(null);
 
@@ -436,11 +443,14 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
       const codes = uniqueStrings(naics.split(/[, ]+/)).map(extractNaicsCode).filter(Boolean);
       if (codes.length > 0) params.set('naics', codes.join(','));
       params.set('months', months === 'all' ? '60' : months);
+      if (ask?.state) params.set('state', ask.state);
       // Opt-in eligibility narrowing. Sends the user's OWN lanes; the API also
       // keeps every unknown-set-aside contract, so this never hides work whose
       // eligibility we simply don't know.
       const eligible = defaults?.eligibleSetAsides ?? profileDefaults?.eligibleSetAsides ?? [];
-      if (eligibleOnly && eligible.length) params.set('eligibleFor', eligible.join(','));
+      if (ask) {
+        if (ask.eligibleFor.length) params.set('eligibleFor', ask.eligibleFor.join(','));
+      } else if (eligibleOnly && eligible.length) params.set('eligibleFor', eligible.join(','));
       params.set('limit', '200');
       params.set('sort', 'value');
       params.set('order', 'desc');
@@ -459,15 +469,19 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
       // The TRUTHFUL count of vehicles matching these filters server-side — the page
       // below is capped at 200, so this is the only honest "how many are there".
       // `capped` means the server's scan stopped early → the number is a floor ("N+").
-      setMatchTotal(typeof data.pagination?.total === 'number' ? data.pagination.total : null);
-      setMatchCapped(Boolean(data.pagination?.capped));
+      const total = typeof data.pagination?.total === 'number' ? data.pagination.total : null;
+      const capped = Boolean(data.pagination?.capped);
+      setMatchTotal(total);
+      setMatchCapped(capped);
 
       // Prefer the VEHICLE-grouped view (1 card per IDIQ, awardees listed) over
       // raw awardee rows, so a 196-winner vehicle isn't 196 duplicate cards
       // (Eric, Jun 25). Falls back to contracts if vehicles isn't present.
       const source = (data.vehicles?.length ? data.vehicles : data.contracts) || [];
       const mappedContracts = (source as RecompeteApiContract[]).map(mapRecompeteContract);
-      applyFilters(mappedContracts, naics, months, competition, defaults ?? null);
+      const shown = applyFilters(mappedContracts, naics, months, competition, defaults ?? null);
+      // Same "is there more" rule as the panel's own "Showing N of M" line; total unknown ⇒ not claimed.
+      return { shown, more: capped || (total !== null && total > shown) };
     } catch (err) {
       console.error('Contract search error:', err);
       setError('Failed to connect to server');
@@ -478,6 +492,7 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
       setSearching(false);
       setLoading(false);
     }
+    return null;
   }, [applyFilters, email, eligibleOnly, profileDefaults]);
 
   // Fetch task orders (subcontracting targets) on demand. limit=100 + the API
@@ -623,6 +638,49 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
     searchContracts('', 'all', '', null);
   };
 
+  // ── Ask Mindy on this tab (OFF unless NEXT_PUBLIC_TAB_ASK=on) ────────────────────────────────
+  // The question becomes THIS tab's filters and reloads THIS tab's list through /api/recompete; Clear
+  // puts back exactly what was on screen before the first question (filters + rows), with no request.
+  const tabAskOn = isTabAskEnabled();
+  const [askSnapshot, setAskSnapshot] = useState<null | {
+    naics: string; usingProfile: boolean; myStatesOnly: boolean; eligibleOnly: boolean;
+    awardType: 'definitive' | 'task'; contracts: ExpiringContract[]; summary: ContractSummary | null;
+    matchTotal: number | null; matchCapped: boolean; degraded: { servedAt: string | null } | null; error: string | null;
+  }>(null);
+
+  const handleTabAsk = async (p: RecompetesAskParams): Promise<TabAskCount> => {
+    if (!askSnapshot) {
+      setAskSnapshot({
+        naics: naicsFilter, usingProfile: usingProfileDefaults, myStatesOnly, eligibleOnly, awardType,
+        contracts, summary, matchTotal, matchCapped, degraded, error,
+      });
+    }
+    // The answer is an expiring-contracts list, shown unnarrowed by the profile-only toggles (the
+    // asked set-aside travels in the request itself).
+    setAwardType('definitive');
+    setMyStatesOnly(false);
+    setEligibleOnly(false);
+    setUsingProfileDefaults(false);
+    setNaicsFilter(p.naics);
+    return searchContracts(p.naics, monthsFilter, competitionFilter, null, { state: p.state, eligibleFor: p.eligibleFor });
+  };
+
+  const clearTabAsk = () => {
+    if (!askSnapshot) return;
+    setNaicsFilter(askSnapshot.naics);
+    setUsingProfileDefaults(askSnapshot.usingProfile);
+    setMyStatesOnly(askSnapshot.myStatesOnly);
+    setEligibleOnly(askSnapshot.eligibleOnly);
+    setAwardType(askSnapshot.awardType);
+    setContracts(askSnapshot.contracts);
+    setSummary(askSnapshot.summary);
+    setMatchTotal(askSnapshot.matchTotal);
+    setMatchCapped(askSnapshot.matchCapped);
+    setDegraded(askSnapshot.degraded);
+    setError(askSnapshot.error);
+    setAskSnapshot(null);
+  };
+
   const getCompetitionBadge = (level: string) => {
     switch (level) {
       case 'sole_source':
@@ -728,6 +786,10 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
           </button>
         </div>
       </div>
+
+      {tabAskOn && (
+        <TabAskBox adapter={recompetesAskAdapter} onAsk={handleTabAsk} onClear={clearTabAsk} />
+      )}
 
       {/* Summary Cards — reflect the ACTIVE view (Eric: was stuck on the 804
           expiring numbers when switched to Subcontracting). */}

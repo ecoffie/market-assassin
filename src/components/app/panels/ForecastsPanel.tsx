@@ -10,6 +10,9 @@ import { SaveToPipelineButton } from '@/components/briefings/SaveToPipelineButto
 import { formatMindyCurrency } from '@/lib/mindy/formatters';
 import { mapLinkForForecast } from '@/lib/maps/map-links';
 import MindyLoader from '@/components/app/MindyLoader';
+import TabAskBox from '@/components/app/TabAskBox';
+import { isTabAskEnabled, type TabAskCount } from '@/lib/app/tab-ask';
+import { forecastsAskAdapter, type ForecastsAskParams } from '@/lib/app/tab-ask-adapters/forecasts';
 
 // The map's ?forecast= record address: the forecast pin id (`fc-<agency_forecasts.id>`). DoD early
 // signals (`sam:<solicitation number>`) are not forecasts and carry no notice id, so they get no link.
@@ -183,12 +186,9 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
     fetchSummary();
   }, [getForecastHeaders]);
 
-  const handleSearchWithParams = useCallback(async (naics: string, agency: string, query: string, state = '', setAside = '') => {
-    if (!naics && !agency && !query) {
-      setForecasts([]);
-      return;
-    }
-
+  // The tab's ONE list load (GET /api/forecasts). Resolves to the rows it showed, or null when the
+  // load failed (unknown — never reported as 0). The filter form and Ask Mindy both go through it.
+  const loadForecasts = useCallback(async (naics: string, agency: string, query: string, state = '', setAside = ''): Promise<TabAskCount> => {
     setSearching(true);
     setError(null);
 
@@ -209,6 +209,7 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
         const data = await response.json();
         if (data.success && data.forecasts) {
           setForecasts(data.forecasts);
+          return { shown: data.forecasts.length, more: data.pagination?.hasMore === true };
         } else if (data.error) {
           setError(data.error);
         }
@@ -221,7 +222,17 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
     } finally {
       setSearching(false);
     }
+    return null;
   }, [getForecastHeaders]);
+
+  const handleSearchWithParams = useCallback(async (naics: string, agency: string, query: string, state = '', setAside = '') => {
+    if (!naics && !agency && !query) {
+      setForecasts([]);
+      return;
+    }
+
+    await loadForecasts(naics, agency, query, state, setAside);
+  }, [loadForecasts]);
 
   // Load shared profile and auto-search all saved NAICS/agencies.
   useEffect(() => {
@@ -308,6 +319,54 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
       naics_count: profileDefaults?.naicsCodes.length || 0,
       agency_count: profileDefaults?.agencies.length || 0,
     });
+  };
+
+  // ── Ask Mindy on this tab (OFF unless NEXT_PUBLIC_TAB_ASK=on) ────────────────────────────────
+  // The question becomes THIS tab's filters and reloads THIS tab's list; Clear puts back exactly what
+  // was on screen before the first question (filters + rows), without another request.
+  const tabAskOn = isTabAskEnabled();
+  const [askSnapshot, setAskSnapshot] = useState<null | {
+    naics: string; agency: string; query: string; state: string; setAside: string;
+    usingProfile: boolean; rows: Forecast[];
+  }>(null);
+
+  const handleTabAsk = async (p: ForecastsAskParams): Promise<TabAskCount> => {
+    if (!askSnapshot) {
+      setAskSnapshot({
+        naics: naicsFilter, agency: agencyFilter, query: searchQuery, state: stateFilter, setAside: setAsideFilter,
+        usingProfile: usingProfileDefaults, rows: forecasts,
+      });
+    }
+    setUsingProfileDefaults(false);
+    setNaicsFilter(p.naics);
+    // The dropdown only holds the corpus' own agency codes; show the agency there when it is one of
+    // them. Either way the request carries it and the summary line names it.
+    setAgencyFilter(stats?.byAgency.some((a) => a.agency === p.agency) ? p.agency : '');
+    setSearchQuery(p.search);
+    setStateFilter(p.state);
+    setSetAsideFilter(p.setAside);
+    track('tool_use', 'forecasts', {
+      action: 'tab_ask',
+      has_naics: !!p.naics,
+      has_agency: !!p.agency,
+      has_query: !!p.search,
+      has_state: !!p.state,
+      has_set_aside: !!p.setAside,
+    });
+    return loadForecasts(p.naics, p.agency, p.search, p.state, p.setAside);
+  };
+
+  const clearTabAsk = () => {
+    if (!askSnapshot) return;
+    setNaicsFilter(askSnapshot.naics);
+    setAgencyFilter(askSnapshot.agency);
+    setSearchQuery(askSnapshot.query);
+    setStateFilter(askSnapshot.state);
+    setSetAsideFilter(askSnapshot.setAside);
+    setUsingProfileDefaults(askSnapshot.usingProfile);
+    setForecasts(askSnapshot.rows);
+    setError(null);
+    setAskSnapshot(null);
   };
 
   const getAgencyColors = (agency: string) => {
@@ -470,6 +529,10 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
             </div>
           </div>
         </div>
+      )}
+
+      {tabAskOn && (
+        <TabAskBox adapter={forecastsAskAdapter} onAsk={handleTabAsk} onClear={clearTabAsk} />
       )}
 
       {/* Search Form */}
