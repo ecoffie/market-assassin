@@ -22,6 +22,7 @@ export const CHAT_FETCH_LIMIT = 200;
 
 type Rec = Record<string, unknown>;
 
+import { displaySourceLabel } from './source-label';
 import { US_STATE_NAMES } from '@/lib/utils/us-states';
 import { formatUsd, formatColumn } from '@/lib/documents/format';
 import { interpretCapabilityNaics } from '@/lib/market/capability-naics';
@@ -864,7 +865,7 @@ export function renderSbloContact(result: Rec): RenderedRecords | null {
   const company = title(str(c?.company) || str(poc?.company)) || 'this company';
   const lines: string[] = [];
   if (c && str(c.sblo_name)) {
-    lines.push(`Designated small business liaison for ${company}: ${str(c.sblo_name)}${str(c.title) ? `, ${str(c.title)}` : ''}${str(c.email) ? ` · ${str(c.email)}${sbloEmailCaveat(c)}` : ''}${str(c.phone) ? ` · ${str(c.phone)}` : ''}. Source: ${str(c.source) || 'not reported'}.`);
+    lines.push(`Designated small business liaison for ${company}: ${str(c.sblo_name)}${str(c.title) ? `, ${str(c.title)}` : ''}${str(c.email) ? ` · ${str(c.email)}${sbloEmailCaveat(c)}` : ''}${str(c.phone) ? ` · ${str(c.phone)}` : ''}. Source: ${displaySourceLabel(str(c.source)) || 'not reported'}.`);
   } else {
     lines.push(`No designated small business liaison is on record for ${company}${str(c?.uei) || str(poc?.uei) ? ` (UEI ${str(c?.uei) || str(poc?.uei)})` : ''}.`);
   }

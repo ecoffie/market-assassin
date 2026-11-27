@@ -13,6 +13,7 @@
  * metered, credits: 20 (curated hit is instant; a miss does one BQ point lookup). `_meta`
  * always ships; `_ai_hint` OFF by default.
  */
+import { displaySourceLabel } from '@/lib/chat/source-label';
 import { lookupSbloContactEnriched, type SbloContact, type SbloSource } from '@/lib/gov-contacts/sblo-lookup';
 import { mcpFlags } from '@/lib/mcp/flags';
 import { resolveRegisteredPocs, REGISTERED_POC_LABEL, type RegisteredPocs } from '@/lib/sam/registered-poc';
@@ -108,7 +109,8 @@ export async function getSbloContact(input: SbloContactToolInput): Promise<SbloC
           : 'none';
 
   const result: SbloContactToolResult = {
-    contact: c,
+    // The stored source label keeps its research date; hosts get it without (no dates in customer-facing text).
+    contact: c ? { ...c, source: displaySourceLabel(c.source) } : null,
     candidates: res.candidates,
     ...(registered ? { registered_points_of_contact: registered } : {}),
     _meta: {
