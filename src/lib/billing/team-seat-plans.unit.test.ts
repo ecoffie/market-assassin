@@ -9,9 +9,13 @@ describe('Team by seats', () => {
     expect(TEAM_SEAT_PLANS[0]).toMatchObject({ annualUsd: 2490, annualPerMonthUsd: 208 });
   });
 
-  it('has no Stripe price until one is configured, and is off by default', async () => {
+  it('uses the live monthly prices (no annual yet), and is off by default', async () => {
     const m = await import('./team-seat-plans');
-    expect(m.TEAM_SEAT_PLANS.every((p) => p.monthlyPriceId === null && p.annualPriceId === null)).toBe(true);
+    expect(m.TEAM_SEAT_PLANS.map((p) => p.monthlyPriceId)).toEqual([
+      'price_1UgRmNK5zyiZ50PBB0eGUTYw', 'price_1UgRmiK5zyiZ50PBUawhanUw', 'price_1UgRn2K5zyiZ50PBEOLJgMT4', 'price_1UgRnIK5zyiZ50PB2dZhuXH7',
+    ]);
+    expect(m.TEAM_SEAT_PLANS.every((p) => p.annualPriceId === null)).toBe(true);
+    expect(m.teamSeatPlanForPriceId('price_1UgRnIK5zyiZ50PB2dZhuXH7')).toMatchObject({ interval: 'month', plan: { seats: 5, credits: 7500 } });
     expect(m.TEAM_SEAT_PRICING_ON).toBe(false);
     expect(m.teamSeatPlanForPriceId('price_1TuxApK5zyiZ50PBPV40eCvG')).toBeNull(); // Mid $249 is NOT Team
   });
