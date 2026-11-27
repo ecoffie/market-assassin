@@ -117,6 +117,20 @@ describe('regional catalog (official organizer pages only)', () => {
   });
   it('coverage names covered and uncovered states with the directory fallback', () => {
     expect(regionalCoverage(['ct', 'TX'])).toEqual({ covered: ['CT'], not_covered: ['TX'], fallback: cat.fallback });
+    expect(regionalCoverage(['VA', 'MD', 'DC', 'FL'])).toMatchObject({ covered: ['VA', 'MD', 'DC', 'FL'], not_covered: [] });
+  });
+  it('"near Arlington" (VA): the Virginia APEX row with no stated date → "check the organizer page"', async () => {
+    const r = await searchFederalEvents({ near: 'Arlington, VA' });
+    expect(r.regional_events!.map((e) => e.id)).toEqual(['va-apex-training']);
+    expect(r.regional_events![0].event_date).toBeNull();
+    expect(r.regional_events![0].date_note).toMatch(/Check the organizer page/);
+    expect(r.regional_coverage).toMatchObject({ covered: ['VA'], not_covered: [] });
+  });
+  it('MD APEX shows the date its own calendar states; DC and FL rows are undated', () => {
+    const rows = regionalEventsForStates(['MD', 'DC', 'FL'], '2026-11-27', '2027-03-27');
+    expect(rows.find((r) => r.id === 'md-apex-events')).toMatchObject({ event_date: '2026-11-30', url: 'https://mdapex.ecenterdirect.com/events/15628' });
+    expect(rows.find((r) => r.id === 'dc-apex')!.event_date).toBeNull();
+    expect(rows.find((r) => r.id === 'fl-apex-ucf')!.event_date).toBeNull();
   });
 });
 

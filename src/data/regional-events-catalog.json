@@ -1,6 +1,12 @@
 {
   "_doc": "State/regional matchmakers and APEX Accelerator events. Official organizer pages only, no AI-discovered rows. A row carries next_occurrence ONLY when the organizer's own page states the date; otherwise readers say 'check the organizer page'. verified_at is internal (never rendered). Maintained by hand; covered_states lists every state with rows.",
-  "covered_states": ["CT"],
+  "covered_states": [
+    "CT",
+    "DC",
+    "FL",
+    "MD",
+    "VA"
+  ],
   "fallback": {
     "name": "APEX Accelerators directory (find the center for any state)",
     "url": "https://www.apexaccelerators.us/"
@@ -16,7 +22,11 @@
       "kind": "matchmaker",
       "description": "Pre-scheduled one-on-one meetings between small businesses and federal, state and prime-contractor buyers.",
       "next_occurrence": null,
-      "verification": { "verified_at": "2026-11-27", "source_url": "https://www.ctbusinessmatchmaker.com/", "note": "Page states the March 5, 2026 event (Connecticut Convention Center), which has passed; no later date stated." }
+      "verification": {
+        "verified_at": "2026-11-27",
+        "source_url": "https://www.ctbusinessmatchmaker.com/",
+        "note": "Page states the March 5, 2026 event (Connecticut Convention Center), which has passed; no later date stated."
+      }
     },
     {
       "id": "ct-apex-events",
@@ -34,7 +44,81 @@
         "url": "https://ctapex.org/event/2026-hands-on-certification-clinics-for-small-business-certification-sam-6/",
         "location": null
       },
-      "verification": { "verified_at": "2026-11-27", "source_url": "https://ctapex.org/wp-json/tribe/events/v1/events?start_date=2026-11-27", "note": "The organizer's own events calendar (The Events Calendar REST feed); 1 upcoming event listed." }
+      "verification": {
+        "verified_at": "2026-11-27",
+        "source_url": "https://ctapex.org/wp-json/tribe/events/v1/events?start_date=2026-11-27",
+        "note": "The organizer's own events calendar (The Events Calendar REST feed); 1 upcoming event listed."
+      }
+    },
+    {
+      "id": "va-apex-training",
+      "name": "Virginia APEX Accelerator training and events",
+      "organizer": "Virginia APEX Accelerator (George Mason University)",
+      "url": "https://virginiaapex.org/services/training/",
+      "state": "VA",
+      "city": null,
+      "kind": "apex",
+      "description": "Free government-contracting training, workshops and special events for Virginia businesses.",
+      "next_occurrence": null,
+      "verification": {
+        "verified_at": "2026-11-27",
+        "source_url": "https://virginiaapex.ecenterdirect.com/events",
+        "note": "Official training calendar loads its list by script; no date readable from the page, so no date is stated here."
+      }
+    },
+    {
+      "id": "md-apex-events",
+      "name": "Maryland APEX Accelerator workshops and events",
+      "organizer": "Maryland APEX Accelerator (University of Maryland)",
+      "url": "https://mdapex.ecenterdirect.com/events",
+      "state": "MD",
+      "city": null,
+      "kind": "apex",
+      "description": "Government-contracting workshops, webinars and briefings for Maryland businesses (many free).",
+      "next_occurrence": {
+        "title": "Small Businesses--In order to GROW, be in the KNOW",
+        "start": "2026-11-30",
+        "end": "2026-11-30",
+        "url": "https://mdapex.ecenterdirect.com/events/15628",
+        "location": "Calvert Library Prince Frederick, 850 Costely Way, Prince Frederick, MD"
+      },
+      "verification": {
+        "verified_at": "2026-11-27",
+        "source_url": "https://mdapex.ecenterdirect.com/events",
+        "note": "The organizer's own events calendar; soonest upcoming event (Nov 30, 2026, no fee)."
+      }
+    },
+    {
+      "id": "dc-apex",
+      "name": "DC APEX Accelerator",
+      "organizer": "DC Department of Small and Local Business Development (DSLBD)",
+      "url": "https://dslbd.dc.gov/service/dc-apex-accelerator",
+      "state": "DC",
+      "city": "Washington",
+      "kind": "apex",
+      "description": "Government-contracting readiness training and counseling for DC businesses.",
+      "next_occurrence": null,
+      "verification": {
+        "verified_at": "2026-11-27",
+        "source_url": "https://dslbd.dc.gov/service/dc-apex-accelerator",
+        "note": "Program page states no upcoming event date."
+      }
+    },
+    {
+      "id": "fl-apex-ucf",
+      "name": "Florida APEX Accelerator at UCF workshops and events",
+      "organizer": "Florida APEX Accelerator at UCF",
+      "url": "https://events.ucf.edu/calendar/5083/florida-apex-accelerator-at-ucf/upcoming/",
+      "state": "FL",
+      "city": "Orlando",
+      "kind": "apex",
+      "description": "Government-contracting workshops, boot camps and an expert speaker series for Florida businesses.",
+      "next_occurrence": null,
+      "verification": {
+        "verified_at": "2026-11-27",
+        "source_url": "https://events.ucf.edu/calendar/5083/florida-apex-accelerator-at-ucf/upcoming/",
+        "note": "Organizer's upcoming-events page showed 'No events found'."
+      }
     }
   ]
 }
