@@ -93,7 +93,8 @@ const baseHandler = createMcpHandler(
           // outcome.needsRecharge is ignored on this path (owner decision 4).
           const projected = projectChatgptResult(tool.name, annotateIgnoredParams(outcome.result, unrecognized));
           return {
-            content: [{ type: 'text', text: JSON.stringify(projected, null, 2) }],
+            // Compact JSON: same data, ~27% fewer characters than pretty-printing (result-size spec).
+            content: [{ type: 'text', text: JSON.stringify(projected) }],
             structuredContent: projected,
           };
         },

@@ -168,7 +168,9 @@ const baseHandler = createMcpHandler(
           // mirrored into structuredContent._meta.credits for machine reads.
           const result = annotateIgnoredParams(outcome.result, unrecognized);
           const content: { type: 'text'; text: string }[] = [
-            { type: 'text', text: JSON.stringify(result, null, 2) },
+            // Compact JSON (Ask Mindy Backend Spec, result size): pretty-printing added ~27% to every tool
+            // response (find_opportunities at 25 rows/horizon: 126K → 92K characters). Same data, same keys.
+            { type: 'text', text: JSON.stringify(result) },
           ];
           // Pooled calls get the TEAM footer (never a personal top-up link). Ownership is
           // only looked up when the pool is low, where the remedy differs by role.
