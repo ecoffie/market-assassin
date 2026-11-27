@@ -4,7 +4,7 @@
  */
 import { describe, it, expect, vi } from 'vitest';
 import {
-  researchModeEnabledFor, toAnthropicTools, runResearchLoop, groundAnswer, fullResult, progressLine, researchSystemPrompt,
+  researchModeEnabledFor, toAnthropicTools, runResearchLoop, billedInputTokens, describeResearchError, groundAnswer, fullResult, progressLine, researchSystemPrompt, RESEARCH_SYSTEM_STATIC, researchSystemDynamic, wantsReport, RESEARCH_SYNTHESIS_AT_CALLS,
   RESEARCH_INSTRUCTIONS, RESEARCH_WITHHELD_TOOLS, RESEARCH_EXTRA_TOOLS, RESULT_CEILING_CHARS, FINAL_RESERVE_MS, researchToolDefs,
 } from './research-mode';
 import { MCP_CONNECTOR_INSTRUCTIONS } from '@/lib/mcp/schedule-discovery';
@@ -66,7 +66,7 @@ describe('the loop is Claude\'s: call, read, call again, then answer', () => {
     expect((execute.mock.calls[1] as never[])[0]).toHaveLength(1);
     const last = (create.mock.calls[2] as never[])[0] as { tool_choice: { type: string }; messages: Array<{ content: Block[] }> };
     expect(last.tool_choice).toEqual({ type: 'none' });
-    expect(JSON.stringify(last.messages[last.messages.length - 1].content)).toMatch(/tool-call limit/);
+    expect(JSON.stringify(last.messages[last.messages.length - 1].content)).toMatch(/Research is complete/);
     expect(JSON.stringify(last.messages[last.messages.length - 1].content)).toMatch(/Not run: the tool-call limit/);
     expect(r.stop).toBe('max_calls');
     expect(r.text).toBe('Answer from what I have.');
@@ -184,6 +184,200 @@ describe('zero live SAM in research mode (samCacheOnly, #2458)', () => {
   });
   it('the instructions fill gaps from official public sources and settle AbilityOne themselves', () => {
     expect(RESEARCH_INSTRUCTIONS).toMatch(/official public source with search_web and read_web_page/);
-    expect(RESEARCH_INSTRUCTIONS).toMatch(/AbilityOne Procurement List, check abilityone\.gov yourself/);
+    expect(RESEARCH_INSTRUCTIONS).toMatch(/check abilityone\.gov yourself/);
+  });
+});
+
+describe('the writing budget (Eric: 30 calls of breadth and no report)', () => {
+  const many = (n: number, prefix: string) => Array.from({ length: n }, (_, i) => toolUse(`${prefix}${i}`, 'find_opportunities'));
+  it('research stops at 24 calls and the answer is written, decision first, with no process talk asked for', async () => {
+    let step = 0;
+    const create = vi.fn(async (body: { tool_choice: { type: string } }) => (body.tool_choice.type === 'none' ? msg([text('The answer.')], 'end_turn') : msg(many(4, `s${++step}-`), 'tool_use')));
+    const r = await runResearchLoop({ ...base, client: { messages: { create } } as never, execute: async (cs) => cs.map((c) => ({ id: c.id, content: 'ok' })) });
+    expect(RESEARCH_SYNTHESIS_AT_CALLS).toBe(24);
+    expect(r.calls).toBe(24);
+    expect(r.stop).toBe('max_calls');
+    const final = (create.mock.calls.at(-1) as never[])[0] as { messages: Array<{ content: Array<{ text?: string }> }> };
+    const note = JSON.stringify(final.messages[final.messages.length - 1].content);
+    expect(note).toMatch(/decision first/);
+    expect(note).toMatch(/Do not describe your process or list what you did not do/);
+    expect(note).not.toMatch(/could not finish/);
+  });
+  it('research stops at 80% of the deadline even with calls left', async () => {
+    let t = 0;
+    const create = vi.fn(async (body: { tool_choice: { type: string } }) => (body.tool_choice.type === 'none' ? msg([text('Written.')], 'end_turn') : msg([toolUse(`a${t}`, 'find_opportunities')], 'tool_use')));
+    const r = await runResearchLoop({ ...base, client: { messages: { create } } as never, now: () => t, deadlineMs: 1_000_000, execute: async (cs) => { t += 300_000; return cs.map((c) => ({ id: c.id, content: 'ok' })); } });
+    expect(r).toMatchObject({ stop: 'deadline', text: 'Written.' });
+    expect(r.calls).toBe(3);
+  });
+  const isReportStep = (body: { tool_choice: { type: string; disable_parallel_tool_use?: boolean } }) => body.tool_choice.type === 'auto' && body.tool_choice.disable_parallel_tool_use === true;
+  it('asked for a report: a run that hits the limit still writes the report document, then the answer (tool_choice auto, never forced)', async () => {
+    const create = vi.fn(async (body: { tool_choice: { type: string; disable_parallel_tool_use?: boolean }; max_tokens: number }) => {
+      if (isReportStep(body)) return msg([toolUse('doc1', 'create_document', { doc_model: { title: 'Assessment' } }), toolUse('x', 'find_opportunities')], 'tool_use');
+      if (body.tool_choice.type === 'none') return msg([text('Here is the decision. The report is ready.')], 'end_turn');
+      return msg(many(3, `r${create.mock.calls.length}-`), 'tool_use');
+    });
+    const executed: string[] = [];
+    const r = await runResearchLoop({ ...base, client: { messages: { create } } as never, maxCalls: 6, reportTool: 'create_document', execute: async (cs) => { executed.push(...cs.map((c) => c.name)); return cs.map((c) => ({ id: c.id, content: 'ok' })); } });
+    const bodies = create.mock.calls.map((c) => (c as never[])[0] as { tool_choice: { type: string; disable_parallel_tool_use?: boolean }; max_tokens: number; messages: Array<{ content: unknown }> });
+    expect(bodies.slice(-2).map((b) => b.tool_choice)).toEqual([{ type: 'auto', disable_parallel_tool_use: true }, { type: 'none' }]);
+    const reportStep = bodies.find(isReportStep)!;
+    expect(reportStep.max_tokens).toBe(32_000);
+    expect(JSON.stringify(reportStep.messages[reportStep.messages.length - 1].content)).toMatch(/Call create_document now, once, with the full report\. Call no other tool\./);
+    expect(executed.filter((n) => n === 'create_document')).toHaveLength(1);
+    expect(executed.at(-1)).toBe('create_document'); // the extra find_opportunities in the report step is not run
+    expect(r.text).toBe('Here is the decision. The report is ready.');
+  });
+  it('the research model only accepts auto or none: no request ever forces a tool', async () => {
+    const create = vi.fn(async (body: { tool_choice: { type: string } }) => (body.tool_choice.type === 'none' ? msg([text('A.')], 'end_turn') : msg(many(4, `q${create.mock.calls.length}-`), 'tool_use')));
+    await runResearchLoop({ ...base, client: { messages: { create } } as never, maxCalls: 8, reportTool: 'create_document', execute: async (cs) => cs.map((c) => ({ id: c.id, content: 'ok' })) });
+    for (const c of create.mock.calls) expect(['auto', 'none']).toContain(((c as never[])[0] as { tool_choice: { type: string } }).tool_choice.type);
+  });
+  it('a report step that does not call the report tool degrades to the answer, never an error', async () => {
+    const create = vi.fn(async (body: { tool_choice: { type: string; disable_parallel_tool_use?: boolean } }) => {
+      if (isReportStep(body)) return msg([toolUse('w', 'search_web', { query: 'x' })], 'tool_use');
+      if (body.tool_choice.type === 'none') return msg([text('The decision, without a document.')], 'end_turn');
+      return msg(many(2, `p${create.mock.calls.length}-`), 'tool_use');
+    });
+    const executed: string[] = [];
+    const r = await runResearchLoop({ ...base, client: { messages: { create } } as never, maxCalls: 2, reportTool: 'create_document', execute: async (cs) => { executed.push(...cs.map((c) => c.name)); return cs.map((c) => ({ id: c.id, content: 'ok' })); } });
+    expect(executed).not.toContain('search_web');
+    expect(r.text).toBe('The decision, without a document.');
+  });
+  it('a report already written before the limit is not forced again', async () => {
+    let step = 0;
+    const create = vi.fn(async (body: { tool_choice: { type: string } }) => {
+      if (body.tool_choice.type === 'none') return msg([text('Done.')], 'end_turn');
+      step++;
+      return step === 1 ? msg([toolUse('d', 'create_document')], 'tool_use') : msg(many(3, `z${step}-`), 'tool_use');
+    });
+    await runResearchLoop({ ...base, client: { messages: { create } } as never, maxCalls: 4, reportTool: 'create_document', execute: async (cs) => cs.map((c) => ({ id: c.id, content: 'ok' })) });
+    expect(create.mock.calls.some((c) => ((c as never[])[0] as { tool_choice: { disable_parallel_tool_use?: boolean } }).tool_choice.disable_parallel_tool_use === true)).toBe(false);
+  });
+});
+
+describe('report requests', () => {
+  it('a full assessment or report on a company is a report request; a question is not', () => {
+    expect(wantsReport('Full company assessment and report for Ridgeline Digital')).toBe(true);
+    expect(wantsReport('Create a capability statement for us')).toBe(true);
+    expect(wantsReport('What janitorial bids are open in Florida?')).toBe(false);
+  });
+});
+
+describe('decision, not findings (Eric, 2026-11-25)', () => {
+  it('plan before calling; read before recommending; decision-first report; no process talk; gaps only as risks', () => {
+    expect(RESEARCH_INSTRUCTIONS).toMatch(/0\. PLAN BEFORE CALLING/);
+    expect(RESEARCH_INSTRUCTIONS).toMatch(/Never recommend or cite an item you have not opened/);
+    expect(RESEARCH_INSTRUCTIONS).toMatch(/REPORT = A DECISION, NOT FINDINGS/);
+    expect(RESEARCH_INSTRUCTIONS).toMatch(/the 3 ranked moves/);
+    expect(RESEARCH_INSTRUCTIONS).toMatch(/No process talk/);
+    expect(RESEARCH_INSTRUCTIONS).toMatch(/under Risks, at most 3/);
+    expect(RESEARCH_INSTRUCTIONS).not.toMatch(/what you could not finish/);
+  });
+  it('AbilityOne is a mandatory source a set-aside does not override; agencies are named from the award record', () => {
+    expect(RESEARCH_INSTRUCTIONS).toMatch(/a small-business set-aside does not override that/);
+    expect(RESEARCH_INSTRUCTIONS).toMatch(/awarding agency and funding agency fields, never from an office code or a city/);
+  });
+});
+
+describe('the writing budget is exact (acceptance: 25 and 28 calls)', () => {
+  it('a 6-call step at 22 calls runs only 2; the other 4 get "Not run"; the total is 24', async () => {
+    let step = 0;
+    const create = vi.fn(async (body: { tool_choice: { type: string } }) => {
+      if (body.tool_choice.type === 'none') return msg([text('Done.')], 'end_turn');
+      step++;
+      const n = step <= 11 ? 2 : 6; // 11 steps x 2 = 22, then one step asking for 6
+      return msg(Array.from({ length: n }, (_, i) => toolUse(`s${step}-${i}`, 'find_opportunities')), 'tool_use');
+    });
+    const batches: number[] = [];
+    const r = await runResearchLoop({ ...base, client: { messages: { create } } as never, execute: async (cs) => { batches.push(cs.length); return cs.map((c) => ({ id: c.id, content: 'ok' })); } });
+    expect(batches.at(-1)).toBe(2);
+    expect(r.calls).toBe(24);
+    const final = (create.mock.calls.at(-1) as never[])[0] as { messages: Array<{ role: string; content: Array<{ content?: string }> }> };
+    const results = final.messages.filter((m) => m.role === 'user').at(-1)!.content;
+    expect(results.filter((b) => String(b.content).startsWith('Not run'))).toHaveLength(4);
+  });
+});
+
+describe('a named company is researched even when the saved profile is a different company', () => {
+  it('the mismatch is one line in Sources & coverage, never the opening', () => {
+    expect(RESEARCH_INSTRUCTIONS).toMatch(/A company named in the question is the company to research, even when it differs from the saved company profile/);
+    expect(RESEARCH_INSTRUCTIONS).toMatch(/only as one line in "Sources & coverage", never at the start of the answer/);
+  });
+});
+
+describe('prompt caching (766K input tokens on one answer)', () => {
+  it('system prompt and tool definitions are cache breakpoints; exactly one moving breakpoint on the newest message; history is never mutated', async () => {
+    const { client, create } = scripted([
+      msg([toolUse('t1', 'find_opportunities')], 'tool_use'),
+      msg([toolUse('t2', 'find_opportunities')], 'tool_use'),
+      msg([text('Done.')], 'end_turn'),
+    ]);
+    const tools = [{ name: 'a', description: 'd', input_schema: { type: 'object' } }, { name: 'find_opportunities', description: 'd', input_schema: { type: 'object' } }];
+    await runResearchLoop({ ...base, tools, client, execute: async (cs) => cs.map((c) => ({ id: c.id, content: 'r' })) });
+    for (const call of create.mock.calls) {
+      const body = (call as never[])[0] as { system: Array<{ cache_control?: unknown }>; tools: Array<{ cache_control?: unknown }>; messages: Array<{ content: unknown }> };
+      expect(body.system[0].cache_control).toEqual({ type: 'ephemeral' });
+      expect(body.tools.map((t) => !!t.cache_control)).toEqual([false, true]);
+      const marks = JSON.stringify(body.messages).match(/"cache_control"/g) ?? [];
+      expect(marks).toHaveLength(1);
+      const last = body.messages[body.messages.length - 1].content as Array<{ cache_control?: unknown }>;
+      expect(last[last.length - 1].cache_control).toEqual({ type: 'ephemeral' });
+    }
+  });
+  it('cache reads and writes are counted and priced (reads 0.1x, writes 1.25x)', async () => {
+    const create = vi.fn(async () => ({ content: [{ type: 'text', text: 'ok' }], stop_reason: 'end_turn', usage: { input_tokens: 100, output_tokens: 10, cache_read_input_tokens: 9000, cache_creation_input_tokens: 400 } }));
+    const r = await runResearchLoop({ ...base, client: { messages: { create } } as never, execute: async () => [] });
+    expect(r.usage).toEqual({ input: 100, output: 10, cacheRead: 9000, cacheWrite: 400 });
+    expect(billedInputTokens(r.usage)).toBe(100 + 900 + 500);
+  });
+  it('modelled on an EFS-sized run (24 steps, 30k system+tools, ~8k new per step): billed input falls by over 75%', () => {
+    const steps = 24, fixed = 30_000, perStep = 8_000;
+    let before = 0, after = 0, prefix = fixed;
+    for (let i = 0; i < steps; i++) {
+      const prompt = prefix + (i === 0 ? 0 : perStep);
+      before += prompt;
+      after += i === 0 ? fixed * 1.25 : prefix * 0.1 + perStep * 1.25;
+      prefix = prompt;
+    }
+    expect(after / before).toBeLessThan(0.25);
+  });
+});
+
+describe('a failed research turn keeps its cost and its cause', () => {
+  const creditError = () => Object.assign(new Error('400 {"type":"error","error":{"type":"invalid_request_error","message":"Your credit balance is too low to access the Anthropic API."}}'), {
+    status: 400, error: { type: 'error', error: { type: 'invalid_request_error', message: 'Your credit balance is too low to access the Anthropic API.' } },
+  });
+  it('the thrown error carries the usage, steps and calls accrued before it', async () => {
+    let n = 0;
+    const create = vi.fn(async () => {
+      if (++n === 1) return { content: [toolUse('t1', 'find_opportunities')], stop_reason: 'tool_use', usage: { input_tokens: 500, output_tokens: 40, cache_read_input_tokens: 2000, cache_creation_input_tokens: 100 } };
+      throw creditError();
+    });
+    const err = await runResearchLoop({ ...base, client: { messages: { create } } as never, execute: async (cs) => cs.map((c) => ({ id: c.id, content: 'ok' })) }).catch((e) => e);
+    const d = describeResearchError(err);
+    expect(d.class).toBe('credit_balance_too_low');
+    expect(d.status).toBe(400);
+    expect(d.message).toMatch(/credit balance is too low/);
+    expect(d.progress).toEqual({ usage: { input: 500, output: 40, cacheRead: 2000, cacheWrite: 100 }, steps: 1, calls: 1 });
+  });
+  it('other provider errors keep their own type; a plain error its name', () => {
+    expect(describeResearchError(Object.assign(new Error('529 overloaded'), { status: 529, error: { type: 'error', error: { type: 'overloaded_error', message: 'Overloaded' } } }))).toMatchObject({ class: 'overloaded_error', status: 529, message: 'Overloaded' });
+    expect(describeResearchError(new TypeError('boom'))).toMatchObject({ class: 'TypeError', status: null, message: 'boom', progress: null });
+  });
+});
+
+describe('the cached prefix is stable (any byte change invalidates it)', () => {
+  it('the fixed system prompt is cached; today and the profile come after the breakpoint; the prefix is byte-identical every step', async () => {
+    const { client, create } = scripted([msg([toolUse('t1', 'find_opportunities')], 'tool_use'), msg([text('Done.')], 'end_turn')]);
+    await runResearchLoop({ ...base, system: RESEARCH_SYSTEM_STATIC, systemDynamic: researchSystemDynamic({ today: '2026-11-25', profileBlock: 'Company: Ridgeline Digital' }), client, execute: async (cs) => cs.map((c) => ({ id: c.id, content: 'r' })) });
+    const bodies = create.mock.calls.map((c) => (c as never[])[0] as { system: Array<{ text: string; cache_control?: unknown }>; tools: unknown[] });
+    for (const b of bodies) {
+      expect(b.system[0]).toMatchObject({ text: RESEARCH_SYSTEM_STATIC, cache_control: { type: 'ephemeral' } });
+      expect(b.system[1].cache_control).toBeUndefined();
+      expect(b.system[1].text).toContain('Today is 2026-11-25.');
+    }
+    expect(JSON.stringify([bodies[0].tools, bodies[0].system[0]])).toBe(JSON.stringify([bodies[1].tools, bodies[1].system[0]]));
+    expect(RESEARCH_SYSTEM_STATIC).not.toMatch(/Today is|SAVED COMPANY PROFILE/);
   });
 });

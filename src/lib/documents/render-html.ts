@@ -10,7 +10,7 @@ import type { Block, Claim, DocModel, TableBlock } from './model';
 import { chartToSvg } from './charts';
 import { hex, resolveTheme, type Theme } from './theme';
 import { INTER_LATIN_FONT_FACE } from '@/lib/fonts/inter-latin-embedded';
-import { assumptionOrigin, keepDash, stripHeadingNumber, citationIndex, citeMarker, claimClass, claimLabel, claimsPresent, formatColumn, formatDocDate, parseInline, unverifiedStatements } from './format';
+import { assumptionOrigin, clientCopy, keepDash, stripHeadingNumber, citationIndex, citeMarker, claimClass, claimLabel, claimsPresent, formatColumn, formatDocDate, parseInline, unverifiedStatements } from './format';
 
 /**
  * The document page may load nothing but itself: no scripts, no network, no frames; only its own
@@ -213,7 +213,8 @@ export interface RenderHtmlOptions {
   screen?: boolean;
 }
 
-export function renderHtml(model: DocModel, opts: RenderHtmlOptions = {}): string {
+export function renderHtml(stored: DocModel, opts: RenderHtmlOptions = {}): string {
+  const model = clientCopy(stored);
   const theme = resolveTheme(model.theme);
   const { ordered, numberOf } = citationIndex(model);
   const showToc = opts.toc ?? model.sections.filter((s) => (s.level ?? 1) === 1).length >= TOC_MIN_SECTIONS;
@@ -230,7 +231,7 @@ export function renderHtml(model: DocModel, opts: RenderHtmlOptions = {}): strin
     '<b>How to read this document.</b> Facts carry a numbered citation like <sup class="cite">[1]</sup> that points to the Sources section.',
     present.has('assumption') ? 'Statements marked <span class="label assumption">Planning assumption</span> are premises stated for this analysis, not recorded facts; each says where it comes from. Check them before relying on them.' : '',
     present.has('recommendation') ? 'Statements marked <span class="label recommendation">Recommendation</span> are suggested actions.' : '',
-    unverified.length ? `Statements marked <span class="label unverified">Unverified — no source</span> could not be traced to a source and are listed in the Unverified statements section.` : '',
+    unverified.length ? `Statements marked <span class="label unverified">Unverified: no source</span> could not be traced to a source and are listed in the Unverified statements section.` : '',
   ].filter(Boolean).join(' ');
 
   // Cover. Both styles use ONLY the model's own metadata — nothing is generated for the cover.

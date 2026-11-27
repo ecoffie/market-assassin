@@ -116,7 +116,11 @@ describe('research mode in the chat route', () => {
     expect(h.create).toHaveBeenCalledTimes(2);
     const first = h.create.mock.calls[0][0] as { model: string; system: string; tools: Array<{ name: string }> };
     expect(first.model).toBe('claude-opus-5-5');
-    expect(first.system).toContain('IDENTITY FIRST');
+    expect(JSON.stringify(first.system)).toContain('IDENTITY FIRST');
+    const sys = first.system as unknown as Array<{ text: string; cache_control?: unknown }>;
+    expect(sys[0].cache_control).toEqual({ type: 'ephemeral' });
+    expect(sys[0].text).not.toMatch(/Today is/);
+    expect(sys[1].text).toMatch(/Today is/);
     const names = first.tools.map((t) => t.name);
     expect(names).toEqual(expect.arrayContaining(['find_opportunities', 'search_contractors', 'search_web', 'read_web_page']));
     for (const t of ['lookup_sam_entity', 'get_contractor_award_history', 'get_solicitation_incumbent', 'get_solicitation_documents', 'get_buying_offices']) expect(names).toContain(t);
@@ -336,5 +340,21 @@ describe('research mode in the chat route', () => {
     delete process.env.ASK_MINDY_RESEARCH_MODE;
     const std = await ask(Q);
     expect(std.some((e) => e.type === 'mode')).toBe(false);
+  });
+
+  it('a provider failure mid-run is traced with its class and the usage it had already cost', async () => {
+    flagOn();
+    let step = 0;
+    h.create.mockImplementation(async () => {
+      if (++step === 1) return { content: [{ type: 'tool_use', id: 'tu1', name: 'find_opportunities', input: { query: 'x' } }], stop_reason: 'tool_use', usage: { input_tokens: 700, output_tokens: 30, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 } };
+      throw Object.assign(new Error('credit'), { status: 400, error: { type: 'error', error: { type: 'invalid_request_error', message: 'Your credit balance is too low to access the Anthropic API.' } } });
+    });
+    const ev = await ask(Q);
+    expect(text(ev)).toMatch(/could not finish this research/);
+    expect(await savedTrace()).toMatchObject({
+      stop: 'error',
+      usage: { input: 700, output: 30 },
+      error: { class: 'credit_balance_too_low', status: 400, steps: 1, call_count: 1 },
+    });
   });
 });
