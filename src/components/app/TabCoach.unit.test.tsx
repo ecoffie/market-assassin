@@ -268,23 +268,47 @@ describe('TabCoach', () => {
     expect(parseFloat(coach()!.style.bottom)).toBeGreaterThanOrEqual(88);
   });
 
-  it('stays dark in the light app theme: explicit colours, no remappable theme tokens', async () => {
+  it('wears the app look: theme tokens only (follows light and dark), site serif title, navy Next, no amber/yellow', async () => {
     addTarget('t-filters');
     await mount();
     const box = coach()!;
-    expect(box.style.backgroundColor).toBe('rgb(17, 24, 39)'); // #111827
-    expect(box.style.color).toBe('rgb(243, 244, 246)'); // #f3f4f6
-    const next = q('tab-coach-next')!;
-    expect(next.style.backgroundColor).toBe('rgb(245, 158, 11)');
-    expect(next.style.color).toBe('rgb(17, 24, 39)');
-    expect(q('tab-coach-skip')!.style.color).not.toBe('');
-    expect(q('tab-coach-ring')!.style.borderColor).not.toBe('');
-    // mi-light.css / app-map.css remap slate / gray / white / amber tokens to light values in /app.
-    const themed = /(^|:)(bg|text|border|shadow)-(slate|gray|zinc|neutral|stone|white|black|amber)\b/;
-    for (const el of [box, ...Array.from(box.querySelectorAll('*')), q('tab-coach-ring')!, q('tab-coach-arrow')!]) {
-      const bad = (el.getAttribute('class') || '').split(/\s+/).filter(c => themed.test(c));
-      expect(bad, el.outerHTML.slice(0, 80)).toEqual([]);
+    const ring = q('tab-coach-ring')!;
+    const arrow = q('tab-coach-arrow')!;
+    const glow = q('tab-coach-glow')!;
+    const cls = (el: Element) => (el.getAttribute('class') || '').split(/\s+/);
+    // Card: the app's surface / hairline / ink tokens and its modal shadow (all re-valued by mi-light + app-map).
+    expect(cls(box)).toEqual(expect.arrayContaining(['bg-surface', 'border', 'border-hairline', 'text-ink-soft', 'shadow-modal', 'rounded-xl']));
+    expect(cls(q('tab-coach-title')!)).toContain('text-ink');
+    expect(q('tab-coach-title')!.style.fontFamily).toContain('Libre Baskerville');
+    expect(cls(q('tab-coach-progress')!)).toContain('text-muted');
+    expect(cls(q('tab-coach-next')!)).toEqual(expect.arrayContaining(['bg-navy', 'text-white']));
+    // bg-navy first, so app-map.css's strong-fill rule ([class^="bg-navy"]) keeps the label really white.
+    expect(q('tab-coach-next')!.className.startsWith('bg-navy')).toBe(true);
+    expect(cls(q('tab-coach-skip')!)).toContain('text-muted');
+    expect(cls(q('tab-coach-skip')!).some(c => /^bg-/.test(c))).toBe(false); // quiet: no fill until hover
+    expect(cls(arrow)).toContain('text-accent');
+    expect(cls(ring)).toContain('mindy-coach-ring');
+    expect(cls(glow)).toContain('mindy-coach-glow');
+    const css = Array.from(document.querySelectorAll('style')).map(s => s.textContent || '').join('\n');
+    expect(css).toMatch(/\.mindy-coach-ring\s*\{[^}]*var\(--color-accent\)/);
+    expect(css).toMatch(/\.mindy-coach-glow\s*\{[^}]*var\(--color-accent\)/);
+    // No fixed colours on the card or its controls: every colour comes from a token class.
+    for (const el of [box, ...Array.from(box.querySelectorAll('*'))]) {
+      const st = (el as HTMLElement).style;
+      expect([st.color, st.backgroundColor, st.borderColor].filter(Boolean), el.outerHTML.slice(0, 80)).toEqual([]);
     }
+    // Nothing amber / yellow / orange is left — not in classes, inline styles or the coach's CSS.
+    const warmClass = /(^|:)(bg|text|border|ring|shadow|from|to|via|fill|stroke|outline)-(amber|yellow|orange)\b/;
+    const warmHex = /#(f59e0b|fbbf24|fcd34d|fde68a|d97706|eab308|facc15|fef08a|f97316)\b|rgba?\(\s*(245|251|252),\s*(158|191|211)/i;
+    for (const el of [box, ...Array.from(box.querySelectorAll('*')), ring, glow, arrow]) {
+      expect(cls(el).filter(c => warmClass.test(c)), el.outerHTML.slice(0, 80)).toEqual([]);
+      expect(warmHex.test(el.getAttribute('style') || ''), el.outerHTML.slice(0, 80)).toBe(false);
+    }
+    expect(warmHex.test(css)).toBe(false);
+    // The veil is light: a low-alpha dim, not a dark room.
+    const alpha = Number((ring.style.boxShadow.match(/rgba\([^)]*,\s*([\d.]+)\)/) || [])[1]);
+    expect(alpha).toBeGreaterThan(0);
+    expect(alpha).toBeLessThanOrEqual(0.25);
   });
 
   it('every anchor in the registry is a valid CSS selector', () => {
