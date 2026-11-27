@@ -35,13 +35,14 @@ export function selectRelevantRfp(rfpText: string, question: string, budget: num
   // Always keep the first window (cover page / summary) + the top-scoring rest.
   const first = windows[0];
   const ranked = windows.slice(1).filter(w => w.score > 0).sort((a, b) => b.score - a.score);
-  const chosen = [first, ...ranked];
-  const out: string[] = [];
+  // Fill the budget in RANK order (first window, then highest score), THEN re-order by document position so it
+  // reads coherently. Sorting by position before budgeting kept the earliest windows and dropped a relevant
+  // passage late in a long file (connected-files acceptance 2026-11-24).
+  const picked: typeof windows = [];
   let used = 0;
-  // Re-order chosen by document position so it reads coherently.
-  for (const w of chosen.sort((a, b) => a.idx - b.idx)) {
-    if (used + w.text.length > budget) break;
-    out.push(w.text); used += w.text.length;
+  for (const w of [first, ...ranked]) {
+    if (used + w.text.length > budget) continue;
+    picked.push(w); used += w.text.length;
   }
-  return out.join('\n…\n');
+  return picked.sort((a, b) => a.idx - b.idx).map((w) => w.text).join('\n…\n');
 }

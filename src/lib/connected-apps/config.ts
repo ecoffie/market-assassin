@@ -1,0 +1,110 @@
+/**
+ * Connected business apps (Google Workspace, Microsoft 365): provider endpoints, least-privilege scopes per
+ * capability, and the feature flag. Spec: docs/connected-apps/CONNECTED-APPS-SPEC-2026-11-24.md.
+ *
+ * Sign-in (Supabase Google/Azure) authenticates the Mindy user; it does NOT authorize Drive, Gmail, Calendar or
+ * Graph. Each connected account gets its own delegated OAuth grant, requested only for the capability in use.
+ */
+export type Provider = 'google' | 'microsoft';
+/**
+ * Only the capabilities this slice uses. Draft (Gmail/Outlook) and calendar scopes are added, and reviewed, in
+ * the slice that ships the tool that uses them; never requested ahead of time.
+ */
+export type Capability = 'identity' | 'file';
+
+export const PROVIDERS: readonly Provider[] = ['google', 'microsoft'];
+
+/** Least privilege, incremental. No domain-wide or restricted Drive scopes. */
+export const SCOPES: Record<Provider, Record<Capability, string[]>> = {
+  google: {
+    identity: ['openid', 'email', 'profile'],
+    // drive.file = the app can open only files the user picks in Google Picker (or that the app created).
+    file: ['https://www.googleapis.com/auth/drive.file'],
+  },
+  microsoft: {
+    identity: ['openid', 'profile', 'email', 'offline_access', 'User.Read'],
+    // Files.Read is NOT selection-limited: it lets the app read ALL of the signed-in user's OneDrive files.
+    // Microsoft has no delegated per-picked-file scope for personal consent. Mindy reads only the file the
+    // customer picks, but the GRANT is broader, and ACCESS_DISCLOSURE says so before consent.
+    file: ['Files.Read'],
+  },
+};
+
+/**
+ * What the provider grant actually allows, shown to the customer BEFORE they are sent to consent. Must describe
+ * the grant, not Mindy's intended use, where the two differ.
+ */
+export const ACCESS_DISCLOSURE: Record<Provider, Record<Exclude<Capability, 'identity'>, string>> = {
+  google: {
+    file: 'Google will let Mindy open only the files you pick. Mindy cannot see the rest of your Drive.',
+  },
+  microsoft: {
+    file: 'Microsoft will let Mindy read all of the files in your OneDrive, not only the ones you pick. Mindy opens only a file you choose, and you can disconnect at any time.',
+  },
+};
+
+export function scopesFor(provider: Provider, caps: Capability[]): string[] {
+  const set = new Set<string>(SCOPES[provider].identity);
+  for (const c of caps) for (const s of SCOPES[provider][c]) set.add(s);
+  return [...set];
+}
+
+type Env = Record<string, string | undefined>;
+
+export function endpoints(provider: Provider, env: Env = process.env) {
+  if (provider === 'google') {
+    return {
+      authorize: 'https://accounts.google.com/o/oauth2/v2/auth',
+      token: 'https://oauth2.googleapis.com/token',
+      revoke: 'https://oauth2.googleapis.com/revoke',
+      identity: 'https://openidconnect.googleapis.com/v1/userinfo',
+    };
+  }
+  const tenant = env.CONNECTED_APPS_MICROSOFT_TENANT || 'common';
+  return {
+    authorize: `https://login.microsoftonline.com/${encodeURIComponent(tenant)}/oauth2/v2.0/authorize`,
+    token: `https://login.microsoftonline.com/${encodeURIComponent(tenant)}/oauth2/v2.0/token`,
+    // Microsoft has no per-grant refresh-token revocation for a delegated app short of revoking ALL the user's
+    // sessions (revokeSignInSessions), which is too broad. Disconnect = discard our token.
+    revoke: null as string | null,
+    identity: 'https://graph.microsoft.com/v1.0/me?$select=id,mail,userPrincipalName,displayName',
+  };
+}
+
+export interface ClientCreds { clientId: string; clientSecret: string }
+
+/** OAuth client credentials (created in Google Cloud / Azure by an admin). null = provider not configured. */
+export function clientCreds(provider: Provider, env: Env = process.env): ClientCreds | null {
+  const id = provider === 'google' ? env.CONNECTED_APPS_GOOGLE_CLIENT_ID : env.CONNECTED_APPS_MICROSOFT_CLIENT_ID;
+  const secret = provider === 'google' ? env.CONNECTED_APPS_GOOGLE_CLIENT_SECRET : env.CONNECTED_APPS_MICROSOFT_CLIENT_SECRET;
+  return id && secret ? { clientId: id, clientSecret: secret } : null;
+}
+
+/** The callback registered with both providers. */
+export function redirectUri(env: Env = process.env): string {
+  const base = (env.CONNECTED_APPS_REDIRECT_BASE || env.NEXT_PUBLIC_SITE_URL || 'https://getmindy.ai').replace(/\/$/, '');
+  return `${base}/api/app/connected-apps/callback`;
+}
+
+/**
+ * Dedicated secrets, required. There is deliberately no fallback to ADMIN_PASSWORD / MCP_OAUTH_SIGNING_SECRET:
+ * rotating an unrelated secret must never invalidate every stored connection or let states signed under one
+ * purpose verify under another. null = refuse to run (routes answer 503 not_configured).
+ */
+export interface ConnectedAppsSecrets { stateSecret: string; tokenKey: { secret: string; salt: string; id: string } }
+const MIN_SECRET_LEN = 32;
+export function connectedAppsSecrets(env: Env = process.env): ConnectedAppsSecrets | null {
+  const state = env.CONNECTED_APPS_STATE_SECRET || '';
+  const enc = env.CONNECTED_APPS_TOKEN_ENC_KEY || '';
+  if (state.length < MIN_SECRET_LEN || enc.length < MIN_SECRET_LEN || state === enc) return null;
+  // Key id travels in every stored ciphertext, so the key can be rotated later (decrypt refuses another id).
+  const id = /^[A-Za-z0-9_-]{1,32}$/.test(env.CONNECTED_APPS_TOKEN_KEY_ID || '') ? env.CONNECTED_APPS_TOKEN_KEY_ID! : 'k1';
+  return { stateSecret: state, tokenKey: { secret: enc, salt: 'mindy-connected-apps-v1', id } };
+}
+
+/** Off unless CONNECTED_APPS=true and the user is on CONNECTED_APPS_ALLOWLIST (comma-separated, or `*`). */
+export function connectedAppsEnabledFor(email: string | null | undefined, env: Env = process.env): boolean {
+  if (env.CONNECTED_APPS !== 'true' || !email) return false;
+  const list = (env.CONNECTED_APPS_ALLOWLIST || '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
+  return list.includes('*') || list.includes(email.trim().toLowerCase());
+}

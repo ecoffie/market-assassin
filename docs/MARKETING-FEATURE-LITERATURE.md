@@ -7828,3 +7828,24 @@ the notices. Test: `federal-events-ranking.unit.test.ts`.
 **SEO:** federal contract opportunities near me, janitorial government contracts Florida, which government contracts should I bid on, federal recompete opportunities.
 
 **Proof:** Live run 2026-11-24 (USASpending award records via the Mindy warehouse, SAM.gov open notices via find_opportunities). Florida janitorial: 7 coming-back contracts checked, 3 pursuable. 4 open notices checked, none for cleaning, matching Claude + the Mindy MCP the same day. The reviewer passed 5/5; a polished metrics-only answer failed 3 of 5. Source: `src/lib/ask-mindy/intelligence-gate.ts`, fixture `src/lib/ask-mindy/__fixtures__/fl-janitorial-recompetes-2026-11-24.json`. Behind `ASK_MINDY_INTELLIGENCE_GATE` (off).
+
+## Connect your Google Workspace or Microsoft 365 account to Ask Mindy (coming, flag off), 2026-11-24
+
+**What:** Connect a business Google or Microsoft account once. Ask Mindy will be able to use a file you choose (like your capability statement), prepare a buyer email as a draft in your own Gmail or Outlook, and add a follow-up to your calendar, each only after you approve it. First step built: secure account connection with least-privilege permissions, scoped to your workspace, with disconnect anytime.
+
+**Why:** After Mindy finds a contract worth pursuing, the work still happens in five other apps. Connecting the tools you already use turns intelligence into action without copy and paste.
+
+**SEO:** government contracting outreach email, capability statement outreach, federal BD follow-up, Gmail Outlook government contracts assistant.
+
+**Proof:** Not yet customer-visible. Permissions are stated honestly before consent: with Google, Mindy can open only the files you pick (`drive.file`); with Microsoft, the `Files.Read` permission covers all of your OneDrive files, and Mindy opens only the one you choose. This part asks for file access only; mail and calendar permissions come later, with the features that use them, and Mindy never asks for permission to send mail. A consent link only works in the browser that started it. Source: `src/lib/connected-apps/`, spec `docs/connected-apps/CONNECTED-APPS-SPEC-2026-11-24.md`. Behind `CONNECTED_APPS` (off).
+
+## Use a file from your Google Drive or OneDrive in Ask Mindy (coming, flag off), 2026-11-24
+
+**What:** Pick your capability statement or a past-performance write-up straight from your connected Google Drive or OneDrive, and Ask Mindy reads that one file to tailor its answer. It quotes only what the file says and names the file it came from.
+
+**Why:** Your best proof of capability already lives in your drive. Re-uploading it every time is friction, and copy-pasting it loses the source.
+
+**SEO:** use capability statement with AI, government contracting capability statement Google Drive, federal BD AI assistant OneDrive.
+
+**Proof:** Not yet customer-visible. Mindy reads only the file you pick: the selection is signed for your workspace and expires after 24 hours, and Mindy cannot browse or search your drive. File text is treated as reference data, never as instructions. Source: `src/lib/connected-apps/files.ts`, `read-file-tool.ts`. Behind `CONNECTED_APPS` (off).
+

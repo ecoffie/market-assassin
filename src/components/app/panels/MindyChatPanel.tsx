@@ -21,6 +21,7 @@ import { Menu, MessageCircle, BookOpen, Lock, FileText, X } from 'lucide-react';
 import type { AppTier, AppPanel } from '../UnifiedSidebar';
 import { authedFetch } from '../authHeaders';
 import { ChatAttachments } from '../chat/ChatAttachments';
+import { ConnectedFiles, type ConnectedFile } from '../chat/ConnectedFiles';
 import type { GeneratedDownloadFile } from '../chat/GeneratedDownloadChips';
 import { ChatReportPreview, validReportId, type ChatInlineReport, type ChatSavedReport } from '../chat/ChatReportPreview';
 import { useVaultCapabilities } from '../chat/useVaultCapabilities';
@@ -213,6 +214,8 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
   // The opportunity this conversation is about (from the Map drawer's "Open in full workspace"). Shown as a
   // removable chip; only its id is sent.
   const [attachedOpp, setAttachedOpp] = useState<AttachedOpportunity | null>(null);
+  // Files picked from a connected Drive / OneDrive (CONNECTED_APPS): signed handles sent with each question.
+  const [connectedFiles, setConnectedFiles] = useState<ConnectedFile[]>([]);
   const [proposalState, setProposalState] = useState<'idle' | 'working' | 'failed'>('idle');
   // Set when the Map hands off into this workspace — shows "Back to Map" without dropping the session.
   const [fromMap, setFromMap] = useState(false);
@@ -304,6 +307,7 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
           sessionId: sessionId || undefined,
           history: historyForServer,
           ...opportunityContextField(attachedOpp),
+          ...(connectedFiles.length ? { connectedFiles: connectedFiles.map((f) => f.handle) } : {}),
           ...screenshotsField(turnShots),
         }),
         signal: controller.signal,
@@ -466,7 +470,7 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
       abortRef.current = null;
       inputRef.current?.focus();
     }
-  }, [email, isStreaming, messages, sessionId, isFree, attachedOpp, canPasteShots, shots]);
+  }, [email, isStreaming, messages, sessionId, isFree, attachedOpp, connectedFiles, canPasteShots, shots]);
 
   // --- Conversation history ----------------------------------------
   const loadSessions = useCallback(async () => {
@@ -538,6 +542,7 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
     setMessages([]);
     setSessionId(null);
     setAttachedOpp(null);
+    setConnectedFiles([]);
     try { sessionStorage.removeItem(LAST_CHAT_SESSION_KEY); } catch { /* unavailable */ }
     clearMapSelectedOpp();
     if (isPhoneWidth()) setSidebarOpen(false);
@@ -967,6 +972,9 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
           )}
           {vaultCaps.uploads && email && !isFree && (
             <ChatAttachments email={email} sessionId={sessionId} ensureSessionId={ensureSessionId} disabled={isStreaming} />
+          )}
+          {email && !isFree && (
+            <ConnectedFiles email={email} files={connectedFiles} onChange={setConnectedFiles} disabled={isStreaming} />
           )}
           {canPasteShots && (
             <ChatScreenshots shots={shots} note={shotNote} onRemove={removeScreenshot} disabled={isStreaming} />

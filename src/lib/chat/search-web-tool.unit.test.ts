@@ -160,8 +160,8 @@ describe('search_web corrections (Agent 4 re-review of #2204)', () => {
 
 describe('chat route wiring for the search_web guard', () => {
   const route = readFileSync(join(__dirname, '../../app/api/app/chat/route.ts'), 'utf8');
-  it('feeds the attached documents and every find_my_documents result into the guard, with attribution', () => {
-    expect(route).toMatch(/const turnDocumentTexts: string\[\] = documentContext\?\.block \? \[documentContext\.block\] : \[\];/);
+  it('feeds the attached documents, connected files and every find_my_documents result into the guard, with attribution', () => {
+    expect(route).toMatch(/const turnDocumentTexts: string\[\] = \[documentContext\?\.block, connectedFiles\?\.block\]\.filter\(\(t\): t is string => !!t\);/);
     expect(route).toMatch(/documentText: \(\) => turnDocumentTexts\.join\('\\n'\),/);
     expect(route).toMatch(/attribution: \{ callerKey: callerKeyFor\(auth\.email\), sessionId: turnSessionId \},/);
     expect(route).toMatch(/return myDocs\.execute\(a\)\.then\(\(r\) => \{\n\s+try \{ turnDocumentTexts\.push\(JSON\.stringify\(r\)\); \}/);

@@ -321,3 +321,19 @@ describe('samCacheOnly (Ask Mindy research mode)', () => {
     expect(((runMcpTool.mock.calls[1] as unknown[])[2] as Record<string, unknown>).samCacheOnly).toBeUndefined();
   });
 });
+
+describe('onResult (Ask Mindy app actions evidence)', () => {
+  it('sees every successful result exactly as the model does, never a failed one, and a throwing hook changes nothing', async () => {
+    const runMcpTool = vi.fn(async (name: string) => { if (name === 'search_contractors') throw new Error('down'); return { result: { notice_id: 'abc123def' }, credits: 0 }; });
+    const seen: Array<[string, string]> = [];
+    const mk = (onResult: (n: string, c: string) => void) => createChatToolExecutor({ userEmail: 'a@b.com', chatSessionId: null, tier0: { defs: [], names: new Set(), execute: async () => ({}) }, deps: { runMcpTool: runMcpTool as never, logCall: (async () => {}) as never }, onResult });
+    const ok = { id: 'a', function: { name: 'find_opportunities', arguments: '{"query":"janitorial"}' } };
+    const bad = { id: 'b', function: { name: 'search_contractors', arguments: '{"query":"x"}' } };
+    const [r1, r2] = await mk((n, c) => seen.push([n, c])).executeRound([ok, bad], { model: 'm', provider: 'p' });
+    expect(seen).toEqual([['find_opportunities', r1.content]]);
+    expect(r2.record.status).toBe('failed');
+    const [r3] = await mk(() => { throw new Error('hook broke'); }).executeRound([ok], { model: 'm', provider: 'p' });
+    expect(r3.record.status).toBe('success');
+    expect(r3.content).toContain('abc123def');
+  });
+});
