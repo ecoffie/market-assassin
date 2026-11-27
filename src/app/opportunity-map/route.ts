@@ -11539,12 +11539,22 @@ const ASK_MINDY_JS = `<script>(function(){
       u.onclick=function(){ undoFn(); u.disabled=true; u.textContent='Undone'; actUndo=null; }; n.appendChild(u); }
     var bub=aEl.querySelector('.bub'); aEl.insertBefore(n,bub||null); body.scrollTop=body.scrollHeight; return n;
   }
+  function actFlush(aEl,turn,evidence){
+    var list=turn.pending||[]; turn.pending=[];
+    for(var i=0;i<list.length;i++){ var act=list[i];
+      if(String(evidence||'').indexOf(act.args.notice_id)<0){ actTrack(act,'rejected:unsourced'); continue; }
+      if(!actRun(act)){ actTrack(act,'rejected:unavailable'); continue; }
+      actTrack(act,'ran'); actNote(aEl,actDescribe(act),null); }
+  }
   function onAction(ev,aEl,turn){
     if(!actionsOn||oppCtx) return;
     if(turn.count>=3){ actTrack(null,'rejected:max'); return; }
     var act=actValidate(ev);
     if(!act){ actTrack(ev&&typeof ev.name==='string'?{name:String(ev.name).slice(0,60)}:null,'rejected:invalid'); if(!turn.noted){ turn.noted=true; actNote(aEl,'Mindy suggested a change this page can’t make',null); } return; }
     turn.count++;
+    // Opening a record waits for the answer to finish: the id must appear in what this turn actually returned
+    // (the answer text or its sources), so an id from a prompt-injected page is never opened (Eric, 2026-11-27).
+    if(act.name==='map.open_record'){ (turn.pending||(turn.pending=[])).push(act); return; }
     // Undo for this action only: the previous action's Undo is withdrawn (one level).
     if(actUndo&&actUndo.btn){ actUndo.btn.disabled=true; actUndo.btn.style.display='none'; }
     var snap=(act.name==='map.open_record')?null:actSnapshot();
@@ -12042,6 +12052,7 @@ const ASK_MINDY_JS = `<script>(function(){
           return pump();
         }); }
         function finish(){
+          try{ if(actTurn.pending&&actTurn.pending.length) actFlush(aEl,actTurn,acc+' '+(ledger?JSON.stringify(ledger):'')+' '+(turnReport?JSON.stringify(turnReport):'')); }catch(e){}
           // Card chat: only a FULLY received answer clears the pending question. A stream that ended without
           // its done event lost the connection: keep the turn id so "Get the answer" (or reopening the card)
           // fetches it without a second charge.

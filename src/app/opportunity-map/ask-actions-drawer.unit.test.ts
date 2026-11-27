@@ -132,14 +132,21 @@ describe('Ask Mindy controls the Map', () => {
     expect(t.notes()).toEqual([]);
   });
 
-  it('open_record opens the existing drawer; national view uses the existing national control (no Undo for open)', async () => {
+  it('open_record waits for the answer and opens only an id this turn returned; national view uses the existing control', async () => {
     const t = boot({ actions: true });
     await t.send('q');
     await t.push(act('map.open_record', { notice_id: '0009f2dae25541e4a2782d4807461bd0' }));
+    await t.push(act('map.open_record', { notice_id: 'injected0000000000000000000000ff' }));
     await t.push(act('map.go_to', { national: true }));
+    expect(t.w.openOppDrawer).not.toHaveBeenCalled(); // not before the answer is in
+    await t.push({ type: 'token', content: 'Start with [the Navy recompete](/opportunity-map?opp=0009f2dae25541e4a2782d4807461bd0).' });
+    await t.push({ type: 'done' });
+    await t.end();
+    expect(t.w.openOppDrawer).toHaveBeenCalledTimes(1);
     expect(t.w.openOppDrawer).toHaveBeenCalledWith('0009f2dae25541e4a2782d4807461bd0');
     expect(t.w.__mapNationalView).toHaveBeenCalled();
-    expect(t.notes()).toEqual(['Opened the opportunity · Beta', 'Showing the whole country · Beta · Undo']);
+    expect(t.notes()).toEqual(['Showing the whole country · Beta · Undo', 'Opened the opportunity · Beta']);
+    expect(t.tracked.map((p) => p.outcome)).toEqual(['ran', 'ran', 'rejected:unsourced']);
   });
 });
 
