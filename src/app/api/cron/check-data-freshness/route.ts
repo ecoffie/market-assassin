@@ -27,6 +27,7 @@ import {
 import { staleDaysForCadence } from '@/lib/data-sources/freshness';
 import { TABLE_MEASURED_SOURCES, classifyTableFreshness, isTableMeasured } from '@/lib/data-sources/table-measured';
 import { decideStamp } from '@/lib/data-sources/stamp-guard';
+import { LIVE_SYNC_CHECKS, classifyLiveSync } from '@/lib/data-sources/live-sync-checks';
 import eventsCatalog from '@/data/federal-events-sources.json';
 import { CATALOG_KEY, catalogDateFindings, catalogLinkFindings, type EventCatalog } from '@/lib/events/catalog-freshness';
 import { measureEventDrift } from '@/lib/events/event-currency-live';
@@ -164,20 +165,19 @@ export async function GET(request: NextRequest) {
   // where a silently-broken daily federal_contacts sync raised no alarm.
   for (const lc of LIVE_SYNC_CHECKS) {
     try {
-      const { data: latest } = await sb
-        .from(lc.table)
-        .select(lc.column)
-        .order(lc.column, { ascending: false })
+      let q = sb.from(lc.table).select(lc.column);
+      if (lc.where) q = q.eq(lc.where.column, lc.where.equals);
+      const { data: latest, error: readErr } = await q
+        .order(lc.column, { ascending: false, nullsFirst: false })
         .limit(1)
         .maybeSingle();
-      const ts = (latest as Record<string, string> | null)?.[lc.column];
-      if (!ts) {
+      const v = classifyLiveSync(lc, { error: readErr, timestamp: (latest as Record<string, string> | null)?.[lc.column] ?? null }, now);
+      if (v.status === 'unreadable') {
+        stale.push({ key: lc.key, name: lc.name, cadence: 'live-sync', ageDays: -1, refreshWith: `${lc.refreshWith} (UNREADABLE — clock could not be read: ${v.error}; not fresh)` });
+      } else if (v.status === 'no_timestamp') {
         stale.push({ key: lc.key, name: lc.name, cadence: 'live-sync', ageDays: 9999, refreshWith: `${lc.refreshWith} (table empty / no timestamp)` });
-        continue;
-      }
-      const ageDays = Math.round((now - new Date(ts).getTime()) / 86400_000);
-      if (ageDays > lc.staleDays) {
-        stale.push({ key: lc.key, name: lc.name, cadence: 'live-sync', ageDays, refreshWith: lc.refreshWith });
+      } else if (v.status === 'stale') {
+        stale.push({ key: lc.key, name: lc.name, cadence: 'live-sync', ageDays: v.ageDays, refreshWith: `${lc.refreshWith} (threshold ${lc.staleDays}d)` });
       }
     } catch (e) {
       stale.push({ key: lc.key, name: lc.name, cadence: 'live-sync', ageDays: -1, refreshWith: `${lc.refreshWith} (check failed: ${e instanceof Error ? e.message : 'unknown'})` });
@@ -291,45 +291,7 @@ export async function GET(request: NextRequest) {
 // down. Add a row here to bring another live pipeline under the watchdog.
 const EVENT_CURRENCY_KEY = 'sam_events_currency';
 
-const LIVE_SYNC_CHECKS: Array<{ key: string; name: string; table: string; column: string; staleDays: number; refreshWith: string }> = [
-  {
-    // extracted_at is written on EVERY upsert (R4), so its max is "when the extractor last re-read
-    // the corpus" — it used to be first-insert only and could not serve as this clock.
-    key: 'sam_events_reread',
-    name: 'Federal events (SAM notice re-read, daily 07:00 UTC)',
-    table: 'sam_events',
-    column: 'extracted_at',
-    staleDays: 2,
-    refreshWith: 'live sync — verify /api/cron/extract-sam-events is running (cron_job_runs.http_status)',
-  },
-  {
-    key: 'federal_contacts_sync',
-    name: 'Government contacts (SAM POC daily sync)',
-    table: 'federal_contacts',
-    column: 'updated_at',
-    staleDays: 3, // daily sync; 3d of silence = pipeline likely broken
-    refreshWith: 'live sync — verify /api/cron/sync-gov-buyer-data is running',
-  },
-  {
-    // Honesty only (specialty repair stays PARKED): max(synced_at) is last REAL data, not last
-    // cron attempt. sync-dibbs disabled 2026-11-02; control plane still said current.
-    key: 'dibbs_rfqs_data',
-    name: 'DLA DIBBS RFQs (last real data via synced_at)',
-    table: 'dibbs_rfqs',
-    column: 'synced_at',
-    staleDays: 3,
-    refreshWith: 'sync-dibbs is DISABLED (Apify cost) — do not re-enable without Eric; mark control plane content_stale',
-  },
-  {
-    // Empty table / no synced_at → ageDays 9999 in the loop above. Stops silent false green.
-    key: 'dod_sbir_topics_data',
-    name: 'DoD SBIR topics cache (dod_sbir_topics)',
-    table: 'dod_sbir_topics',
-    column: 'synced_at',
-    staleDays: 2,
-    refreshWith: 'sync-dod-sbir stays ENABLED. HTTP 503 is degraded, not a reason to park. Do not apply 20261118_park_false_green_freshness.sql to disable this job.',
-  },
-];
+// LIVE_SYNC_CHECKS moved to src/lib/data-sources/live-sync-checks.ts (data-age alarm, 2026-11-25) so thresholds are unit-tested.
 
 // How to refresh each curated source (the runnable path — keep in sync with the
 // registry doc's "Refresh ownership" section).

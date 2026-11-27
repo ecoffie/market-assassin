@@ -8,6 +8,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { MindyLogo } from '@/components/mindy/MindyLogo';
 import { ACTION_PLAN, ACTION_PLAN_STEPS } from '@/lib/learn/action-plan';
+import { COURSE_LIVE } from '@/lib/course/course-live';
 
 const CHECKS_KEY = 'mindy_roadmap_2027_checks';
 /** The free course: sign-up, then the personalized stage and the lessons. */
@@ -37,6 +38,7 @@ const CSS = `
 .rd-btn{display:inline-flex;align-items:center;padding:13px 22px;border-radius:999px;border:1px solid var(--mp-line);background:var(--mp-surface);color:var(--mp-ink);font:600 15px var(--mp-font-sans);text-decoration:none}
 .rd-btn--primary{background:var(--mp-navy);border-color:var(--mp-navy);color:var(--mp-surface)}
 .rd-btn--primary:hover{background:var(--mp-navy-hover)}
+.rd-soon{opacity:.65;cursor:default}
 .rd-flow{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin-top:14px}
 .rd-fp{background:var(--mp-surface);border:1px solid var(--mp-line);border-radius:12px;padding:12px;display:grid;gap:6px;align-content:start;justify-items:start;text-decoration:none;color:var(--mp-ink)}
 .rd-fp:hover{border-color:var(--mp-navy)}
@@ -71,6 +73,7 @@ const CSS = `
 .rd-learn{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;background:var(--mp-navy-wash);border:1px solid var(--mp-line);border-radius:12px;padding:14px 16px;font:500 15px var(--mp-font-sans);color:var(--mp-body)}
 .rd-learn a{font:600 15px var(--mp-font-sans);color:var(--mp-navy);text-decoration:none;white-space:nowrap}
 .rd-learn a:hover{text-decoration:underline}
+.rd-learn .rd-soon{font:600 15px var(--mp-font-sans);color:var(--mp-muted);white-space:nowrap}
 .rd-close{background:var(--mp-navy);color:var(--mp-surface);border-radius:16px;padding:30px 28px;display:grid;gap:10px;justify-items:start}
 .rd-close h2{font:700 clamp(1.5rem,3.4vw,2rem)/1.15 var(--mp-font-sans);margin:0;color:var(--mp-surface);text-wrap:balance}
 .rd-close p{font:400 16px/1.55 var(--mp-font-sans);margin:0;max-width:56ch;color:var(--mp-navy-wash)}
@@ -82,6 +85,19 @@ const CSS = `
 function Badge({ cadence }: { cadence: 'ONCE' | 'REPEAT' }) {
   return (
     <span className={`rd-badge ${cadence === 'ONCE' ? 'rd-badge--once' : 'rd-badge--repeat'}`}>{cadence}</span>
+  );
+}
+
+/**
+ * A call to action into the free course. While the course is not live (/course shows only a
+ * "Coming soon" placeholder) it is plain, non-clickable text labelled "(coming soon)".
+ */
+function CourseLink({ className, children }: { className?: string; children: string }) {
+  if (COURSE_LIVE) return <Link className={className} href={COURSE_URL}>{`${children} →`}</Link>;
+  return (
+    <span className={className ? `${className} rd-soon` : 'rd-soon'} aria-disabled="true">
+      {`${children} (coming soon)`}
+    </span>
   );
 }
 
@@ -118,11 +134,13 @@ export default function RoadmapChecklist() {
             <p className="rd-by">Presented by <MindyLogo size={20} /><b>Mindy</b></p>
             <p className="rd-lede">
               Every step to build a winning federal contracting business: {TOTAL} action items across 5 phases.
-              Check them off as you go, and learn how to do each one in the free course.
+              {COURSE_LIVE
+                ? 'Check them off as you go, and learn how to do each one in the free course.'
+                : 'Check them off as you go. A free course that teaches each one is coming soon.'}
             </p>
             <div className="rd-btns">
-              <Link className="rd-btn rd-btn--primary" href={COURSE_URL}>Learn how in the free course →</Link>
-              <a className="rd-btn" href="#phase-1">See the 27 steps</a>
+              <CourseLink className={COURSE_LIVE ? 'rd-btn rd-btn--primary' : 'rd-btn'}>Learn how in the free course</CourseLink>
+              <a className={COURSE_LIVE ? 'rd-btn' : 'rd-btn rd-btn--primary'} href="#phase-1">See the 27 steps</a>
             </div>
             <nav className="rd-flow" aria-label="Phases">
               {ACTION_PLAN.map((p) => (
@@ -177,7 +195,7 @@ export default function RoadmapChecklist() {
                 </ol>
                 <div className="rd-learn">
                   <span>Not sure how to do these steps?</span>
-                  <Link href={COURSE_URL}>Learn Phase {p.n} in the free course →</Link>
+                  <CourseLink>{`Learn Phase ${p.n} in the free course`}</CourseLink>
                 </div>
               </section>
             ))}
@@ -185,11 +203,12 @@ export default function RoadmapChecklist() {
             <section className="rd-close">
               <h2>You have the steps. Now learn how to do them.</h2>
               <p>
-                The free course shows you which stage you are in and walks you through each step with short lessons.
-                It takes one minute to start.
+                {COURSE_LIVE
+                  ? 'The free course shows you which stage you are in and walks you through each step with short lessons. It takes one minute to start.'
+                  : 'A free course that shows you which stage you are in and walks you through each step with short lessons is coming soon.'}
               </p>
               <div className="rd-btns">
-                <Link className="rd-btn" href={COURSE_URL}>Start the free course →</Link>
+                <CourseLink className="rd-btn">Start the free course</CourseLink>
                 <Link className="rd-btn rd-btn--ghost" href="/">See what Mindy does</Link>
               </div>
             </section>

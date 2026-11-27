@@ -301,3 +301,28 @@ describe('unresolved offices stay unnamed', () => {
     expect(r.notes.join(' ')).toMatch(/No contact was added/);
   });
 });
+
+describe('get_buying_offices: window vs warehouse currency (EFS Digital chip, 2026-11-25)', () => {
+  // The chip read "as of 2026-09-30" (FY2026 end, the default window's last FY) while the warehouse held actions
+  // through 2026-11-20. _meta now carries both, and as_of is kept unchanged for existing readers.
+  const coverage = async () => ({ clocks: { sourceActionMax: '2026-11-20' }, lastBuilt: null, freshness: 'fresh' }) as never;
+  it('reports the fiscal-year window and data_current_through separately; as_of unchanged', async () => {
+    const { d } = deps();
+    const r = await getBuyingOffices({ state: 'TN' }, d, NOW, undefined, coverage);
+    expect(r._meta.window).toMatchObject({ fy_from: 2024, fy_to: 2026, defaulted: true });
+    expect(r._meta.window.label).toMatch(/FY2024-FY2026/);
+    expect(r._meta.data_current_through).toBe('2026-11-20');
+    expect('as_of' in r._meta).toBe(true);
+  });
+  it('an unreadable coverage clock is null (unknown), never a guessed date', async () => {
+    const { d } = deps();
+    const r = await getBuyingOffices({ state: 'TN' }, d, NOW, undefined, async () => { throw new Error('kv down'); });
+    expect(r._meta.data_current_through).toBeNull();
+  });
+  it('validation and unavailable results carry the window too', async () => {
+    const { d } = deps({ fail: true });
+    const r = await getBuyingOffices({ state: 'TN' }, d, NOW, undefined, coverage);
+    expect(r._meta.window.fy_to).toBe(2026);
+    expect(r._meta.data_current_through).toBe('2026-11-20');
+  });
+});

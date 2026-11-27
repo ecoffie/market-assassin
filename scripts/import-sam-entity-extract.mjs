@@ -13,6 +13,9 @@
  *   node scripts/import-sam-entity-extract.mjs --file /tmp/sam-extract/entities.zip
  *   NAICS=541512,541611 node scripts/import-sam-entity-extract.mjs
  *   node scripts/import-sam-entity-extract.mjs --all-naics     # import everything (big)
+ *   node scripts/import-sam-entity-extract.mjs --file <zip> --all-naics --dry   # ZERO writes: parse, reconcile,
+ *        count would-update vs would-insert (read-only probe), print sample rows. No archive upload, no upsert,
+ *        no checkpoint, no dead-letter file.
  *
  * The extract is a ZIP of a pipe-delimited .dat. Fields are 1-indexed; the
  * NAICS-list and SBA-types fields are variable-width (a counter followed by
@@ -31,6 +34,7 @@ import unzipper from 'unzipper';
 import { Storage } from '@google-cloud/storage';
 import { execSync } from 'node:child_process';
 import { archiveSamZip, snapshotDate, SAM_ARCHIVE_BUCKET, ArchiveChecksumConflict } from './lib/sam-archive.mjs';
+import { resolveExtractFileName, findDatEntry } from './lib/sam-extract-input.mjs';
 
 // Bump when the parser's FIELD MAPPING changes, so a backfill can target only rows
 // produced by superseded logic. v2 = added per-NAICS sbaSmallBusiness (P0-3).
@@ -54,6 +58,18 @@ const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
 //                     mode — covers whole industries, e.g. all construction)
 //   NAICS=541512,...  keep only these exact 6-digit codes (default seed set)
 const ALL_NAICS = process.argv.includes('--all-naics');
+// --dry: ZERO persistent writes (no GCS archive, no upsert, no checkpoint / dead-letter files). Reads only:
+// the local ZIP and a pre-existence probe per batch, so the would-update vs would-insert split is real.
+const DRY = process.argv.includes('--dry');
+const DRY_SAMPLE_ROWS = 3;
+/**
+ * Payload columns the extract can leave BLANK (null / 'Unknown') while another writer holds a value. A blank never
+ * overwrites: the existing value is kept (flush). Every other payload column is always populated by the parser.
+ */
+const PRESERVE_IF_BLANK = [
+  'cage_code', 'dba_name', 'physical_city', 'physical_state', 'physical_zip', 'physical_country',
+  'primary_naics', 'registration_status', 'registration_expiry',
+];
 const SECTORS = (process.env.SECTORS || '')
   .split(',').map(s => s.trim()).filter(Boolean);
 const SEED_NAICS = new Set((process.env.NAICS ||
@@ -70,7 +86,11 @@ function naicsMatches(codes) {
 
 const fileArgIdx = process.argv.indexOf('--file');
 const ZIP_PATH = fileArgIdx > -1 ? process.argv[fileArgIdx + 1] : '/tmp/sam-extract/entities.zip';
-const EXTRACT_FILENAME = process.env.SAM_EXTRACT_FILE || 'SAM_PUBLIC_MONTHLY_V2_20260503.ZIP';
+// The provenance label names the file actually imported: the --file basename, which SAM_EXTRACT_FILE must match.
+let EXTRACT_FILENAME;
+try {
+  EXTRACT_FILENAME = resolveExtractFileName({ fileArg: fileArgIdx > -1 ? ZIP_PATH : null, envName: process.env.SAM_EXTRACT_FILE });
+} catch (e) { console.error(e.message); process.exit(1); }
 
 // ── SBA business-type code → normalized label (matches entity-api.ts) ──
 function sbaLabel(code) {
@@ -215,19 +235,32 @@ function parseRecord(fields) {
 async function downloadIfNeeded() {
   if (existsSync(ZIP_PATH)) { console.log('Using existing file:', ZIP_PATH); return; }
   if (!SAM_KEY) { console.error('No SAM key to download; provide --file'); process.exit(1); }
-  await mkdir('/tmp/sam-extract', { recursive: true });
-  const url = `https://api.sam.gov/data-services/v1/extracts?fileType=ENTITY&fileName=${EXTRACT_FILENAME}&api_key=${SAM_KEY}`;
+  await mkdir(dirname(ZIP_PATH), { recursive: true });
+  // ⚠️ The key travels in the query string (SAM's extract API). The URL is NEVER logged, and a failed download
+  // reports only the HTTP status or error code (Agent 4, 2026-11-25: the monthly GitHub Action prints this output).
+  const url = `https://api.sam.gov/data-services/v1/extracts?fileType=ENTITY&fileName=${encodeURIComponent(EXTRACT_FILENAME)}&api_key=${SAM_KEY}`;
   console.log('Downloading', EXTRACT_FILENAME, '...');
-  await new Promise((res, rej) => {
-    const get = (u) => https.get(u, (r) => {
-      if (r.statusCode >= 300 && r.statusCode < 400 && r.headers.location) return get(r.headers.location);
-      if (r.statusCode !== 200) return rej(new Error('HTTP ' + r.statusCode));
-      const f = createWriteStream(ZIP_PATH);
-      r.pipe(f); f.on('finish', () => f.close(res));
-    }).on('error', rej);
-    get(url);
-  });
+  try {
+    await new Promise((res, rej) => {
+      const get = (u, hops = 0) => https.get(u, (r) => {
+        if (r.statusCode >= 300 && r.statusCode < 400 && r.headers.location && hops < 5) { r.resume(); return get(r.headers.location, hops + 1); }
+        if (r.statusCode !== 200) { r.resume(); return rej(new Error(`download failed: HTTP ${r.statusCode}`)); }
+        const f = createWriteStream(ZIP_PATH);
+        r.pipe(f); f.on('finish', () => f.close(res)); f.on('error', (e) => rej(new Error(`download failed: write ${e.code || 'error'}`)));
+      }).on('error', (e) => rej(new Error(`download failed: ${e.code || 'network error'}`)));
+      get(url);
+    });
+  } catch (e) {
+    throw new Error(redactSecrets(e instanceof Error ? e.message : String(e)));
+  }
   console.log('Downloaded to', ZIP_PATH);
+}
+
+/** Strip any api_key value (and the raw key) from text before it reaches a log. */
+function redactSecrets(text) {
+  let out = String(text).replace(/api_key=[^&\s"']+/gi, 'api_key=***');
+  if (SAM_KEY) out = out.split(SAM_KEY).join('***');
+  return out;
 }
 
 /**
@@ -265,8 +298,11 @@ async function archiveOrRefuse(zipPath) {
 
 async function main() {
   await downloadIfNeeded();
-  // STEP 1-5: archive and verify BEFORE a single row is written.
-  const archive = await archiveOrRefuse(ZIP_PATH);
+  if (DRY) console.log('\n=== DRY RUN — no archive upload, no upsert, no checkpoint ===');
+  // STEP 1-5: archive and verify BEFORE a single row is written. A dry run writes no rows, so it archives nothing.
+  const archive = DRY
+    ? { key: '(dry run: not archived)', sha256: '-', storedSha: '-', generation: '-', size: 0, bytes: 0, skipped: true, codeVersion: '' }
+    : await archiveOrRefuse(ZIP_PATH);
   console.log(`\n=== ARCHIVE CONFIRMED ===`);
   console.log(`  object:     gs://${SAM_ARCHIVE_BUCKET}/${archive.key}`);
   console.log(`  sha256:     ${archive.sha256}`);
@@ -303,7 +339,8 @@ async function main() {
   //   • updated vs inserted split, so we know how much of the universe changed
   const CKPT = `${ZIP_PATH}.checkpoint.json`;
   const DEADLETTER = `${ZIP_PATH}.failed.jsonl`;
-  const RESUME = process.argv.includes('--resume');
+  const RESUME = process.argv.includes('--resume') && !DRY;
+  const samples = [];
   let resumeFrom = 0;
   if (RESUME && existsSync(CKPT)) {
     try {
@@ -315,6 +352,8 @@ async function main() {
   let parsed = 0, kept = 0, upserted = 0, lineNo = 0;
   let unparseable = 0, failed = 0, inserted = 0, updated = 0, skippedResume = 0;
   let structural = 0, dedupedInBatch = 0;   // BOF/EOF markers; repeat UEIs collapsed per batch
+  const preservedByCol = {};
+  let PAYLOAD_COLUMNS = null;              // the exact column set every upsert row carries (reported)
   let batch = [];
 
   // Which UEIs already exist? Needed for the inserted-vs-updated split, since
@@ -328,15 +367,48 @@ async function main() {
     const ueis = rows.map(r => r.uei);
 
     let preExisting = new Set();
+    /** Existing values of the fields this extract can carry as NULL (see PRESERVE_IF_BLANK). */
+    let existingByUei = new Map();
     // .range() is REQUIRED: PostgREST silently caps an unranged select at 1,000 rows, so a
     // batch larger than that would report missing UEIs as "new" and inflate the inserted
     // count. Batches are 500 today; the explicit range makes the guarantee independent of
     // that constant instead of relying on it.
     const { data: existing, error: exErr } = await sb
-      .from('sam_entities').select('uei').in('uei', ueis).range(0, Math.max(ueis.length - 1, 0));
-    if (exErr) console.warn('  [warn] pre-existence probe failed:', exErr.message);
-    else preExisting = new Set((existing || []).map(r => r.uei));
+      .from('sam_entities').select(['uei', ...PRESERVE_IF_BLANK].join(', ')).in('uei', ueis).range(0, Math.max(ueis.length - 1, 0));
+    if (exErr) {
+      // Without the existing values a blank extract field would ERASE another writer's value. Never write blind.
+      console.warn('  [warn] pre-existence probe failed — batch NOT written:', exErr.message);
+      failed += rows.length;
+      if (!DRY) appendFileSync(DEADLETTER, rows.map(r => JSON.stringify({ uei: r.uei, line: lineNo, err: `probe: ${exErr.message}` })).join('\n') + '\n');
+      batch = [];
+      return;
+    }
+    preExisting = new Set((existing || []).map(r => r.uei));
+    existingByUei = new Map((existing || []).map(r => [r.uei, r]));
+    // NULL-SAFETY (Agent 4, 2026-11-25): an upsert writes every key in the payload, so a key the extract left blank
+    // would overwrite a value another source filled (live entity sync, POC importer). Keep the existing value
+    // instead, and count each preserved field. Columns the extract never carries (entity_url, points_of_contact,
+    // certification_records, psc_codes, exclusion_flag, raw_data, duns) are not in the payload at all.
+    for (const r of rows) {
+      const ex = existingByUei.get(r.uei);
+      if (!ex) continue;
+      for (const col of PRESERVE_IF_BLANK) {
+        const blank = col === 'registration_status' ? (r[col] == null || r[col] === 'Unknown') : r[col] == null;
+        if (blank && ex[col] != null && !(col === 'registration_status' && ex[col] === 'Unknown')) {
+          r[col] = ex[col];
+          preservedByCol[col] = (preservedByCol[col] || 0) + 1;
+        }
+      }
+    }
 
+    if (DRY) {
+      // Same accounting as a real batch, with no write: would-update / would-insert from the read-only probe.
+      upserted += rows.length;
+      for (const u of ueis) (preExisting.has(u) ? updated++ : inserted++);
+      for (const r of rows) if (samples.length < DRY_SAMPLE_ROWS) samples.push({ ...r, _would: preExisting.has(r.uei) ? 'update' : 'insert' });
+      batch = [];
+      return;
+    }
     const { error } = await sb.from('sam_entities')
       .upsert(rows, { onConflict: 'uei', ignoreDuplicates: false });
     if (error) {
@@ -355,8 +427,9 @@ async function main() {
 
   // Stream the ZIP → the .dat entry → line by line (never load it all).
   const directory = await unzipper.Open.file(ZIP_PATH);
-  const datEntry = directory.files.find(f => /\.dat$/i.test(f.path)) || directory.files[0];
-  console.log('Reading entry:', datEntry.path);
+  // SAM wrapped the November 2026 extract in a second zip: open nested single-zip archives (≤2 levels) to the .dat.
+  const { entry: datEntry, nesting } = await findDatEntry(directory, (buf) => unzipper.Open.buffer(buf));
+  console.log('Reading entry:', datEntry.path, nesting ? `(inside ${nesting} nested zip layer${nesting > 1 ? 's' : ''})` : '');
 
   const rl = createInterface({ input: datEntry.stream(), crlfDelay: Infinity });
   for await (const line of rl) {
@@ -369,6 +442,7 @@ async function main() {
     parsed++;
     if (!ALL_NAICS && !naicsMatches(row.naics_codes)) continue;
     kept++;
+    if (!PAYLOAD_COLUMNS) PAYLOAD_COLUMNS = Object.keys(row).sort();
     batch.push(row);
     if (batch.length >= 500) await flush();
     if (lineNo % 100000 === 0) console.log(`  ...line ${lineNo}, parsed ${parsed}, kept ${kept}, upserted ${upserted}`);
@@ -394,11 +468,19 @@ kept (matched filter)   ${kept.toLocaleString()}
   failed (dead-letter)  ${failed.toLocaleString()}
   accounted             ${keptAccounted.toLocaleString()}  ${keptAccounted === kept ? 'BALANCES' : 'MISMATCH — investigate'}
 
-REGISTRY CHANGE
-  updated existing      ${updated.toLocaleString()}
-  newly inserted        ${inserted.toLocaleString()}
-  sam_entities total    ${count?.toLocaleString?.() ?? count}
+NULL-SAFETY (existing value kept where the extract field was blank)
+${PRESERVE_IF_BLANK.map((c) => `  ${c.padEnd(22)}${(preservedByCol[c] || 0).toLocaleString()}`).join('\n')}
+  payload columns       ${PAYLOAD_COLUMNS ? PAYLOAD_COLUMNS.join(', ') : '(no rows)'}
+
+REGISTRY CHANGE${DRY ? ' (DRY RUN — nothing written; "upserted" = would upsert)' : ''}
+  ${DRY ? 'would update' : 'updated existing'}      ${updated.toLocaleString()}
+  ${DRY ? 'would insert' : 'newly inserted'}        ${inserted.toLocaleString()}
+  sam_entities total    ${count?.toLocaleString?.() ?? count}${DRY ? ' (unchanged)' : ''}
 ${failed ? `\n  ${failed} rows dead-lettered to ${DEADLETTER} — re-run with --resume after investigating.` : ''}`);
+  if (DRY) {
+    console.log(`\n=== SAMPLE ROWS (first ${samples.length} kept, as they WOULD be written) ===`);
+    for (const r of samples) console.log(JSON.stringify(r, null, 2));
+  }
 }
 
-main().catch(e => { console.error('FATAL', e); process.exit(1); });
+main().catch(e => { console.error('FATAL', redactSecrets(e instanceof Error ? (e.stack || e.message) : e)); process.exit(1); });
