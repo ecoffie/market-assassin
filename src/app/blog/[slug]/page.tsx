@@ -189,8 +189,8 @@ function BodyHowToFindContracts() {
       </Lead>
 
       <P>
-        Every business day, roughly <Strong>1,500 new federal opportunities</Strong>{' '}
-        get posted across more than 15 government websites. SAM.gov is the
+        Every business day, <Strong>new federal opportunities</Strong>{' '}
+        get posted across a long list of government websites. SAM.gov is the
         biggest one, but it&apos;s not the only one. And if you&apos;re searching
         only by keyword on a Tuesday night, you&apos;re missing most of what
         matters.
@@ -202,7 +202,7 @@ function BodyHowToFindContracts() {
         contractors make every single week.
       </P>
 
-      <H2>The problem: 15 websites, 1,500 daily opps, no UX</H2>
+      <H2>The problem: too many websites, too many notices, no UX</H2>
 
       <P>
         The federal government doesn&apos;t have a single &quot;opportunities&quot;
@@ -229,32 +229,33 @@ function BodyHowToFindContracts() {
       <H2>The 4 sources every contractor should monitor</H2>
 
       <P>
-        You don&apos;t need to monitor 15 websites. You need to monitor four.
-        The other 11 either re-publish what these four have, or they&apos;re
+        You don&apos;t need to monitor every one of those websites. You need to monitor four.
+        The rest either re-publish what these four have, or they&apos;re
         agency-specific portals you only need if you&apos;re already targeting
         that agency.
       </P>
 
       <H3>1. SAM.gov — the federal procurement firehose</H3>
       <P>
-        Every federal contract over $25,000 has to be posted here. It&apos;s
+        Most federal contract actions expected to exceed $25,000 have to be
+        posted here (FAR 5.101), with a few listed exceptions. It&apos;s
         the legal system of record. Search by NAICS code (not keyword) and
         you&apos;ll see solicitations, sources sought notices, and award
         notices. The UI is rough, but the data is authoritative.
       </P>
       <P>
         The trick most contractors miss: SAM.gov isn&apos;t one stream of
-        notices, it&apos;s six. Solicitations are the ones with a due date.
+        notices, it&apos;s several. Solicitations are the ones with a due date.
         Sources sought are the early signals — agencies asking the market
         if anyone can do this work. Special notices, award notices, sale
         notices, and combined synopsis/solicitations round out the rest.
-        Filter to all six notice types or you&apos;ll miss the
+        Filter to every notice type or you&apos;ll miss the
         forward-looking signals that matter most.
       </P>
 
       <H3>2. Grants.gov — the grants side most contractors ignore</H3>
       <P>
-        Federal grants are a separate $700B+ system. If your business does
+        Federal grants are a separate system with their own rules. If your business does
         research, training, technology development, or anything in the
         health/education/energy space, Grants.gov has work SAM.gov never
         will. Most small contractors never check it. That&apos;s the
@@ -271,7 +272,7 @@ function BodyHowToFindContracts() {
       <H3>3. Agency forecasts — what&apos;s coming before it posts</H3>
       <P>
         Every major agency publishes a procurement forecast — what they
-        <em> plan</em> to buy in the next 12-18 months. These are gold for
+        <em> plan</em> to buy next. These are gold for
         positioning, because by the time something hits SAM.gov, the incumbent
         has been talking to the agency for a year. The forecast is your
         chance to start that conversation early.
@@ -305,7 +306,7 @@ function BodyHowToFindContracts() {
 
       <P>
         Filtering is where most people go wrong. They search by keyword
-        (&quot;cybersecurity&quot;) and get 400 results that have nothing to
+        (&quot;cybersecurity&quot;) and get a pile of results that have nothing to
         do with their business. Then they give up and assume there&apos;s
         nothing for them.
       </P>
@@ -347,7 +348,7 @@ function BodyHowToFindContracts() {
           Most opportunity search tools default to keyword search because
           that&apos;s what&apos;s easy to build. NAICS search takes a few
           extra steps. That&apos;s why I lead with NAICS — it&apos;s where
-          90% of the noise drops out.
+          most of the noise drops out.
         </p>
       </Callout>
 
@@ -374,7 +375,7 @@ function BodyHowToFindContracts() {
       <H3>Mistake 3: Not tracking incumbents</H3>
       <P>
         Every contract has an end date. Every end date is a sales opportunity
-        — for whoever knows about it 12+ months ahead. If you&apos;re only
+        — for whoever knows about it well ahead. If you&apos;re only
         looking at what&apos;s on SAM.gov right now, you&apos;re missing the
         contracts that <em>will</em> be on SAM.gov a year from now. Those are
         the easiest to win, because you have time to position.
@@ -419,7 +420,7 @@ function BodyHowToFindContracts() {
 
       <P>
         Even if you&apos;re doing this without any tools, you can build a
-        rhythm that catches 80% of what matters in under an hour a week:
+        rhythm that catches most of what matters in under an hour a week:
       </P>
 
       <UL>
@@ -447,7 +448,7 @@ function BodyHowToFindContracts() {
 
       <P>
         That&apos;s the floor. It&apos;s not enough to win the big
-        contracts, but it&apos;s more than 90% of small contractors are
+        contracts, but it&apos;s more than most small contractors are
         doing — and it&apos;ll surface real opportunities within the first
         month. Then decide whether to keep the manual cadence or hand the
         scanning off to something (or someone) else.
@@ -516,17 +517,17 @@ function BodySamGovAlerts() {
         the notice exists.
       </P>
 
-      <H2>How keyword alerts create noise (with real numbers)</H2>
+      <H2>How keyword alerts create noise (an example)</H2>
 
       <P>
         Let&apos;s say you set up a SAM.gov alert for &quot;IT support
         services.&quot; Reasonable keyword. Common business. Here&apos;s
-        roughly what your inbox looks like after a week:
+        an illustrative week in your inbox:
       </P>
 
       <UL>
         <LI>
-          ~40 notices/week match the keyword across all federal agencies.
+          Say 40 notices match the keyword across all federal agencies.
         </LI>
         <LI>
           Of those, maybe 8 are set-asides your business qualifies for.
@@ -578,8 +579,8 @@ function BodySamGovAlerts() {
         <LI>
           <Strong>Incumbent context.</Strong> Tell me who has it now (if
           it&apos;s a recompete), when their contract ends, and what they
-          were paid. That&apos;s the difference between a 15-minute triage
-          and a 2-hour research session.
+          were paid. That&apos;s the difference between a quick triage
+          and a long research session.
         </LI>
         <LI>
           <Strong>Recompete flags.</Strong> Flag opportunities that are
@@ -605,8 +606,8 @@ function BodySamGovAlerts() {
         responding to the sources sought to introduce your team.&quot;
       </P>
       <P>
-        That&apos;s 60 seconds of reading and a clear next step. Compare
-        it to a SAM.gov email with 40 raw notice titles and no context.
+        That&apos;s a short read and a clear next step. Compare
+        it to a SAM.gov email full of raw notice titles and no context.
         Same data underneath. Wildly different value to you.
       </P>
 
@@ -645,15 +646,15 @@ function BodySamGovAlerts() {
         What I&apos;m saying is: don&apos;t use it for <em>discovery</em>.
         Use it for the transaction. Discovery is a different job — it
         requires aggregating four different government data sources,
-        scoring fit against your business, and surfacing the 5 things
-        worth your attention out of the 1,500 daily opportunities.
+        scoring fit against your business, and surfacing the few things
+        worth your attention out of everything posted each day.
       </P>
 
       <P>
         That&apos;s the job I built me for. Every morning, I send you a
         briefing with the opportunities that actually fit your business —
         scored, contextualized, with the incumbent data and recompete flags
-        already pulled. You spend two minutes reading, click into the ones
+        already pulled. You spend a few minutes reading, click into the ones
         worth pursuing, and go to SAM.gov to read the full notice and bid.
       </P>
 
@@ -679,8 +680,8 @@ function BodyRecompetesGuide() {
   return (
     <>
       <Lead>
-        Roughly $2 billion in federal contracts come up for recompete every
-        business day. Most of them are won by the incumbent — not because
+        Every business day, federal contracts reach the end of their term
+        and come up for recompete. Many of them are won by the incumbent — not because
         the incumbent is better, but because nobody else started working the
         opportunity 18 months in advance. That&apos;s the gap. That&apos;s
         also where the money is.
@@ -697,8 +698,9 @@ function BodyRecompetesGuide() {
       <H2>What a recompete is (and why it matters)</H2>
 
       <P>
-        Almost every federal contract has a base period plus option years —
-        typically a 5-year total ceiling. When the option years run out, the
+        Almost every federal contract has a base period plus option years.
+        For services, the base and options together normally may not run
+        past five years (FAR 17.204(e)). When the option years run out, the
         agency has to compete the work again. That&apos;s a recompete.
       </P>
 
@@ -805,7 +807,7 @@ function BodyRecompetesGuide() {
       <P>
         Sources sought notices are the agency saying &quot;we&apos;re
         thinking about buying this — who&apos;s out there?&quot; They
-        almost always precede a recompete by 6-9 months. Track them by
+        often come before a recompete solicitation. Track them by
         NAICS in SAM.gov, and pay extra attention when one matches a
         contract you already identified as expiring. That pairing is your
         signal to move.

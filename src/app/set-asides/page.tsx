@@ -17,6 +17,7 @@
 import type { Metadata } from 'next';
 import { siteShareImages } from '@/lib/seo/share-image';
 import Link from 'next/link';
+import { forecastsLabel } from '@/lib/marketing-stats';
 
 export const metadata: Metadata = {
   title: 'SBA Set-Aside Programs — 8(a), HUBZone, SDVOSB, WOSB Contracts | Mindy',
@@ -50,7 +51,7 @@ const programs = [
     name: '8(a) Business Development',
     short: '8(a)',
     eligibility:
-      'Socially and economically disadvantaged small businesses certified by the SBA. Nine-year program with sole-source authority up to $4.5M services / $8M manufacturing.',
+      'Socially and economically disadvantaged small businesses certified by the SBA. Nine-year program with sole-source authority up to the dollar limits set in the FAR.',
     href: '/set-asides/8a',
   },
   {
@@ -58,7 +59,7 @@ const programs = [
     name: 'HUBZone',
     short: 'HUBZone',
     eligibility:
-      'Small businesses with principal office in a Historically Underutilized Business Zone and 35%+ of employees living in a HUBZone. Gets a 10% price evaluation preference on full-and-open bids.',
+      'Small businesses with principal office in a Historically Underutilized Business Zone and at least 35% of employees living in a HUBZone, under SBA rules. Gets a 10% price evaluation preference on full-and-open bids (15 U.S.C. 657a).',
     href: '/set-asides/hubzone',
   },
   {
@@ -66,7 +67,7 @@ const programs = [
     name: 'Service-Disabled Veteran-Owned',
     short: 'SDVOSB',
     eligibility:
-      'Small businesses 51%+ owned and controlled by veterans with a service-connected disability. SBA-certified as of 2023. VA Veterans First gives priority at the VA.',
+      'Small businesses at least 51% owned and controlled by veterans with a service-connected disability, under SBA rules. SBA-certified as of 2023. VA Veterans First gives priority at the VA.',
     href: '/set-asides/sdvosb',
   },
   {
@@ -74,7 +75,7 @@ const programs = [
     name: 'Women-Owned Small Business',
     short: 'WOSB / EDWOSB',
     eligibility:
-      'Small businesses 51%+ owned and controlled by U.S. citizen women. EDWOSB adds an economic-disadvantage threshold and unlocks set-asides in a broader range of NAICS codes.',
+      'Small businesses at least 51% owned and controlled by U.S. citizen women, under SBA rules. EDWOSB adds an economic-disadvantage threshold and unlocks set-asides in a broader range of NAICS codes.',
     href: '/set-asides/wosb',
   },
 ];
@@ -220,7 +221,7 @@ export default function SetAsidesIndexPage() {
 
             <div className="bg-(--mp-surface) border border-(--mp-line) rounded-lg p-5">
               <h3 className="text-(--mp-ink) font-semibold mb-1">
-                Your business is 51%+ owned by women
+                Your business is majority owned by women
               </h3>
               <p className="text-(--mp-muted) text-sm">
                 Start with <Link href="/set-asides/wosb" className="text-(--mp-navy) hover:text-(--mp-navy-hover)">WOSB</Link> —
@@ -281,22 +282,22 @@ export default function SetAsidesIndexPage() {
               <h3 className="text-(--mp-ink) font-semibold mb-2">Sole-source intelligence</h3>
               <p className="text-(--mp-muted) text-sm">
                 8(a), SDVOSB, HUBZone, and WOSB firms can win sole-source awards up to
-                $4.5M (services) / $8M (manufacturing). Mindy tracks which agencies
+                the dollar limits set in the FAR. Mindy tracks which agencies
                 actually use that authority.
               </p>
             </div>
             <div className="bg-(--mp-surface) border border-(--mp-line) rounded-lg p-5">
               <h3 className="text-(--mp-ink) font-semibold mb-2">Recompete alerts</h3>
               <p className="text-(--mp-muted) text-sm">
-                When a set-aside contract is 12 months from expiring, Mindy flags it —
+                When a set-aside contract is nearing expiration, Mindy flags it,
                 including whether the incumbent shares your certification.
               </p>
             </div>
             <div className="bg-(--mp-surface) border border-(--mp-line) rounded-lg p-5">
               <h3 className="text-(--mp-ink) font-semibold mb-2">Forecast aggregation</h3>
               <p className="text-(--mp-muted) text-sm">
-                33,000+ federal forecasts pulled into one feed, filtered by set-aside.
-                See what&apos;s coming 6–18 months before the solicitation hits SAM.gov.
+                {forecastsLabel} federal forecasts pulled into one feed, filtered by set-aside.
+                See what&apos;s coming before the solicitation hits SAM.gov.
               </p>
             </div>
           </div>

@@ -19,11 +19,12 @@
 import type { Metadata } from 'next';
 import { siteShareImages } from '@/lib/seo/share-image';
 import Link from 'next/link';
+import { forecastsLabel } from '@/lib/marketing-stats';
 
 export const metadata: Metadata = {
   title: 'GovWin Alternative [2026] — Federal Market Intelligence for Small Business | Mindy',
   description:
-    'Mindy is the small business alternative to Deltek GovWin: $149/mo vs $15K-$50K/yr, 3-minute signup, no sales call. Same opportunities, recompetes, and forecasts.',
+    'Mindy is the small business alternative to Deltek GovWin: $149/mo vs $15K-$50K/yr, self-serve signup, no sales call. Same opportunities, recompetes, and forecasts.',
   alternates: {
     canonical: 'https://getmindy.ai/compare/govwin',
   },
@@ -57,7 +58,7 @@ const comparisonRows = [
   },
   {
     feature: 'Setup Time',
-    mindy: '3 minutes — sign up, get briefing',
+    mindy: 'Self-serve — sign up, get briefing',
     govwin: 'Weeks of onboarding + analyst calls',
     winner: 'mindy' as const,
   },
@@ -87,7 +88,7 @@ const comparisonRows = [
   },
   {
     feature: 'Recompete Intelligence',
-    mindy: 'Flags expiring contracts 12 months out',
+    mindy: 'Flags expiring contracts before they recompete',
     govwin: 'Recompete tracking included',
     winner: 'tie' as const,
   },
@@ -99,7 +100,7 @@ const comparisonRows = [
   },
   {
     feature: 'Forecast Intelligence',
-    mindy: '33,000+ agency forecasts aggregated',
+    mindy: `${forecastsLabel} agency forecasts aggregated`,
     govwin: 'IQ pipeline + forecast database',
     winner: 'tie' as const,
   },
@@ -149,7 +150,7 @@ const faqs = [
   },
   {
     q: 'What if I outgrow Mindy?',
-    a: "Honest answer: if you scale into a 50+ person BD org with a dedicated capture team and you're chasing $50M+ contracts where a single bad bid kills your year, GovWin (or a similar enterprise platform) probably belongs in your stack. We'll be the first to tell you. Until then, Mindy gives you 90% of the intelligence at 1% of the cost.",
+    a: "Honest answer: if you scale into a 50+ person BD org with a dedicated capture team and you're chasing $50M+ contracts where a single bad bid kills your year, GovWin (or a similar enterprise platform) probably belongs in your stack. We'll be the first to tell you. Until then, Mindy gives you the core intelligence at 1% of the cost.",
   },
   {
     q: 'Do I need to talk to sales to sign up?',
@@ -315,7 +316,7 @@ export default function GovWinComparePage() {
               <div className="text-3xl mb-3">📚</div>
               <h3 className="text-(--mp-ink) font-semibold mb-2 text-lg">Enterprise UI Overwhelm</h3>
               <p className="text-(--mp-muted) text-sm">
-                Dashboards built for capture analysts with 40 hours a week to spend in the tool.
+                Dashboards built for capture analysts who spend their whole week in the tool.
                 If you&apos;re a founder running BD between proposals and delivery, you don&apos;t
                 have time to learn an enterprise platform.
               </p>
@@ -456,7 +457,7 @@ export default function GovWinComparePage() {
             What Mindy Actually Does for You
           </h2>
           <p className="text-(--mp-muted) text-center mb-12 max-w-2xl mx-auto">
-            Everything a $150K capture manager does. For less than your coffee budget.
+            The daily work of a capture manager. For less than your coffee budget.
           </p>
 
           <div className="grid md:grid-cols-2 gap-4">
@@ -467,14 +468,14 @@ export default function GovWinComparePage() {
               },
               {
                 title: 'Recompete alerts',
-                detail: 'Know 12 months in advance when an incumbent contract is expiring in your space.',
+                detail: 'Know well in advance when an incumbent contract is expiring in your space.',
               },
               {
                 title: 'Competitor tracking',
                 detail: "See who's winning awards in your NAICS codes and what contracts they hold.",
               },
               {
-                title: '33,000+ agency forecasts',
+                title: `${forecastsLabel} agency forecasts`,
                 detail: 'Federal forecasts aggregated so you can position before opportunities post.',
               },
               {

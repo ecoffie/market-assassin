@@ -258,7 +258,7 @@ export default function UnifiedPricing({ initialTab, proCredits, teamCredits, si
     // No Free card: there is no free plan for new users (Nov 2026). Pro and Teams carry the
     // 14-day trial.
     {
-      name: 'Pro', badge: '✦ Most popular', color: 'navy', tag: 'The $150K capture manager in your pocket.',
+      name: 'Pro', badge: '✦ Most popular', color: 'navy', tag: 'A capture manager in your pocket.',
       price: annual ? 124 : 149, was: annual ? 149 : undefined, per: annual ? '/mo billed yearly' : '/mo',
       href: PRO_TRIAL ? (annual ? PRO_TRIAL_ANNUAL : PRO_TRIAL_MONTHLY) : (annual ? PRO_CHECKOUT_ANNUAL : PRO_CHECKOUT_MONTHLY),
       cta: PRO_TRIAL ? TRIAL_CTA_LABEL : 'Get Pro', pill: annual ? '-17% · Save $298' : undefined,

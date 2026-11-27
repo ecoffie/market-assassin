@@ -34,6 +34,7 @@ import Link from 'next/link';
 import contractorsData from '@/data/contractors.json';
 import { resolveHubTargets } from '@/lib/seo/hub-links';
 import { CANONICAL_POPULATION_LABEL } from '@/lib/data-core/contractor-corpus';
+import { contractorsLabel, forecastsLabel } from '@/lib/marketing-stats';
 import {
   formatCompactCurrency,
   getContractorSlug,
@@ -49,16 +50,16 @@ export const metadata: Metadata = {
   // awarded", "top government contractors". Lead with the count and "Database"
   // to match how searchers describe what they want. Updated stat from the
   // stale 2,700 (contractors.json era) to the real BQ count.
-  title: '290,000+ Federal Contractors — Award History Database | Mindy',
+  title: `${contractorsLabel} Federal Contractors — Award History Database | Mindy`,
   description:
-    'Search 290,000+ federal contractors by name. Year-over-year award history, top agencies, NAICS coverage, executive disclosures. Pulled live from USAspending.gov FY2016-FY2026.',
+    `Search ${contractorsLabel} federal contractors by name. Year-over-year award history, top agencies, NAICS coverage, executive disclosures. Pulled live from USAspending.gov FY2016-FY2026.`,
   alternates: {
     canonical: 'https://getmindy.ai/contractors',
   },
   openGraph: {
-    title: '290,000+ Federal Contractors — Award History Database | Mindy',
+    title: `${contractorsLabel} Federal Contractors — Award History Database | Mindy`,
     description:
-      'Search 290,000+ federal contractors by name. Year-over-year award history, top agencies, NAICS coverage, executive disclosures.',
+      `Search ${contractorsLabel} federal contractors by name. Year-over-year award history, top agencies, NAICS coverage, executive disclosures.`,
     url: 'https://getmindy.ai/contractors',
     type: 'website',
     siteName: 'Mindy',
@@ -66,8 +67,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: '290,000+ Federal Contractors — Award History Database | Mindy',
-    description: 'Search 290,000+ federal contractors. Real USAspending data, FY2016-FY2026.',
+    title: `${contractorsLabel} Federal Contractors — Award History Database | Mindy`,
+    description: `Search ${contractorsLabel} federal contractors. Real USAspending data, FY2016-FY2026.`,
     images: siteShareImages(),
   },
 };
@@ -304,7 +305,7 @@ export default async function ContractorsIndexPage() {
           </h2>
           <p className="text-sm text-(--mp-muted) mb-4 max-w-2xl mx-auto">
             {SITE_NAME} Market Intelligence gives you SAM.gov opportunities, recompete tracking,
-            agency pain points, OSBP contacts, AI bid/no-bid analysis, and 33,000+ agency forecasts
+            agency pain points, OSBP contacts, AI bid/no-bid analysis, and {forecastsLabel} agency forecasts
             — all in one workspace.
           </p>
           <Link

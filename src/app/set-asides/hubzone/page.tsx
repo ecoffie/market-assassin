@@ -18,11 +18,12 @@
 import type { Metadata } from 'next';
 import { siteShareImages } from '@/lib/seo/share-image';
 import Link from 'next/link';
+import { forecastsLabel } from '@/lib/marketing-stats';
 
 export const metadata: Metadata = {
   title: 'HUBZone Contract Opportunities — Federal Set-Aside Alerts | Mindy',
   description:
-    'Daily HUBZone set-aside opportunities from SAM.gov, agency forecasts, and recompetes. Opportunity alerts for certified HUBZone firms — including 10% price preference intel.',
+    'Daily HUBZone set-aside opportunities from SAM.gov, agency forecasts, and recompetes. Opportunity alerts for certified HUBZone firms, including price preference intel.',
   alternates: {
     canonical: 'https://getmindy.ai/set-asides/hubzone',
   },
@@ -38,7 +39,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: 'HUBZone Contract Opportunities — Daily Set-Aside Alerts | Mindy',
     description:
-      'Mindy filters SAM.gov, agency forecasts, and recompetes for HUBZone set-asides and flags the 10% price preference on full-and-open bids.',
+      'Mindy filters SAM.gov, agency forecasts, and recompetes for HUBZone set-asides and flags the price preference on full-and-open bids.',
     type: 'website',
     url: 'https://getmindy.ai/set-asides/hubzone',
     images: siteShareImages(),
@@ -52,7 +53,7 @@ const faqs = [
   },
   {
     q: 'What\'s the 10% price evaluation preference?',
-    a: 'On full-and-open competitive contracts (not set-asides), when a HUBZone firm and a non-HUBZone firm submit bids, the government treats the HUBZone bid as if it were 10% lower for evaluation purposes. The HUBZone firm still gets paid their actual bid price if they win — the 10% is purely an evaluation adjustment. It applies even outside HUBZone-set-aside competitions, which means HUBZone certification adds value beyond just the set-aside opportunities.',
+    a: 'On full-and-open competitive contracts (not set-asides), when a HUBZone firm and a non-HUBZone firm submit bids, the government treats the HUBZone bid as if it were 10% lower for evaluation purposes (15 U.S.C. 657a). The HUBZone firm still gets paid their actual bid price if they win — the 10% is purely an evaluation adjustment. It applies even outside HUBZone-set-aside competitions, which means HUBZone certification adds value beyond just the set-aside opportunities.',
   },
   {
     q: 'What does "principal office" mean for HUBZone?',
@@ -60,11 +61,11 @@ const faqs = [
   },
   {
     q: 'Can HUBZone firms win sole-source contracts?',
-    a: 'Yes — up to $4.5M for services and $8M for manufacturing, the same thresholds as 8(a). A contracting officer can sole-source to a HUBZone firm without competition when those thresholds are met and the price is fair. Sole-source HUBZone awards are less common than 8(a) sole-sources, but they exist and are worth pursuing once you\'ve built the agency relationship.',
+    a: 'Yes, up to the sole-source dollar limits set in the FAR, the same kind of authority 8(a) has. A contracting officer can sole-source to a HUBZone firm without competition when those limits are met and the price is fair. Sole-source HUBZone awards are less common than 8(a) sole-sources, but they exist and are worth pursuing once you\'ve built the agency relationship.',
   },
   {
     q: 'Why does the government push so hard on HUBZone?',
-    a: 'The federal government has a statutory goal that 3% of all prime contract dollars go to HUBZone firms. Historically that goal has consistently underperformed — agencies routinely miss it. The shortfall means OSDBU offices and contracting officers are actively looking for qualified HUBZones to award work to. The gap between the 3% goal and actual performance is your opportunity.',
+    a: 'The federal government has a statutory goal that 3% of all prime contract dollars go to HUBZone firms (15 U.S.C. 644(g)). Historically that goal has consistently underperformed — agencies routinely miss it. The shortfall means OSDBU offices and contracting officers are actively looking for qualified HUBZones to award work to. The gap between the goal and actual performance is your opportunity.',
   },
   {
     q: 'Can I stack HUBZone with 8(a), SDVOSB, or WOSB?',
@@ -156,9 +157,9 @@ export default function HubzonePage() {
           </h1>
           <p className="text-lg md:text-xl text-(--mp-body) max-w-2xl mx-auto mb-8">
             The federal government has a statutory goal of awarding 3% of all prime
-            contracts to HUBZone firms — and consistently misses it. That gap is your
-            opportunity. Mindy filters every set-aside posted to SAM.gov, plus 33,000+
-            agency forecasts, for HUBZone work — and flags the 10% price preference
+            contract dollars to HUBZone firms (15 U.S.C. 644(g)), and consistently misses it. That gap is your
+            opportunity. Mindy filters every set-aside posted to SAM.gov, plus {forecastsLabel}
+            agency forecasts, for HUBZone work, and flags the 10% price preference (15 U.S.C. 657a)
             on full-and-open bids where it kicks in.
           </p>
           <Link
@@ -233,14 +234,14 @@ export default function HubzonePage() {
               <h3 className="text-(--mp-ink) font-semibold mb-1">Full-and-open with HUBZone price preference</h3>
               <p className="text-(--mp-muted) text-sm">
                 On any full-and-open competition (not a set-aside), the 10% price
-                evaluation preference applies. That makes you competitive against
+                evaluation preference applies (15 U.S.C. 657a). That makes you competitive against
                 larger firms on contracts that aren&apos;t HUBZone-only.
               </p>
             </div>
             <div className="bg-(--mp-surface) border border-(--mp-line) rounded-lg p-5">
               <h3 className="text-(--mp-ink) font-semibold mb-1">Agency forecasts with HUBZone designation</h3>
               <p className="text-(--mp-muted) text-sm">
-                Most agency forecasts identify anticipated set-aside type 6–18 months
+                Most agency forecasts identify the anticipated set-aside type well
                 ahead. Forecasted HUBZone work is the earliest signal — gives you
                 time to build agency relationships before the RFP drops.
               </p>
@@ -256,7 +257,7 @@ export default function HubzonePage() {
             Top Agencies Awarding HUBZone Contracts
           </h2>
           <p className="text-(--mp-body) mb-6">
-            Because the federal government chronically misses its 3% HUBZone goal,
+            Because the federal government chronically misses its HUBZone goal,
             most agencies are actively trying to award more — but a handful drive
             the bulk of historical HUBZone spend:
           </p>
@@ -317,10 +318,10 @@ export default function HubzonePage() {
               </p>
             </div>
             <div className="bg-(--mp-surface) border border-(--mp-line) rounded-lg p-5">
-              <h3 className="text-(--mp-ink) font-semibold mb-1">4. Talk to the OSDBU about the 3% gap</h3>
+              <h3 className="text-(--mp-ink) font-semibold mb-1">4. Talk to the OSDBU about the goal gap</h3>
               <p className="text-(--mp-muted) text-sm">
                 Every agency has a small business goal scorecard. Ask the OSDBU
-                where they stand against the 3% HUBZone goal — if they&apos;re behind,
+                where they stand against the HUBZone goal. If they&apos;re behind,
                 they will actively help you find work that closes the gap.
               </p>
             </div>
@@ -328,7 +329,7 @@ export default function HubzonePage() {
               <h3 className="text-(--mp-ink) font-semibold mb-1">5. Track HUBZone recompetes</h3>
               <p className="text-(--mp-muted) text-sm">
                 When a HUBZone contract is expiring, the recompete will almost always
-                be re-set aside as HUBZone. Mindy flags these 12 months in advance
+                be re-set aside as HUBZone. Mindy flags these well in advance
                 with the incumbent name and award value so you have time to position.
               </p>
             </div>
@@ -353,7 +354,7 @@ export default function HubzonePage() {
             <div className="bg-(--mp-surface) border border-(--mp-line) rounded-lg p-5">
               <h3 className="text-(--mp-ink) font-semibold mb-1">Price-preference flag</h3>
               <p className="text-(--mp-muted) text-sm">
-                Mindy flags full-and-open opportunities where the 10% HUBZone price
+                Mindy flags full-and-open opportunities where the HUBZone price
                 preference applies, so you don&apos;t miss the contracts you&apos;re
                 advantaged on outside the set-aside lane.
               </p>
@@ -361,15 +362,15 @@ export default function HubzonePage() {
             <div className="bg-(--mp-surface) border border-(--mp-line) rounded-lg p-5">
               <h3 className="text-(--mp-ink) font-semibold mb-1">HUBZone recompete alerts</h3>
               <p className="text-(--mp-muted) text-sm">
-                12-month advance notice when a HUBZone incumbent contract is
-                expiring — incumbent name and award value included.
+                Early notice when a HUBZone incumbent contract is
+                expiring, incumbent name and award value included.
               </p>
             </div>
             <div className="bg-(--mp-surface) border border-(--mp-line) rounded-lg p-5">
               <h3 className="text-(--mp-ink) font-semibold mb-1">HUBZone forecast feed</h3>
               <p className="text-(--mp-muted) text-sm">
-                33,000+ agency forecasts aggregated; filter by HUBZone designation
-                to see what&apos;s coming 6–18 months ahead.
+                {forecastsLabel} agency forecasts aggregated; filter by HUBZone designation
+                to see what&apos;s coming.
               </p>
             </div>
           </div>
@@ -421,7 +422,7 @@ export default function HubzonePage() {
           </h2>
           <p className="text-lg text-(--mp-body) mb-8">
             Daily briefings filtered to HUBZone set-asides plus full-and-open bids
-            where the 10% price preference applies. 14-day free trial. Cancel anytime.
+            where the HUBZone price preference applies. 14-day free trial. Cancel anytime.
           </p>
           <Link
             href="/pricing"

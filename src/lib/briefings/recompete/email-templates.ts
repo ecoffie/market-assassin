@@ -60,7 +60,7 @@ export function generateCondensedBriefingEmail(briefing: CondensedBriefing): Rec
   const timeStr = `4:15 AM ${briefing.timezone}`;
 
   const subject = `Daily Recompete Alerts — Displacement Intel (${dateStr})`;
-  const preheader = `Top 10 recompete opportunities + 3 teaming plays`;
+  const preheader = `Top ${briefing.opportunities.length} recompete opportunities + ${briefing.teamingPlays.length} teaming plays`;
 
   const htmlBody = generateCondensedHtmlBody(briefing, dateStr, timeStr);
   const textBody = generateCondensedTextBody(briefing, dateStr, timeStr);
@@ -161,7 +161,7 @@ function generateFullHtmlBody(briefing: RecompeteBriefing, dateStr: string, time
 
     <!-- Section 4: Priority Scorecard -->
     <div class="section">
-      <h2 class="section-title">4) Priority Scorecard — Must-Watch This Week (Top 3)</h2>
+      <h2 class="section-title">4) Priority Scorecard — Must-Watch This Week (Top ${briefing.priorityScorecard.length})</h2>
       ${briefing.priorityScorecard.map(entry => renderScorecardEntry(entry)).join('')}
     </div>
 
@@ -324,7 +324,7 @@ function generateFullTextBody(briefing: RecompeteBriefing, dateStr: string, time
   }
 
   text += `================================================================================
-4) PRIORITY SCORECARD — MUST-WATCH THIS WEEK (TOP 3)
+4) PRIORITY SCORECARD — MUST-WATCH THIS WEEK (TOP ${briefing.priorityScorecard.length})
 ================================================================================
 
 `;
