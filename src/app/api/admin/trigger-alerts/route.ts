@@ -7,6 +7,7 @@
  * GET /api/admin/trigger-alerts?password=...&mode=execute&email=test@example.com (single user)
  */
 
+import { unsubscribeUrl as signedUnsubscribeUrl } from '@/lib/email/unsubscribe';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { fetchSamOpportunities, scoreOpportunity } from '@/lib/briefings/pipelines/sam-gov';
@@ -266,7 +267,7 @@ async function sendAlertEmail(
   tier: string,
   totalAvailable: number
 ) {
-  const unsubscribeUrl = `${MINDY_SITE_URL}/alerts/unsubscribe?email=${encodeURIComponent(email)}`;
+  const unsubscribeUrl = signedUnsubscribeUrl(email, 'trigger_alerts');
   const preferencesUrl = await createSecureAccessUrl(email, 'preferences');
   const mindyDashboardUrl = MINDY_APP_URL;
 

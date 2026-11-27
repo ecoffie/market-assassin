@@ -1,4 +1,7 @@
 import { assertNoLegacyDestinations } from '@/lib/email/legacy-destination-guard';
+import { fillUnsubscribePlaceholder, fillUnsubscribePlaceholderText, listUnsubscribeHeaders, UNSUBSCRIBE_URL_PLACEHOLDER } from '@/lib/email/unsubscribe';
+
+const MINDY_UNSUB_FALLBACK = 'https://getmindy.ai/alerts/preferences';
 import { Resend } from 'resend';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { createSecureAccessUrl } from '@/lib/access-links';
@@ -405,6 +408,23 @@ export async function sendEmail({
     throw new Error('Email provider unavailable: RESEND_API_KEY is not configured (Mindy has no fallback sender)');
   }
 
+  // ONE-CLICK UNSUBSCRIBE (Eric, 2026-11-27). Every non-transactional send carries RFC 8058 List-Unsubscribe headers
+  // (Gmail/Yahoo bulk-sender requirement) and the footer placeholder becomes this recipient's signed link
+  // (src/lib/email/unsubscribe.ts). Transactional mail (receipts, password, 2FA) carries no unsubscribe.
+  const isTransactional = !!transactional || isTransactionalType(emailType);
+  let unsubHeaders: Record<string, string> = {};
+  try {
+    if (!isTransactional) unsubHeaders = listUnsubscribeHeaders(to, emailType);
+    html = fillUnsubscribePlaceholder(html, to, emailType);
+    if (text) text = fillUnsubscribePlaceholderText(text, to, emailType);
+  } catch (e) {
+    // No signing secret: never ship a raw placeholder or an unsigned link. The footer falls back to the
+    // preferences page (sign-in), and the missing header is logged loudly.
+    console.error('[SendEmail] unsubscribe link could not be signed; footer falls back to preferences:', e instanceof Error ? e.message : e);
+    html = html.split(UNSUBSCRIBE_URL_PLACEHOLDER).join(`${MINDY_UNSUB_FALLBACK}`);
+    if (text) text = text.split(UNSUBSCRIBE_URL_PLACEHOLDER).join(MINDY_UNSUB_FALLBACK);
+  }
+
   const resendTags = toResendTags(tags);
   let sendResult: Awaited<ReturnType<typeof resend.emails.send>>;
   try {
@@ -419,6 +439,7 @@ export async function sendEmail({
       headers: {
         'X-GCG-Email-Type': sanitizeResendTagValue(emailType || 'general'),
         'X-GCG-Event-Source': sanitizeResendTagValue(eventSource || 'general'),
+        ...unsubHeaders,
       },
     });
   } catch (thrown) {
