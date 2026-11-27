@@ -70,6 +70,30 @@ const AFTER: DocModel = {
   ],
 };
 
+describe('contacts: a citation marker, never provenance prose (Eric, 2026-11-27)', () => {
+  const NOTICE: DocModel['sources'][number] = { id: 's-notice', label: 'SAM.gov notice EXAMPLE0001, base contracting office', kind: 'sam_notice', recordId: 'EXAMPLE0001' };
+  const CONTACTS: DocModel = {
+    title: 'Northwind Digital Media: action plan',
+    sources: [...SOURCES, NOTICE],
+    sections: [{ id: 'sec-who', heading: 'Who to talk to and what to say', blocks: [{
+      type: 'table', id: 'b-who', claim: 'fact', cites: ['s-notice'],
+      columns: [{ key: 'person', label: 'Person' }, { key: 'office', label: 'Office' }, { key: 'ask', label: 'The question to ask' }],
+      rows: [{ person: 'Contracting officer (named on the notice)', office: 'Base contracting office', ask: 'When do you expect the next requirement?' }],
+    }] }],
+  };
+  it('a contact table cites its notice source, so nothing is demoted, and no cell or line explains where it came from', () => {
+    const d = demoteUncitedFacts(CONTACTS);
+    expect(d.unverified).toEqual([]);
+    expect(d.model.sections[0].blocks[0]).toMatchObject({ cites: ['s-notice'] });
+    expect(JSON.stringify(d.model.sections)).not.toMatch(/from the (office's )?(recent )?(SAM )?notice|retrieved|last seen/i);
+  });
+  it('an uncited contact table is demoted: contacts are facts and must cite', () => {
+    const { cites: _c, ...uncited } = CONTACTS.sections[0].blocks[0] as { cites?: string[] };
+    void _c;
+    expect(demoteUncitedFacts({ ...CONTACTS, sections: [{ ...CONTACTS.sections[0], blocks: [uncited as DocModel['sections'][number]['blocks'][number]] }] }).unverified).toEqual(['b-who']);
+  });
+});
+
 describe('research report labels: framing never lands in "Unverified statements"', () => {
   it('BEFORE (the demo report shape): every framing line and the uncited web fact were demoted', () => {
     const d = demoteUncitedFacts(BEFORE);
