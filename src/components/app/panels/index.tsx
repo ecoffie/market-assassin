@@ -4,6 +4,8 @@ import { Suspense, lazy } from 'react';
 import type { AppPanel, AppTier } from '../UnifiedSidebar';
 import { parseSettingsSection, parseVaultSection } from '@/lib/app/deep-link-params';
 import { isTodayHomeEnabled } from '@/lib/app/today-home';
+import { getTabTips, isTabTipsEnabled } from '@/lib/app/tab-tips';
+import TabTipsBox from '../TabTipsBox';
 
 // Lazy load panels for better performance
 const MindyChatPanel = lazy(() => import('./MindyChatPanel'));
@@ -66,6 +68,18 @@ function PanelLoading() {
       </div>
     </div>
   );
+}
+
+// Panels whose signed-in FREE tier renders a different surface (a teaser / preview) instead of the
+// full panel. Their tips describe the full panel, so the free variant shows no tips box.
+const FREE_VARIANT_PANELS = new Set<AppPanel>(['forecasts', 'recompetes', 'contractors', 'decision-makers', 'pipeline']);
+
+/** The panel id whose tips describe what is actually rendered for `activePanel` (aliases resolved). */
+export function tabTipsPanelId(activePanel: AppPanel, email: string | null, tier: AppTier, todayHome = TODAY_HOME): AppPanel | null {
+  if (email && tier === 'free' && FREE_VARIANT_PANELS.has(activePanel)) return null;
+  if (activePanel === 'today' && !todayHome) return 'dashboard';
+  if (activePanel === 'library') return 'vault';
+  return activePanel;
 }
 
 export default function PanelContainer({ activePanel, email, tier, onPanelChange, panelContext }: PanelContainerProps) {
@@ -160,9 +174,22 @@ export default function PanelContainer({ activePanel, email, tier, onPanelChange
     }
   };
 
-  return (
+  const panel = (
     <Suspense fallback={<PanelLoading />}>
       {renderPanel()}
     </Suspense>
+  );
+
+  // "How to use this tab" (NEXT_PUBLIC_TAB_TIPS, default OFF). Mounted once here, above the active
+  // panel, keyed by panel id — never inside a panel. OFF (or no entry) = exactly the panel, as before.
+  if (!isTabTipsEnabled()) return panel;
+  const tipsId = tabTipsPanelId(activePanel, email, tier);
+  const tips = getTabTips(tipsId);
+  if (!tipsId || !tips) return panel;
+  return (
+    <>
+      <TabTipsBox key={tipsId} panelId={tipsId} tips={tips} />
+      {panel}
+    </>
   );
 }
