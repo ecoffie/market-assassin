@@ -151,11 +151,12 @@ export default function KnowledgeBasePanel({ email, initialDocId }: { email: str
           onChange={e => setQ(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') load(); }}
           placeholder="Search the knowledge base…"
+          data-tip="knowledge-base-search"
           className="flex-1 min-w-[240px] h-10 px-3 bg-surface border border-hairline rounded-lg text-white text-sm placeholder-faint focus:border-emerald-500 focus:outline-none"
         />
         <button onClick={load} className="h-10 px-5 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded-lg">Search</button>
       </div>
-      <div className="flex flex-wrap gap-1.5 mb-4">
+      <div className="flex flex-wrap gap-1.5 mb-4" data-tip="knowledge-base-types">
         <button onClick={() => setDocType('')} className={`px-3 py-1 rounded-full text-xs ${!docType ? 'bg-emerald-600 text-white' : 'bg-surface text-muted hover:text-white'}`}>All ({total})</button>
         {facets.map(f => (
           <button key={f.docType} onClick={() => setDocType(f.docType)} className={`px-3 py-1 rounded-full text-xs ${docType === f.docType ? 'bg-emerald-600 text-white' : 'bg-surface text-muted hover:text-white'}`}>
@@ -167,7 +168,7 @@ export default function KnowledgeBasePanel({ email, initialDocId }: { email: str
       {/* Split pane */}
       <div className="grid grid-cols-1 lg:grid-cols-[360px_1fr] gap-4">
         {/* List */}
-        <div className="border border-surface rounded-xl bg-ground overflow-hidden">
+        <div className="border border-surface rounded-xl bg-ground overflow-hidden" data-tip="knowledge-base-list">
           <div className="max-h-[600px] overflow-y-auto divide-y divide-slate-800">
             {loading && <div className="p-4 text-sm text-faint">Loading…</div>}
             {!loading && docs.length === 0 && <div className="p-4 text-sm text-faint">No documents match.</div>}

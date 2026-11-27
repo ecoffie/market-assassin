@@ -52,6 +52,10 @@ const CHAT_OVERRIDES: Readonly<Record<string, ChatToolPolicy>> = {
     decision: 'allowed_write',
     reason: "Saves a NEW generated document (PDF + Word) to the acting scope's own Vault; never overwrites (a revision is a new version row). Non-billable. Offered only when VAULT_GENERATED_FILES is on for the verified caller.",
   },
+  create_email_draft: {
+    decision: 'allowed_write',
+    reason: "Saves an email DRAFT in the caller's own connected Gmail/Outlook (connected apps Slice B). Never sends: the customer reviews and sends it. Offered only when CONNECTED_APPS is on for the verified caller; scope re-resolved per call.",
+  },
   update_market_schedule: {
     decision: 'allowed_write',
     reason: 'Renames or changes the cadence/enabled state of the session user\'s own alert; reversible.',
@@ -79,6 +83,10 @@ const CHAT_OVERRIDES: Readonly<Record<string, ChatToolPolicy>> = {
   search_web: {
     decision: 'allowed_read',
     reason: 'Open-web search via Serper for public facts Ask does not store (CRS, bills, GAO, PAE press, 8(a) coverage).',
+  },
+  read_web_page: {
+    decision: 'allowed_read',
+    reason: 'Reads one public page (https, SSRF-guarded, pinned, 3/turn) whose URL came from this turn\'s search results or the customer; research mode only (ASK_MINDY_RESEARCH_MODE).',
   },
 
   // ── Chat-specific exceptions ──

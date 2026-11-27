@@ -86,8 +86,9 @@ function samAwardToRecompeteContract(award: ContractAward): RawRecompeteData['ex
     setAsideType: undefined, // Map from extentCompeted if needed
     placeOfPerformanceState: award.placeOfPerformanceState,
     // NEW: Competition intelligence from SAM.gov
-    numberOfBids: award.numberOfOffersReceived,
-    competitionLevel: award.competitionLevel,
+    // Not reported → undefined (unknown), never 0.
+    numberOfBids: award.numberOfOffersReceived ?? undefined,
+    competitionLevel: award.competitionLevel === 'unknown' ? undefined : award.competitionLevel,
     competitionType: award.extentCompetedDescription,
     daysUntilExpiration: award.daysUntilExpiration,
   };

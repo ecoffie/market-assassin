@@ -13,8 +13,9 @@
  *   answer stream idle ..... answerIdleMs        (no new bytes → the answer is cut and flagged)
  *   whole turn ............. turnMs              (watchdog: error + done, card turn released)
  *
- * turnMs sits below the route's maxDuration (300 s), so the watchdog always fires before the platform
- * kills the function. Each value can be lowered per environment with the CHAT_* variables below (tests
+ * turnMs sits below the route's maxDuration (800 s since research mode; ordinary turns still stop at 285 s), so the
+ * watchdog always fires before the platform kills the function. A research-mode turn has its own, longer watchdog
+ * (RESEARCH_TURN_MS in src/lib/ask-mindy/research-mode.ts), also below maxDuration. Each value can be lowered per environment with the CHAT_* variables below (tests
  * use milliseconds); a missing, zero, negative or non-numeric value falls back to the default.
  */
 
@@ -30,7 +31,8 @@ export interface ChatDeadlines {
 }
 
 /** The route's `maxDuration` (seconds). Kept here so the watchdog can be checked against it. */
-export const CHAT_ROUTE_MAX_DURATION_S = 300;
+/** 800 s since research mode (2026-11-25); ordinary turns still stop at turnMs (285 s). */
+export const CHAT_ROUTE_MAX_DURATION_S = 800;
 
 export const DEFAULT_CHAT_DEADLINES: Omit<ChatDeadlines, 'toolMsFromEnv'> = {
   plannerMs: 30_000,

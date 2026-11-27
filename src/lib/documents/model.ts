@@ -84,6 +84,8 @@ export interface BulletsBlock {
   id: string;
   items: BulletItem[];
   ordered?: boolean;
+  /** Rendering hint only: 'checklist' draws an empty checkbox per item (next steps, readiness). Ignored when ordered. */
+  style?: 'checklist';
 }
 
 export type ColumnFormat = 'text' | 'usd' | 'int' | 'pct' | 'date';
@@ -152,6 +154,11 @@ export interface DocSection {
 
 export interface DocModel {
   schema: typeof DOC_SCHEMA;
+  /**
+   * Document type, for layout only. 'capability_statement' renders the one-page capability statement layout
+   * (capability-statement.ts); anything else (or absent) is the report layout. Never changes validation.
+   */
+  kind?: 'report' | 'capability_statement';
   title: string;
   subtitle?: string;
   /** Who the document is for. Never auto-filled from the Vault. */

@@ -536,7 +536,7 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
       )}
 
       {/* Search Form */}
-      <div className="bg-ground border border-surface rounded-xl p-5">
+      <div className="bg-ground border border-surface rounded-xl p-5" data-tip="forecasts-filters">
         <h3 className="text-sm font-semibold text-muted uppercase tracking-wider mb-4">Explore Upcoming Buys</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
           <div>
@@ -685,6 +685,7 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
                       type="button"
                       onClick={() => toggleForecast(forecast.id)}
                       className="flex-1 min-w-0 text-left"
+                      data-tip="forecasts-result"
                       aria-expanded={expanded}
                     >
                       {/* Badges */}
@@ -819,7 +820,7 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
                           Award: {formatDate(awardDate)}
                         </div>
                       )}
-                      <div className="mt-2 flex flex-col items-end gap-1">
+                      <div className="mt-2 flex flex-col items-end gap-1" data-tip="forecasts-track">
                         <div className="text-[11px] uppercase tracking-wider text-slate-600">Add to My Pursuits</div>
                         <SaveToPipelineButton
                           opportunity={{

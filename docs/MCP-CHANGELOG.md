@@ -8,8 +8,37 @@ accurately from this file.
 Authoritative counts (never trust a grep — tools register via two paths: explicit
 `*_TOOL_DEF` consts in `src/lib/mcp/tool-registry.ts` AND the TIER1/TIER2 chat defs):
 - **Internal registry, `listMcpTools()` = 65.** Mindy Chat and tool-to-tool composition use it.
-- **Public catalog, `listPublicMcpTools()` = 54.** What the hosted HTTP edge lists and accepts.
+- **Public catalog, `listPublicMcpTools()` = 52.** What the hosted HTTP edge lists and accepts.
   The difference is the hidden set in `src/lib/mcp/public-catalog-config.ts`.
+
+---
+
+## November 2026 — get_winning_playbook unlisted (public 53 → 52, internal 65)
+
+**`get_winning_playbook`** is no longer in the public catalog (Eric, 2026-11-27: unused, and built partly
+from podcast content). Same pattern as search_podcast_lessons below: hidden as `hide`, still registered,
+not in tools/list; a host that names it gets "tool not found" (nothing runs, nothing charged); a saved
+paywall attempt is refused by `/api/mcp/continue`. Ask Mindy already blocked it. It was the one
+Pro-gated MCP tool; its `pro` entry in `entitlements.ts` stays for the internal registry.
+
+### Docs kept in sync
+
+- Capabilities artifact (`31ec6de1-1dcf-4a04-aa43-30289bfc6c7c`) — 52 tools (republish pending).
+
+---
+
+## November 2026 — search_podcast_lessons unlisted (public 54 → 53, internal 65)
+
+**`search_podcast_lessons`** is no longer in the public catalog (Eric, 2026-11-27: the podcast corpus is
+removed from every customer-facing surface). It stays registered (hidden as `hide` in
+`public-catalog-config.ts`), so it is not in tools/list and an external host that still names it gets
+the transport's "tool not found": nothing runs and nothing is charged. A saved paywall attempt for it is
+refused by `/api/mcp/continue` (410 `not_available`, no charge). Ask Mindy already blocked it
+(`chat-tool-policy.ts`, since 2026-08-02).
+
+### Docs kept in sync
+
+- Capabilities artifact (`31ec6de1-1dcf-4a04-aa43-30289bfc6c7c`) — 52 tools (republish pending).
 
 ---
 
@@ -25,7 +54,7 @@ getmindy.ai/jobs.
 
 ### Docs kept in sync
 
-- Capabilities artifact (`31ec6de1-1dcf-4a04-aa43-30289bfc6c7c`) — 54 tools.
+- Capabilities artifact (`31ec6de1-1dcf-4a04-aa43-30289bfc6c7c`) — 52 tools.
 
 ---
 
@@ -53,7 +82,7 @@ Source: `tasks/mcp-tool-portfolio-audit-2026-10-02.md` (Phase 0 + Phase 1).
 
 ### Docs kept in sync
 
-- Capabilities artifact (`31ec6de1-1dcf-4a04-aa43-30289bfc6c7c`) — 54 tools.
+- Capabilities artifact (`31ec6de1-1dcf-4a04-aa43-30289bfc6c7c`) — 52 tools.
 
 ---
 

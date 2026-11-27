@@ -133,12 +133,12 @@ export interface LegislationStatusResult {
 const LIMITATIONS = ['bill_text_not_held', 'action_history_not_held', 'ndaa_titled_measures_only'];
 
 export const LEGISLATION_HOST_RULES = [
-  'Answer covered status questions from these stored records and give their as-of date (_meta.as_of).',
+  'Answer covered status questions from these stored records. Give each bill\'s latest stored action with its action date (latest_stored_action.date); never state how current Mindy\'s data is (_meta.as_of is not for the answer).',
   'Keep the House and Senate bills separate — never describe them as one merged bill.',
   'REPORTED is not passed. Say "reported by committee", not "passed".',
   'Passing one chamber — or both in differing forms — is not law. Only overall_status.enacted=true, backed by a PUBLIC_LAW record, is law.',
   'A committee report is report language, not law; errata are corrections to a report, not bills.',
-  'Say "latest stored action as of <date>" — never "complete legislative history". Mindy stores one latest action per bill, not votes or action history.',
+  'Say "the latest stored action is <action> on <latest_stored_action.date>" — never "complete legislative history". Mindy stores one latest action per bill, not votes or action history.',
   'When content_status is NOT_HELD: say Mindy holds this bill\'s status but not its text, then stop. Do not describe provisions from memory, pain points or report titles; label any outside source as not Mindy evidence.',
   'When resolution.outcome is NOT_ESTABLISHED or NOT_FOUND_IN_COVERED_CORPUS, never say the bill does not exist — state the scope that was covered.',
   'Do not predict passage or timing, and do not add political commentary.',
@@ -253,7 +253,7 @@ function scopeNote(coverage: LegislativeCoverage | null, what: string, inScope: 
     return `${what} is outside the Congress Mindy's legislative corpus covers (${coverage?.scope ?? 'NDAA-titled measures'}). NOT_ESTABLISHED — not evidence that it does not exist.`;
   }
   return coverage?.status === 'complete'
-    ? `${what} was not found among ${coverage.scope} (discovery complete as of ${coverage.last_complete_discovery_at ?? 'unknown'}). Mindy tracks NDAA-titled measures only — this is not evidence the item does not exist elsewhere.`
+    ? `${what} was not found among ${coverage.scope} (discovery complete). Mindy tracks NDAA-titled measures only — this is not evidence the item does not exist elsewhere.`
     : `${what} is not in the held corpus and discovery coverage is ${coverage?.status ?? 'unknown'} — NOT_ESTABLISHED.`;
 }
 
@@ -293,7 +293,7 @@ export async function getLegislationStatus(
         summary: result._meta.grounded
           ? `${result.subject.label}: ${result.overall_status?.enacted ? `enacted (PL ${result.overall_status.law_number})` : 'not enacted'} per stored records.`
           : `No stored record: ${result.resolution.outcome}.`,
-        how_to_use: 'Quote stages from documents[].current_stage_display and dates from _meta.as_of. Obey host_rules.',
+        how_to_use: 'Quote stages from documents[].current_stage_display and action dates from documents[].latest_stored_action.date. Obey host_rules.',
         key_caveats: ['Bill text is not held.', 'Latest stored action only — no action history or votes.'],
       };
     }

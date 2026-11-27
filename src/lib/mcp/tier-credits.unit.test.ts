@@ -24,12 +24,12 @@ describe('app-tier credit allowances', () => {
    * Pin BOTH allowances together. They are one coordinated product decision, so a
    * change to either should have to state its intent here rather than drift alone.
    */
-  it('Pro is 1,500/mo and Team is 7,000/mo shared (2026-11-12)', () => {
+  it('Pro is 1,500/mo and Team is 7,500/mo shared (2026-11-27)', () => {
     expect(PRO_MONTHLY_CREDITS).toBe(1500);
-    // Team: 7,000 a month SHARED by the team (owner decision 2026-11-12). Until pooled team
+    // Team: 7,500 a month SHARED by the team (2026-11-27; was 7,000 from 2026-11-12). Until pooled team
     // credits are switched on (tasks/PRD-pooled-team-credits.md), the grant lands on the Stripe
-    // billing contact's balance — one pot, not 7,000 per seat.
-    expect(TEAM_MONTHLY_CREDITS).toBe(7000);
+    // billing contact's balance — one pot, not 7,500 per seat.
+    expect(TEAM_MONTHLY_CREDITS).toBe(7500);
   });
 
   /**

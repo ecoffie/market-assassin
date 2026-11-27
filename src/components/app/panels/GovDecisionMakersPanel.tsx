@@ -292,7 +292,7 @@ export default function GovDecisionMakersPanel({ email }: Props) {
 
       {/* Search + filters */}
       <div className="space-y-4">
-        <div className="flex gap-3">
+        <div data-tip="decision-makers-search" className="flex gap-3">
           <input
             value={search}
             onChange={e => setSearch(e.target.value)}
@@ -336,6 +336,7 @@ export default function GovDecisionMakersPanel({ email }: Props) {
               step"). The later steps now render disabled, which is what makes
               the hierarchy legible BEFORE you commit to a guess. */}
           <select
+            data-tip="decision-makers-agency"
             value={agency}
             onChange={e => { setAgency(e.target.value); setSubAgency(''); if (e.target.value) setScope('all'); }}
             className="px-3 py-2 bg-surface border border-hairline rounded-lg text-white text-sm focus:border-emerald-500 outline-none max-w-xs"
@@ -518,6 +519,7 @@ export default function GovDecisionMakersPanel({ email }: Props) {
                           Links via DoDAAC; the name auto-fills from the directory. */}
                       {c.dodaac && c.derivedOffice && (
                         <button
+                          data-tip="decision-makers-track"
                           onClick={() => trackOffice(c)}
                           disabled={trackedOffices.has(c.dodaac)}
                           className="inline-flex shrink-0 items-center gap-1 text-[11px] px-1.5 py-0.5 rounded border border-hairline text-muted hover:text-emerald-400 hover:border-emerald-600 disabled:opacity-50 disabled:cursor-default"

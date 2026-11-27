@@ -1,5 +1,6 @@
 'use client';
 
+import { reportedOffers } from '@/lib/opportunities/offers';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { MapPin, Landmark, Building2, Flame, Zap, CalendarClock, type LucideIcon } from 'lucide-react';
 import type { AppTier } from '../UnifiedSidebar';
@@ -46,7 +47,8 @@ interface ExpiringContract {
   startDate: string;          // period_of_performance_start — when the incumbent's term began
   expirationDate: string;
   daysUntilExpiration: number;
-  bidsReceived: number;
+  /** Offers received on the current award. null = NOT REPORTED (never 0, never 1). */
+  bidsReceived: number | null;
   competitionLevel: string;
   competitionType: string;
   location: { city?: string; state?: string; zip?: string };
@@ -94,7 +96,8 @@ interface AwardDetail {
 interface ContractSummary {
   totalContracts: number;
   totalValue: number;
-  avgBidsPerContract: number;
+  /** null when no returned contract reports an offer count (unknown, never 0). */
+  avgBidsPerContract: number | null;
   soleSourceContracts: number;
   lowCompetitionContracts: number;
   urgentContracts: number;
@@ -182,18 +185,23 @@ function uniqueStrings(values: Array<string | null | undefined>): string[] {
     .filter(Boolean)));
 }
 
-function getCompetitionLevel(contract: RecompeteApiContract): string {
+/**
+ * Competition signal from the row's own fields. 'unknown' when neither the competition type nor an offer count is
+ * reported — absent data is not "full competition" (it used to return 'full').
+ */
+export function getCompetitionLevel(contract: Pick<RecompeteApiContract, 'competition_type' | 'number_of_offers'>): string {
   const competitionType = (contract.competition_type || '').toLowerCase();
-  const offers = contract.number_of_offers || 0;
+  const offers = reportedOffers(contract.number_of_offers);
 
   if (competitionType.includes('not competed') || competitionType.includes('sole source') || offers === 1) {
     return 'sole_source';
   }
 
-  if (offers > 1 && offers <= 3) {
+  if (offers !== null && offers > 1 && offers <= 3) {
     return 'low';
   }
 
+  if (!competitionType && offers === null) return 'unknown';
   return 'full';
 }
 
@@ -234,7 +242,7 @@ function mapRecompeteContract(contract: RecompeteApiContract): ExpiringContract 
     startDate: contract.period_of_performance_start || '',
     expirationDate,
     daysUntilExpiration: getDaysUntil(expirationDate),
-    bidsReceived: contract.number_of_offers || 0,
+    bidsReceived: reportedOffers(contract.number_of_offers),
     competitionLevel: getCompetitionLevel(contract),
     competitionType: contract.competition_type || contract.recompete_likelihood || 'Recompete candidate',
     location: {
@@ -386,16 +394,16 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
     });
 
     const totalValue = mappedContracts.reduce((sum, contract) => sum + contract.value, 0);
-    const offersWithValues = mappedContracts.filter(contract => contract.bidsReceived > 0);
+    const offersWithValues = mappedContracts.filter((contract): contract is typeof contract & { bidsReceived: number } => contract.bidsReceived !== null);
     const avgBids = offersWithValues.length > 0
       ? offersWithValues.reduce((sum, contract) => sum + contract.bidsReceived, 0) / offersWithValues.length
-      : 0;
+      : null;
 
     setContracts(mappedContracts);
     setSummary({
       totalContracts: mappedContracts.length,
       totalValue,
-      avgBidsPerContract: Math.round(avgBids * 10) / 10,
+      avgBidsPerContract: avgBids === null ? null : Math.round(avgBids * 10) / 10,
       soleSourceContracts: mappedContracts.filter(contract => contract.competitionLevel === 'sole_source').length,
       lowCompetitionContracts: mappedContracts.filter(contract => contract.competitionLevel === 'low').length,
       urgentContracts: mappedContracts.filter(contract =>
@@ -883,7 +891,7 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
           </span>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+        <div data-tip="recompetes-filters" className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
           <div>
             <label className="block text-xs text-faint mb-1">NAICS Code(s)</label>
             <NaicsAutocompleteInput
@@ -1235,7 +1243,7 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
 
                       {/* Title — the whole card toggles now, so this is just the
                           visual affordance (no nested button inside a clickable card). */}
-                      <div className="group mb-1 flex w-full items-start gap-2">
+                      <div data-tip="recompetes-result" className="group mb-1 flex w-full items-start gap-2">
                         <h4 className="text-white font-medium line-clamp-2 group-hover:text-purple-200">
                           {contract.title || 'Contract'}
                         </h4>
@@ -1345,7 +1353,7 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
                       <div className={`text-xs mt-1 ${urgency.text}`}>
                         {contract.daysUntilExpiration} days left
                       </div>
-                      <div className="mt-3 flex flex-col items-end gap-1" onClick={(e) => e.stopPropagation()}>
+                      <div data-tip="recompetes-track" className="mt-3 flex flex-col items-end gap-1" onClick={(e) => e.stopPropagation()}>
                         <div className="text-[11px] uppercase tracking-wider text-slate-600">Add to My Pursuits</div>
                         <SaveToPipelineButton
                           opportunity={{
@@ -1454,7 +1462,7 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
                             </div>
                             <div className="flex justify-between gap-3">
                               <dt className="text-faint">Offers</dt>
-                              <dd className="text-right text-slate-200">{contract.bidsReceived || 'Unknown'}</dd>
+                              <dd className="text-right text-slate-200">{contract.bidsReceived ?? 'Not reported'}</dd>
                             </div>
                             <div className="flex justify-between gap-3">
                               <dt className="text-faint">Expires</dt>

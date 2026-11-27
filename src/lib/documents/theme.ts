@@ -51,8 +51,8 @@ export interface Theme {
   /** 'band' = full-width colored bar, white uppercase text · 'numbered-rule' = "1. Summary" in accent + thin rule. */
   headingStyle: 'band' | 'numbered-rule';
   table: { headerRadiusPx: number; uppercaseHeader: boolean; boldFirstColumn: boolean };
-  /** 'brand-band' = rounded brand header band + key-value card · 'rule' = title, gray metadata, accent rule. */
-  cover: 'brand-band' | 'rule';
+  /** 'letterhead' = logo + contact lines over an accent rule, then title, byline and a key-value table · 'brand-band' = rounded brand header band + key-value card · 'rule' = title, gray metadata, accent rule. */
+  cover: 'letterhead' | 'brand-band' | 'rule';
   /** The header band's gradient (PDF); DOCX uses a solid band in `accent`. */
   gradient?: [string, string];
   brand: { mark: string; name: string; tagline: string; contactLines: string[] };
@@ -70,7 +70,7 @@ const SHARED = {
 };
 
 export const THEMES: Record<ThemeName, Theme> = {
-  /** Default. Rounded navy→purple brand band, numbered navy headings, rounded navy table headers. */
+  /** Default. Letterhead cover (logo, contact lines, purple rule), numbered navy headings, rounded navy table headers. */
   mindy: {
     name: 'mindy',
     colors: {
@@ -89,7 +89,7 @@ export const THEMES: Record<ThemeName, Theme> = {
     fonts: { pdf: '"Helvetica Neue", Helvetica, Arial, sans-serif', docx: 'Calibri' },
     headingStyle: 'numbered-rule',
     table: { headerRadiusPx: 6, uppercaseHeader: false, boldFirstColumn: true },
-    cover: 'brand-band',
+    cover: 'letterhead',
     gradient: ['1E3A8A', '7C3AED'],
     brand: MINDY_BRAND,
   },

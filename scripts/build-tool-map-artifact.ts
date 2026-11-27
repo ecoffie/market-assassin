@@ -49,8 +49,6 @@ const LINE: Record<string, string> = {
   get_market_vocabulary: 'The words winning contracts actually use in a market',
   derive_company_keywords: "Turn a company's own words into the keywords buyers use",
   get_pricing_intel: 'GSA CALC labor rates for price-to-win (p25, p50, p75)',
-  get_winning_playbook: 'Eight years of GovCon Giants coaching on how to win this scenario',
-  search_podcast_lessons: 'Lessons from real contractor and agency podcast guests',
   get_agency_intel: 'The buyer brief: priorities, pain points, hierarchy and spend',
   understand_customer: 'After a FIND hit: what this customer cares about and what to emphasize',
   get_agency_spending_detail: 'Who inside the department buys, and its set-aside mix',

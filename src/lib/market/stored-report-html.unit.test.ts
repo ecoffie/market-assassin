@@ -28,8 +28,10 @@ describe('stored report HTML = the preview the tool rendered', () => {
     expect(stripButton(renderStoredReportHtml(saved as never, { pdfUrl: '/reports/x/pdf' }))).toBe(stripButton(preview));
   });
 
-  it('a later view still carries the generation date, not today', () => {
-    expect(renderStoredReportHtml(saved as never)).toContain('July 16, 2026');
+  it('a later view matches the preview: no generation or freshness date is printed (Eric, 2026-11-27), so nothing drifts', () => {
+    const html = renderStoredReportHtml(saved as never);
+    expect(html).not.toContain('July 16, 2026');
+    expect(html).not.toContain(new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }));
   });
 
   it('the preview keeps its print button; the hosted page gets the download link', () => {

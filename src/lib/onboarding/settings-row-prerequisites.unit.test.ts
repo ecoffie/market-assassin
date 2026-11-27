@@ -48,6 +48,8 @@ function from(name: string) {
 }
 
 vi.mock('@supabase/supabase-js', () => ({ createClient: () => ({ from }) }));
+const sendEmailMock = vi.hoisted(() => vi.fn(async () => true));
+vi.mock('@/lib/send-email', () => ({ sendEmail: sendEmailMock }));
 vi.mock('@/lib/api-auth', () => ({
   verifyUserOwnsEmail: async (_r: unknown, email: string) => ({ authenticated: true, email: String(email).toLowerCase() }),
 }));
@@ -65,7 +67,7 @@ const settingsOps = () => db.ops.filter((o) => o.table === 'user_notification_se
 const settingsCreates = () => settingsOps().filter((o) => o.op === 'insert' || o.op === 'upsert');
 const req = (url: string, init?: RequestInit) => new NextRequest(url, init as never);
 
-beforeEach(() => { db.tables = {}; db.ops = []; });
+beforeEach(() => { db.tables = {}; db.ops = []; sendEmailMock.mockClear(); });
 
 describe('saves do not depend on a settings row', () => {
   it('opportunities/save: a company/buyer/recompete save succeeds for a user with no settings row', async () => {
@@ -88,27 +90,30 @@ describe('saves do not depend on a settings row', () => {
 });
 
 describe('alerts/unsubscribe', () => {
-  it('GET for an address with no settings row reports the truth, not "Unsubscribed", and creates nothing', async () => {
+  // 2026-11-27: the legacy GET ?email= no longer unsubscribes whatever address it is given (anyone could unsubscribe
+  // anyone; mail scanners pre-fetch links). It writes nothing, emails the OWNER a signed one-click link, and the page
+  // never confirms whether the address exists. Signed links (/api/unsubscribe) are the only GET-reachable path.
+  it('GET for an address with no settings row: same neutral page, creates nothing, emails nobody', async () => {
     const { GET } = await import('@/app/api/alerts/unsubscribe/route');
     const html = await (await GET(req('https://getmindy.ai/api/alerts/unsubscribe?email=nobody@example.com'))).text();
-    expect(html).toContain('No alerts for this address');
-    expect(html).not.toContain("You've been unsubscribed");
+    expect(html).toContain('Check your inbox');
+    expect(html).not.toContain("You're unsubscribed");
     expect(settingsCreates()).toHaveLength(0);
+    expect(sendEmailMock).not.toHaveBeenCalled();
   });
 
-  it('GET with an existing row pauses it and says Unsubscribed', async () => {
+  it('GET with an existing row writes NOTHING (the signed-link email is covered in alerts/unsubscribe/legacy-get)', async () => {
     T('user_notification_settings').push({ user_email: 'me@example.com', alerts_enabled: true, alert_frequency: 'daily' });
     const { GET } = await import('@/app/api/alerts/unsubscribe/route');
     const html = await (await GET(req('https://getmindy.ai/api/alerts/unsubscribe?email=me@example.com'))).text();
-    expect(html).toContain("You've been unsubscribed");
-    expect(T('user_notification_settings')[0]).toMatchObject({ alerts_enabled: false, alert_frequency: 'paused' });
+    expect(html).toContain('Check your inbox');
+    expect(T('user_notification_settings')[0]).toMatchObject({ alerts_enabled: true, alert_frequency: 'daily' });
   });
 
   it('GET never reflects the raw email into the page (SEC-5)', async () => {
     const { GET } = await import('@/app/api/alerts/unsubscribe/route');
     const html = await (await GET(req('https://getmindy.ai/api/alerts/unsubscribe?email=' + encodeURIComponent('<script>alert(1)</script>')))).text();
     expect(html).not.toContain('<script>alert(1)</script>');
-    expect(html).toContain('&lt;script&gt;');
   });
 
   it('POST (authenticated) with no row creates a PAUSED row — never an alerts-on one', async () => {

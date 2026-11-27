@@ -1621,6 +1621,7 @@ export default function DashboardPanel({ email, tier, onPanelChange }: Dashboard
                                 event.stopPropagation();
                                 toggleItem(item.id);
                               }}
+                              data-tip="dashboard-review-fit"
                               className="inline-flex min-h-[44px] items-center justify-center rounded bg-emerald-600 px-2.5 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-500 sm:px-3 md:min-h-0 md:py-1.5"
                             >
                               {isExpanded ? 'Hide Fit' : 'Review Fit'}
@@ -1774,7 +1775,7 @@ export default function DashboardPanel({ email, tier, onPanelChange }: Dashboard
                           </div>
                         )}
 
-                        <div className="mt-4 border-t border-surface pt-4">
+                        <div data-tip="dashboard-tune" className="mt-4 border-t border-surface pt-4">
                           <p className="text-xs uppercase tracking-wider text-faint mb-2">Tune Mindy</p>
                           <div className="flex flex-wrap gap-2">
                             {FEEDBACK_OPTIONS.map(option => {

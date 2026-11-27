@@ -150,9 +150,10 @@ export const TRIAL_UPGRADE_BONUS_CREDITS = 500;
  * Vercel. Not set in production as of 2026-08-02 (verified), so this default applies.
  */
 // 2026-11-12: raised to 7,000 shared (owner decision, with the Fyxer-style pricing page).
+// 2026-11-27: 7,500 shared, so the 5-user Team plan matches 5 seats x 1,500 (team-seat-plans.ts).
 export const TEAM_MONTHLY_CREDITS = Math.max(
   0,
-  Number(process.env.MCP_TEAM_MONTHLY_CREDITS ?? '7000') || 0,
+  Number(process.env.MCP_TEAM_MONTHLY_CREDITS ?? '7500') || 0,
 );
 
 /**

@@ -14,6 +14,7 @@
  * 4. Send email with teaming plays, calendar, competitive landscape
  */
 
+import { reportedOffers, offersCompetitionLevel } from '@/lib/opportunities/offers';
 import { NextRequest, NextResponse } from 'next/server';
 import { authorizeCronRequest } from '@/lib/cron/cron-request-auth';
 import { expandNaicsForBriefing as expandNaicsCodes } from '@/lib/briefings/naics-briefing-expansion';
@@ -45,7 +46,8 @@ interface ContractForBriefing {
   daysUntilExpiration: number;
   setAside: string;
   description: string;
-  numberOfBids?: number;
+  /** null = not reported on the award (never 0). */
+  numberOfBids?: number | null;
   competitionLevel?: string;
 }
 
@@ -276,7 +278,9 @@ async function fetchContractsForNaics(naicsCodes: string[]): Promise<ContractFor
             const endDate = periodPerf.end_date || award['End Date'] || '';
             const daysUntil = endDate ? Math.ceil((new Date(endDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : 180;
 
-            const numberOfBids = parseInt(contractData.number_of_offers_received || '0', 10) || 0;
+            // Not reported → null + 'unknown' — never "0 bids" / sole source (offers.ts).
+            const numberOfBids = reportedOffers(contractData.number_of_offers_received);
+            const competitionLevel = offersCompetitionLevel(numberOfBids);
 
             allContracts.push({
               contractNumber: detail.piid || award['Award ID'],
@@ -287,10 +291,10 @@ async function fetchContractsForNaics(naicsCodes: string[]): Promise<ContractFor
               naicsCode: naics,
               expirationDate: endDate,
               daysUntilExpiration: daysUntil,
-              setAside: contractData.extent_competed_description || 'Full & Open',
+              setAside: contractData.type_set_aside_description || 'Not reported',
               description: detail.description || '',
               numberOfBids,
-              competitionLevel: numberOfBids <= 2 ? 'low' : numberOfBids <= 5 ? 'medium' : 'high',
+              competitionLevel,
             });
           }
         } catch {
@@ -322,6 +326,7 @@ Generate JSON with:
 
 Focus on contracts with:
 - Low numberOfBids (1-2 bids = vulnerable incumbent)
+- numberOfBids null / competitionLevel "unknown" means the offer count was NOT REPORTED: say "offers not reported", never "0 bids", "sole source" or "1 bidder"
 - competitionLevel "low"
 - Near-term expiration (daysUntilExpiration < 180)
 

@@ -232,7 +232,7 @@ export default function PricingIntelPanel({ email, tier }: Props) {
           NAICS from their profile (fetched on mount). */}
       <div className="bg-ground/60 border border-surface rounded-lg p-3 space-y-3">
         {/* Mode toggle: NAICS (industry) vs Labor Category (the native CALC way). */}
-        <div className="inline-flex rounded-md border border-hairline overflow-hidden text-xs">
+        <div data-tip="pricing-mode" className="inline-flex rounded-md border border-hairline overflow-hidden text-xs">
           <button type="button" onClick={() => setMode('naics')}
             className={`px-3 py-1.5 ${mode === 'naics' ? 'bg-emerald-600 text-white' : 'bg-ground-deep text-muted hover:text-white'}`}>
             By NAICS
@@ -243,7 +243,7 @@ export default function PricingIntelPanel({ email, tier }: Props) {
           </button>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div data-tip="pricing-query" className="flex items-center gap-3">
           {mode === 'naics' ? (
             <>
               <label className="text-sm text-muted whitespace-nowrap">NAICS Code:</label>
@@ -377,7 +377,7 @@ export default function PricingIntelPanel({ email, tier }: Props) {
           <h3 className="text-sm font-semibold text-white mb-2">
             Your price-to-win targets <span className="font-normal text-faint">— blended hourly labor rate</span>
           </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div data-tip="pricing-rates" className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <RateTile
               label="Aggressive"
               rate={data.priceToWinGuidance.aggressiveRate}

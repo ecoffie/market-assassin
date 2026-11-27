@@ -48,6 +48,17 @@ const dateOnly = (s: string | null | undefined) => {
   const m = String(s ?? '').match(/^(\d{4}-\d{2}-\d{2})/);
   return m ? m[1] : null;
 };
+/**
+ * The data date inside a source's date label (context-sources sourceDateLabel: "data through 2026-11-20", "data as of
+ * ...", "source dated ...", or a bare date from an older ledger). A SAM registration record's date says when the
+ * registration was cached, not how current the data is, so it never sets the document's "Data as of" line.
+ */
+const dataDate = (s: string | null | undefined) => {
+  const v = String(s ?? '');
+  if (/SAM registration record from/i.test(v)) return null;
+  const m = v.match(/(\d{4}-\d{2}-\d{2})/);
+  return m ? m[1] : null;
+};
 const normUrl = (u: string | null | undefined) =>
   String(u ?? '').trim().toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/[?#].*$/, '').replace(/\/+$/, '');
 const normId = (s: string | null | undefined) => String(s ?? '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
@@ -67,7 +78,7 @@ function matchesFor(src: DocSource, records: readonly ProvenanceRecord[]): Prove
 }
 
 /** Fill DocSource provenance and the data-date subtitle from tool-result records. Pure; never mutates its input. */
-export function applySourceProvenance(model: DocModel, records: readonly ProvenanceRecord[]): ApplyProvenanceResult {
+export function applySourceProvenance(model: DocModel, records: readonly ProvenanceRecord[], opts: { dataDateSubtitle?: boolean } = {}): ApplyProvenanceResult {
   const out: ApplyProvenanceResult = { model, filledRetrievedAt: 0, replacedRetrievedAt: 0, filledUrl: 0, filledRecordId: 0, unmatched: 0, removedUnverified: 0, subtitleSet: false };
   if (!model || !Array.isArray(model.sources)) return out;
   const usedAsOf: string[] = [];
@@ -95,11 +106,13 @@ export function applySourceProvenance(model: DocModel, records: readonly Provena
     if (!next.url && urls.length === 1) { next.url = urls[0]; out.filledUrl += 1; }
     const ids = [...new Set(m.flatMap((r) => r.recordIds ?? []).filter(Boolean))];
     if (!next.recordId && ids.length === 1) { next.recordId = ids[0]; out.filledRecordId += 1; }
-    for (const r of m) { const d = dateOnly(r.asOf); if (d) usedAsOf.push(d); }
+    for (const r of m) { const d = dataDate(r.asOf); if (d) usedAsOf.push(d); }
     return next;
   });
   let subtitle = model.subtitle;
-  if (!subtitle?.trim() && usedAsOf.length) {
+  // No "Data as of" subtitle (Eric, 2026-11-27: record dates make the data look stale). Kept behind an explicit
+  // opt-in only, for a caller that must show it.
+  if (opts.dataDateSubtitle && !subtitle?.trim() && usedAsOf.length) {
     // A range when the matched results disagree: the latest date alone would overstate how current the older data is.
     const dates = [...new Set(usedAsOf)].sort();
     subtitle = dates.length === 1 ? `Data as of ${dates[0]}` : `Data as of ${dates[0]} to ${dates[dates.length - 1]}`;

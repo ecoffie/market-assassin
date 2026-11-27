@@ -49,9 +49,15 @@ export interface AwardDetail {
   multipleOrSingleAward?: string | null;
   /** Latest transaction's set-aside description, as reported. Null when not reported. */
   setAsideDescription?: string | null;
+  /**
+   * How this award was competed, classified from THIS record's latest_transaction_contract_data (competition-facts.ts):
+   * extent competed, set-aside, offers received (null = not reported, never 1 or 0), other-than-full-and-open reason.
+   */
+  competition?: CompetitionFacts;
 }
 
 import { CONTRACT_CODES, IDV_CODES } from '@/lib/usaspending/award-type-codes';
+import { classifyCompetition, type CompetitionFacts } from '@/lib/opportunities/competition-facts';
 
 export type AwardCeilingSource =
   | 'base_and_all_options'
@@ -110,51 +116,82 @@ const SEARCH = 'https://api.usaspending.gov/api/v2/search/spending_by_award/';
  * Contracts). USASpending forbids mixing contract + IDV type groups in one query,
  * so we try each group. Returns null if not found (caller degrades gracefully).
  */
-export async function resolvePiidToId(piid: string): Promise<string | null> {
+/**
+ * A lookup's answer: FOUND, a CONFIRMED miss (every upstream query answered and none matched), or UNAVAILABLE
+ * (an upstream query errored, timed out or was refused, so a miss would be a guess). Issue #2432: the null-returning
+ * readers folded an upstream failure into "no such award", and get_award_detail told a customer a real VA award
+ * did not exist (found 82 s later with the same args). Unknown is never zero.
+ */
+export type AwardLookup<T> = { state: 'found'; value: T } | { state: 'not_found' } | { state: 'unavailable'; reason: string };
+
+/** USASpending drops connections from cloud/serverless IPs that send no User-Agent (see fetchAwardDetail). */
+function usaspendingHeaders(): Record<string, string> {
+  return {
+    'Content-Type': 'application/json',
+    'User-Agent': `Mindy-GovConGiants (${process.env.MCP_CONTACT_EMAIL || 'hello@govcongiants.com'})`,
+  };
+}
+
+/** PIID → generated_internal_id, distinguishing a confirmed miss from an upstream failure. */
+export async function resolvePiidToIdChecked(piid: string, fetcher: typeof fetch = fetch): Promise<AwardLookup<string>> {
   const clean = (piid || '').trim();
-  if (!clean) return null;
+  if (!clean) return { state: 'not_found' };
   // Already a generated id? pass through.
-  if (/^CONT_(AWD|IDV)_/i.test(clean)) return clean;
+  if (/^CONT_(AWD|IDV)_/i.test(clean)) return { state: 'found', value: clean };
   const groups = [[...CONTRACT_CODES], [...IDV_CODES]];
+  let failure: string | null = null;
   for (const award_type_codes of groups) {
     try {
-      const res = await fetch(SEARCH, {
+      const res = await fetcher(SEARCH, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: usaspendingHeaders(),
         body: JSON.stringify({ filters: { award_type_codes, keywords: [clean] }, fields: ['Award ID', 'generated_internal_id'], limit: 10 }),
       });
-      if (!res.ok) continue;
+      if (!res.ok) { failure = `search HTTP ${res.status}`; continue; }
       const j = await res.json();
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const hit = (j.results || []).find((r: any) => (r['Award ID'] || '').toUpperCase() === clean.toUpperCase());
-      if (hit?.generated_internal_id) return hit.generated_internal_id;
-    } catch { /* try next group */ }
+      if (hit?.generated_internal_id) return { state: 'found', value: hit.generated_internal_id };
+    } catch (err) {
+      failure = `search error: ${(err as Error)?.message || String(err)}`;
+    }
   }
-  return null;
+  // A group that failed could have held the award: that is unknown, not absent.
+  return failure ? { state: 'unavailable', reason: failure } : { state: 'not_found' };
+}
+
+/** Back-compat reader: null for a miss OR a failure. Use resolvePiidToIdChecked where the difference matters. */
+export async function resolvePiidToId(piid: string): Promise<string | null> {
+  const r = await resolvePiidToIdChecked(piid);
+  return r.state === 'found' ? r.value : null;
 }
 
 /** Fetch + normalize the full award detail for a USASpending generated_internal_id. */
 export async function fetchAwardDetail(generatedId: string): Promise<AwardDetail | null> {
-  if (!generatedId) return null;
+  const r = await fetchAwardDetailChecked(generatedId);
+  return r.state === 'found' ? r.value : null;
+}
+
+/** Fetch + normalize, distinguishing a confirmed miss (HTTP 404) from an upstream failure. */
+export async function fetchAwardDetailChecked(generatedId: string, fetcher: typeof fetch = fetch): Promise<AwardLookup<AwardDetail>> {
+  if (!generatedId) return { state: 'not_found' };
   try {
-    const res = await fetch(`${BASE}/${encodeURIComponent(generatedId)}/`, {
+    const res = await fetcher(`${BASE}/${encodeURIComponent(generatedId)}/`, {
       // A descriptive User-Agent is required-in-practice: USASpending drops connections
       // from cloud/serverless IPs (Vercel) that send no UA, so the enrich cron got 0/5
       // while a local call (which sent a UA) got 200. Same contact-UA convention as the
       // EDGAR client. Harmless for the app surfaces that also call this.
-      headers: {
-        'Content-Type': 'application/json',
-        'User-Agent': `Mindy-GovConGiants (${process.env.MCP_CONTACT_EMAIL || 'hello@govcongiants.com'})`,
-      },
+      headers: usaspendingHeaders(),
     });
-    if (!res.ok) return null;
+    if (res.status === 404) return { state: 'not_found' };
+    if (!res.ok) return { state: 'unavailable', reason: `detail HTTP ${res.status}` };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const d: any = await res.json();
     const loc = d.recipient?.location || {};
     const pop = d.period_of_performance || {};
     const obligated = Number(d.total_obligation || 0);
     const { ceiling, ceilingSource } = resolveAwardCeiling(d);
-    return {
+    return { state: 'found', value: {
       awardId: d.piid || d.fain || d.uri || generatedId,
       generatedId,
       description: d.description || '',
@@ -185,8 +222,16 @@ export async function fetchAwardDetail(generatedId: string): Promise<AwardDetail
       usaSpendingUrl: `https://www.usaspending.gov/award/${encodeURIComponent(generatedId)}`,
       multipleOrSingleAward: d.latest_transaction_contract_data?.multiple_or_single_award_description || null,
       setAsideDescription: d.latest_transaction_contract_data?.type_set_aside_description || null,
-    };
-  } catch {
-    return null;
+      competition: classifyCompetition(d.latest_transaction_contract_data ? {
+        extent_competed: d.latest_transaction_contract_data.extent_competed ?? null,
+        extent_competed_description: d.latest_transaction_contract_data.extent_competed_description ?? null,
+        type_set_aside_description: d.latest_transaction_contract_data.type_set_aside_description ?? null,
+        other_than_full_and_open_description: d.latest_transaction_contract_data.other_than_full_and_open_description ?? null,
+        number_of_offers_received: d.latest_transaction_contract_data.number_of_offers_received ?? null,
+        business_categories: Array.isArray(d.recipient?.business_categories) ? d.recipient.business_categories : null,
+      } : null),
+    } };
+  } catch (err) {
+    return { state: 'unavailable', reason: `detail error: ${(err as Error)?.message || String(err)}` };
   }
 }

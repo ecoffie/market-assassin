@@ -98,6 +98,13 @@ export interface McpToolContext {
    * MCP transports never set it, so hosted MCP behaviour is unchanged.
    */
   vaultEmail?: string;
+  /**
+   * Ask Mindy research mode (Eric, 2026-11-25: "we have sam cache no need to make live calls"): tools that would reach
+   * live SAM serve Mindy's SAM cache instead, and say so in _meta. MCP transports never set it, so hosted MCP
+   * behaviour is unchanged. Wired: lookup_sam_entity, find_opportunities (company anchor), get_solicitation_incumbent,
+   * get_solicitation_documents.
+   */
+  samCacheOnly?: boolean;
 }
 
 /**
@@ -986,7 +993,7 @@ const PAST_CONTRACTS_TOOL_DEF = {
       '"W912EQ" = USACE Memphis District, "N00189" = NAVSUP FLC Norfolk). Only pass the filters the user asked ' +
       'for: do NOT add a state the user did not name. _meta.applied_filters lists every filter applied. When the ' +
       'date window is recent, _meta.lag_note explains that DoD awards publish with a ~90-day delay: report "not ' +
-      'yet published / data current through <date>", never "no award was made".',
+      'yet published; recent awards may not appear yet" (in words, no data date), never "no award was made".',
     parameters: {
       type: 'object',
       properties: {
@@ -1439,7 +1446,13 @@ const FEDERAL_EVENTS_TOOL_DEF = {
     parameters: {
       type: 'object',
       properties: {
-        agency: { type: 'string', description: 'Agency name, e.g. "Department of Defense", "Navy", "GSA". Messy raw names resolve via normalization.' },
+        agency: { type: 'string', description: 'Agency name, e.g. "Department of Defense", "Navy", "GSA". Messy raw names resolve via normalization. Optional when state or near is given.' },
+        state: {
+          type: 'string',
+          description:
+            'Optional LOCATION filter: state code(s) or name(s), e.g. "CT", "Connecticut", "CT, MA". SAM events match on the notice\'s place of performance, else the buying office\'s state (never free text); events with no stated location are counted in _meta.location_filter.location_unknown, never shown as matches. Also returns regional_events (state matchmakers, APEX Accelerator events) and regional_coverage.',
+        },
+        near: { type: 'string', description: 'Optional "City, ST" (e.g. "Hartford, CT"): filters to that state and lists that city\'s regional events first.' },
         months_ahead: { type: 'number', description: 'Look-ahead window in months (default 4, max 12).' },
         include_ai_discovery: { type: 'boolean', description: 'Also run a web search for association conferences not in SAM (slower, best-effort). Default false.' },
         limit: { type: 'number', description: 'Max SAM rows to return (default 50, max 100). Attendable events fill it first; notices keep at least a fifth of it when they exist. Local table — a larger set has no per-call cost.' },
@@ -1450,7 +1463,7 @@ const FEDERAL_EVENTS_TOOL_DEF = {
             'Only events with a real source date are included (undated ones are counted in _meta.ics_skipped_undated, never guessed onto a day). Default false.',
         },
       },
-      required: ['agency'],
+      required: [],
     },
   },
 };
@@ -1585,7 +1598,7 @@ const SBLO_CONTACT_TOOL_DEF = {
       'BigQuery-tier match — BQ has award data, NOT SBLO contacts) means no public SBLO was found, so it surfaces the ' +
       'supplier portal and NEVER invents a contact. When no named SBLO is curated (most small firms), returns ' +
       'registered_points_of_contact: the people the firm listed on its SAM registration (names/titles, from Mindy\'s ' +
-      'stored SAM data, dated by as_of), labelled "registered SAM point of contact, not a designated small business ' +
+      'stored SAM data), labelled "registered SAM point of contact, not a designated small business ' +
       'liaison". SAM redacts POC email/phone; never invent them. grounded=false = not curated, not a matching federal ' +
       'prime, and no registered POC held.',
     parameters: {
@@ -2345,7 +2358,7 @@ async function dispatchMcpTool(
     const result = (await getSolicitationIncumbent({
       solicitation_number: typeof args.solicitation_number === 'string' ? args.solicitation_number : undefined,
       notice_id: typeof args.notice_id === 'string' ? args.notice_id : undefined,
-    })) as unknown as Record<string, unknown>;
+    }, { samCacheOnly: ctx.samCacheOnly === true })) as unknown as Record<string, unknown>;
     return { result, credits };
   }
 
@@ -2355,7 +2368,7 @@ async function dispatchMcpTool(
       name: typeof args.name === 'string' ? args.name : undefined,
       state: typeof args.state === 'string' ? args.state : undefined,
       limit: typeof args.limit === 'number' ? args.limit : undefined,
-    })) as unknown as Record<string, unknown>;
+    }, { cacheOnly: ctx.samCacheOnly === true })) as unknown as Record<string, unknown>;
     return { result, credits };
   }
 
@@ -2485,7 +2498,7 @@ async function dispatchMcpTool(
         ? (args.states as unknown[]).filter((s): s is string => typeof s === 'string')
         : typeof args.states === 'string' ? args.states : undefined,
       stage: typeof args.stage === 'string' ? args.stage : undefined,
-    })) as unknown as Record<string, unknown>;
+    }, { samCacheOnly: ctx.samCacheOnly === true })) as unknown as Record<string, unknown>;
     // Result contract: report the coerced arguments the tool DID apply, so a string `states`
     // (schema: array) or a normalized `stage` ("market research" -> MARKET_RESEARCH) is not
     // reported as ignored. An unrecognizable stage stays reported (the enum check flags it).
@@ -2555,7 +2568,7 @@ async function dispatchMcpTool(
       max_value: typeof args.max_value === 'number' ? args.max_value : undefined,
       likelihood: args.likelihood === 'high' || args.likelihood === 'medium' || args.likelihood === 'low' ? args.likelihood : undefined,
       limit: typeof args.limit === 'number' ? args.limit : undefined,
-    })) as unknown as Record<string, unknown>;
+    }, { competition: true })) as unknown as Record<string, unknown>;
     return { result, credits };
   }
 
@@ -2768,6 +2781,8 @@ async function dispatchMcpTool(
   if (name === 'search_federal_events') {
     const result = (await searchFederalEvents({
       agency: typeof args.agency === 'string' ? args.agency : '',
+      state: typeof args.state === 'string' || Array.isArray(args.state) ? (args.state as string | string[]) : undefined,
+      near: typeof args.near === 'string' ? args.near : undefined,
       months_ahead: typeof args.months_ahead === 'number' ? args.months_ahead : undefined,
       include_ai_discovery: args.include_ai_discovery === true,
       limit: typeof args.limit === 'number' ? args.limit : undefined,
@@ -2788,7 +2803,7 @@ async function dispatchMcpTool(
       continuation: typeof args.continuation === 'string' ? args.continuation : undefined,
       // The VERIFIED caller from the transport — never an argument — binds continuation tokens.
       userEmail: ctx.userEmail,
-    })) as unknown as Record<string, unknown>;
+    }, { samCacheOnly: ctx.samCacheOnly === true })) as unknown as Record<string, unknown>;
     return { result, credits };
   }
 

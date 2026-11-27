@@ -99,6 +99,16 @@ export interface ChatToolExecutorOptions {
    * callers that bound the whole operation themselves). The Ask Mindy route always sets it.
    */
   toolTimeoutMs?: (name: string) => number;
+  /**
+   * Ask Mindy research mode: every registry tool runs with McpToolContext.samCacheOnly, so SAM-backed tools read
+   * Mindy's caches only and never call live SAM (Eric, 2026-11-25). Hosted MCP never sets it.
+   */
+  samCacheOnly?: boolean;
+  /**
+   * Called with every SUCCESSFUL call's name and result content (the JSON string the model sees). Ask Mindy app actions
+   * use it as this turn's evidence: map.open_record may only name a notice id a tool returned. Errors are swallowed.
+   */
+  onResult?: (name: string, content: string) => void;
 }
 
 /** A logging call may never hold up a turn: telemetry waits at most this long. */
@@ -124,7 +134,7 @@ function refusal(category: string, message: string): Record<string, unknown> {
  * carry billing_outcome 'nonbillable_free_tool', so they stay free if per-answer billing (#2110) is ever
  * enabled, whatever their result looks like. The success/failure outcome is still classified normally.
  */
-export const CHAT_FREE_TOOLS: ReadonlySet<string> = new Set(['create_document', 'find_my_documents']);
+export const CHAT_FREE_TOOLS: ReadonlySet<string> = new Set(['create_document', 'find_my_documents', 'create_email_draft']);
 
 /** Outcome telemetry is best-effort: a classifier error must not cost the log row. */
 function safeOutcome(name: string, result: unknown): { outcome?: ReturnType<typeof classifyCallOutcome> } {
@@ -371,6 +381,7 @@ export function createChatToolExecutor(opts: ChatToolExecutorOptions) {
         : (await deps.runMcpTool(name, args, {
             userEmail: opts.userEmail,
             ...(opts.vaultEmail && VAULT_GROUNDED_TOOLS.has(name) ? { vaultEmail: opts.vaultEmail } : {}),
+            ...(opts.samCacheOnly ? { samCacheOnly: true } : {}),
           })).result)();
       result = limitMs == null ? await run : await withTimeout(run, limitMs, `tool:${name}`);
     } catch (err) {
@@ -394,7 +405,9 @@ export function createChatToolExecutor(opts: ChatToolExecutorOptions) {
     const latencyMs = Date.now() - started;
     const resourceIds = policy.decision === 'allowed_write' ? safeResourceIds(name, result) : null;
     await safeLog(planner, name, 'success', executionId, { args, latencyMs, resourceIds, result });
-    return { ...done('success', policy.decision, null, {}), content: safeStringify(result ?? {}, resourceIds) };
+    const content = safeStringify(result ?? {}, resourceIds);
+    if (opts.onResult) { try { opts.onResult(name, content); } catch (err) { console.error('[chat] onResult failed (non-fatal):', err); } }
+    return { ...done('success', policy.decision, null, {}), content };
   }
 
   /** logCall never throws by contract; this keeps a broken logger from ever affecting results. */

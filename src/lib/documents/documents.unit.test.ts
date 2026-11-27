@@ -18,8 +18,8 @@ vi.mock('@/lib/pdf/launch-browser', () => ({
 import { SAMPLE_REPORT } from './__fixtures__/sample-report';
 import { DOC_SCHEMA, type DocModel } from './model';
 import { validateDocModel, demoteUncitedFacts, repairDocModelStructure, hardenedAssumptions, DEFAULT_ASSUMPTION_ORIGIN, repeatedSentences, fixtureMarkers } from './validate';
-import { keepDash, citationIndex, citeMarker, formatCell, formatColumn, formatChartValue, chartDuplicatesTable, parseInline, NOT_AVAILABLE, fileBaseName } from './format';
-import { renderHtml } from './render-html';
+import { keepDash, noEmDash, clientCopy, claimLabel, DOC_STAGE_MARK, citationIndex, citeMarker, formatCell, formatColumn, formatChartValue, chartDuplicatesTable, parseInline, NOT_AVAILABLE, fileBaseName } from './format';
+import { renderHtml, DOC_HTML_CSP, TOC_MIN_SECTIONS } from './render-html';
 import { renderDocx } from './render-docx';
 import { renderPdf, pdfOptions } from './render-pdf';
 import { renderDocument } from './index';
@@ -805,20 +805,21 @@ describe('titles keep a dash with the word before it (A5, v5)', () => {
     expect(keepDash('Pre-award work-up')).toBe('Pre-award work-up');
   });
 
-  it('PDF/HTML and DOCX titles and headings carry the non-breaking space', async () => {
-    const m = { ...clone(), sections: [...clone().sections, { id: 'extra', heading: 'Next steps — 90 days', blocks: [{ type: 'paragraph' as const, id: 'x1', text: 'Act.', claim: 'recommendation' as const }] }] };
+  it('client copy has no em dash: a title or heading reads "A: B"; an en dash range still keeps its non-breaking space', async () => {
+    const m = { ...clone(), sections: [...clone().sections, { id: 'extra', heading: 'Next steps \u2014 90 days', blocks: [{ type: 'paragraph' as const, id: 'x1', text: 'Act.', claim: 'recommendation' as const }] }, { id: 'range', heading: 'Spend FY2024 \u2013 FY2026', blocks: [{ type: 'paragraph' as const, id: 'x2', text: 'Act.', claim: 'recommendation' as const }] }] };
     const html = renderHtml(m);
-    expect(html).toContain('<h1>Federal Janitorial Services Market — Research Report (Fixture)</h1>');
-    expect(html).toContain('Next steps — 90 days</h2>');
-    expect(html).not.toMatch(/Market — Research/);
-    expect(String(pdfOptions(m).headerTemplate)).toContain('Market — Research');
+    expect(html).toContain('<h1>Federal Janitorial Services Market: Research Report (Fixture)</h1>');
+    expect(html).toContain('Next steps: 90 days</h2>');
+    expect(html).toContain('Spend FY2024\u00a0\u2013 FY2026</h2>');
+    expect(html).not.toContain('\u2014');
+    expect(String(pdfOptions(m).headerTemplate)).toContain('Market: Research');
     const files = unzipSync(new Uint8Array(await renderDocx(m)));
     const doc = strFromU8(files['word/document.xml']);
     const header = Object.keys(files).filter((k) => /^word\/header\d*\.xml$/.test(k)).map((k) => strFromU8(files[k])).join('');
-    expect(doc).toContain('Market — Research Report (Fixture)');
-    expect(doc).toContain('Next steps — 90 days');
-    expect(doc).not.toContain('Market — Research');
-    expect(header).toContain('Market — Research');
+    expect(doc).toContain('Market: Research Report (Fixture)');
+    expect(doc).toContain('Next steps: 90 days');
+    expect(doc).not.toContain('\u2014');
+    expect(header).toContain('Market: Research');
   });
 });
 
@@ -877,7 +878,9 @@ describe('render-html', () => {
     expect(html).not.toMatch(/<script/i);
     expect(html).not.toMatch(/<link/i);
     expect(html).not.toMatch(/<img/i);
-    expect(html).not.toMatch(/@import|url\(/i);
+    expect(html).not.toMatch(/@import/i);
+    // The only url() allowed is an embedded data: font (no request); any other url() would be a fetch.
+    expect(html.match(/url\((?!data:font\/woff2;base64,)/gi)).toBeNull();
   });
 
   it('shows labels, citations, Not available and a numbered Sources section', () => {
@@ -889,7 +892,9 @@ describe('render-html', () => {
     expect(html).toContain('<sup class="cite">[1]</sup>');
     expect(html).toContain(NOT_AVAILABLE);
     expect(html).toMatch(/<h2>Sources<\/h2><ol><li>Example award data extract/);
-    expect(html).toContain('<h2>Contents</h2>');
+    // 8 sections: short enough to read without a contents list (TOC_MIN_SECTIONS), like the reference plans.
+    expect(html).not.toContain('<h2>Contents</h2>');
+    expect(renderHtml(SAMPLE_REPORT, { toc: true })).toContain('<h2>Contents</h2>');
     expect((html.match(/<svg /g) || []).length).toBe(4);
   });
 });
@@ -897,7 +902,7 @@ describe('render-html', () => {
 describe('contents list matches the body numbering', () => {
   it('numbered-rule: TOC numbers equal body numbers; Sources/Unverified unnumbered; model-supplied "1." prefix not doubled', () => {
     const m = { ...SAMPLE_REPORT, theme: 'mindy' as const, sections: SAMPLE_REPORT.sections.map((s, i) => (i === 0 ? { ...s, heading: '1. Executive summary' } : s)) };
-    const html = renderHtml(m);
+    const html = renderHtml(m, { toc: true });
     expect(html).toContain('<h2><span class="num">1.</span>Executive summary</h2>');
     expect(html).not.toContain('1. 1.');
     expect(html).toContain('<li><span class="n">1.</span>Executive summary</li>');
@@ -907,7 +912,8 @@ describe('contents list matches the body numbering', () => {
     expect(html).not.toContain(`<span class="n">${n + 1}.</span>`);
   });
   it('briefing theme (unnumbered body): TOC carries no numbers', () => {
-    const html = renderHtml({ ...SAMPLE_REPORT, theme: 'briefing' });
+    const html = renderHtml({ ...SAMPLE_REPORT, theme: 'briefing' }, { toc: true });
+    expect(html).toContain('<h2>Contents</h2>');
     expect(html).not.toContain('<span class="n">');
   });
   it('wide tables get the dense class and header cells may wrap', () => {
@@ -963,7 +969,7 @@ describe('HTML Content-Security-Policy', () => {
   it('the CSP meta is the FIRST element of <head> (it must govern prefetch/preconnect links too)', () => {
     const html = renderHtml(SAMPLE_REPORT);
     const head = html.slice(html.indexOf('<head>') + '<head>'.length);
-    expect(head.startsWith(`<meta http-equiv="Content-Security-Policy" content="${"default-src 'none'; style-src 'unsafe-inline'; img-src data:"}">`)).toBe(true);
+    expect(head.startsWith(`<meta http-equiv="Content-Security-Policy" content="${"default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:"}">`)).toBe(true);
     expect(html.match(/http-equiv="Content-Security-Policy"/g)).toHaveLength(1);
   });
 
@@ -983,7 +989,7 @@ describe('unverified statements', () => {
   ] }] });
   it('HTML: labeled inline and listed in an "Unverified statements" section before Sources', () => {
     const html = renderHtml(m());
-    expect(html).toContain('class="label unverified">Unverified — no source</span>');
+    expect(html).toContain('class="label unverified">Unverified: no source</span>');
     expect(html).toMatch(/<h2>Unverified statements<\/h2>[\s\S]*Buyers:<\/span> VA buys the most\.[\s\S]*<h2>Sources<\/h2>/);
   });
   it('HTML: no section when nothing is unverified', () => {
@@ -992,7 +998,7 @@ describe('unverified statements', () => {
   it('DOCX: labeled inline and listed', async () => {
     const files = unzipSync(new Uint8Array(await renderDocx(m())));
     const doc = strFromU8(files['word/document.xml']);
-    expect(doc).toContain('UNVERIFIED — NO SOURCE');
+    expect(doc).toContain('UNVERIFIED: NO SOURCE');
     expect(doc).toContain('Unverified statements');
     expect(doc).toContain('Buyers: ');
   });
@@ -1224,5 +1230,165 @@ describe('module boundary', () => {
       const src = readFileSync(f, 'utf8');
       expect(src, f).not.toMatch(/supabase|@vercel\/kv|\.insert\(|\.upsert\(|\.update\(|\.delete\(|\.storage\b|writeFile|appendFile/);
     }
+  });
+});
+
+describe('reference layout (Design & Output, 2026-11-25)', () => {
+  it('contents list only for long documents (TOC_MIN_SECTIONS top-level sections), never on a forced page', () => {
+    const many = { ...SAMPLE_REPORT, sections: Array.from({ length: TOC_MIN_SECTIONS }, (_, i) => ({ ...SAMPLE_REPORT.sections[i % SAMPLE_REPORT.sections.length], id: `s${i}` })) };
+    expect(renderHtml(many)).toContain('<h2>Contents</h2>');
+    expect(renderHtml({ ...many, sections: many.sections.slice(1) })).not.toContain('<h2>Contents</h2>');
+    expect(renderHtml(many)).not.toMatch(/\.(?:toc|cover)\s*\{[^}]*break-after:\s*page/);
+  });
+  it('the default theme opens with a letterhead: brand, contact lines, title, byline and the metadata table', () => {
+    const html = renderHtml({ ...SAMPLE_REPORT, meta: { ...SAMPLE_REPORT.meta, attention: 'A. Reader' } });
+    expect(html).toContain('<section class="cover letterhead">');
+    expect(html).toMatch(/<p class="byline">Prepared for Example Company \(fixture\)<\/p>/);
+    expect(html).toContain('<dt>Attention</dt><dd>A. Reader</dd>');
+  });
+  it('a checklist bullets block renders as checkboxes; ordered lists and plain bullets are unchanged', () => {
+    const blk = (extra: object) => ({ ...SAMPLE_REPORT, sections: [{ id: 'n', heading: 'Next steps', blocks: [{ type: 'bullets' as const, id: 'c', items: [{ text: 'Register in SAM.gov', claim: 'recommendation' as const }], ...extra }] }] });
+    expect(renderHtml(blk({ style: 'checklist' }))).toContain('<ul class="checklist"><li>');
+    expect(renderHtml(blk({ style: 'checklist', ordered: true }))).toContain('<ol><li>');
+    expect(renderHtml(blk({}))).toContain('<ul><li>');
+  });
+  it('embeds the static Inter faces (real fonts in the PDF, not Type 3) and the CSP allows data: fonts only', () => {
+    const html = renderHtml(SAMPLE_REPORT);
+    expect(html).toContain("font-family:'Mindy Report Inter'");
+    expect(html).toContain("font-family: 'Mindy Report Inter', ");
+    expect(DOC_HTML_CSP).toContain('font-src data:');
+  });
+});
+
+describe('research report launch (Design & Output, 2026-11-27)', () => {
+  it('noEmDash: running text gets a comma, headings a colon; a dash-only cell reads Not available; en dash ranges untouched', () => {
+    expect(noEmDash('The buyer is behind \u2014 two years running.')).toBe('The buyer is behind, two years running.');
+    expect(noEmDash('decision\u2014not findings')).toBe('decision, not findings');
+    expect(noEmDash('Pathways \u2014 where to focus', 'heading')).toBe('Pathways: where to focus');
+    expect(noEmDash('\u2014')).toBe(NOT_AVAILABLE);
+    expect(noEmDash('\u2014 leading and trailing \u2014')).toBe('leading and trailing');
+    expect(noEmDash('FY2024\u2013FY2026')).toBe('FY2024\u2013FY2026');
+  });
+  it('noEmDash: an em dash between numbers or amounts is a range and becomes an en dash, never a comma', () => {
+    expect(noEmDash('$10M\u2014$19M')).toBe('$10M\u2013$19M');
+    expect(noEmDash('the FHWA $10M \u2014 $19M program')).toBe('the FHWA $10M\u2013$19M program');
+    expect(noEmDash('2024\u20142026')).toBe('2024\u20132026');
+    expect(noEmDash('FY2024\u2014FY2026')).toBe('FY2024\u2013FY2026');
+    expect(noEmDash('10%\u201415% of awards')).toBe('10%\u201315% of awards');
+    expect(noEmDash('Won 3 awards \u2014 all small')).toBe('Won 3 awards, all small');
+  });
+  it('source titles and URLs are quoted verbatim (exempt from client-copy rewriting)', () => {
+    const m = clone();
+    m.sources[0] = { ...m.sources[0], label: 'GAO-26-1 \u2014 Federal Facilities: Backlog', url: 'https://example.com/a\u2014b' };
+    const out = clientCopy(m);
+    expect(out.sources[0].label).toBe('GAO-26-1 \u2014 Federal Facilities: Backlog');
+    expect(out.sources[0].url).toBe('https://example.com/a\u2014b');
+  });
+  it('no em dash reaches the reader anywhere in the PDF/HTML or Word output, and the stored model is unchanged', async () => {
+    const m = clone();
+    m.title = 'Acme \u2014 Plan';
+    m.sections[0].blocks.unshift({ type: 'paragraph', id: 'em1', text: 'One move \u2014 the best one.', claim: 'recommendation' });
+    const html = renderHtml(m);
+    const doc = strFromU8(unzipSync(new Uint8Array(await renderDocx(m)))['word/document.xml']);
+    expect(html.replace(/<style>[\s\S]*?<\/style>/, '')).not.toContain('\u2014');
+    expect(doc).not.toContain('\u2014');
+    expect(m.title).toBe('Acme \u2014 Plan');
+    expect(claimLabel('unverified')).toBe('Unverified: no source');
+  });
+  it('every page footer carries the Beta mark (PDF and Word)', async () => {
+    expect(DOC_STAGE_MARK).toBe('Beta');
+    expect(String(pdfOptions(clone()).footerTemplate)).toContain('Beta');
+    const files = unzipSync(new Uint8Array(await renderDocx(clone())));
+    const footer = Object.keys(files).filter((k) => /^word\/footer\d*\.xml$/.test(k)).map((k) => strFromU8(files[k])).join('');
+    expect(footer).toContain('Beta');
+  });
+  it('Word: the cover flows into the first section and short documents get no contents page', async () => {
+    const doc = strFromU8(unzipSync(new Uint8Array(await renderDocx(clone())))['word/document.xml']);
+    expect(doc).not.toContain('>Contents<');
+    const firstHeading = doc.indexOf('Executive summary');
+    expect(firstHeading).toBeGreaterThan(0);
+    expect(doc.slice(0, firstHeading)).not.toContain('w:type="page"');
+  });
+});
+
+describe('sources list carries no retrieval date (Eric, 2026-11-27)', () => {
+  const m = () => {
+    const x = clone();
+    x.sources = [
+      { id: 's1', kind: 'web', label: 'GAO-25-106719, Nov 20 2024: Federal Real Property', url: 'https://www.gao.gov/products/gao-25-106719', retrievedAt: '2026-11-27' },
+      { id: 's2', kind: 'usaspending', label: 'Award record', recordId: 'HE125425CE002', retrievedAt: '2026-11-26' },
+    ];
+    for (const sec of x.sections) for (const b of sec.blocks) if ('cites' in b && Array.isArray(b.cites)) b.cites = b.cites.filter((c) => c === 's1' || c === 's2').length ? b.cites.filter((c) => c === 's1' || c === 's2') : ['s1'];
+    x.sections[0].blocks.unshift({ type: 'paragraph', id: 'cite2', text: 'Cited award.', claim: 'fact', cites: ['s2'] });
+    return x;
+  };
+  it('HTML/PDF: title, link and record id are kept; no "Retrieved" date; a date in the title is kept', () => {
+    const html = renderHtml(m());
+    const sources = html.slice(html.indexOf('<h2>Sources</h2>'));
+    expect(sources).not.toMatch(/Retrieved/i);
+    expect(sources).not.toContain('2026-11-27');
+    expect(sources).not.toContain('2026-11-26');
+    expect(sources).toContain('GAO-25-106719, Nov 20 2024: Federal Real Property');
+    expect(sources).toContain('https://www.gao.gov/products/gao-25-106719');
+    expect(sources).toContain('(HE125425CE002)');
+  });
+  it('Word: same', async () => {
+    const doc = strFromU8(unzipSync(new Uint8Array(await renderDocx(m())))['word/document.xml']);
+    expect(doc).not.toMatch(/Retrieved/i);
+    expect(doc).not.toContain('2026-11-27');
+    expect(doc).toContain('GAO-25-106719, Nov 20 2024: Federal Real Property');
+    expect(doc).toContain('HE125425CE002');
+  });
+});
+
+describe('document cover carries no date (Eric, 2026-11-27)', () => {
+  it('HTML/PDF and Word covers show no Date row and no date in the byline', async () => {
+    const m = { ...clone(), date: '2026-11-17' };
+    const html = renderHtml(m);
+    const cover = html.slice(html.indexOf('<section class="cover'), html.indexOf('</section>', html.indexOf('<section class="cover')));
+    expect(cover).not.toContain('<dt>Date</dt>');
+    expect(cover).not.toContain('November 17, 2026');
+    const doc = strFromU8(unzipSync(new Uint8Array(await renderDocx(m)))['word/document.xml']);
+    expect(doc).not.toContain('November 17, 2026');
+    expect(doc).not.toMatch(/>Date</);
+  });
+  it('a dated cited title or an opportunity deadline in the body still renders', () => {
+    const m = clone();
+    m.sections[0].blocks.unshift({ type: 'paragraph', id: 'dl', text: 'Responses are due December 17, 2026.', claim: 'recommendation' });
+    expect(renderHtml(m)).toContain('Responses are due December 17, 2026.');
+  });
+});
+
+describe('shared renderer fixes from the capability statement screenshots (2026-11-27)', () => {
+  const withCiteOnlyTable = (): DocModel => ({
+    ...clone(),
+    sources: [...clone().sources, { id: 'up', kind: 'upload', label: 'Company-profile.docx', recordId: '67e4223f-0000-4000-8000-00000000abcd' }],
+    sections: [{ id: 'cd', heading: 'Company data', blocks: [
+      { type: 'table', id: 't', claim: 'fact', cites: ['s1'], columns: [{ key: 'f', label: 'Field' }, { key: 'v', label: 'Value' }], rows: [{ f: 'UEI', v: 'ABC123DEF456' }] },
+      { type: 'paragraph', id: 'p', claim: 'fact', cites: ['up'], text: 'From the company profile.' },
+    ] }],
+  });
+
+  it('a table cited without a caption carries its marker on the last header cell, never as a stray line above the table (HTML/PDF)', () => {
+    const html = renderHtml(withCiteOnlyTable());
+    expect(html).not.toMatch(/<div class="caption"><sup class="cite">\[\d+\]<\/sup><\/div>/);
+    expect(html).toMatch(/<th class="">Value <sup class="cite">\[1\]<\/sup><\/th>/);
+  });
+
+  it('Word: same, the marker is in the last header cell and there is no caption paragraph holding only "[n]"', async () => {
+    const doc = strFromU8(unzipSync(new Uint8Array(await renderDocx(withCiteOnlyTable())))['word/document.xml']);
+    expect(doc).toContain('Value [1]');
+    expect(doc).not.toMatch(/<w:pStyle w:val="Caption"\/>(?:(?!<\/w:p>).)*\[1\](?:(?!<\/w:p>).)*<\/w:p>/);
+  });
+
+  it('an upload source shows its file name only, never the internal Vault id (HTML/PDF and Word); public record ids stay', async () => {
+    const html = renderHtml(withCiteOnlyTable());
+    const sources = html.slice(html.indexOf('<h2>Sources</h2>'));
+    expect(sources).toContain('Company-profile.docx');
+    expect(sources).not.toContain('67e4223f');
+    const doc = strFromU8(unzipSync(new Uint8Array(await renderDocx(withCiteOnlyTable())))['word/document.xml']);
+    expect(doc).toContain('Company-profile.docx');
+    expect(doc).not.toContain('67e4223f');
+    expect(renderHtml(SAMPLE_REPORT)).toContain('(EX-QUERY-1)');
   });
 });

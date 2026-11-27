@@ -27,10 +27,10 @@
  *   - { type: 'error', message }       — on failure
  */
 
-import { NextRequest } from 'next/server';
+import { NextRequest, after } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verifyUserOwnsEmail } from '@/lib/api-auth';
-import { hasProAccess } from '@/lib/access/resolve-access';
+import { canUseAskMindy } from '@/lib/access/chat-access';
 // RAG corpus removed 2026-08-02 (Eric: "not just the podcast the 8 year corpus training —
 // anything not related to the data core we should remove. No one wants to learn here").
 // Ask Mindy now answers ONLY from the live federal Data Core tools; the teaching-chunk +
@@ -40,9 +40,14 @@ import { contractIdentityNote, contractEvidence, contractEvidenceNote, priorAwar
 import { ledgerForTrace } from '@/lib/chat/ledger-persistence';
 import { askMindyStrategyPlanEnabledFor, isStrategyPlanRequest, STRATEGY_PLAN_CHAT_CONTRACT, strategyPlanCheck, strategyProfileNote, strategyCompanyContext, strategyFitNote, type StrategyProfileInput } from '@/lib/ask-mindy/strategy-plan';
 import { isUserOverBudget, recordLlmUsage } from '@/lib/llm/usage-cost';
+import { researchClient } from '@/lib/ask-mindy/research-client';
 import { makeTier0Tools, TIER0_TOOL_DEFS, TIER0_TOOL_NAMES } from '@/lib/chat/tier0-tools';
 import { makeMyDocumentsTool, MY_DOCUMENTS_TOOL_DEF, FIND_MY_DOCUMENTS } from '@/lib/chat/my-documents-tool';
+import { connectedAppsEnabledFor, connectedAppsDraftsEnabledFor } from '@/lib/connected-apps/config';
+import { loadConnectedFilesContext } from '@/lib/connected-apps/read-file-tool';
+import { makeEmailDraftTool, EMAIL_DRAFT_TOOL_DEF, CREATE_EMAIL_DRAFT, type VerifiedSource } from '@/lib/connected-apps/email-draft';
 import { makeSearchWebTool, SEARCH_WEB_TOOL_DEF, SEARCH_WEB, callerKeyFor } from '@/lib/chat/search-web-tool';
+import { makeReadWebPageTool, READ_WEB_PAGE_TOOL_DEF, READ_WEB_PAGE, urlsInText } from '@/lib/chat/read-web-page';
 import { makeGenerateDocumentTool, CREATE_DOCUMENT_TOOL_DEF, CREATE_DOCUMENT, isDocumentCreationRequest, parseCreateDocumentDeliverables, type CreateDocumentDeliverable } from '@/lib/chat/generate-document-tool';
 import { vaultDocEnabledFor } from '@/lib/vault/flags';
 // Tools run ONLY through the chat tool executor (policy check at offer AND execution,
@@ -50,7 +55,8 @@ import { vaultDocEnabledFor } from '@/lib/vault/flags';
 import { createChatToolExecutor, type ChatExecutionRecord } from '@/lib/chat/chat-tool-executor';
 import { resolveChatActingScope, vaultEmailFor } from '@/lib/chat/chat-acting-scope';
 import type { BidderProfile } from '@/lib/proposal/types';
-import { resolvePlannerChain, plannerKey, anthropicSupportsForcedToolChoice, resolveAnswerChain, answerKey, ANSWER_ENDPOINTS, openAiChatParams, type PlannerTarget } from '@/lib/chat/planner-config';
+import { createMarkupFilter } from '@/lib/chat/tool-markup-filter';
+import { budgetDowngradeActive, resolvePlannerChain, plannerKey, anthropicSupportsForcedToolChoice, resolveAnswerChain, answerKey, ANSWER_ENDPOINTS, openAiChatParams, type PlannerTarget } from '@/lib/chat/planner-config';
 import { fitMessages, inputBudget, type MsgKind } from '@/lib/chat/token-budget';
 import { stagingModelConfig, STAGING_CONFIG_HEADER } from '@/lib/chat/staging-model-config';
 import { customerErrorMessage } from '@/lib/chat/customer-errors';
@@ -119,6 +125,17 @@ import { ASK_MINDY_RULES_LAYER, askMindyRulesEnabledFor, askMindyRulesPromptBloc
 import { askMindyRecipesEnabledFor } from '@/lib/ask-mindy/flags';
 import { loadCompanyProfile } from '@/lib/ask-mindy/company-profile';
 import { intelligenceGateEnabledFor, runIntelligenceGate, type GateResult } from '@/lib/ask-mindy/intelligence-gate';
+import { helpAnswerFor, helpAnswersEnabledFor } from '@/lib/ask-mindy/help-answers';
+import Anthropic from '@anthropic-ai/sdk';
+import {
+  researchModeEnabledFor, researchModel, researchSystemPrompt, toAnthropicTools, runResearchLoop, groundAnswer, progressLine,
+  RESEARCH_TURN_MS, RESEARCH_DEADLINE_MS, RESEARCH_NO_ANSWER, RESEARCH_BETA_LABEL, researchToolDefs, billedInputTokens, describeResearchError, RESEARCH_SYSTEM_STATIC, researchSystemDynamic, type ResearchCall, wantsReport,
+} from '@/lib/ask-mindy/research-mode';
+import { toolLabel } from '@/lib/chat/context-sources';
+import { researchCapDecision } from '@/lib/ask-mindy/research-caps';
+import { COMPETITION_AND_START_PLAYBOOK } from '@/lib/ask-mindy/competition-playbook';
+import { parseChatImages, imageContentBlocks, SCREENSHOT_NOT_READ } from '@/lib/chat/chat-images';
+import { researchCapDeps } from '@/lib/ask-mindy/research-caps-deps';
 import { gateEligible, extractWorkPhrase, profileForGate } from '@/lib/ask-mindy/gate-intent';
 import { fitRankingNote, rankFindResult } from '@/lib/ask-mindy/compose';
 import { provenanceRecords } from '@/lib/chat/doc-provenance';
@@ -131,6 +148,8 @@ import { getNaics } from '@/lib/codes/lookup';
 import { capabilityPlannerNote, interpretCapabilityNaics } from '@/lib/market/capability-naics';
 import { guardUnstatedStates, guardUnstatedCities } from '@/lib/chat/stated-filters';
 import { parseDisplayHint, displayHintNote } from '@/lib/chat/display-hint';
+import { appActionsEnabledFor, parseActionSurface, actionNamesFor, createAppActionProposer, proposeAppActionToolDef, PROPOSE_APP_ACTION, APP_ACTIONS_NOTE, type AppActionProposer } from '@/lib/chat/app-actions/propose';
+import { QUESTION_OVER_PROFILE, OUTREACH_AND_PLAN_RULES } from '@/lib/ask-mindy/outreach-rules';
 import { compileIntent, enforceIntent, dedupeToolCalls, isMapScopeNote, splitViewPreamble } from '@/lib/chat/intent-compiler';
 import { sessionTitleFrom } from '@/lib/chat/view-preamble';
 import { prepareChatToolArgs, renderExpiringRecords, renderStatusChecks, renderBuyingOffices, renderPricing, renderKeywords, renderVehicleMix, renderSbloContact, lintAnalysis, deterministicNextSteps, crossCheckOffices, checkSummaryAgainstRecords, EXPIRING_TOOL, PAST_CONTRACTS_TOOL, BUYING_OFFICES_TOOL, PRICING_TOOL, KEYWORDS_TOOL, VEHICLE_MIX_TOOL, SBLO_TOOL, type RenderedRecords } from '@/lib/chat/record-render';
@@ -180,7 +199,9 @@ export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 // A7: an explicit platform limit. Must equal CHAT_ROUTE_MAX_DURATION_S (turn-deadlines.ts): the turn
 // watchdog fires before it, so a turn always ends with `error` + `done`, never a silent cut.
-export const maxDuration = 300;
+// 800 s (Fluid compute ceiling) so an allowlisted RESEARCH MODE turn can finish (Agent 4, 2026-11-25). Every other
+// turn keeps its own 285 s watchdog (turn-deadlines.ts), so it behaves exactly as before.
+export const maxDuration = 800;
 
 // B2: the answer-step model chain lives in resolveAnswerChain (planner-config.ts). The old
 // Groq llama-3.1-8b-instant backup is retired; Groq runs only if CHAT_ANSWER_FALLBACKS lists it.
@@ -224,6 +245,8 @@ interface ChatRequest {
   email: string;
   message: string;
   sessionId?: string;
+  /** File handles from the connected-file picker (verified server-side; see connected-apps/read-file-tool.ts). */
+  connectedFiles?: string[];
   history?: ChatMessage[];
   /** Card chat: stable id of THIS question, generated by the browser and reused on retry/refresh/reopen. */
   turn_id?: string;
@@ -231,6 +254,8 @@ interface ChatRequest {
   replay_only?: boolean;
   /** How the surface shows the answer ('narrow_panel' = the Map drawer). A system note, never user text. */
   display?: string;
+  /** Which page is asking ('map' | 'app'): selects the app actions offered (src/lib/chat/app-actions/propose.ts). */
+  surface?: string;
 }
 
 // Retained only for the `chat_messages.cited_sources` column shape — Ask Mindy
@@ -301,7 +326,7 @@ VOICE:
 - Direct, plain language. Federal acronyms are fine (NAICS, OSBP, FAR, IDIQ, 8(a), HUBZone, WOSB, SDVOSB, SAM, GSA). Tech/sales jargon (TAL, ICP, ABM, GTM) is not.
 - NEVER say "I'm an AI" or "as a language model". You're Mindy.
 - Keep responses tight. Most answers are 3-6 sentences or a short numbered list. No essays.
-- ANSWER FIRST. The first sentence answers the question that was asked: for "which agencies should I target first" it names the first target and why; for "who should I contact" it names the contact. How you ranked, which data you used, its time window and freshness come AFTER the answer in at most two short sentences. Never open with methodology, data caveats or a list of steps you took.
+- ANSWER FIRST. The first sentence answers the question that was asked: for "which agencies should I target first" it names the first target and why; for "who should I contact" it names the contact. How you ranked, which data you used, its time window and any lag caveat (in words, no data date) come AFTER the answer in at most two short sentences. Never open with methodology, data caveats or a list of steps you took.
 
 TODAY: {today} (US Eastern). Use this date for every time calculation. When the user asks about a window such as "the next 18 months", compute its end date from today and compare every date you report against it. Never call a date inside the window "outside" it, or the reverse.
 
@@ -340,10 +365,10 @@ Tool-use rules:
 - Buying-office lists show 10 offices at a time. When the user asks for more (for example "show offices 11 to 20" or "the next 10"), call get_buying_offices again with exactly the same filters plus display_offset = the first requested office number minus 1.
 - Only pass search filters the user stated or clearly implied. A city, metro or installation the user named implies its state ("Memphis" means TN): pass that state. Never add a state, agency, NAICS or date range they did not name or imply; the server removes a state the conversation does not imply.
 - Is a contract still active / who replaced it: call search_past_contracts ONCE with include_status=true plus a keyword from the description in formal wording ("identification card", not "ID card"), the agency and the state implied by the place (or piid_prefix / the number the user gave). Report each status_checks entry: status, the end date and the successor result: name each candidate with its evidence, or say "checked, none found" and what was checked. Do not ask the user for a contract number first.
-- If a result has _meta.lag_note, say the data is current through that date and recent awards may not be published yet. Never say no award was made.
+- If a result has _meta.lag_note, say in words, without a date, that recent awards may not be published yet (for example "USASpending posts awards with about a 90-day delay, so recent awards may not appear yet"). Never say no award was made.
 - Incumbents: name one only when _meta.incumbent_finding is "identified". Otherwise follow _meta.absence_note: say you could not identify (or confirm) an incumbent and what was searched. Never say "there is no incumbent", "no one holds it", "it appears there is no incumbent" or "this is a new requirement" unless a record says so; not finding a prior award is not proof that none exists.
-- Small-business contact at a buying office or agency (small business specialist, SBLO, OSDBU/OSBP): call search_federal_contacts for the office AND lookup_federal_osbp for its department in the same step. If the office search names no small-business specialist, give the department's small business office from lookup_federal_osbp (office, director, email and phone exactly as returned, with its verified date), and say it is the agency-level small business office, not that buying office's own specialist. Do not stop at "I couldn't confirm a contact" when that lookup returned an office.
-- Contacts at a company: call get_sblo_contact. If it has no named liaison but returns registered_points_of_contact, name those people with their titles, say they are the firm's registered SAM points of contact (not a designated small business liaison) as of the as_of date, and never state an email or phone the tool did not return.
+- Small-business contact at a buying office or agency (small business specialist, SBLO, OSDBU/OSBP): call search_federal_contacts for the office AND lookup_federal_osbp for its department in the same step. If the office search names no small-business specialist, give the department's small business office from lookup_federal_osbp (office, director, email and phone exactly as returned), and say it is the agency-level small business office, not that buying office's own specialist. Do not stop at "I couldn't confirm a contact" when that lookup returned an office.
+- Contacts at a company: call get_sblo_contact. If it has no named liaison but returns registered_points_of_contact, name those people with their titles, say they are the firm's registered SAM points of contact (not a designated small business liaison), and never state an email or phone the tool did not return.
 - Who buys a kind of work in a city or metro: call get_buying_offices with the state, the core city in city (it expands to the metro automatically), and the NAICS. Name each contracting office with its code, the customer agencies in top_funding_offices, the obligated dollars, and where the work is performed; never say the office is located in the city.
 - How much spending runs through schedules, BPAs or IDIQs: call get_vehicle_spend_mix and give dollars and percent for each bucket, plus the verified, heuristic and unresolved shares. unavailable or scope_too_broad is not a zero: say so and narrow the window.
 - Keywords for a company: call derive_company_keywords with brand_exclude set to the company name the user gave. Present keywords and occupational_titles, and cite each one's keyword_sources. Never list a city, state or company name as a keyword.
@@ -362,7 +387,9 @@ WRITING STYLE:
 - Default to second person ("you / your") — you're talking TO the user, not ABOUT a hypothetical bidder.
 - NEVER mention tool names, internal mechanics, or "the [X] tool" to the user. Just answer with what you found, or — if you need one more detail to search (e.g. which agency) — ask for it naturally ("Which agency did you have in mind?"). The user never sees the plumbing.
 
-USER PROFILE (use to personalize answers when relevant; if blank, write generically using "your company"):
+${OUTREACH_AND_PLAN_RULES}
+
+USER PROFILE (use to personalize answers when relevant; if blank, write generically using "your company"; the customer's own words in this conversation override it):
 {userProfile}`;
 
 // (buildContextBlock / chunksToCitations / buildCitationChips removed 2026-08-02 — the entire RAG
@@ -473,6 +500,11 @@ export async function POST(request: NextRequest) {
       headers: { 'Content-Type': 'application/json' },
     });
   }
+  // Screenshots (RM-4): type by magic bytes, size and count checked, metadata stripped. Never persisted or logged:
+  // only the count is ever recorded. 400 malformed / too many, 413 too large, 415 not PNG / JPEG / WebP.
+  const imageCheck = parseChatImages((body as unknown as { images?: unknown }).images);
+  if (!imageCheck.ok) return jsonResponse({ error: imageCheck.error, message: imageCheck.message }, imageCheck.status);
+  const turnImages = imageCheck.images;
   // ── Opportunity-INTENT detector (Andre @ CypherIntel, 2026-07-30) ──
   // The tool round runs tool_choice:'auto', so for "what opportunities are available…" the
   // model SOMETIMES declines the tool and answers from the RAG teaching corpus ("keep an eye
@@ -510,7 +542,7 @@ export async function POST(request: NextRequest) {
   // Pro gate: Mindy Chat retrieves from the proprietary knowledge base, so it's a
   // paid feature. Enforced server-side (hiding the sidebar item isn't enough — a
   // free user could call this API directly). 403 → the UI shows the upgrade prompt.
-  const chatPro = await hasProAccess(auth.email);
+  const chatPro = await canUseAskMindy(auth.email);
   shadowEntitlement({ route: 'app/chat POST', capability: 'chat.ask', email: auth.email, identityVerified: true, currentAllow: chatPro });
 
   // ── Selected listing (Eric 2026-11-16: it attaches to THIS main chat; see src/lib/chat/selected-notice.ts) ──
@@ -607,6 +639,23 @@ export async function POST(request: NextRequest) {
   const startedAt = Date.now();
   // A7: every wait in this turn is bounded (src/lib/chat/turn-deadlines.ts).
   const deadlines = chatDeadlines(process.env);
+  // Research mode (ASK_MINDY_RESEARCH_MODE, default off + allowlist): Claude + the Mindy MCP catalog in its own loop.
+  // Card chat is unchanged (Eric, 2026-11-25).
+  const researchEligible = !cardCtx && researchModeEnabledFor(auth.email);
+  // Daily cap on in-depth answers (plan-based, research-caps.ts). At the cap the turn runs on the standard engine and
+  // the answer opens with a plain notice. A cap that cannot be read never blocks research.
+  const researchCap = researchEligible ? await researchCapDecision(auth.email!, researchCapDeps).catch(() => null) : null;
+  const researchTurn = researchEligible && (researchCap?.allowed ?? true);
+  const researchCapNotice = researchEligible && researchCap && !researchCap.allowed ? researchCap.notice : null;
+  // What opens a standard (non-research) answer: the cap notice, and a plain note when its screenshots were not read.
+  // A research turn must finish and save even if the browser disconnects (Eric, 2026-11-25: no background job).
+  // after() keeps the function alive until the research work settles, within maxDuration.
+  let researchSettled: () => void = () => {};
+  if (researchTurn) {
+    const settled = new Promise<void>((resolve) => { researchSettled = resolve; });
+    try { after(() => settled); } catch { /* outside a request scope (unit tests): nothing to extend */ }
+  }
+  const standardLeadNotice = [researchCapNotice, !researchTurn && turnImages.length ? SCREENSHOT_NOT_READ : null].filter(Boolean).join('\n\n') || null;
 
   // SSE response — manually constructed ReadableStream since the
   // Vercel Edge / Node runtime doesn't expose an out-of-the-box helper.
@@ -665,11 +714,30 @@ export async function POST(request: NextRequest) {
           void failCardTurn({ turnId, claimToken, reason: 'turn_timeout' })
             .catch((e) => console.error('[chat] card turn fail-mark failed:', (e as Error)?.message));
         }
-      }, deadlines.turnMs);
+      }, researchTurn ? RESEARCH_TURN_MS : deadlines.turnMs);
 
       try {
         // Tell client which session this exchange belongs to right away
         send({ type: 'session', sessionId });
+
+        // Help answers (beta, ASK_MINDY_HELP_ANSWERS, default off; src/lib/ask-mindy/help-answers.ts): a plain how-to
+        // question is answered from the register, with no tools and no research run. No match, card chat, or a turn
+        // with screenshots falls through unchanged.
+        const help = !cardCtx && !turnImages.length && helpAnswersEnabledFor(auth.email)
+          ? helpAnswerFor(splitViewPreamble(message).rest || message, { hasAttachedOpportunity: !!selectedCtx, actionsEnabled: false })
+          : null;
+        if (help) {
+          send({ type: 'token', content: help.text });
+          send({ type: 'citations', sources: [] });
+          send({ type: 'done' });
+          closeStream();
+          persistExchange({
+            email: auth.email!, sessionId, userMessage: message, assistantMessage: help.text, citedSources: [],
+            tokensUsed: 0, latencyMs: Date.now() - startedAt,
+            trace: { engine: 'help_answer', help_id: help.id, help_kind: help.kind },
+          }).catch((err) => console.error('[chat] persist failed:', err));
+          return;
+        }
 
         // Load ONLY the bidder profile for context. The ENTIRE RAG corpus — the 8-year
         // teaching/curriculum chunks AND the podcast episodes — was REMOVED (Eric 2026-08-02:
@@ -707,7 +775,7 @@ export async function POST(request: NextRequest) {
         // Market questions: gather evidence -> record checks -> analyst -> independent evaluator -> publish only on
         // pass, else disclose. The chat answer and the report brief come from the same decision. Any other turn, or a
         // turn where the customer's own words name no work, falls through to the existing path unchanged.
-        if (!cardCtx && intelligenceGateEnabledFor(auth.email)) {
+        if (!cardCtx && !researchTurn && intelligenceGateEnabledFor(auth.email)) {
           const ask = splitViewPreamble(message).rest || message;
           const eligible = gateEligible(ask);
           const work = eligible.ok ? await extractWorkPhrase(ask).catch(() => null) : null;
@@ -722,11 +790,15 @@ export async function POST(request: NextRequest) {
                 states: eligible.states,
                 profile: gateProfile.text,
                 eligibility: gateProfile.eligibility,
+                // Customer-language progress while the gate works (the chat shows `progress` as notices).
+                onProgress: (m) => send({ type: 'progress', message: m }),
               });
             } catch (err) {
               console.error('[chat] intelligence gate failed:', (err as Error)?.message);
             }
             if (gate) {
+              // A capped research user answered by the gate still gets the cap notice first.
+              if (standardLeadNotice) gate.answer = `${standardLeadNotice}\n\n${gate.answer}`;
               send({ type: 'token', content: gate.answer });
               // Same event and trace shape as the packaged report path, so the Ask pane opens it and History restores it.
               const gateReport = gate.report?.deliverable?.html
@@ -751,6 +823,10 @@ export async function POST(request: NextRequest) {
                   engine: 'intelligence_gate',
                   gate_status: gate.status,
                   attempts: gate.attempts,
+                  gate_timings_ms: gate.timings,
+                  gate_deadline_hit: gate.deadlineHit,
+                  // Figure text only (no surrounding answer text): shows whether the figure check over-fires.
+                  gate_untraceable_figures: gate.untraceableFigures,
                   work,
                   states: eligible.states,
                   checks: gate.checks.map((c) => ({ id: c.contract_id, verdict: c.verdict, codes: [...c.exclusions, ...c.barriers, ...c.actions].map((x) => x.code) })),
@@ -774,7 +850,8 @@ export async function POST(request: NextRequest) {
         const profile: BidderProfile = profileResult?.profile ?? {};
         const { rec: noticeRecord, origin: noticeOrigin, mention: mentionedNotice, facts: noticeFacts } = await noticeP;
         cardRecord = noticeRecord;
-        const userProfileBlock = formatProfileForPrompt(profile) + (
+        const profileText = formatProfileForPrompt(profile);
+        const userProfileBlock = profileText + (profileText.trim() ? `\n\n${QUESTION_OVER_PROFILE}` : '') + (
           !profileEmail
             ? '\n\nCOMPANY PROFILE NOT USED this turn: the acting workspace could not be confirmed, so no saved company profile applies. Say so if fit matters; use only what the customer has said in this conversation, and do not ask again for details they already gave.'
             : profileResult?.status === 'unavailable'
@@ -816,6 +893,8 @@ export async function POST(request: NextRequest) {
               : `\n\n${findContract}`;
         const rulesBlock = !rulesLayer ? '' : federalMarketProfileAsk ? `\n\n${ASK_MINDY_RULES_LAYER}` : `\n\n${askMindyRulesPromptBlock()}`;
         const systemPrompt = SYSTEM_PROMPT_TEMPLATE.replace('{today}', today).replace('{userProfile}', userProfileBlock)
+          // The least-competition / where-to-start method (Claude + MCP's), for standard answers too (same tools).
+          + `\n\n${COMPETITION_AND_START_PLAYBOOK}`
           + hostContract
           + rulesBlock;
         // Step 2–8: self-report → pathways → vehicles → market size → contacts → web gap → write-up.
@@ -877,6 +956,14 @@ export async function POST(request: NextRequest) {
           } else documentsNotice = `documents:${loaded.reason}`;
         }
         if (documentContext) messages.push({ role: 'system', content: documentContext.block });
+        // Connected files (CONNECTED_APPS, default off; never in card turns): files the customer picked from a
+        // connected Google Drive / OneDrive, READ BY THE SERVER for this turn (handles verified against the acting
+        // scope and owner) and given to the answer step as fenced, untrusted text. The planner sees names only.
+        // The text lives in this turn's memory only: never saved to chat history, the trace or logs.
+        const connectedFiles = !cardCtx && connectedAppsEnabledFor(auth.email)
+          ? await loadConnectedFilesContext(body.connectedFiles, actingScope, customerWords)
+          : null;
+        if (connectedFiles?.block) messages.push({ role: 'system', content: connectedFiles.block });
         // Category caveat grounded by the work the customer named in THIS message (janitorial → AbilityOne).
         const categoryNote = abilityOneCaveat(customerWords, interpretCapabilityNaics(customerWords).codes);
         if (categoryNote) messages.push({ role: 'system', content: categoryNote });
@@ -1005,6 +1092,7 @@ export async function POST(request: NextRequest) {
         if (cardContext) toolRoundMessages.push({ role: 'system', content: cardContext.block });
         // The planner sees which documents exist, not their text.
         if (documentContext) toolRoundMessages.push({ role: 'system', content: documentContext.manifest });
+        if (connectedFiles?.manifest) toolRoundMessages.push({ role: 'system', content: connectedFiles.manifest });
         // create_document only: the uploaded text (fenced, with document ids) so the document can include it.
         if (plannerDocumentText) toolRoundMessages.push({ role: 'system', content: plannerDocumentText });
         for (const n of ledgerSystemNotes) toolRoundMessages.push({ role: 'system', content: n });
@@ -1023,7 +1111,7 @@ export async function POST(request: NextRequest) {
         const staging = stagingModelConfig(request.headers.get(STAGING_CONFIG_HEADER), TRACE_EVENTS);
         const overBudgetEarly = staging?.config.overBudget ?? await isUserOverBudget(email).catch(() => false);
         const modelEnv: Record<string, string | undefined> = staging ? { ...process.env, ...staging.config.env } : process.env;
-        const chatModelEarly = overBudgetEarly
+        const chatModelEarly = budgetDowngradeActive(modelEnv, overBudgetEarly)
           ? (modelEnv.LLM_OPENAI_MODEL || 'gpt-4o-mini')
           : (modelEnv.CHAT_OPENAI_MODEL || 'gpt-4o');
 
@@ -1069,6 +1157,8 @@ export async function POST(request: NextRequest) {
         if (noticeFacts) turnTrace.notices.push(`selected_notice_incumbent:${noticeFacts.incumbent.finding}`);
         if (capabilityNote) turnTrace.notices.push('capability_interpreted');
         if (documentContext) turnTrace.notices.push(`documents:${documentContext.docCount}`);
+        // Counts only: no file name, handle or text in the stored trace.
+        if (connectedFiles && (connectedFiles.accepted || connectedFiles.dropped)) turnTrace.notices.push(`connected_files:${connectedFiles.accepted}:read=${connectedFiles.read}${connectedFiles.failed ? `:failed=${connectedFiles.failed}` : ''}${connectedFiles.dropped ? `:dropped=${connectedFiles.dropped}` : ''}`);
         if (documentsNotice) turnTrace.notices.push(documentsNotice);
         turnTrace.notices.push(...turnTrace0);
         if (staging) turnTrace.notices.push(`staging_model_config:${staging.name}`);
@@ -1161,16 +1251,44 @@ export async function POST(request: NextRequest) {
                 : {}),
             })
             : null;
+          // Connected apps Slice B: save an email DRAFT in the customer's own Gmail / Outlook (never sends). Flag
+          // CONNECTED_APPS + allowlist AND CONNECTED_APPS_DRAFTS_ALLOWLIST (its own gate); never in card chat. The acting scope is re-resolved on every call, and the
+          // recipient is kept only when this turn's public records (or the attached notice's contacts) cite it.
+          const emailDraft = !cardCtx && connectedAppsDraftsEnabledFor(auth.email)
+            ? makeEmailDraftTool({
+              resolveScope: () => resolveChatActingScope(auth.email!, request),
+              callerEmail: auth.email!,
+              verifiedSources: (): VerifiedSource[] => [
+                ...turnSources
+                  .filter((x) => x.owner === null && (x.status === 'ok' || x.status === 'truncated'))
+                  .map((x) => ({ text: x.content, officialOnly: x.tool === 'search_web' || x.tool === 'read_web_page' })),
+                ...(noticeRecord ? [{ text: JSON.stringify((noticeRecord as { points_of_contact?: unknown }).points_of_contact ?? '') }] : []),
+              ],
+            })
+            : null;
           // Server-side web-search controls (per-turn cap, privacy guard, usage log): search-web-tool.ts.
           // Every document excerpt this turn has seen: the attached block plus each find_my_documents result.
-          const turnDocumentTexts: string[] = documentContext?.block ? [documentContext.block] : [];
+          const turnDocumentTexts: string[] = [documentContext?.block, connectedFiles?.block].filter((t): t is string => !!t);
           const searchWeb = makeSearchWebTool({
             forbidden: { emails: [auth.email, vaultEmailFor(actingScope)] },
             documentText: () => turnDocumentTexts.join('\n'),
             attribution: { callerKey: callerKeyFor(auth.email), sessionId: turnSessionId },
           });
-          const privateDefs = [...TIER0_TOOL_DEFS, SEARCH_WEB_TOOL_DEF, ...(myDocs ? [MY_DOCUMENTS_TOOL_DEF] : []), ...(genDoc ? [CREATE_DOCUMENT_TOOL_DEF] : [])];
-          const privateNames = new Set([...TIER0_TOOL_NAMES, SEARCH_WEB, ...(myDocs ? [FIND_MY_DOCUMENTS] : []), ...(genDoc ? [CREATE_DOCUMENT] : [])]);
+          // read_web_page (research mode only, RM-3): URLs from this turn's search results or the customer's words; page
+          // text joins the document guard so it can never be copied into an outside search query.
+          const turnWebUrls: string[] = [...urlsInText(message)];
+          const readPage = researchTurn
+            ? makeReadWebPageTool({ allowedUrls: () => turnWebUrls, onPageText: (t) => { turnDocumentTexts.push(t); } })
+            : null;
+          // App actions (beta, ASK_MINDY_APP_ACTIONS + allowlist): never on card turns, and only where the asking page has
+          // at least one registered action. The model's call is validated against the registry before anything is sent.
+          const actionSurface = parseActionSurface(body);
+          const actions: AppActionProposer | null = !cardCtx && appActionsEnabledFor(auth.email) && actionNamesFor(actionSurface).length
+            ? createAppActionProposer({ surface: actionSurface, hasPro: chatPro, emit: (evt) => send(evt) })
+            : null;
+          const actionDefs = actions ? [proposeAppActionToolDef(actions.surface)] : [];
+          const privateDefs = [...TIER0_TOOL_DEFS, ...actionDefs, SEARCH_WEB_TOOL_DEF, ...(readPage ? [READ_WEB_PAGE_TOOL_DEF] : []), ...(myDocs ? [MY_DOCUMENTS_TOOL_DEF] : []), ...(genDoc ? [CREATE_DOCUMENT_TOOL_DEF] : []), ...(emailDraft ? [EMAIL_DRAFT_TOOL_DEF] : [])];
+          const privateNames = new Set([...TIER0_TOOL_NAMES, ...(actions ? [PROPOSE_APP_ACTION] : []), SEARCH_WEB, ...(readPage ? [READ_WEB_PAGE] : []), ...(myDocs ? [FIND_MY_DOCUMENTS] : []), ...(genDoc ? [CREATE_DOCUMENT] : []), ...(emailDraft ? [CREATE_EMAIL_DRAFT] : [])]);
           const executor = createChatToolExecutor({
             userEmail: auth.email!,
             ...(actingScope.kind === 'client' ? { vaultEmail: actingScope.vaultEmail } : {}),
@@ -1180,7 +1298,20 @@ export async function POST(request: NextRequest) {
               defs: privateDefs,
               names: privateNames,
               execute: (n, a) => {
-                if (n === SEARCH_WEB) return searchWeb.execute(a);
+                if (actions && n === PROPOSE_APP_ACTION) {
+                  const r = actions.propose(a);
+                  const last = actions.log[actions.log.length - 1];
+                  if (last) turnTrace.notices.push(`app_action:${last.name || 'unknown'}:${last.outcome}`);
+                  return Promise.resolve(r);
+                }
+                if (n === SEARCH_WEB) {
+                  return searchWeb.execute(a).then((r) => {
+                    for (const x of (r.results as Array<{ url?: string }> | undefined) || []) if (x?.url) turnWebUrls.push(String(x.url));
+                    return r;
+                  });
+                }
+                if (readPage && n === READ_WEB_PAGE) return readPage.execute(a);
+                if (emailDraft && n === CREATE_EMAIL_DRAFT) return emailDraft.execute(a);
                 if (myDocs && n === FIND_MY_DOCUMENTS) {
                   return myDocs.execute(a).then((r) => {
                     try { turnDocumentTexts.push(JSON.stringify(r)); } catch { /* unserializable result: nothing to guard */ }
@@ -1203,7 +1334,148 @@ export async function POST(request: NextRequest) {
             // Card chat offers only its opportunity tools (narrowing; the policy still applies).
             ...(cardCtx ? { allowedToolNames: CARD_CHAT_TOOLS } : {}),
             toolTimeoutMs: (n) => toolTimeoutMs(n, deadlines),
+            // Research mode: SAM-backed tools read Mindy's caches only (zero live SAM calls).
+            ...(researchTurn ? { samCacheOnly: true } : {}),
+            // App actions: every successful result is this turn's evidence for map.open_record.
+            ...(actions ? { onResult: (n: string, c: string) => actions.observeToolResult(n, c) } : {}),
           });
+          if (actions) {
+            turnTrace.notices.push(`app_actions_offered:${actions.surface}`);
+            if (!researchTurn) messages.push({ role: 'system', content: APP_ACTIONS_NOTE });
+          }
+
+          // ── RESEARCH MODE: Claude runs its own loop over the same catalog (src/lib/ask-mindy/research-mode.ts). ──
+          if (researchTurn) {
+            const rmStarted = Date.now();
+            // Beta label: the chat tags this answer and its progress line (only research turns carry it).
+            send({ type: 'mode', mode: 'research', beta: true, label: RESEARCH_BETA_LABEL });
+            const model = researchModel();
+            const rmTrace: Record<string, unknown> = {
+              engine: 'research_mode', model, beta: true, label: RESEARCH_BETA_LABEL,
+              ...(turnImages.length ? { screenshots: turnImages.length } : {}),
+              ...(researchCap ? { research_cap: { plan: researchCap.plan, cap: researchCap.cap, used: researchCap.used, ...(researchCap.countUnknown ? { count_unknown: true } : {}) } } : {}),
+            };
+            // Awaited: after() keeps the function alive only until this turn settles, so the save must finish first.
+            const finish = async (answer: string, extra: Record<string, unknown> = {}, sources: typeof turnSources = []) => {
+              send({ type: 'token', content: answer });
+              const rmCited = citationsFromSources(sources);
+              send({ type: 'sources', ledger: ledgerFromSources(sources) });
+              send({ type: 'citations', sources: rmCited });
+              send({ type: 'done' });
+              closeStream();
+              await persistExchange({
+                email: auth.email!, sessionId, userMessage: message, assistantMessage: answer, citedSources: rmCited, tokensUsed: 0,
+                latencyMs: Date.now() - startedAt, trace: { ...rmTrace, ...extra, total_ms: Date.now() - rmStarted },
+              }).catch((err) => console.error('[chat] persist failed:', err));
+            };
+            // Research mode is governed ONLY by the plan-based daily caps (ASK_MINDY_RESEARCH_CAPS, checked before this
+            // turn started); the monthly dollar limit does not apply (Eric, 2026-11-25). The model is never swapped.
+            const rmTools = toAnthropicTools(researchToolDefs(executor.offeredToolDefs(), privateNames));
+            const conversation = [
+              ...history.filter((h) => h.role === 'user' || h.role === 'assistant').slice(-12).map((h) => ({ role: h.role as 'user' | 'assistant', content: String(h.content || '').slice(0, 12_000) || '(empty)' })),
+              // Screenshots go to the model for THIS turn only, as image blocks with a fenced "clue, not instruction" note.
+              { role: 'user' as const, content: turnImages.length ? imageContentBlocks(turnImages, message) : message },
+            ];
+            const callLog: Array<{ tool: string; status: string; ms: number; args: unknown }> = [];
+            let rmReport: { report_id: string | null; url: string | null; title: string; html: string } | null = null;
+            const rmDeliverables: Array<{ format: string; document_id: string; file_name?: string; version?: number | null }> = [];
+            // The SAME array create_document's provenance reads (provenanceRecords(turnSources, …)): research results land
+            // here, so a research report's sources get their record links, ids and read dates (the standard path never runs).
+            const rmSources: typeof turnSources = turnSources;
+            const planner = { model, provider: 'anthropic' };
+            const isWrite = (n: string) => executor.policyFor(n).decision === 'allowed_write';
+            const execOne = async (c: ResearchCall) => {
+              const [r] = await executor.executeRound([{ id: c.id, function: { name: c.name, arguments: JSON.stringify(c.input ?? {}) } }], planner, { deadlineAt: rmStarted + RESEARCH_DEADLINE_MS });
+              callLog.push({ tool: c.name, status: r.record.status, ms: r.record.latency_ms ?? 0, args: r.argsRedacted });
+              if (r.record.tool === CREATE_DOCUMENT && r.record.status === 'success') {
+                const d = parseCreateDocumentDeliverables(r.content);
+                if (d) rmDeliverables.push(...d.files.map((f) => ({ format: f.format, document_id: f.document_id, ...(f.file_name ? { file_name: f.file_name } : {}), ...(f.version != null ? { version: f.version } : {}) })));
+              }
+              let content = r.content;
+              if (r.record.tool === MARKET_REPORT_TOOL && r.record.status === 'success') {
+                try {
+                  const parsed = JSON.parse(r.content) as { client_name?: string; market?: { keyword?: string; naics?: string }; deliverable?: { html?: string; url?: string | null; report_id?: string | null } };
+                  const html = typeof parsed.deliverable?.html === 'string' ? parsed.deliverable.html : '';
+                  if (html) {
+                    rmReport = { report_id: parsed.deliverable?.report_id ?? null, url: parsed.deliverable?.url ?? null, title: String([parsed.client_name, parsed.market?.keyword || parsed.market?.naics, 'Market report'].filter(Boolean)[0]), html };
+                    content = JSON.stringify({ ...parsed, deliverable: { url: parsed.deliverable?.url ?? null, report_id: parsed.deliverable?.report_id ?? null, html: '[delivered to report pane]' } });
+                  }
+                } catch { /* leave raw content */ }
+              }
+              rmSources.push(sourceFromToolResult({
+                tool: r.record.tool, toolCallId: r.tool_call_id, status: r.record.status, content, rendered: null, argsRedacted: r.argsRedacted,
+                owner: { email: (actingScope.kind === 'client' ? actingScope.vaultEmail : auth.email!) || auth.email!, scope: actingScopeKey },
+                retrievedAt: new Date().toISOString(),
+              }));
+              return { id: c.id, content, isError: r.record.status !== 'success' };
+            };
+            const client = researchClient();
+            try {
+              const loop = await runResearchLoop({
+                client, model,
+                // Fixed prompt first (cached across steps and turns), then today's date and the profile after the breakpoint.
+                // App actions (allowlisted users only) go in the per-turn part so the cached prefix stays identical for all.
+                system: RESEARCH_SYSTEM_STATIC,
+                systemDynamic: researchSystemDynamic({ today, profileBlock: userProfileBlock }) + (actions ? `\n\n${APP_ACTIONS_NOTE}` : ''),
+                conversation,
+                tools: rmTools,
+                effort: process.env.ASK_MINDY_RESEARCH_EFFORT || 'high',
+                // Asked for a report: if research stops before it was written, the report is written from what was gathered.
+                reportTool: genDoc && rmTools.some((t) => t.name === CREATE_DOCUMENT) && wantsReport(splitViewPreamble(message).rest || message) ? CREATE_DOCUMENT : null,
+                onCalls: (cs) => { for (const c of cs) send({ type: 'progress', message: progressLine(toolLabel(c.name)) }); },
+                onFinalStep: () => send({ type: 'progress', message: 'Writing the answer.', phase: 'writing' }),
+                // Independent reads run in parallel; writes (documents, reports) run one at a time after them.
+                execute: async (cs) => {
+                  const reads = cs.filter((c) => !isWrite(c.name));
+                  const writes = cs.filter((c) => isWrite(c.name));
+                  const out = await Promise.all(reads.map(execOne));
+                  for (const w of writes) out.push(await execOne(w));
+                  return out;
+                },
+              });
+              // Cost: cached input priced as billed (reads 0.1x, writes 1.25x); the raw counts go to the trace.
+              void recordLlmUsage({ userEmail: auth.email, tool: 'chat', job: 'research_mode', provider: 'anthropic', model, usage: { prompt_tokens: billedInputTokens(loop.usage), completion_tokens: loop.usage.output } });
+              rmTrace.usage = { input: loop.usage.input, cache_read: loop.usage.cacheRead, cache_write: loop.usage.cacheWrite, output: loop.usage.output };
+              Object.assign(rmTrace, { stop: loop.stop, steps: loop.steps, call_count: loop.calls, calls: callLog, results_cut: loop.resultsCut, sam_cache_only: true });
+              if (!loop.text) { await finish(RESEARCH_NO_ANSWER, {}, rmSources); return; }
+              send({ type: 'progress', message: 'Checking every figure against the sources.', phase: 'checking' });
+              const grounded = await groundAnswer({
+                text: loop.text,
+                evidence: [...loop.evidence, userProfileBlock],
+                revise: async (note) => {
+                  const r = await client.messages.create({
+                    model, max_tokens: 16_000, system: researchSystemPrompt({ today, profileBlock: userProfileBlock }),
+                    messages: [{ role: 'user', content: `${note}\n\nANSWER TO REWRITE:\n${loop.text}` }],
+                  }, { timeout: 90_000, maxRetries: 0 });
+                  return r.content.filter((b) => b.type === 'text').map((b) => (b as Anthropic.TextBlock).text).join('').trim() || null;
+                },
+              });
+              rmTrace.figure_check = { untraceable: grounded.untraceable, revised: grounded.revised, disclosed: grounded.disclosed };
+              if (rmDeliverables.length) { rmTrace.deliverables = { files: rmDeliverables }; send({ type: 'deliverables', files: rmDeliverables }); }
+              if (rmReport) {
+                const rep = rmReport as { report_id: string | null; url: string | null; title: string; html: string };
+                rmTrace.market_report = { report_id: rep.report_id, url: rep.url, title: rep.title, html: '' };
+                send({ type: 'market_report', ...rep });
+              }
+              await finish(grounded.text, {}, rmSources);
+            } catch (err) {
+              // The failure keeps its cost and its cause: usage accrued before the error is logged, and the trace records
+              // the error class (e.g. credit_balance_too_low), status and message, not just "error".
+              const failure = describeResearchError(err);
+              console.error('[chat] research mode failed:', failure.class, failure.status ?? '', failure.message);
+              if (failure.progress) {
+                const u = failure.progress.usage;
+                void recordLlmUsage({ userEmail: auth.email, tool: 'chat', job: 'research_mode_failed', provider: 'anthropic', model, usage: { prompt_tokens: billedInputTokens(u), completion_tokens: u.output } });
+                rmTrace.usage = { input: u.input, cache_read: u.cacheRead, cache_write: u.cacheWrite, output: u.output };
+              }
+              Object.assign(rmTrace, {
+                stop: 'error', calls: callLog,
+                error: { class: failure.class, status: failure.status, message: failure.message, ...(failure.progress ? { steps: failure.progress.steps, call_count: failure.progress.calls } : {}) },
+              });
+              await finish('I could not finish this research because a service did not respond. Please try again in a moment.', {}, rmSources);
+            }
+            return;
+          }
           // Offered tools are filtered by the chat tool policy (blocked tools are never shown).
           // B2: an open-opportunity question is not offered the expiring-contracts tool (it returns
           // awarded contracts, not open solicitations). See src/lib/chat/tool-selection.ts.
@@ -2538,6 +2810,13 @@ export async function POST(request: NextRequest) {
         }
 
         let assistantContent = '';
+        if (standardLeadNotice) {
+          // Never a silent switch: the standard answer opens with the cap notice and/or the screenshot note.
+          assistantContent = `${standardLeadNotice}\n\n`;
+          send({ type: 'token', content: assistantContent });
+          if (researchCapNotice) turnTrace.notices.push(`research_cap:reached:${researchCap?.used}/${researchCap?.cap}:${researchCap?.plan}`);
+          if (turnImages.length) turnTrace.notices.push(`screenshots_not_read:${turnImages.length}`);
+        }
         if (renderedRecords.length) {
           // Scope the MAP supplied is labeled as the map's, never as "from your request" (2026-11-15 review).
           const fromRequest = [...scopeApplied].filter((n) => !isMapScopeNote(n));
@@ -2568,6 +2847,8 @@ export async function POST(request: NextRequest) {
         const decoder = new TextDecoder();
         let leftover = '';
         let finishReason: string | null = null;
+        // Tool-call markup never reaches the customer as answer text (see tool-markup-filter.ts).
+        const markupFilter = createMarkupFilter();
 
         while (true) {
           // Nobody is reading: stop the provider stream instead of generating unread tokens.
@@ -2603,11 +2884,12 @@ export async function POST(request: NextRequest) {
               const delta = parsed?.choices?.[0]?.delta?.content;
               const fr = parsed?.choices?.[0]?.finish_reason;
               if (typeof fr === 'string' && fr) finishReason = fr;
-              if (typeof delta === 'string' && delta.length > 0) {
-                assistantContent += delta;
+              const shown = typeof delta === 'string' && delta.length > 0 ? markupFilter.push(delta) : '';
+              if (shown.length > 0) {
+                assistantContent += shown;
                 // With a verified list on screen, the analysis is checked before it is shown (see below).
                 // When create_document left download paths, buffer until host rewrite runs.
-                if (!renderedRecords.length && !deferAnswerTokens) send({ type: 'token', content: delta });
+                if (!renderedRecords.length && !deferAnswerTokens) send({ type: 'token', content: shown });
               }
               if (parsed?.usage?.total_tokens) {
                 tokensUsed = parsed.usage.total_tokens;
@@ -2621,6 +2903,13 @@ export async function POST(request: NextRequest) {
             } catch {
               // Ignore unparseable lines — Groq occasionally sends keep-alives
             }
+          }
+        }
+        {
+          const tail = markupFilter.end();
+          if (tail) {
+            assistantContent += tail;
+            if (!renderedRecords.length && !deferAnswerTokens) send({ type: 'token', content: tail });
           }
         }
 
@@ -2885,6 +3174,7 @@ export async function POST(request: NextRequest) {
         closeStream();
       } finally {
         clearTimeout(watchdog);
+        researchSettled();
         // Any path that did not settle the turn (provider failure, early return, thrown error) leaves it
         // free and re-askable. The update matches only this claim, so it can never undo a completed turn.
         if (claimToken && turnId && !turnSettled) {

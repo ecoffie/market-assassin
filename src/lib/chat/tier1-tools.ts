@@ -124,6 +124,7 @@ interface SamRow {
   solicitation_number?: string | null;
   pop_state?: string | null;
   pop_city?: string | null;
+  pop_country?: string | null;
   office_address?: { state?: string | null } | null;
   points_of_contact?: unknown;
 }
@@ -277,7 +278,7 @@ export function makeTier1Tools(db: Tier1Db) {
     // (websearch = supports quoted phrases / OR).
     const todayIso = new Date().toISOString();
     const SELECT_COLS =
-      'notice_id, title, department, naics_code, set_aside_description, notice_type, response_deadline, ui_link, solicitation_number, pop_state, pop_city, office_address, points_of_contact';
+      'notice_id, title, department, naics_code, set_aside_description, notice_type, response_deadline, ui_link, solicitation_number, pop_state, pop_city, pop_country, office_address, points_of_contact';
 
     // Resolve set-aside BEFORE the fetch so an unrecognized term errors, never
     // returns zero rows (see SET_ASIDE_CODES). "no 8(a) work in Maryland" and "you
@@ -354,7 +355,7 @@ export function makeTier1Tools(db: Tier1Db) {
         const k = rowKey(r);
         if (seen.has(k)) continue;
         // Belt and braces for the database rule above: never return work performed outside the asked states.
-        if (performedOutsideRegion(r.pop_state, stateCodes)) continue;
+        if (performedOutsideRegion(r.pop_state, stateCodes, r.pop_country)) continue;
         seen.add(k);
         out.push(r);
         if (out.length >= fetchN) break;

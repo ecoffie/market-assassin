@@ -157,7 +157,7 @@ describe('create_document through the real chat route', () => {
     ]);
     const model = h.saved[0].docModel as { subtitle?: string; sources: Array<{ retrievedAt?: string; recordId?: string }> };
     expect(model.sources[0]).toMatchObject({ recordId: 'W9124D26D0005', retrievedAt: '2026-11-22' });
-    expect(model.subtitle).toBe('Data as of 2026-11-20');
+    expect(model.subtitle).toBeUndefined(); // no data-freshness subtitle (Eric, 2026-11-27)
     expect(toolResultsSeen.join(' ')).toMatch(/"source_provenance":\{"filledRetrievedAt":0,"replacedRetrievedAt":1/);
   });
 });

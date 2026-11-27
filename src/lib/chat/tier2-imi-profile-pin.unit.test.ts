@@ -35,6 +35,7 @@ vi.mock('@/lib/bigquery/recipients', () => ({
     : null)),
   getRecipientByUei: vi.fn(async () => null),
   getRecentAwardsForRecipient: vi.fn(async () => AWARDS),
+  getExecutivesForRecipient: vi.fn(async () => []),
   getTopAgenciesForRecipient: vi.fn(async () => []),
   getYearlyTotalsForRecipient: vi.fn(async () => []),
   getSetAsideHistoryForRecipient: vi.fn(async () => []),

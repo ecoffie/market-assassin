@@ -70,14 +70,35 @@ const forecast = (id: string, pop_state: string | null): Row => ({
 
 describe('placeOfPerformanceWinsExpr / performedOutsideRegion', () => {
   it('place of performance decides when known; office counts only when it is missing', () => {
-    expect(placeOfPerformanceWinsExpr(['FL'])).toBe('pop_state.is.null,pop_state.in.(FL)');
-    expect(placeOfPerformanceWinsExpr(['FL', 'GA'])).toBe('pop_state.is.null,pop_state.in.(FL,GA)');
+    expect(placeOfPerformanceWinsExpr(['FL'])).toBe('pop_state.in.(FL),and(pop_state.is.null,or(pop_country.is.null,pop_country.eq."",pop_country.ilike.USA,pop_country.ilike.US,pop_country.ilike."UNITED STATES"))');
+    expect(placeOfPerformanceWinsExpr(['FL', 'GA'])).toBe('pop_state.in.(FL,GA),and(pop_state.is.null,or(pop_country.is.null,pop_country.eq."",pop_country.ilike.USA,pop_country.ilike.US,pop_country.ilike."UNITED STATES"))');
     expect(placeOfPerformanceWinsExpr([])).toBeNull();
     expect(performedOutsideRegion('PR', ['FL'])).toBe(true);
     expect(performedOutsideRegion('fl', ['FL'])).toBe(false);
     expect(performedOutsideRegion(null, ['FL'])).toBe(false); // unknown location is kept, never guessed
     expect(performedOutsideRegion('', ['FL'])).toBe(false);
     expect(performedOutsideRegion('PR', [])).toBe(false); // no location asked → nothing dropped
+  });
+
+  it('a no-state notice stated to be ABROAD is outside a US region, whatever the buying office (2026-11-24)', () => {
+    // MCC "ZAMBIA- Consultant Services ... Roads", bought by a DC office, matched a VA/MD/DC query.
+    expect(performedOutsideRegion(null, ['VA', 'MD', 'DC'], 'ZMB')).toBe(true);
+    expect(performedOutsideRegion('', ['VA', 'MD', 'DC'], 'zmb')).toBe(true);
+    // Domestic or unstated country with no state: still kept (the buying office stands in).
+    expect(performedOutsideRegion(null, ['VA', 'MD', 'DC'], 'USA')).toBe(false);
+    expect(performedOutsideRegion(null, ['VA', 'MD', 'DC'], null)).toBe(false);
+    expect(performedOutsideRegion(null, ['VA', 'MD', 'DC'])).toBe(false);
+    // A known in-region state wins regardless of country; a known out-of-region state is still out.
+    expect(performedOutsideRegion('VA', ['VA', 'MD', 'DC'], 'ZMB')).toBe(false);
+    expect(performedOutsideRegion('PR', ['VA', 'MD', 'DC'], 'USA')).toBe(true);
+    // Every domestic spelling, any case, is domestic (Agent 4 review 2026-11-24): never silently dropped.
+    for (const c of ['USA', 'usa', 'US', 'us', 'Us', 'United States', 'UNITED STATES', 'united states', ' United States ']) {
+      expect(performedOutsideRegion(null, ['VA'], c), c).toBe(false);
+    }
+    // Look-alikes are not the US.
+    for (const c of ['USAF', 'UNITED KINGDOM', 'UMI', 'PRI']) expect(performedOutsideRegion(null, ['VA'], c), c).toBe(true);
+    // No region asked → nothing dropped, even abroad.
+    expect(performedOutsideRegion(null, [], 'ZMB')).toBe(false);
   });
 });
 
@@ -95,8 +116,8 @@ describe('findOpportunities — Florida janitorial never shows Puerto Rico work'
     for (const c of openFetches) {
       const ors = c.ops.filter(([m]) => m === 'or').map(([, a]) => String(a[0]));
       expect(ors).toContain(stateOrExpr(['FL']));
-      expect(ors).toContain('pop_state.is.null,pop_state.in.(FL)');
-      const iPop = c.ops.findIndex(([m, a]) => m === 'or' && a[0] === 'pop_state.is.null,pop_state.in.(FL)');
+      expect(ors).toContain(placeOfPerformanceWinsExpr(['FL']));
+      const iPop = c.ops.findIndex(([m, a]) => m === 'or' && a[0] === placeOfPerformanceWinsExpr(['FL']));
       const iLimit = c.ops.findIndex(([m]) => m === 'limit');
       expect(iPop).toBeLessThan(iLimit);
     }

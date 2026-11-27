@@ -1,0 +1,632 @@
+{
+  "doc": "docs/knowledge/consortia-status-2026-11-27.json",
+  "checked_on": "2026-11-27",
+  "method": "Read-only web research (consortium, manager and sponsor sites; ATI awards page https://www.ati.org/rd-project-awards/). No SAM.gov notices opened. 'secondary' = search snippet or aggregator. Baseline: MITRE AiDA consortia table, updated 2024-04-23.",
+  "rows": [
+    {
+      "claim_id": "KB-C1",
+      "short": "DOTC",
+      "name": "DoD Ordnance Technology Consortium (DOTC), with the National Armaments Consortium",
+      "claim": "DOTC (DoD Ordnance Technology Consortium, OSD-sponsored, used by all Services) is issuing project awards.",
+      "status": "current",
+      "verified": true,
+      "sources": [
+        {
+          "url": "https://www.ati.org/dotc/",
+          "kind": "consortium_primary",
+          "evidence": "ATI DOTC page (dated 2026-04-06): OSD sponsor, used by all Services.",
+          "exact_url": true
+        },
+        {
+          "url": "https://www.ati.org/rd-project-awards/",
+          "kind": "consortium_primary",
+          "evidence": "Latest DOTC award listed 10/30/2026 (Polymer Technologies, $672K).",
+          "exact_url": true
+        },
+        {
+          "url": "https://nac-dotc.org/",
+          "kind": "consortium_primary",
+          "evidence": "Site live; visible content dated 2023.",
+          "exact_url": true
+        }
+      ],
+      "notes": "Listed sponsor in the Apr 2024 AiDA table: DoD/Army. Manager: NAC Consortium Management Firm (ATI hosts the DOTC page).",
+      "supersedes": null
+    },
+    {
+      "claim_id": "KB-C2",
+      "short": "C5",
+      "name": "Consortium for Command, Control and Communications in Cyberspace (C5)",
+      "claim": "C5 (sponsors PEO IEW&S and Marine Corps Systems Command) is managed by CMG Networks; its project calls are posted in the member portal.",
+      "status": "current",
+      "verified": false,
+      "sources": [
+        {
+          "url": "https://cmgnetworks.org/c5",
+          "kind": "consortium_primary",
+          "evidence": "CMG C5 page names two active OTAs: PEO IEW&S (Army) and MCSC; DEVCOM not named. cmgcorp.org now redirects to cmgnetworks.org.",
+          "exact_url": true
+        },
+        {
+          "url": "https://www.bidnetdirect.com/",
+          "kind": "secondary",
+          "evidence": "Latest public call found: RWP C5-25-1001 (PM Tactical Radios, due Apr 2025) \u2014 secondary. (exact page URL not recorded; host shown)",
+          "exact_url": false
+        }
+      ],
+      "notes": "Sponsor changed: the Apr 2024 table listed Army DEVCOM. No public 2026 call found (calls are member-portal only). The original 2017 Army OTA ran 10 years (~2027 end) per a secondary source, not verified.",
+      "supersedes": "Army DEVCOM (Apr 2024 AiDA table)"
+    },
+    {
+      "claim_id": "KB-C3",
+      "short": "COBRA",
+      "name": "Cyberspace Operations Broad Responsive Agreement (COBRA)",
+      "claim": "No confirmed active calls for COBRA (Cyberspace Operations Broad Responsive Agreement).",
+      "status": "unverified",
+      "verified": false,
+      "sources": [
+        {
+          "url": "https://www.sossecinc.com/",
+          "kind": "consortium_primary",
+          "evidence": "SOSSEC lists 'COBRA' only as a label under its OTAs.",
+          "exact_url": true
+        },
+        {
+          "url": "https://www.mrcy.com/",
+          "kind": "secondary",
+          "evidence": "Mercury consortia list: sponsor PEO EIS (PM Defensive Cyber Operations). (exact page URL not recorded; host shown)",
+          "exact_url": false
+        }
+      ],
+      "notes": "Only dated evidence is a news article ($100M ceiling, 5 years, signed 'July 25', year not shown). The 5-year term may have lapsed unless extended \u2014 not verified. Unrelated: 'COBRA' in 2025 news is a SAIC task order.",
+      "supersedes": null
+    },
+    {
+      "claim_id": "KB-C4",
+      "short": "SCEC",
+      "name": "Sensors, Communications and Electronics Consortium (SCEC)",
+      "claim": "No confirmed active calls for SCEC (Sensors, Communications and Electronics Consortium).",
+      "status": "unverified",
+      "verified": false,
+      "sources": [
+        {
+          "url": "https://www.sossecinc.com/",
+          "kind": "consortium_primary",
+          "evidence": "SOSSEC says it manages OTAs 'for the SOSSEC and SCE Consortia'; no standalone SCEC site found.",
+          "exact_url": true
+        },
+        {
+          "url": "https://www.mrcy.com/",
+          "kind": "secondary",
+          "evidence": "Mercury list: sponsor Army DEVCOM C5ISR Center. (exact page URL not recorded; host shown)",
+          "exact_url": false
+        }
+      ],
+      "notes": "Formed from a 2017 ACC-APG/CERDEC solicitation; the 10-year term is unverified. sosseccorp.com did not resolve from the checking session.",
+      "supersedes": null
+    },
+    {
+      "claim_id": "KB-C5",
+      "short": "NAMC",
+      "name": "National Advanced Mobility Consortium (NAMC)",
+      "claim": "NAMC (National Advanced Mobility Consortium, Army DEVCOM GVSC / ACC-Detroit Arsenal) is issuing project calls and awards.",
+      "status": "current",
+      "verified": true,
+      "sources": [
+        {
+          "url": "https://namconsortium.org/",
+          "kind": "consortium_primary",
+          "evidence": "News dated 2026-11-23; Ground Vehicle Architecture Board kickoff 2026-12-03.",
+          "exact_url": true
+        },
+        {
+          "url": "https://namconsortium.org/project-awards",
+          "kind": "consortium_primary",
+          "evidence": "Project awards include RPP-26-D01 (Engineer Autonomous Breaching Capability) and RPP-26-D03 (award dates not shown).",
+          "exact_url": true
+        }
+      ],
+      "notes": "Detroit Arsenal Innovation OTA W56HZV-23-9-D001 (2023-09-01, secondary). Self-managed nonprofit.",
+      "supersedes": null
+    },
+    {
+      "claim_id": "KB-C6",
+      "short": "DATC",
+      "name": "Defense Automotive Technologies Consortium (DATC)",
+      "claim": "No confirmed active calls for DATC (Defense Automotive Technologies Consortium).",
+      "status": "unverified",
+      "verified": false,
+      "sources": [
+        {
+          "url": "https://www.mrcy.com/",
+          "kind": "secondary",
+          "evidence": "Mercury list: sponsor Army GVSC. (exact page URL not recorded; host shown)",
+          "exact_url": false
+        },
+        {
+          "url": "https://saemobilus.sae.org/",
+          "kind": "secondary",
+          "evidence": "Latest public DATC call found: 2018 (Stryker IVN-2, OTA W56HZV-16-9-0001) \u2014 secondary. (exact page URL not recorded; host shown)",
+          "exact_url": false
+        }
+      ],
+      "notes": "datc.ati.org did not resolve from the checking session. Manager: SAE Industry Technologies Consortia. Recent GVSC calls go through NAMC or the GVSC Commercial Solutions Opening. The 2016 OTA may have expired \u2014 not verified.",
+      "supersedes": null
+    },
+    {
+      "claim_id": "KB-C7",
+      "short": "MTEC",
+      "name": "Medical Technology Enterprise Consortium (MTEC)",
+      "claim": "MTEC (Medical Technology Enterprise Consortium, Army Medical Research and Development Command) is issuing requests for prototype proposals.",
+      "status": "current",
+      "verified": true,
+      "sources": [
+        {
+          "url": "https://www.mtec-sc.org/",
+          "kind": "consortium_primary",
+          "evidence": "News dated 2026-11-10; FY2026 Multi-Topic RPP MTEC-26-04 released 2026-08-07, due 2026-10-30; TBI devices RFS 2026-10-16.",
+          "exact_url": true
+        },
+        {
+          "url": "https://mrdc.health.mil/",
+          "kind": "official",
+          "evidence": "USAMRDC partner page: MTEC prototype OTA. (exact page URL not recorded; host shown)",
+          "exact_url": false
+        }
+      ],
+      "notes": "MTEC-26-04 is issued by 'MTEC, Inc., North Bethesda'; in 2025 ATI was the manager (MTEC-25-04). Whether ATI still manages MTEC is unconfirmed.",
+      "supersedes": null
+    },
+    {
+      "claim_id": "KB-C8",
+      "short": "MCDC",
+      "name": "Medical CBRN Defense Consortium (MCDC)",
+      "claim": "MCDC (Medical CBRN Defense Consortium, JPEO-CBRND) is issuing project awards.",
+      "status": "current",
+      "verified": true,
+      "sources": [
+        {
+          "url": "https://www.medcbrn.org/",
+          "kind": "consortium_primary",
+          "evidence": "Post dated 2026-11-25.",
+          "exact_url": true
+        },
+        {
+          "url": "https://www.ati.org/rd-project-awards/",
+          "kind": "consortium_primary",
+          "evidence": "Latest MCDC award listed 9/30/2026 (Battelle, $49.2M).",
+          "exact_url": true
+        }
+      ],
+      "notes": "Manager: ATI. A secondary source says no RPP was open in early Oct 2026. Joint CWMD/MCDC member meeting 2027-02-23/24.",
+      "supersedes": null
+    },
+    {
+      "claim_id": "KB-C9",
+      "short": "CWMD",
+      "name": "Countering Weapons of Mass Destruction (CWMD) Consortium",
+      "claim": "The CWMD Consortium (JPEO-CBRND) is issuing requests for prototype proposals and awards.",
+      "status": "current",
+      "verified": true,
+      "sources": [
+        {
+          "url": "https://cwmdconsortium.org/",
+          "kind": "consortium_primary",
+          "evidence": "Post dated 2026-11-25; open RPP 'AI-Based Remote Operation and Adaptive Modeling for CB Sensors', due Dec 1.",
+          "exact_url": true
+        },
+        {
+          "url": "https://www.ati.org/rd-project-awards/",
+          "kind": "consortium_primary",
+          "evidence": "Latest CWMD award listed 8/7/2026 (Polaris Alpha, $16.2M).",
+          "exact_url": true
+        }
+      ],
+      "notes": "Manager: ATI. Site logo links to JPEO-CBRND; a DTRA link is not shown.",
+      "supersedes": null
+    },
+    {
+      "claim_id": "KB-C10",
+      "short": "TReX",
+      "name": "Training and Readiness Accelerator II (TReX II)",
+      "claim": "TReX II (Training and Readiness Accelerator, Army PEO STRI) is issuing project awards.",
+      "status": "current",
+      "verified": true,
+      "sources": [
+        {
+          "url": "https://www.ati.org/trex-ii/",
+          "kind": "consortium_primary",
+          "evidence": "ATI page: sponsor PEO STRI; issuing office ACC-Orlando.",
+          "exact_url": true
+        },
+        {
+          "url": "https://trexii.org/",
+          "kind": "consortium_primary",
+          "evidence": "Post dated 2026-11-23.",
+          "exact_url": true
+        },
+        {
+          "url": "https://www.ati.org/rd-project-awards/",
+          "kind": "consortium_primary",
+          "evidence": "Latest TReX II award listed 10/19/2026 (Southwest Research Institute, $5.2M).",
+          "exact_url": true
+        }
+      ],
+      "notes": "Manager: ATI. 2026 calls include TReXII-26-08 and 26-03 (secondary).",
+      "supersedes": null
+    },
+    {
+      "claim_id": "KB-C11",
+      "short": "CEED",
+      "name": "Consortium for Energy, Environment and Demilitarization (CEED)",
+      "claim": "CEED (sponsors U.S. Army Corps of Engineers and Marine Corps Systems Command; open to agreements officers across the DoW and Intelligence Community) is managed by CMG Networks.",
+      "status": "current",
+      "verified": false,
+      "sources": [
+        {
+          "url": "https://cmgnetworks.org/ceed",
+          "kind": "consortium_primary",
+          "evidence": "CMG lists two active OTAs: USACE and MCSC (no ceiling).",
+          "exact_url": true
+        },
+        {
+          "url": "https://www.navy.mil/",
+          "kind": "secondary",
+          "evidence": "Department of the Navy installation-energy solicitation through CEED; RWP N11011-25-RP-00002 due 2025-10-13 \u2014 secondary. (exact page URL not recorded; host shown)",
+          "exact_url": false
+        }
+      ],
+      "notes": "Sponsor changed: the Apr 2024 table listed Army DEVCOM. No public 2026 call found.",
+      "supersedes": "Army DEVCOM (Apr 2024 AiDA table)"
+    },
+    {
+      "claim_id": "KB-C12",
+      "short": "ERDC",
+      "name": "U.S. Army ERDC OTA consortium",
+      "claim": "No confirmed active calls for the ERDC consortium; ERDC runs its own continuously open Broad OTA Announcement for prototype agreements.",
+      "status": "unverified",
+      "verified": false,
+      "sources": [
+        {
+          "url": "https://www.mrcy.com/",
+          "kind": "secondary",
+          "evidence": "Mercury list: ERDC consortium managed by SOSSEC. (exact page URL not recorded; host shown)",
+          "exact_url": false
+        },
+        {
+          "url": "https://bwcoconsulting.com/",
+          "kind": "secondary",
+          "evidence": "ERDC BOTAA 27-01 (W912HZ27BOTAA), prototype OTs, continuously open \u2014 secondary. (exact page URL not recorded; host shown)",
+          "exact_url": false
+        }
+      ],
+      "notes": "ERDC's direct BOTAA may be replacing the consortium route \u2014 not verified. No consortium site found.",
+      "supersedes": null
+    },
+    {
+      "claim_id": "KB-C13",
+      "short": "SpEC",
+      "name": "Space Enterprise Consortium (SpEC)",
+      "claim": "SpEC (Space Enterprise Consortium, Space Systems Command) is managed by NSTXL and continues to award projects.",
+      "status": "current",
+      "verified": false,
+      "sources": [
+        {
+          "url": "https://nstxl.org/spec-gmm-2026",
+          "kind": "consortium_primary",
+          "evidence": "General Member Meeting Jan 2026: 5 new projects in 2025, 121+ since 2017.",
+          "exact_url": true
+        },
+        {
+          "url": "https://nstxl.org/",
+          "kind": "secondary",
+          "evidence": "2026 awards (FORGE Enterprise OPIR, Mar 2026; Sphinx Defense $287M ESS Mission Planning OTA) \u2014 secondary. (exact page URL not recorded; host shown)",
+          "exact_url": false
+        }
+      ],
+      "notes": "spaceenterpriseconsortium.org did not resolve from the checking session. NSTXL 10-year agreement from Jan 2021. DD 2345 no longer required for membership.",
+      "supersedes": null
+    },
+    {
+      "claim_id": "KB-C14",
+      "short": "S2MARTS",
+      "name": "Strategic & Spectrum Missions Advanced Resilient Trusted Systems (S2MARTS)",
+      "claim": "S2MARTS (NSWC Crane) is issuing project calls.",
+      "status": "current",
+      "verified": true,
+      "sources": [
+        {
+          "url": "https://s2marts.org/",
+          "kind": "consortium_primary",
+          "evidence": "Site live; several active calls.",
+          "exact_url": true
+        },
+        {
+          "url": "https://nstxl.org/opportunity/s2marts26-11",
+          "kind": "consortium_primary",
+          "evidence": "Project 26-11 (expendable countermeasure dispenser), revised 2026-07-07.",
+          "exact_url": true
+        }
+      ],
+      "notes": "Manager: NSTXL. JHTO, ONR and OUSD(R&E) also sponsor projects.",
+      "supersedes": null
+    },
+    {
+      "claim_id": "KB-C15",
+      "short": "NSC",
+      "name": "National Spectrum Consortium (NSC)",
+      "claim": "The National Spectrum Consortium (calls issued by the DoW FutureG Office and TRMC under the Spectrum Forward OTA) is issuing requests for prototype proposals.",
+      "status": "current",
+      "verified": false,
+      "sources": [
+        {
+          "url": "https://www.nationalspectrumconsortium.org/",
+          "kind": "consortium_primary",
+          "evidence": "Site rendered blank to the checking fetch.",
+          "exact_url": true
+        },
+        {
+          "url": "https://bwcoconsulting.com/",
+          "kind": "secondary",
+          "evidence": "TRMC 5G range buildout RPP at Edwards AFB, posted Oct 23, due 2026-12-03 \u2014 secondary. (exact page URL not recorded; host shown)",
+          "exact_url": false
+        },
+        {
+          "url": "https://www.executivegov.com/",
+          "kind": "secondary",
+          "evidence": "Spectrum Forward OTA, up to $2.5B \u2014 secondary. (exact page URL not recorded; host shown)",
+          "exact_url": false
+        }
+      ],
+      "notes": "Sponsor shifted: the Apr 2024 table listed USD(R&E); Mercury lists ODASD EC&P. Manager: ATI (Mercury list).",
+      "supersedes": "USD(R&E) (Apr 2024 AiDA table)"
+    },
+    {
+      "claim_id": "KB-C16",
+      "short": "IWRP",
+      "name": "Information Warfare Research Project (IWRP)",
+      "claim": "IWRP (Information Warfare Research Project, NAVWAR / NIWC) is active under its recompeted agreement, IWRP 3.",
+      "status": "current",
+      "verified": true,
+      "sources": [
+        {
+          "url": "https://theiwrp.org/",
+          "kind": "consortium_primary",
+          "evidence": "Post dated 2026-10-13.",
+          "exact_url": true
+        },
+        {
+          "url": "https://www.niwcatlantic.navy.mil/",
+          "kind": "official",
+          "evidence": "IWRP 3 awarded to ATI June 2024; ordering period 2024-10-01 to 2034-09-30, no set ceiling. (exact page URL not recorded; host shown)",
+          "exact_url": false
+        }
+      ],
+      "notes": "Recompeted since the Apr 2024 table (IWRP 3). NIWC Pacific industry days 2026-05-27 and 2026-08-11 previewed upcoming RPPs (secondary). iwrp.org is an unrelated organization.",
+      "supersedes": null
+    },
+    {
+      "claim_id": "KB-C17",
+      "short": "NSTIC",
+      "name": "Naval Surface Technology & Innovation Consortium (NSTIC)",
+      "claim": "NSTIC (Naval Surface Technology & Innovation Consortium, NSWC Dahlgren) is issuing project awards.",
+      "status": "current",
+      "verified": true,
+      "sources": [
+        {
+          "url": "https://nstic.org/",
+          "kind": "consortium_primary",
+          "evidence": "Post dated 2026-10-13.",
+          "exact_url": true
+        },
+        {
+          "url": "https://www.ati.org/rd-project-awards/",
+          "kind": "consortium_primary",
+          "evidence": "Award listed 10/7/2026 (Ispa Technology, $85M).",
+          "exact_url": true
+        }
+      ],
+      "notes": "Manager: ATI.",
+      "supersedes": null
+    },
+    {
+      "claim_id": "KB-C18",
+      "short": "NASC",
+      "name": "Naval Aviation Systems Consortium (NASC)",
+      "claim": "NASC (Naval Aviation Systems Consortium, NAVAIR) is issuing project calls.",
+      "status": "current",
+      "verified": false,
+      "sources": [
+        {
+          "url": "https://cmgnetworks.org/",
+          "kind": "consortium_primary",
+          "evidence": "NASC listed on CMG Networks.",
+          "exact_url": true
+        },
+        {
+          "url": "https://bwcoconsulting.com/",
+          "kind": "secondary",
+          "evidence": "TRUAS Increment II cargo drone demonstration call, posted Nov 3, white papers due 2026-11-30 \u2014 secondary. (exact page URL not recorded; host shown)",
+          "exact_url": false
+        }
+      ],
+      "notes": "Manager: CMG Networks. The call evidence is secondary only.",
+      "supersedes": null
+    },
+    {
+      "claim_id": "KB-C19",
+      "short": "UTIC",
+      "name": "Undersea Technology Innovation Consortium (UTIC)",
+      "claim": "UTIC (Undersea Technology Innovation Consortium, NUWC Newport) is issuing project calls.",
+      "status": "current",
+      "verified": false,
+      "sources": [
+        {
+          "url": "https://underseatech.org/",
+          "kind": "consortium_primary",
+          "evidence": "Posts dated Nov 2026.",
+          "exact_url": true
+        },
+        {
+          "url": "https://www.ati.org/utic-3/",
+          "kind": "consortium_primary",
+          "evidence": "UTIC 3 page.",
+          "exact_url": true
+        },
+        {
+          "url": "https://www.highergov.com/",
+          "kind": "secondary",
+          "evidence": "UTIC-FY26-02 Commercial Solutions Opening, posted 2026-06-29, due 2026-07-31 \u2014 secondary. (exact page URL not recorded; host shown)",
+          "exact_url": false
+        }
+      ],
+      "notes": "Manager: ATI. 100th prototype award in 2025. The dated call evidence is secondary only.",
+      "supersedes": null
+    },
+    {
+      "claim_id": "KB-C20",
+      "short": "MSTIC",
+      "name": "Maritime Sustainment Technology and Innovation Consortium (MSTIC)",
+      "claim": "MSTIC (Maritime Sustainment Technology and Innovation Consortium, NSWC Philadelphia Division) is issuing project awards.",
+      "status": "current",
+      "verified": true,
+      "sources": [
+        {
+          "url": "https://mstic.org/",
+          "kind": "consortium_primary",
+          "evidence": "Post dated 2026-10-13.",
+          "exact_url": true
+        },
+        {
+          "url": "https://www.ati.org/mstic/",
+          "kind": "consortium_primary",
+          "evidence": "ATI MSTIC page (CMF award June 2021).",
+          "exact_url": true
+        },
+        {
+          "url": "https://www.ati.org/rd-project-awards/",
+          "kind": "consortium_primary",
+          "evidence": "Award listed 9/21/2026 (Bogue Systems, $312.8K).",
+          "exact_url": true
+        }
+      ],
+      "notes": "Manager: ATI. MSTIC_25-02 issued 2025-03-31.",
+      "supersedes": null
+    },
+    {
+      "claim_id": "KB-C21",
+      "short": "Cornerstone",
+      "name": "Cornerstone OTA",
+      "claim": "Cornerstone (Army Contracting Command\u2013Rock Island, industrial base) is issuing project calls.",
+      "status": "current",
+      "verified": false,
+      "sources": [
+        {
+          "url": "https://www.army.mil/article/264446",
+          "kind": "official",
+          "evidence": "Cornerstone run by ACC-Rock Island; DEVCOM as a requiring office.",
+          "exact_url": true
+        },
+        {
+          "url": "https://sam.gov/",
+          "kind": "secondary",
+          "evidence": "CS-26-0404 (JMTC foundry design, posted 2026-07-20, due 2026-08-10) and CS-26-1801 (June 2026) \u2014 seen only as govly/sam.gov snippets (secondary). (exact page URL not recorded; host shown)",
+          "exact_url": false
+        }
+      ],
+      "notes": "Government-run (no commercial manager). cornerstone.army.mil did not resolve from the checking session. Mercury lists ECBC for OSD MIBP.",
+      "supersedes": null
+    },
+    {
+      "claim_id": "KB-C22",
+      "short": "DIBC",
+      "name": "Defense Industrial Base Consortium (DIBC)",
+      "claim": "DIBC (Defense Industrial Base Consortium; sponsor credited as the DoW Warfighting, Investments, Resourcing, and Execution (WIRE) office) is issuing requests for prototype proposals and awards.",
+      "status": "current",
+      "verified": true,
+      "sources": [
+        {
+          "url": "https://dibconsortium.org/",
+          "kind": "consortium_primary",
+          "evidence": "Site dated 2026-03-24 credits the DoW WIRE office; critical minerals RPP 2026-02-27; DIBC-RFS-26-02 due 2026-07-21.",
+          "exact_url": true
+        },
+        {
+          "url": "https://www.ati.org/dibc/",
+          "kind": "consortium_primary",
+          "evidence": "ATI page still names MCEIP.",
+          "exact_url": true
+        },
+        {
+          "url": "https://www.ati.org/rd-project-awards/",
+          "kind": "consortium_primary",
+          "evidence": "Award listed 6/24/2026 (MATSYS, $38.8M).",
+          "exact_url": true
+        }
+      ],
+      "notes": "Sponsor name changed: the Apr 2024 table listed OSD Industrial Policy / MCEIP. Manager: ATI.",
+      "supersedes": "OSD Industrial Policy / MCEIP (Apr 2024 AiDA table)"
+    },
+    {
+      "claim_id": "KB-C23",
+      "short": "HSTech",
+      "name": "Homeland Security Technology Consortium (HSTech)",
+      "claim": "No confirmed active calls for HSTech (Homeland Security Technology Consortium, DHS CBP).",
+      "status": "unverified",
+      "verified": false,
+      "sources": [
+        {
+          "url": "https://www.ati.org/hstech/",
+          "kind": "consortium_primary",
+          "evidence": "ATI page: sponsor CBP.",
+          "exact_url": true
+        },
+        {
+          "url": "https://hstech.ati.org/",
+          "kind": "consortium_primary",
+          "evidence": "Homepage post dated 2025-12-23 with no content.",
+          "exact_url": true
+        },
+        {
+          "url": "https://www.ati.org/rd-project-awards/",
+          "kind": "consortium_primary",
+          "evidence": "No HSTech solicitations or awards listed.",
+          "exact_url": true
+        }
+      ],
+      "notes": "DHS OTA authority lapsed in 2024. The PATHS Act (H.R. 1692) passed the House on 2025-03-11 and was referred to Senate HSGAC; no evidence of enactment was found.",
+      "supersedes": null
+    },
+    {
+      "claim_id": "KB-X1",
+      "short": "2808a",
+      "name": "Construction OTA authority, 10 U.S.C. 2808a",
+      "claim": "No DoW-wide implementing guidance yet for construction other transactions under 10 U.S.C. 2808a; USACE has published a playbook, 'Executing PDB with OTA'.",
+      "status": "current",
+      "verified": false,
+      "interval": 60,
+      "sources": [
+        {
+          "url": "https://www.law.cornell.edu/uscode/text/10/2808a",
+          "kind": "official",
+          "evidence": "Added by Pub. L. 119-60 \u00a72802 (Dec 18, 2025); applies to transactions on or after enactment.",
+          "exact_url": true
+        },
+        {
+          "url": "https://media.defense.gov/2026/Jul/07/2003958350/-1/-1/1/USACE%20PLAYBOOK%20-%20EXECUTING%20PDB%20WITH%20OTA%2012%20JUNE%202026.PDF",
+          "kind": "official",
+          "evidence": "USACE playbook 'Executing Progressive Design-Build (PDB) with Other Transaction', dated 12 June 2026.",
+          "exact_url": true
+        },
+        {
+          "url": "https://www.hklaw.com/en/insights/publications/2026/08/other-transaction-authority-may-change-military-construction",
+          "kind": "secondary",
+          "evidence": "Law-firm note: the DoW Guide to Prototype OTs (Oct 14, 2026) Appendix D 'Construction OT' is a placeholder \u2014 secondary.",
+          "exact_url": true
+        }
+      ],
+      "notes": "Supersedes the Holland & Knight Jul 23, 2026 'none issued' wording. An Air Force \u00a72808a PDB OT solicitation is live (91st Cyber Operations Center, W9126G27QA008; secondary). verified=false: the guidance-status evidence is a law-firm note and a search result; only the statute page was opened.",
+      "supersedes": null
+    }
+  ]
+}

@@ -493,6 +493,7 @@ export default function CoachPanel({
                       // many "Cape Fear ..." clients. A plain action is unambiguous.
                       className="h-9 px-4 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-sm font-medium text-white"
                       aria-label={`Work as ${c.businessName}`}
+                      data-tip="coach-work-as"
                       title={`Work as ${c.businessName}`}
                     >
                       Work as client →
@@ -501,6 +502,7 @@ export default function CoachPanel({
                     <button
                       type="button"
                       onClick={clearActive}
+                      data-tip="coach-exit"
                       className="h-9 px-4 rounded-lg border border-hairline text-sm text-muted hover:text-white"
                     >
                       Exit to my account
@@ -659,7 +661,7 @@ function AddClientCard({
   compactTitle?: string;
 }) {
   return (
-    <div className="rounded-xl border border-surface bg-ground/60 p-5">
+    <div className="rounded-xl border border-surface bg-ground/60 p-5" data-tip="coach-add-client">
       <h3 className="text-sm font-semibold text-white">{compactTitle || 'Add a client'}</h3>
       <p className="mt-1 text-xs text-faint mb-4">
         Paste their capability statement to auto-extract NAICS, keywords, and target agencies.
