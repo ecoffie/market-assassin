@@ -124,7 +124,7 @@ import { intelligenceGateEnabledFor, runIntelligenceGate, type GateResult } from
 import Anthropic from '@anthropic-ai/sdk';
 import {
   researchModeEnabledFor, researchModel, researchSystemPrompt, toAnthropicTools, runResearchLoop, groundAnswer, progressLine,
-  RESEARCH_TURN_MS, RESEARCH_DEADLINE_MS, RESEARCH_NO_ANSWER, researchToolDefs, billedInputTokens, RESEARCH_SYSTEM_STATIC, researchSystemDynamic, type ResearchCall,
+  RESEARCH_TURN_MS, RESEARCH_DEADLINE_MS, RESEARCH_NO_ANSWER, researchToolDefs, billedInputTokens, RESEARCH_SYSTEM_STATIC, researchSystemDynamic, wantsReport, type ResearchCall,
 } from '@/lib/ask-mindy/research-mode';
 import { toolLabel } from '@/lib/chat/context-sources';
 import { researchCapDecision } from '@/lib/ask-mindy/research-caps';
@@ -1284,11 +1284,8 @@ export async function POST(request: NextRequest) {
                 latencyMs: Date.now() - startedAt, trace: { ...rmTrace, ...extra, total_ms: Date.now() - rmStarted },
               }).catch((err) => console.error('[chat] persist failed:', err));
             };
-            // Never a silent model swap: if a budget limit applies, say so plainly and stop.
-            if (await isUserOverBudget(email).catch(() => false)) {
-              await finish('You have reached this month\'s research limit, so I can\'t run a full research answer right now. Your saved conversations and reports are unaffected.', { stop: 'over_budget' });
-              return;
-            }
+            // Research mode is governed ONLY by the plan-based daily caps (ASK_MINDY_RESEARCH_CAPS, checked before this
+            // turn started); the monthly dollar limit does not apply (Eric, 2026-11-25). The model is never swapped.
             const rmTools = toAnthropicTools(researchToolDefs(executor.offeredToolDefs(), privateNames));
             const conversation = [
               ...history.filter((h) => h.role === 'user' || h.role === 'assistant').slice(-12).map((h) => ({ role: h.role as 'user' | 'assistant', content: String(h.content || '').slice(0, 12_000) || '(empty)' })),
@@ -1336,6 +1333,8 @@ export async function POST(request: NextRequest) {
                 conversation,
                 tools: rmTools,
                 effort: process.env.ASK_MINDY_RESEARCH_EFFORT || 'high',
+                // Asked for a report: if research stops before it was written, the report is written from what was gathered.
+                reportTool: genDoc && rmTools.some((t) => t.name === CREATE_DOCUMENT) && wantsReport(splitViewPreamble(message).rest || message) ? CREATE_DOCUMENT : null,
                 onCalls: (cs) => { for (const c of cs) send({ type: 'progress', message: progressLine(toolLabel(c.name)) }); },
                 onFinalStep: () => send({ type: 'progress', message: 'Writing the answer.', phase: 'writing' }),
                 // Independent reads run in parallel; writes (documents, reports) run one at a time after them.

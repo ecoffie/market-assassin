@@ -21,7 +21,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { getAllDistinctSAMKeys } from '@/lib/sam/utils';
+import { SamKeyWalker, isKeyUnusableStatus } from '@/lib/sam/key-health';
 // Opportunity DNA — compute + persist the genome on ingest so NEW opps carry their strand keys the
 // moment they land (the backfill covers the existing corpus; this keeps every new row fresh). Uses
 // the SAME computeGenome() + genomeKeys() as the map decorate + backfill — one source of truth, no
@@ -84,21 +84,11 @@ export const maxDuration = 300;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 const SAM_API_BASE = 'https://api.sam.gov/opportunities/v2';
 
-// All distinct SAM keys for 429 fail-over. SAM.gov throttles at 1,000/day PER
-// KEY; with N keys we try the next one when the current is "Message throttled
-// out", turning a daily outage into a non-event. `samKeyIndex` advances on 429.
-const SAM_KEYS = getAllDistinctSAMKeys();
-let samKeyIndex = 0;
-function currentSamKey(): string {
-  return SAM_KEYS[samKeyIndex] || '';
-}
-/** Advance to the next key after a 429. Returns false if no keys remain to try. */
-function advanceSamKey(): boolean {
-  if (samKeyIndex >= SAM_KEYS.length - 1) return false;
-  samKeyIndex++;
-  console.warn(`[SAM sync] key ${samKeyIndex} throttled → failing over to key ${samKeyIndex + 1}/${SAM_KEYS.length}`);
-  return true;
-}
+// Key fail-over. SAM.gov throttles at 1,000/day PER KEY (429), and REJECTS an expired/invalid key (401/403).
+// 2026-11-25: production SAM_API_KEY and SAM_API_KEY_2 returned 401; fail-over ran only on 429, so the sync died on
+// _2 and never reached the live _3 — no opportunity was written for ~21 hours. Now ANY unusable status moves to the
+// next key; a rejected key is remembered for the process (key-health.ts), and logs name the slot, never the value.
+const samKeys = new SamKeyWalker();
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let _supabase: any = null;
@@ -241,7 +231,7 @@ async function fetchOpportunitiesPage(
 
   const buildUrl = () => {
     const params = new URLSearchParams({
-      api_key: currentSamKey(),
+      api_key: samKeys.current(),
       limit: String(limit),
       offset: String(page), // SAM reads this as a page index — see the note above
 
@@ -251,40 +241,32 @@ async function fetchOpportunitiesPage(
     return `${SAM_API_BASE}/search?${params.toString()}`;
   };
 
-  // Use retry wrapper with 90-second timeout per request. On a 429 (quota
-  // throttle) we fail over to the NEXT key before retrying — a throttled key
-  // never recovers same-day, so retrying it is pointless; the next key may have
-  // quota left. If all keys are throttled, the error propagates (resumable).
+  // Use retry wrapper with 90-second timeout per request. On an unusable key (429 throttled, 401/403 rejected) we
+  // fail over to the NEXT key before retrying. If every key is unusable, the error propagates (resumable) and names
+  // the slots.
   return fetchWithRetry(async () => {
-    const response = await fetch(buildUrl(), {
-      headers: { 'Accept': 'application/json' },
-      signal: AbortSignal.timeout(90000), // 90 seconds
-    });
-
-    if (!response.ok) {
+    if (!samKeys.current()) throw new Error(samKeys.message(0));
+    // Walk the keys while SAM says the KEY is unusable (401/403 rejected, 429 throttled); any other error is the
+    // request's, not the key's, and goes to the retry/backoff wrapper.
+    for (;;) {
+      const response = await fetch(buildUrl(), {
+        headers: { 'Accept': 'application/json' },
+        signal: AbortSignal.timeout(90000), // 90 seconds
+      });
+      if (response.ok) {
+        const data = await response.json();
+        return {
+          opportunities: data.opportunitiesData || [],
+          total: data.totalRecords || 0,
+        };
+      }
       const errorText = await response.text().catch(() => 'Unknown error');
-      if (response.status === 429 && advanceSamKey()) {
-        // Retry immediately with the next key (don't count the throttle as a
-        // backoff-worthy transient — it's a hard per-key daily cap).
-        const retry = await fetch(buildUrl(), {
-          headers: { 'Accept': 'application/json' },
-          signal: AbortSignal.timeout(90000),
-        });
-        if (retry.ok) {
-          const d = await retry.json();
-          return { opportunities: d.opportunitiesData || [], total: d.totalRecords || 0 };
-        }
-        const retryErr = await retry.text().catch(() => 'Unknown error');
-        throw new Error(`SAM.gov API error: ${retry.status} - ${retryErr.substring(0, 200)}`);
+      if (isKeyUnusableStatus(response.status)) {
+        if (samKeys.fail(response.status, errorText)) continue;
+        throw new Error(samKeys.message(response.status));
       }
       throw new Error(`SAM.gov API error: ${response.status} - ${errorText.substring(0, 200)}`);
     }
-
-    const data = await response.json();
-    return {
-      opportunities: data.opportunitiesData || [],
-      total: data.totalRecords || 0,
-    };
   }, 3, 5000); // 3 retries, starting at 5 second delay
 }
 
@@ -447,13 +429,14 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  if (SAM_KEYS.length === 0) {
+  if (samKeys.size === 0) {
     if (!dryRun) await reportSam(syncTypeParam, 'error', 'No SAM API keys configured');
     return NextResponse.json({ error: 'No SAM API keys configured (SAM_API_KEY / SAM_API_KEY_1..N / SAM_API_KEY_BACKUP)' }, { status: 500 });
   }
   // Start each run from the first key so keys whose quota has reset get re-tried
   // (the module-level index can otherwise stay advanced across warm invocations).
-  samKeyIndex = 0;
+  // A key SAM rejected (401/403) stays skipped (key-health.ts); a throttled one is re-tried next run.
+  samKeys.reset();
 
   const startTime = Date.now();
   const maxRecords = limitParam ? parseInt(limitParam) : 50000;

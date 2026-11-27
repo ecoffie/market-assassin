@@ -20,6 +20,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { sendOpsAlert } from '@/lib/ops-alert';
+import { classifySamSyncRuns } from '@/lib/sam/sync-run-health';
 import { hasValidCronSecret } from '@/lib/cron/cron-request-auth';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
@@ -42,6 +43,9 @@ interface CacheHealth {
   consecutiveFailures: number;
   /** last full sync's total_fetched / total_available; null when unknown. */
   completenessRatio: number | null;
+  /** A recent run named a rejected SAM key (401/403) — critical until the env value is replaced. */
+  credentialFailure: boolean;
+  credentialErrorSample: string | null;
   healthScore: number;
   healthStatus: 'healthy' | 'warning' | 'critical';
 }
@@ -92,7 +96,7 @@ async function getCacheHealth(): Promise<CacheHealth> {
   // status-only select is what let a 'partial' run look healthy for six days.
   const { data: recentRuns, error: recentRunsErr } = await supabase
     .from('sam_sync_runs')
-    .select('status, sync_type, total_fetched, total_available')
+    .select('status, sync_type, total_fetched, total_available, error_message')
     .order('started_at', { ascending: false })
     .limit(10);
   // Surface it: if this query fails, data is null, recentRuns is empty, and BOTH
@@ -102,14 +106,9 @@ async function getCacheHealth(): Promise<CacheHealth> {
     console.error('[sam-sync-watchdog] recent-runs query failed — completeness and failure counts unreliable:', recentRunsErr.message);
   }
 
-  let consecutiveFailures = 0;
-  for (const run of recentRuns || []) {
-    if (run.status === 'failed') {
-      consecutiveFailures++;
-    } else {
-      break;
-    }
-  }
+  // Count what the runs REPORTED, not just status='failed' (2026-11-25: two 401 runs with 0 fetched read as healthy).
+  const runHealth = classifySamSyncRuns(recentRuns || []);
+  const consecutiveFailures = runHealth.consecutiveUnproductive;
 
   // Calculate health score (0-100)
   let healthScore = 100;
@@ -155,6 +154,10 @@ async function getCacheHealth(): Promise<CacheHealth> {
     healthScore -= 20;
   }
 
+  // A rejected SAM key is critical on its own: every later run fails the same way until the env is fixed.
+  if (runHealth.credentialFailure) healthScore = 0;
+  if (recentRunsErr) healthScore = Math.min(healthScore, 49); // unreadable run history is never healthy
+
   // Clamp to 0-100
   healthScore = Math.max(0, Math.min(100, healthScore));
 
@@ -177,6 +180,8 @@ async function getCacheHealth(): Promise<CacheHealth> {
     lastSyncStatus: lastSuccess?.status,
     consecutiveFailures,
     completenessRatio,
+    credentialFailure: runHealth.credentialFailure,
+    credentialErrorSample: runHealth.credentialErrorSample,
     healthScore,
     healthStatus,
   };
@@ -239,6 +244,10 @@ async function sendAlertEmail(health: CacheHealth, action: string): Promise<void
           <td style="padding: 8px; border: 1px solid #ddd;"><strong>Consecutive Failures</strong></td>
           <td style="padding: 8px; border: 1px solid #ddd;">${health.consecutiveFailures}</td>
         </tr>
+        ${health.credentialFailure ? `<tr>
+          <td style="padding: 8px; border: 1px solid #ddd;"><strong>SAM key rejected</strong></td>
+          <td style="padding: 8px; border: 1px solid #ddd;">A recent run failed with a credential error (401/403). Replace the rejected SAM_API_KEY* value(s) in Vercel production. ${String(health.credentialErrorSample || '').replace(/[<>&]/g, '')}</td>
+        </tr>` : ''}
         <tr>
           <td style="padding: 8px; border: 1px solid #ddd;"><strong>Last full sync completeness</strong></td>
           <td style="padding: 8px; border: 1px solid #ddd;">${
