@@ -142,6 +142,7 @@ import { getNaics } from '@/lib/codes/lookup';
 import { capabilityPlannerNote, interpretCapabilityNaics } from '@/lib/market/capability-naics';
 import { guardUnstatedStates, guardUnstatedCities } from '@/lib/chat/stated-filters';
 import { parseDisplayHint, displayHintNote } from '@/lib/chat/display-hint';
+import { appActionsEnabledFor, parseActionSurface, actionNamesFor, createAppActionProposer, proposeAppActionToolDef, PROPOSE_APP_ACTION, APP_ACTIONS_NOTE, type AppActionProposer } from '@/lib/chat/app-actions/propose';
 import { compileIntent, enforceIntent, dedupeToolCalls, isMapScopeNote, splitViewPreamble } from '@/lib/chat/intent-compiler';
 import { sessionTitleFrom } from '@/lib/chat/view-preamble';
 import { prepareChatToolArgs, renderExpiringRecords, renderStatusChecks, renderBuyingOffices, renderPricing, renderKeywords, renderVehicleMix, renderSbloContact, lintAnalysis, deterministicNextSteps, crossCheckOffices, checkSummaryAgainstRecords, EXPIRING_TOOL, PAST_CONTRACTS_TOOL, BUYING_OFFICES_TOOL, PRICING_TOOL, KEYWORDS_TOOL, VEHICLE_MIX_TOOL, SBLO_TOOL, type RenderedRecords } from '@/lib/chat/record-render';
@@ -244,6 +245,8 @@ interface ChatRequest {
   replay_only?: boolean;
   /** How the surface shows the answer ('narrow_panel' = the Map drawer). A system note, never user text. */
   display?: string;
+  /** Which page is asking ('map' | 'app'): selects the app actions offered (src/lib/chat/app-actions/propose.ts). */
+  surface?: string;
 }
 
 // Retained only for the `chat_messages.cited_sources` column shape — Ask Mindy
@@ -1218,8 +1221,15 @@ export async function POST(request: NextRequest) {
           const readPage = researchTurn
             ? makeReadWebPageTool({ allowedUrls: () => turnWebUrls, onPageText: (t) => { turnDocumentTexts.push(t); } })
             : null;
-          const privateDefs = [...TIER0_TOOL_DEFS, SEARCH_WEB_TOOL_DEF, ...(readPage ? [READ_WEB_PAGE_TOOL_DEF] : []), ...(myDocs ? [MY_DOCUMENTS_TOOL_DEF] : []), ...(genDoc ? [CREATE_DOCUMENT_TOOL_DEF] : [])];
-          const privateNames = new Set([...TIER0_TOOL_NAMES, SEARCH_WEB, ...(readPage ? [READ_WEB_PAGE] : []), ...(myDocs ? [FIND_MY_DOCUMENTS] : []), ...(genDoc ? [CREATE_DOCUMENT] : [])]);
+          // App actions (beta, ASK_MINDY_APP_ACTIONS + allowlist): never on card turns, and only where the asking page has
+          // at least one registered action. The model's call is validated against the registry before anything is sent.
+          const actionSurface = parseActionSurface(body);
+          const actions: AppActionProposer | null = !cardCtx && appActionsEnabledFor(auth.email) && actionNamesFor(actionSurface).length
+            ? createAppActionProposer({ surface: actionSurface, hasPro: chatPro, emit: (evt) => send(evt) })
+            : null;
+          const actionDefs = actions ? [proposeAppActionToolDef(actions.surface)] : [];
+          const privateDefs = [...TIER0_TOOL_DEFS, ...actionDefs, SEARCH_WEB_TOOL_DEF, ...(readPage ? [READ_WEB_PAGE_TOOL_DEF] : []), ...(myDocs ? [MY_DOCUMENTS_TOOL_DEF] : []), ...(genDoc ? [CREATE_DOCUMENT_TOOL_DEF] : [])];
+          const privateNames = new Set([...TIER0_TOOL_NAMES, ...(actions ? [PROPOSE_APP_ACTION] : []), SEARCH_WEB, ...(readPage ? [READ_WEB_PAGE] : []), ...(myDocs ? [FIND_MY_DOCUMENTS] : []), ...(genDoc ? [CREATE_DOCUMENT] : [])]);
           const executor = createChatToolExecutor({
             userEmail: auth.email!,
             ...(actingScope.kind === 'client' ? { vaultEmail: actingScope.vaultEmail } : {}),
@@ -1229,6 +1239,12 @@ export async function POST(request: NextRequest) {
               defs: privateDefs,
               names: privateNames,
               execute: (n, a) => {
+                if (actions && n === PROPOSE_APP_ACTION) {
+                  const r = actions.propose(a);
+                  const last = actions.log[actions.log.length - 1];
+                  if (last) turnTrace.notices.push(`app_action:${last.name || 'unknown'}:${last.outcome}`);
+                  return Promise.resolve(r);
+                }
                 if (n === SEARCH_WEB) {
                   return searchWeb.execute(a).then((r) => {
                     for (const x of (r.results as Array<{ url?: string }> | undefined) || []) if (x?.url) turnWebUrls.push(String(x.url));
@@ -1260,7 +1276,13 @@ export async function POST(request: NextRequest) {
             toolTimeoutMs: (n) => toolTimeoutMs(n, deadlines),
             // Research mode: SAM-backed tools read Mindy's caches only (zero live SAM calls).
             ...(researchTurn ? { samCacheOnly: true } : {}),
+            // App actions: every successful result is this turn's evidence for map.open_record.
+            ...(actions ? { onResult: (n: string, c: string) => actions.observeToolResult(n, c) } : {}),
           });
+          if (actions) {
+            turnTrace.notices.push(`app_actions_offered:${actions.surface}`);
+            if (!researchTurn) messages.push({ role: 'system', content: APP_ACTIONS_NOTE });
+          }
 
           // ── RESEARCH MODE: Claude runs its own loop over the same catalog (src/lib/ask-mindy/research-mode.ts). ──
           if (researchTurn) {
@@ -1327,7 +1349,7 @@ export async function POST(request: NextRequest) {
             try {
               const loop = await runResearchLoop({
                 client, model,
-                system: researchSystemPrompt({ today, profileBlock: userProfileBlock }),
+                system: researchSystemPrompt({ today, profileBlock: userProfileBlock }) + (actions ? `\n\n${APP_ACTIONS_NOTE}` : ''),
                 conversation,
                 tools: rmTools,
                 effort: process.env.ASK_MINDY_RESEARCH_EFFORT || 'high',

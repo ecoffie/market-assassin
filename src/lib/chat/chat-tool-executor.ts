@@ -104,6 +104,11 @@ export interface ChatToolExecutorOptions {
    * Mindy's caches only and never call live SAM (Eric, 2026-11-25). Hosted MCP never sets it.
    */
   samCacheOnly?: boolean;
+  /**
+   * Called with every SUCCESSFUL call's name and result content (the JSON string the model sees). Ask Mindy app actions
+   * use it as this turn's evidence: map.open_record may only name a notice id a tool returned. Errors are swallowed.
+   */
+  onResult?: (name: string, content: string) => void;
 }
 
 /** A logging call may never hold up a turn: telemetry waits at most this long. */
@@ -400,7 +405,9 @@ export function createChatToolExecutor(opts: ChatToolExecutorOptions) {
     const latencyMs = Date.now() - started;
     const resourceIds = policy.decision === 'allowed_write' ? safeResourceIds(name, result) : null;
     await safeLog(planner, name, 'success', executionId, { args, latencyMs, resourceIds, result });
-    return { ...done('success', policy.decision, null, {}), content: safeStringify(result ?? {}, resourceIds) };
+    const content = safeStringify(result ?? {}, resourceIds);
+    if (opts.onResult) { try { opts.onResult(name, content); } catch (err) { console.error('[chat] onResult failed (non-fatal):', err); } }
+    return { ...done('success', policy.decision, null, {}), content };
   }
 
   /** logCall never throws by contract; this keeps a broken logger from ever affecting results. */
