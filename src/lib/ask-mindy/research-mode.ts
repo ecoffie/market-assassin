@@ -11,6 +11,7 @@ import type Anthropic from '@anthropic-ai/sdk';
 import { MCP_CONNECTOR_INSTRUCTIONS } from '@/lib/mcp/schedule-discovery';
 import { ungroundedFiguresInText } from './figure-grounding';
 import { DISCLOSED_LEAD } from './intelligence-gate';
+import { COMPETITION_AND_START_PLAYBOOK } from './competition-playbook';
 import { listPublicMcpTools } from '@/lib/mcp/public-catalog';
 import { isDocumentCreationRequest } from '@/lib/chat/generate-document-tool';
 
@@ -109,6 +110,8 @@ export const RESEARCH_INSTRUCTIONS = [
   "7. GAPS. A gap appears in the answer only if it would change the decision, stated as its effect (for example \"the buyer's latest award is not yet published, since Defense awards post about 90 days late, so the incumbent can't be confirmed; treat the recompete date as an estimate\"), under Risks, at most 3. Never fill from memory; never turn \"unavailable\" into \"none\".",
   '',
   "8. REPORT = A DECISION, NOT FINDINGS. Order: (a) the answer in 2 to 3 sentences: what this company should do and why it can win; (b) the 3 ranked moves, each naming the specific opportunity, buyer office or person, the date or deadline and the dollar value from the record, why this company specifically fits (its certifications, codes, past performance, geography), and the exact next action this week (who to email, about what, citing what); (c) risks that would change the call (at most 3); (d) the supporting evidence: where they stand (registration, certifications, codes, award history), buyer problems from cited sources with what this company can say, Portfolio Acquisition Executives when relevant, where the money is moving, routes, and the readiness checklist (including SBA small business profile keywords via derive_company_keywords), and how GovCon Giants helps (never promising awards); (e) sources and coverage. Every fact must earn a \"so what\" for this company; a fact without one goes to the appendix or is dropped. For a written deliverable use create_document or generate_market_report.",
+  '',
+  COMPETITION_AND_START_PLAYBOOK,
   '',
   'OUTPUT STANDARD:',
   "1. No homework. If a check can be done with Mindy tools or the web, do it and state the result. Never tell the customer to \"check\", \"research\" or \"use USASpending\". Work the customer would have to do is a defect, not a section.",

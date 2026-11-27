@@ -40,6 +40,9 @@ export interface ActionDef {
 }
 
 const PLAIN_PATTERN = "^[A-Za-z0-9 ,.&()'/:_-]+$";
+const UUID_PATTERN = '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$';
+const NOTICE_PATTERN = '^[A-Za-z0-9_-]{6,64}$';
+const FREQUENCIES = ['daily', 'weekly', 'off'];
 const str = (maxLength: number, extra: JsonSchema = {}): JsonSchema => ({ type: 'string', minLength: 1, maxLength, pattern: PLAIN_PATTERN, ...extra });
 const HORIZON_PROPS = { open: { type: 'boolean' }, recompete: { type: 'boolean' }, forecast: { type: 'boolean' } };
 
@@ -86,7 +89,41 @@ export const ACTIONS: Record<string, ActionDef> = {
     args: ['notice_id'],
     argsSchema: { type: 'object', additionalProperties: false, required: ['notice_id'], properties: { notice_id: { type: 'string', pattern: '^[A-Za-z0-9_-]{6,64}$' } } },
   },
+  // ── Write actions (slice 2): always the one-line inline confirm; executed by POST /api/app/mindy-actions (Agent 3).
+  'map.save_search': {
+    surfaces: ['map'], kind: 'write', needsConfirm: true, gate: 'signed_in',
+    description: 'Save the map view the customer is looking at as a saved search, with alerts. The client saves exactly what is on screen; give only a short name and the alert frequency.',
+    args: ['name', 'alert_frequency'],
+    argsSchema: { type: 'object', additionalProperties: false, required: ['name', 'alert_frequency'], properties: { name: str(80), alert_frequency: { type: 'string', enum: FREQUENCIES } } },
+  },
+  'map.update_alert': {
+    surfaces: ['map'], kind: 'write', needsConfirm: true, gate: 'signed_in',
+    description: 'Change how often a saved search sends alerts (daily, weekly or off).',
+    args: ['search_id', 'alert_frequency'],
+    argsSchema: { type: 'object', additionalProperties: false, required: ['search_id', 'alert_frequency'], properties: { search_id: { type: 'string', pattern: UUID_PATTERN }, alert_frequency: { type: 'string', enum: FREQUENCIES } } },
+  },
+  'map.add_to_pursuits': {
+    surfaces: ['map'], kind: 'write', needsConfirm: true, gate: 'signed_in',
+    description: "Add an opportunity (notice_id) or recompete (contract_id) the customer chose to My Pursuits. Only an id that appeared in THIS turn's tool results.",
+    args: ['kind', 'notice_id', 'contract_id'],
+    argsSchema: {
+      type: 'object', additionalProperties: false, required: ['kind'],
+      properties: { kind: { type: 'string', enum: ['opportunity', 'recompete'] }, notice_id: { type: 'string', pattern: NOTICE_PATTERN }, contract_id: str(64) },
+      oneOf: [{ properties: { kind: { const: 'opportunity' } }, required: ['notice_id'], not: { required: ['contract_id'] } }, { properties: { kind: { const: 'recompete' } }, required: ['contract_id'], not: { required: ['notice_id'] } }],
+    },
+  },
+  'map.remove_from_pursuits': {
+    surfaces: ['map'], kind: 'write', needsConfirm: true, gate: 'signed_in',
+    description: 'Remove an item from My Pursuits (pursuit_id or notice_id).',
+    args: ['pursuit_id', 'notice_id'],
+    argsSchema: { type: 'object', additionalProperties: false, properties: { pursuit_id: { type: 'string', pattern: UUID_PATTERN }, notice_id: { type: 'string', pattern: NOTICE_PATTERN } }, oneOf: [{ required: ['pursuit_id'] }, { required: ['notice_id'] }] },
+  },
 };
+
+/** The route's action name (Agent 3 accepts bare names): the registry name without its surface prefix. */
+export function routeActionName(name: string): string {
+  return name.replace(/^(map|app)\./, '');
+}
 
 /**
  * The input schema for the server's propose_app_action tool (Agent 1): one of the registered actions with its own
@@ -107,6 +144,8 @@ export function toolInputSchema(surfaces: ActionSurface[] = ['map', 'app']): Jso
 const PLAIN = /^[A-Za-z0-9 ,.&()'/:_-]+$/;
 const STATES = /^[A-Z]{2}(,[A-Z]{2})*$/;
 const NOTICE_ID = /^[A-Za-z0-9_-]{6,64}$/;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const FREQ = ['daily', 'weekly', 'off'];
 const HORIZONS = ['open', 'recompete', 'forecast'] as const;
 
 export type ValidAction = { id: string; name: string; kind: ActionKind; args: Record<string, unknown> };
@@ -171,6 +210,24 @@ export function validateAction(evt: unknown, surface: ActionSurface): ActionChec
   } else if (name === 'map.open_record') {
     if (typeof raw.notice_id !== 'string' || !NOTICE_ID.test(raw.notice_id)) return { ok: false, reason: 'notice_id' };
     args.notice_id = raw.notice_id;
+  } else if (name === 'map.save_search') {
+    const n = plain(raw.name, 80);
+    if (n == null) return { ok: false, reason: 'name' };
+    if (!FREQ.includes(raw.alert_frequency as string)) return { ok: false, reason: 'alert_frequency' };
+    args.name = n; args.alert_frequency = raw.alert_frequency;
+  } else if (name === 'map.update_alert') {
+    if (typeof raw.search_id !== 'string' || !UUID.test(raw.search_id)) return { ok: false, reason: 'search_id' };
+    if (!FREQ.includes(raw.alert_frequency as string)) return { ok: false, reason: 'alert_frequency' };
+    args.search_id = raw.search_id; args.alert_frequency = raw.alert_frequency;
+  } else if (name === 'map.add_to_pursuits') {
+    if (raw.kind === 'opportunity' && typeof raw.notice_id === 'string' && NOTICE_ID.test(raw.notice_id) && raw.contract_id == null) { args.kind = 'opportunity'; args.notice_id = raw.notice_id; }
+    else if (raw.kind === 'recompete' && raw.notice_id == null) { const c = plain(raw.contract_id, 64); if (c == null) return { ok: false, reason: 'contract_id' }; args.kind = 'recompete'; args.contract_id = c; }
+    else return { ok: false, reason: 'target' };
+  } else if (name === 'map.remove_from_pursuits') {
+    const hasP = raw.pursuit_id != null, hasN = raw.notice_id != null;
+    if (hasP === hasN) return { ok: false, reason: 'target' };
+    if (hasP) { if (typeof raw.pursuit_id !== 'string' || !UUID.test(raw.pursuit_id)) return { ok: false, reason: 'pursuit_id' }; args.pursuit_id = raw.pursuit_id; }
+    else { if (typeof raw.notice_id !== 'string' || !NOTICE_ID.test(raw.notice_id)) return { ok: false, reason: 'notice_id' }; args.notice_id = raw.notice_id; }
   }
   return { ok: true, action: { id, name, kind: def.kind, args } };
 }
