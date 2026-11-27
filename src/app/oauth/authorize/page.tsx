@@ -238,7 +238,7 @@ export default function AuthorizePage() {
               </p>
             ) : (
               <p className="mt-2 text-sm text-slate-400">
-                Allow this app to connect to your Mindy account? It can search SAM, pull playbooks, financials &amp; pricing, and{' '}
+                Allow this app to connect to your Mindy account? It can search SAM, pull award history, contacts &amp; pricing, and{' '}
                 <strong className="text-slate-300">spend your credits</strong> on your behalf.
               </p>
             )}

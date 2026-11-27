@@ -128,7 +128,7 @@ const TASKS: { id: string; label: string; note: string; tools: string[]; on: boo
   { id: 'find', label: 'Find & filter opportunities', note: 'Live SAM search · NAICS + keywords', tools: ['search_sam_opportunities'], on: true },
   { id: 'incumbent', label: 'Vet the incumbent', note: 'Who holds it + contractor profile', tools: ['get_solicitation_incumbent', 'get_contractor_profile'], on: true },
   { id: 'price', label: 'Price the bid', note: 'GSA labor rates p25/p50/p75', tools: ['get_pricing_intel'], on: true },
-  { id: 'playbook', label: 'Draft a win strategy', note: 'Proprietary winning playbook', tools: ['get_winning_playbook'], on: false },
+  { id: 'actionplan', label: 'Build an action plan', note: 'Who to contact, what to say, which events', tools: ['search_federal_contacts', 'search_federal_events'], on: false },
   { id: 'teaming', label: 'Build a teaming shortlist', note: 'Who-can-win scan + partner profiles', tools: ['find_capable_contractors', 'get_contractor_profile', 'get_contractor_profile'], on: false },
   { id: 'proposal', label: 'Draft the proposal', note: 'Matrix → draft → compliance referee', tools: ['extract_compliance_matrix', 'draft_proposal', 'referee_proposal_compliance'], on: false },
 ];
