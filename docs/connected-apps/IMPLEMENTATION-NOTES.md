@@ -148,7 +148,12 @@ Save an email DRAFT in the customer's own Gmail or Outlook. Mindy never sends: t
   - Google Cloud: add `gmail.compose` to the consent screen. **It is a RESTRICTED scope**: test users work now; public use needs Google app verification (and possibly a security assessment).
   - Entra: add the delegated `Mail.ReadWrite`. Still no `Mail.Send`.
 - **The Picker token never carries mail scopes.** Google's `include_granted_scopes` puts `gmail.compose` on the stored access token once drafts are allowed, and the Picker token reaches the browser. For a connection with a mail scope, `/picker-token` mints a fresh token from the refresh token limited to identity + `drive.file` (`restrictedAccessTokenFor`, not stored). It refuses (`picker_scope_unavailable`) if Google returns any other scope or does not say which. Files-only connections are unchanged.
-- **Rollout**: after Mindy Day, except Eric's own account (allowlist).
+- **Its own gate.** `CONNECTED_APPS_DRAFTS_ALLOWLIST` (comma list or `*`; empty = nobody) is AND-ed with the uploads gate. Uploads can go to everyone (`CONNECTED_APPS_ALLOWLIST=*`) while drafts stay off. It is checked in three places:
+  - the chat tool registration;
+  - `/start` for the draft capability (403 `drafts_not_enabled`);
+  - the "Allow email drafts" menu, through `drafts` in the list response.
+- **Timeouts.** The Gmail and Graph draft calls time out at 15 s. A timeout is reported as unconfirmed ("check Drafts before trying again"), with the copy-paste fallback; never as saved.
+- **Rollout**: after Mindy Day, except Eric's own account (`CONNECTED_APPS_DRAFTS_ALLOWLIST=<eric>`).
 - **Testing rule**: no customer contact. Drafts go only to the eric@ / erika@ test accounts.
 
 ## 3c. Live acceptance (Slice A), each provider independently

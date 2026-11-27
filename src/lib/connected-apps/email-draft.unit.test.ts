@@ -7,7 +7,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   mailDraftClient, mimeMessage, checkDraftInput, recipientIsCited, makeEmailDraftTool, splitSignature, DraftError,
-  EMAIL_DRAFT_TOOL_DEF, type EmailDraftToolDeps, type VerifiedSource,
+  EMAIL_DRAFT_TOOL_DEF, DRAFT_TIMEOUT_MS, type EmailDraftToolDeps, type VerifiedSource,
 } from './email-draft';
 import type { ConnectionView } from './store';
 import { OUTREACH_RULES } from '@/lib/ask-mindy/outreach-rules';
@@ -57,6 +57,16 @@ describe('the mail client can only create drafts', () => {
     expect(url).toBe('https://graph.microsoft.com/v1.0/me/messages');
     expect(JSON.parse(String(init.body))).toEqual({ subject: 'S', body: { contentType: 'Text', content: 'B' }, toRecipients: [] });
     expect(d.webLink).toBe('https://outlook.office365.com/owa/?ItemID=AAMk');
+  });
+
+  it('both provider calls carry a 15 s abort signal', async () => {
+    const seen: Array<AbortSignal | undefined> = [];
+    const f = vi.fn(async (_u: string, init?: RequestInit) => { seen.push(init?.signal ?? undefined); return new Response(JSON.stringify({ id: 'x', message: { id: 'm' }, webLink: 'https://outlook.office.com/x' }), { status: 200 }); });
+    await mailDraftClient.createDraft('google', 't', { to: null, subject: 's', body: 'b' }, 'a@example.com', f as unknown as typeof fetch);
+    await mailDraftClient.createDraft('microsoft', 't', { to: null, subject: 's', body: 'b' }, 'a@example.com', f as unknown as typeof fetch);
+    expect(seen).toHaveLength(2);
+    for (const sig of seen) expect(sig).toBeInstanceOf(AbortSignal);
+    expect(DRAFT_TIMEOUT_MS).toBe(15_000);
   });
 
   it('maps provider refusals to typed errors, never a success', async () => {
@@ -228,6 +238,15 @@ describe('create_email_draft tool', () => {
     const r = await tool.execute(ARGS);
     expect(r).toMatchObject({ ok: false, error_category: 'provider_error' });
     expect(String(r.message)).toMatch(/check their Drafts folder before trying again/);
+  });
+
+  it('a timeout is never a saved draft: copy-paste fallback and "check Drafts before trying again"', async () => {
+    const { tool } = setup({ create: async () => { throw new DOMException('The operation timed out.', 'TimeoutError'); } });
+    const r = await tool.execute(ARGS);
+    expect(r).toMatchObject({ ok: false, error_category: 'timeout' });
+    expect(String(r.message)).toMatch(/did not answer in time/);
+    expect(String(r.message)).toMatch(/check their Drafts folder before trying again/);
+    expect(String(r.message)).toMatch(/copy-paste text/);
   });
 
   it('the same draft retried in the turn is saved once', async () => {

@@ -68,9 +68,13 @@ function failFor(status: number): DraftError {
   return new DraftError('provider_error');
 }
 
+/** Like every provider call: a hung provider never holds the turn. A timeout is reported as unconfirmed, never saved. */
+export const DRAFT_TIMEOUT_MS = 15_000;
+
 async function createGmailDraft(token: string, p: DraftPayload, accountEmail: string, f: Fetch): Promise<CreatedDraft> {
   const res = await f('https://gmail.googleapis.com/gmail/v1/users/me/drafts', {
     method: 'POST',
+    signal: AbortSignal.timeout(DRAFT_TIMEOUT_MS),
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ message: { raw: b64url(mimeMessage(p)) } }),
   });
@@ -87,6 +91,7 @@ async function createOutlookDraft(token: string, p: DraftPayload, f: Fetch): Pro
   // POST /me/messages creates the message in Drafts and does not send it.
   const res = await f('https://graph.microsoft.com/v1.0/me/messages', {
     method: 'POST',
+    signal: AbortSignal.timeout(DRAFT_TIMEOUT_MS),
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
       subject: p.subject,
@@ -301,11 +306,13 @@ export function makeEmailDraftTool(opts: {
       done.set(key, result);
       return result;
     } catch (err) {
-      const code = err instanceof DraftError ? err.code : 'provider_error';
+      const timedOut = !(err instanceof DraftError) && (err as { name?: string } | null)?.name !== undefined && ['TimeoutError', 'AbortError'].includes(String((err as { name?: string }).name));
+      const code = err instanceof DraftError ? err.code : timedOut ? 'timeout' : 'provider_error';
       logEvent(`failed_${code}`);
       const why = code === 'permission_needed' ? `${conn.connected_email} has not allowed email drafts. They can choose "Allow email drafts" in the "Use a file from Drive or OneDrive" menu under the message box.`
         : code === 'reauth_needed' ? `${conn.connected_email} needs to be reconnected from the "Use a file from Drive or OneDrive" menu under the message box.`
         : code === 'rate_limited' ? `${PROVIDER_NAME[conn.provider]} is busy right now.`
+        : code === 'timeout' ? `${PROVIDER_NAME[conn.provider]} did not answer in time, so the draft may or may not have been saved. Tell the customer to check their Drafts folder before trying again.`
         : `${PROVIDER_NAME[conn.provider]} did not confirm the draft. Tell the customer to check their Drafts folder before trying again.`;
       return unavailable(code, `No draft was confirmed. ${why} ${COPY_TEXT}`);
     }

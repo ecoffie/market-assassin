@@ -43,7 +43,7 @@ import { isUserOverBudget, recordLlmUsage } from '@/lib/llm/usage-cost';
 import { researchClient } from '@/lib/ask-mindy/research-client';
 import { makeTier0Tools, TIER0_TOOL_DEFS, TIER0_TOOL_NAMES } from '@/lib/chat/tier0-tools';
 import { makeMyDocumentsTool, MY_DOCUMENTS_TOOL_DEF, FIND_MY_DOCUMENTS } from '@/lib/chat/my-documents-tool';
-import { connectedAppsEnabledFor } from '@/lib/connected-apps/config';
+import { connectedAppsEnabledFor, connectedAppsDraftsEnabledFor } from '@/lib/connected-apps/config';
 import { loadConnectedFilesContext } from '@/lib/connected-apps/read-file-tool';
 import { makeEmailDraftTool, EMAIL_DRAFT_TOOL_DEF, CREATE_EMAIL_DRAFT, type VerifiedSource } from '@/lib/connected-apps/email-draft';
 import { makeSearchWebTool, SEARCH_WEB_TOOL_DEF, SEARCH_WEB, callerKeyFor } from '@/lib/chat/search-web-tool';
@@ -1252,9 +1252,9 @@ export async function POST(request: NextRequest) {
             })
             : null;
           // Connected apps Slice B: save an email DRAFT in the customer's own Gmail / Outlook (never sends). Flag
-          // CONNECTED_APPS + allowlist; never in card chat. The acting scope is re-resolved on every call, and the
+          // CONNECTED_APPS + allowlist AND CONNECTED_APPS_DRAFTS_ALLOWLIST (its own gate); never in card chat. The acting scope is re-resolved on every call, and the
           // recipient is kept only when this turn's public records (or the attached notice's contacts) cite it.
-          const emailDraft = !cardCtx && connectedAppsEnabledFor(auth.email)
+          const emailDraft = !cardCtx && connectedAppsDraftsEnabledFor(auth.email)
             ? makeEmailDraftTool({
               resolveScope: () => resolveChatActingScope(auth.email!, request),
               callerEmail: auth.email!,

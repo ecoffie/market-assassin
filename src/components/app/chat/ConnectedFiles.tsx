@@ -88,6 +88,8 @@ export function ConnectedFiles({ email, files, onChange, disabled }: {
   const [enabled, setEnabled] = useState(false);
   const [connections, setConnections] = useState<Connection[]>([]);
   const [providers, setProviders] = useState<Array<{ provider: 'google' | 'microsoft'; available: boolean }>>([]);
+  // Email drafts have their own allowlist (the list endpoint says whether this caller is on it).
+  const [draftsAllowed, setDraftsAllowed] = useState(false);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -106,6 +108,7 @@ export function ConnectedFiles({ email, files, onChange, disabled }: {
       setEnabled(true);
       setConnections((j.connections || []).filter((c: Connection) => c.status === 'connected' || c.status === 'reauth_needed'));
       setProviders(j.providers || []);
+      setDraftsAllowed(j.drafts === true);
     } catch { setEnabled(false); }
   }, [email]);
 
@@ -277,7 +280,7 @@ export function ConnectedFiles({ email, files, onChange, disabled }: {
                 </button>
               ))}
               {/* Email drafts (Slice B): asked for only when the customer chooses it. Mindy saves drafts; it never sends. */}
-              {connections.filter((c) => c.status === 'connected' && !hasCapability(c.provider, c.granted_scopes || [], 'draft')).map((c) => (
+              {draftsAllowed && connections.filter((c) => c.status === 'connected' && !hasCapability(c.provider, c.granted_scopes || [], 'draft')).map((c) => (
                 <button key={`dr-${c.id}`} type="button" data-testid="allow-email-drafts" className="block w-full rounded px-2 py-1.5 text-left text-white hover:bg-white/5" onClick={() => { setOpen(false); void startConnect(c.provider, ['file', 'draft']); }}>
                   Allow email drafts in {MAIL_LABEL[c.provider]} ({c.connected_email})
                 </button>

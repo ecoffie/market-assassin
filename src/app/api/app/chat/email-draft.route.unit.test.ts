@@ -82,6 +82,7 @@ beforeEach(async () => {
   state.plannerMessages = []; state.answerMessages = []; state.inserts = []; state.updates = []; state.providerCalls = []; state.providerStatus = 200; state.tokenCalls = []; state.guardText = []; state.offered = []; state.execute = null; state.connRows = [];
   vi.stubEnv('CONNECTED_APPS', 'true');
   vi.stubEnv('CONNECTED_APPS_ALLOWLIST', ME);
+  vi.stubEnv('CONNECTED_APPS_DRAFTS_ALLOWLIST', ME);
   vi.stubEnv('CONNECTED_APPS_STATE_SECRET', 'state-secret-test-0123456789abcdef0123');
   vi.stubEnv('CONNECTED_APPS_TOKEN_ENC_KEY', 'token-key-test-0123456789abcdef01234567');
   vi.stubEnv('OPENAI_API_KEY', 'ok'); vi.stubEnv('GROQ_API_KEY', 'gk');
@@ -127,6 +128,14 @@ describe('create_email_draft in the chat route', () => {
     vi.stubEnv('CONNECTED_APPS_ALLOWLIST', 'someone-else@acme.com');
     state.offered = [];
     await ask();
+    expect(state.offered.flat()).not.toContain('create_email_draft');
+  });
+
+  it('uploads on for everyone but the drafts allowlist empty: never offered (drafts have their own gate)', async () => {
+    vi.stubEnv('CONNECTED_APPS_ALLOWLIST', '*');
+    vi.stubEnv('CONNECTED_APPS_DRAFTS_ALLOWLIST', '');
+    await ask();
+    expect(state.offered.length).toBeGreaterThan(0);
     expect(state.offered.flat()).not.toContain('create_email_draft');
   });
 

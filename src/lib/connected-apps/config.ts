@@ -137,3 +137,14 @@ export function connectedAppsEnabledFor(email: string | null | undefined, env: E
   const list = (env.CONNECTED_APPS_ALLOWLIST || '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
   return list.includes('*') || list.includes(email.trim().toLowerCase());
 }
+
+/**
+ * Email drafts (Slice B) have their OWN allowlist, AND-ed with the uploads gate: uploads can go to everyone
+ * (CONNECTED_APPS_ALLOWLIST=*) while drafts stay with the people on CONNECTED_APPS_DRAFTS_ALLOWLIST (comma list or
+ * `*`). Empty or unset = nobody.
+ */
+export function connectedAppsDraftsEnabledFor(email: string | null | undefined, env: Env = process.env): boolean {
+  if (!connectedAppsEnabledFor(email, env) || !email) return false;
+  const list = (env.CONNECTED_APPS_DRAFTS_ALLOWLIST || '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
+  return list.includes('*') || list.includes(email.trim().toLowerCase());
+}
