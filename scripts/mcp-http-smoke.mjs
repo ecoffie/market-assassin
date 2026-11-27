@@ -6,9 +6,10 @@
  *
  * Asserts, in order:
  *   1. AUTH — connecting with NO key is rejected (401). The edge is required:true.
- *   2. HANDSHAKE + TOOLS — with a valid key, initialize succeeds and the tool
- *      list contains get_winning_playbook.
- *   3. TOOL CALL — get_winning_playbook returns a well-formed result.
+ *   2. HANDSHAKE + TOOLS — with a valid key, initialize succeeds, the tool list contains
+ *      get_balance, and the unlisted tools (get_winning_playbook, search_podcast_lessons;
+ *      Eric 2026-11-27) are NOT listed.
+ *   3. TOOL CALL — get_balance (free) returns a well-formed result.
  *
  * This is the Slice-2 acceptance test (PRD §7, HTTP edge).
  *
@@ -97,14 +98,18 @@ if (!key) {
 
     const { tools } = await client.listTools();
     const names = tools.map((t) => t.name);
-    if (!names.includes('get_winning_playbook')) {
-      fail(`tool list missing get_winning_playbook (got: ${names.join(', ') || 'none'})`);
+    if (!names.includes('get_balance')) {
+      fail(`tool list missing get_balance (got: ${names.join(', ') || 'none'})`);
     }
-    ok(`tools/list contains get_winning_playbook (${names.length} tool(s))`);
+    for (const gone of ['get_winning_playbook', 'search_podcast_lessons']) {
+      if (names.includes(gone)) fail(`tools/list still lists ${gone} (unlisted 2026-11-27)`);
+    }
+    ok(`tools/list contains get_balance and none of the unlisted tools (${names.length} tool(s))`);
+    void topic;
 
     const res = await client.callTool({
-      name: 'get_winning_playbook',
-      arguments: { topic },
+      name: 'get_balance',
+      arguments: {},
     });
     const text = res?.content?.find((c) => c.type === 'text')?.text;
     if (!text) fail('tool call returned no text content');
@@ -114,10 +119,10 @@ if (!key) {
     } catch {
       fail('tool result text was not JSON');
     }
-    if (typeof parsed !== 'object' || !('topic' in parsed)) {
+    if (typeof parsed !== 'object' || !('balance' in parsed)) {
       fail(`tool result shape unexpected: ${text.slice(0, 200)}`);
     }
-    ok(`get_winning_playbook returned a well-formed result (grounded=${parsed?._meta?.grounded})`);
+    ok(`get_balance returned a well-formed result (balance=${parsed.balance})`);
 
     await client.close().catch(() => {});
     console.log('\n✅ HTTP EDGE SMOKE PASSED — transport + auth + tool all working.\n');

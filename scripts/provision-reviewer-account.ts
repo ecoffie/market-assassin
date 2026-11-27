@@ -22,7 +22,7 @@
  *
  * The tier gate is NOT the problem: MCP_ENFORCE_TIERS is '' in production, and
  * on() requires the literal 'true', so mcpFlags.enforceTiers is FALSE and
- * get_winning_playbook is not Pro-gated today. A free account runs all 49 tools.
+ * get_winning_playbook (the only Pro-gated tool) was unlisted 2026-11-27; a free account runs every public tool.
  *
  * ── IT MUST HAVE NO CREDIT-BALANCE ROW ───────────────────────────────────────
  * grantSignupCreditsIfFirst() grants only when NO balance row exists ("already has

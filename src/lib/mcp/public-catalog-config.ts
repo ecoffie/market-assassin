@@ -45,7 +45,6 @@ export const PUBLIC_MCP_TOOLS: readonly string[] = [
   'get_sblo_contact',
   'get_solicitation_documents',
   'get_solicitation_incumbent',
-  'get_winning_playbook',
   'list_market_schedules',
   'lookup_federal_osbp',
   'lookup_sam_entity',
@@ -70,6 +69,10 @@ export const PUBLIC_MCP_TOOLS: readonly string[] = [
 
 /** Registered but not listed to external MCP hosts. Implementation is kept. */
 export const HIDDEN_FROM_PUBLIC_MCP: Readonly<Record<string, HiddenToolEntry>> = {
+  get_winning_playbook: {
+    decision: 'hide',
+    reason: 'Unused, and built partly from podcast content (Eric, 2026-11-27); Ask Mindy already blocks it.',
+  },
   search_podcast_lessons: {
     decision: 'hide',
     reason: 'Podcast corpus removed from every customer-facing surface (Eric, 2026-11-27); Ask Mindy already blocks it.',
