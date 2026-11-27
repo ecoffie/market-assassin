@@ -1667,7 +1667,7 @@ export default function DashboardPanel({ email, tier, onPanelChange }: Dashboard
                         </div>
                       </div>
 
-                      <div data-tip="dashboard-tune" className={`transition-all duration-200 overflow-hidden ${
+                      <div className={`transition-all duration-200 overflow-hidden ${
                         isExpanded
                           ? `${itemAttachments.length > 0 ? 'max-h-[40rem] overflow-y-auto' : 'max-h-96'} opacity-100 mt-4`
                           : 'max-h-0 opacity-0'
@@ -1742,7 +1742,7 @@ export default function DashboardPanel({ email, tier, onPanelChange }: Dashboard
                           </div>
                         )}
 
-                        <div className="mt-4 border-t border-surface pt-4">
+                        <div data-tip="dashboard-tune" className="mt-4 border-t border-surface pt-4">
                           <p className="text-xs uppercase tracking-wider text-faint mb-2">Tune Mindy</p>
                           <div className="flex flex-wrap gap-2">
                             {FEEDBACK_OPTIONS.map(option => {

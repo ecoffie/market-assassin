@@ -3,7 +3,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import TabCoach, { findTabCoachAnchor } from './TabCoach';
+import TabCoach, { HINT_BOTTOM, findTabCoachAnchor } from './TabCoach';
 import { TAB_TIPS, normalizeTabTipSteps, tabTipsStorageKey, type TabTips } from '@/lib/app/tab-tips';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -155,6 +155,30 @@ describe('TabCoach', () => {
     expect(coach()).not.toBeNull();
   });
 
+  it('a collapsed anchor (width but 0 height) is treated as missing', async () => {
+    addTarget('t-filters', { top: 100, left: 50, width: 300, height: 0 });
+    await mount();
+    expect(q('tab-coach-ring')).toBeNull();
+    expect(findTabCoachAnchor('[data-tip="t-filters"]')).toBeNull();
+  });
+
+  it('a transparent or visibility:hidden anchor is missing, including inside an opacity-0 parent', () => {
+    const a = addTarget('t-a');
+    a.style.opacity = '0';
+    expect(findTabCoachAnchor('[data-tip="t-a"]')).toBeNull();
+    const b = addTarget('t-b');
+    b.style.visibility = 'hidden';
+    expect(findTabCoachAnchor('[data-tip="t-b"]')).toBeNull();
+    const parent = document.createElement('div');
+    parent.style.opacity = '0'; // e.g. Dashboard's collapsed Review Fit expander (max-h-0 opacity-0)
+    document.body.appendChild(parent);
+    const c = addTarget('t-c');
+    parent.appendChild(c);
+    expect(findTabCoachAnchor('[data-tip="t-c"]')).toBeNull();
+    parent.style.opacity = '1';
+    expect(findTabCoachAnchor('[data-tip="t-c"]')).toBe(c);
+  });
+
   it('an anchor that appears later gets highlighted when it shows', async () => {
     vi.useFakeTimers();
     try {
@@ -226,10 +250,41 @@ describe('TabCoach', () => {
     expect(coach()).toBeNull();
   });
 
-  it('phone width: full width at the bottom with 16px gutters (left-4 right-4 bottom-4)', async () => {
+  it('phone width: full width with 16px gutters, lifted clear of the "Get help" button', async () => {
     await mount();
     const cls = coach()!.className.split(/\s+/);
-    expect(cls).toEqual(expect.arrayContaining(['fixed', 'left-4', 'right-4', 'bottom-4']));
+    expect(cls).toEqual(expect.arrayContaining(['fixed', 'left-4', 'right-4']));
+    expect(coach()!.getAttribute('data-position')).toBe('bottom');
+    expect(coach()!.style.bottom).toBe(`${HINT_BOTTOM}px`);
+  });
+
+  it('never sits under the site-wide "Get help" button (help-widget.ts: fixed, 18px from the bottom, ~37px tall)', async () => {
+    // Widget top edge = 18 + 37 = 55px from the bottom on desktop (12 + 37 = 49px on phones).
+    expect(HINT_BOTTOM).toBeGreaterThanOrEqual(88);
+    await mount();
+    const cls = coach()!.className.split(/\s+/);
+    // No Tailwind bottom-* utility that could pull the box back down at some breakpoint.
+    expect(cls.some(c => /(^|:)bottom-/.test(c))).toBe(false);
+    expect(parseFloat(coach()!.style.bottom)).toBeGreaterThanOrEqual(88);
+  });
+
+  it('stays dark in the light app theme: explicit colours, no remappable theme tokens', async () => {
+    addTarget('t-filters');
+    await mount();
+    const box = coach()!;
+    expect(box.style.backgroundColor).toBe('rgb(17, 24, 39)'); // #111827
+    expect(box.style.color).toBe('rgb(243, 244, 246)'); // #f3f4f6
+    const next = q('tab-coach-next')!;
+    expect(next.style.backgroundColor).toBe('rgb(245, 158, 11)');
+    expect(next.style.color).toBe('rgb(17, 24, 39)');
+    expect(q('tab-coach-skip')!.style.color).not.toBe('');
+    expect(q('tab-coach-ring')!.style.borderColor).not.toBe('');
+    // mi-light.css / app-map.css remap slate / gray / white / amber tokens to light values in /app.
+    const themed = /(^|:)(bg|text|border|shadow)-(slate|gray|zinc|neutral|stone|white|black|amber)\b/;
+    for (const el of [box, ...Array.from(box.querySelectorAll('*')), q('tab-coach-ring')!, q('tab-coach-arrow')!]) {
+      const bad = (el.getAttribute('class') || '').split(/\s+/).filter(c => themed.test(c));
+      expect(bad, el.outerHTML.slice(0, 80)).toEqual([]);
+    }
   });
 
   it('every anchor in the registry is a valid CSS selector', () => {

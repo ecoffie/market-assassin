@@ -19,19 +19,19 @@ export const TAB_TIPS: TabTipsRegistry = {
   pipeline: {
     steps: [
       {
-        text: 'Each card is an opportunity you are tracking. Pick Board to see cards by stage, or List for a table.',
+        text: 'Your pursuits show as a List (a table, one row per opportunity) or a Board (cards grouped by stage). Use these buttons to switch.',
         anchor: '[data-tip="pipeline-view-toggle"]',
       },
       {
-        text: 'Click a card to open its details. Set Stage, Priority and Next Action, add Notes, then press Save Changes.',
+        text: 'Click an opportunity (a row in List, a card in Board) to open its details. Set Stage, Priority and Next Action, add Notes, then press Save Changes.',
         anchor: '[data-tip="pipeline-card"]',
       },
       {
-        text: 'On a Pursuing, Bidding or Submitted card, press "Draft Proposal" (or "Upload an RFP") to start writing.',
+        text: 'Press Draft Proposal to start writing: the pen button in the List\'s Actions column (a paperclip means upload the RFP first). On the Board it shows on Pursuing, Bidding and Submitted cards.',
         anchor: '[data-tip="pipeline-draft"]',
       },
     ],
-    tip: 'Use the "Move to" menu on a card to change its stage in one step. "Add by voice" lets you say an opportunity out loud and Mindy adds it for you.',
+    tip: 'On the Board, use the "Move to" menu on a card to change its stage in one step. "Add by voice" lets you say an opportunity out loud and Mindy adds it for you.',
   },
   proposals: {
     steps: [

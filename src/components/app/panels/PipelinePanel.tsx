@@ -1315,6 +1315,7 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
                   return (
                     <tr
                       key={opp.id}
+                      data-tip="pipeline-card"
                       onClick={() => openOpportunity(opp)}
                       className={`border-b border-surface/50 hover:bg-surface/50 cursor-pointer transition-colors ${
                         urgency?.label === 'OVERDUE' ? 'bg-red-500/5' : ''
@@ -1508,6 +1509,7 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
                                     onPanelChange('proposals', { pursuit_id: opp.id });
                                   }}
                                   title="No SAM attachments — open Proposal Assist to upload an RFP"
+                                  data-tip="pipeline-draft"
                                   className="inline-flex items-center rounded border border-amber-700/60 bg-amber-950/40 px-1.5 py-1 font-medium text-amber-200 hover:bg-amber-900/50"
                                 >
                                   <Paperclip className="h-3.5 w-3.5" strokeWidth={2} />
@@ -1528,6 +1530,7 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
                                       ? 'Draft Proposal — SAM docs still downloading'
                                       : 'Draft Proposal'
                                 }
+                                data-tip="pipeline-draft"
                                 className="inline-flex items-center rounded bg-purple-600 px-1.5 py-1 font-semibold text-white hover:bg-purple-700"
                               >
                                 <PenLine className="h-3.5 w-3.5" strokeWidth={2} />

@@ -6,6 +6,10 @@
  *
  *  - A small dark hint box slides into the bottom-right corner (full width with 16px gutters on a phone)
  *    and shows ONE step at a time ("1 of 3") with Next and Skip; after the last step it shows the "Tip:".
+ *    It sits HINT_BOTTOM px up so the site-wide "Get help" button (help-widget.ts, fixed 18px from the
+ *    bottom-right, z-index far above ours) never covers Next / Skip.
+ *  - Colours are explicit hex values, never theme tokens: in /app, mi-light.css / app-map.css remap
+ *    slate / white / amber tokens to the light theme, which turned the "dark" box light.
  *  - When a step names an `anchor` (a CSS selector) and that element is on the page, the page dims
  *    slightly, the element gets a glowing ring and a small arrow points at it. The overlay is
  *    pointer-events:none, so the page stays fully usable. No anchor / not found / iframe tab = hint only.
@@ -29,6 +33,20 @@ interface Box { top: number; left: number; width: number; height: number }
 
 const RING_PAD = 6;
 const ARROW = 28;
+/** Clearance above the "Get help" button: it is ~37px tall at 18px (12px on phones) from the bottom. */
+export const HINT_BOTTOM = 88;
+
+/** Fixed dark palette (WCAG AA on HINT_COLORS.bg: text 16.1:1, muted 10.2:1, title 12.3:1, Next 8.3:1). */
+export const HINT_COLORS = {
+  bg: '#111827',
+  border: 'rgba(255, 255, 255, 0.14)',
+  text: '#f3f4f6',
+  muted: '#bfc5cf',
+  title: '#fcd34d',
+  nextBg: '#f59e0b',
+  nextText: '#111827',
+  ring: '#fbbf24',
+} as const;
 
 function readDone(panelId: string): boolean {
   try {
@@ -69,6 +87,26 @@ function subscribeReducedMotion(onChange: () => void): () => void {
 
 const noopSubscribe = () => () => {};
 
+/**
+ * Visible = a real box (width AND height > 0), not visibility:hidden, and neither it nor an ancestor is
+ * fully transparent (a collapsed `max-h-0 opacity-0` section still has a width, so one dimension is not
+ * enough).
+ */
+function isVisibleAnchor(el: HTMLElement): boolean {
+  const r = el.getBoundingClientRect();
+  if (!(r.width > 0 && r.height > 0)) return false;
+  try {
+    if (window.getComputedStyle(el).visibility === 'hidden') return false;
+    for (let n: Element | null = el; n && n !== document.documentElement; n = n.parentElement) {
+      const o = parseFloat(window.getComputedStyle(n).opacity);
+      if (!Number.isNaN(o) && o <= 0) return false;
+    }
+  } catch {
+    /* no computed style: fall back to the box check */
+  }
+  return true;
+}
+
 /** The first visible element matching `selector`, outside the coach itself — or null (never throws). */
 export function findTabCoachAnchor(selector: string, exclude?: Element | null): HTMLElement | null {
   let matches: NodeListOf<Element>;
@@ -80,8 +118,7 @@ export function findTabCoachAnchor(selector: string, exclude?: Element | null): 
   for (const el of Array.from(matches)) {
     if (!(el instanceof HTMLElement)) continue;
     if (exclude && exclude.contains(el)) continue;
-    const r = el.getBoundingClientRect();
-    if (r.width > 0 || r.height > 0) return el;
+    if (isVisibleAnchor(el)) return el;
   }
   return null;
 }
@@ -248,8 +285,9 @@ export default function TabCoach({ panelId, tips }: { panelId: string; tips: Tab
 
   const vw = window.innerWidth || 0;
   const vh = window.innerHeight || 0;
-  // Keep the hint off the highlighted element: move it to the top when the target sits in its corner.
-  const boxAtTop = !!target && target.top + target.height > vh - 240 && (vw < 640 || target.left + target.width > vw - 420);
+  // Keep the hint off the highlighted element: move it to the top when the target sits in its corner
+  // (the box spans roughly HINT_BOTTOM .. HINT_BOTTOM + 200px from the bottom).
+  const boxAtTop = !!target && target.top + target.height > vh - (HINT_BOTTOM + 220) && (vw < 640 || target.left + target.width > vw - 420);
   const arrowAbove = !!target && target.top - RING_PAD - ARROW - 4 > 0;
   const arrowLeft = target ? Math.min(Math.max(target.left + target.width / 2 - ARROW / 2, 8), Math.max(8, vw - ARROW - 8)) : 0;
   const arrowTop = target
@@ -265,8 +303,9 @@ export default function TabCoach({ panelId, tips }: { panelId: string; tips: Tab
           <div
             aria-hidden="true"
             data-testid="tab-coach-ring"
-            className="pointer-events-none fixed z-[58] rounded-xl border-2 border-amber-400"
+            className="pointer-events-none fixed z-[58] rounded-xl border-2"
             style={{
+              borderColor: HINT_COLORS.ring,
               top: target.top - RING_PAD,
               left: target.left - RING_PAD,
               width: target.width + RING_PAD * 2,
@@ -288,8 +327,8 @@ export default function TabCoach({ panelId, tips }: { panelId: string; tips: Tab
             aria-hidden="true"
             data-testid="tab-coach-arrow"
             data-direction={arrowAbove ? 'down' : 'up'}
-            className="pointer-events-none fixed z-[59] text-amber-300 drop-shadow"
-            style={{ top: arrowTop, left: arrowLeft, width: ARROW, height: ARROW, ...anim(`${arrowAbove ? 'mindy-coach-nudge-down' : 'mindy-coach-nudge-up'} 1.2s ease-in-out infinite`) }}
+            className="pointer-events-none fixed z-[59] drop-shadow"
+            style={{ color: HINT_COLORS.title, top: arrowTop, left: arrowLeft, width: ARROW, height: ARROW, ...anim(`${arrowAbove ? 'mindy-coach-nudge-down' : 'mindy-coach-nudge-up'} 1.2s ease-in-out infinite`) }}
             data-coach-anim=""
           >
             {arrowAbove
@@ -308,19 +347,26 @@ export default function TabCoach({ panelId, tips }: { panelId: string; tips: Tab
         tabIndex={-1}
         data-testid="tab-coach"
         data-position={boxAtTop ? 'top' : 'bottom'}
-        className={`fixed left-4 right-4 z-[61] rounded-xl border border-white/10 bg-slate-950/95 p-4 text-sm text-white shadow-2xl shadow-black/60 sm:left-auto sm:right-6 sm:w-[22rem] ${boxAtTop ? 'top-4 sm:top-6' : 'bottom-4 sm:bottom-6'}`}
-        style={anim('mindy-coach-in 220ms ease-out')}
+        className={`fixed left-4 right-4 z-[61] rounded-xl border p-4 text-sm shadow-2xl sm:left-auto sm:right-6 sm:w-[22rem] ${boxAtTop ? 'top-4 sm:top-6' : ''}`}
+        style={{
+          ...(boxAtTop ? {} : { bottom: HINT_BOTTOM }),
+          backgroundColor: HINT_COLORS.bg,
+          borderColor: HINT_COLORS.border,
+          color: HINT_COLORS.text,
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.6)',
+          ...anim('mindy-coach-in 220ms ease-out'),
+        }}
         data-coach-anim=""
       >
         <div className="flex items-center justify-between gap-3">
-          <h2 id={titleId} className="text-xs font-semibold uppercase tracking-wider text-amber-300">{title}</h2>
-          <span className="shrink-0 text-xs text-slate-400" data-testid="tab-coach-progress">
+          <h2 id={titleId} className="text-xs font-semibold uppercase tracking-wider" style={{ color: HINT_COLORS.title }}>{title}</h2>
+          <span className="shrink-0 text-xs" style={{ color: HINT_COLORS.muted }} data-testid="tab-coach-progress">
             {onTip ? 'Tip' : `${index + 1} of ${steps.length}`}
           </span>
         </div>
-        <p id={textId} aria-live="polite" className="mt-2 break-words leading-relaxed text-slate-100" data-testid="tab-coach-text">
+        <p id={textId} aria-live="polite" className="mt-2 break-words leading-relaxed" style={{ color: HINT_COLORS.text }} data-testid="tab-coach-text">
           {onTip
-            ? <><strong className="text-amber-300">Tip:</strong> {tips.tip}</>
+            ? <><strong style={{ color: HINT_COLORS.title }}>Tip:</strong> {tips.tip}</>
             : steps[index]?.text}
         </p>
         <div className="mt-3 flex items-center justify-end gap-2">
@@ -329,7 +375,8 @@ export default function TabCoach({ panelId, tips }: { panelId: string; tips: Tab
               type="button"
               onClick={finish}
               data-testid="tab-coach-skip"
-              className="rounded-md px-3 py-1.5 text-xs text-slate-400 hover:bg-white/5 hover:text-white transition-colors"
+              className="rounded-md px-3 py-1.5 text-xs transition-colors hover:bg-[rgba(255,255,255,0.1)]"
+              style={{ color: HINT_COLORS.muted }}
             >
               Skip
             </button>
@@ -339,7 +386,8 @@ export default function TabCoach({ panelId, tips }: { panelId: string; tips: Tab
             type="button"
             onClick={onTip ? finish : next}
             data-testid="tab-coach-next"
-            className="rounded-md bg-amber-500 px-3 py-1.5 text-xs font-semibold text-slate-950 hover:bg-amber-400 transition-colors"
+            className="rounded-md px-3 py-1.5 text-xs font-semibold transition hover:brightness-110"
+            style={{ backgroundColor: HINT_COLORS.nextBg, color: HINT_COLORS.nextText }}
           >
             {onTip ? 'Done' : 'Next'}
           </button>

@@ -45,7 +45,9 @@ export const TAB_TIPS: TabTipsRegistry = {
     steps: [
       { text: 'Under "Top Opportunities to Review", press Review Fit on a card to see why it may fit you.', anchor: '[data-tip="dashboard-review-fit"]' },
       { text: 'Press Track to follow one in your pursuits, or Dismiss to hide it. Use All, Urgent or Teaming to filter.', anchor: '[data-tour="dash-track"]' },
-      { text: 'Inside Review Fit, use the Tune Mindy buttons, like Good match or Not my industry, to give feedback.', anchor: '[data-tip="dashboard-tune"]' },
+      // dashboard-tune sits on the Tune Mindy block inside the expander: highlighted once Review Fit is open,
+      // hint only while it is collapsed (findTabCoachAnchor skips invisible elements).
+      { text: 'Open Review Fit on a card, then use the Tune Mindy buttons, like Good match or Not my industry, to give feedback.', anchor: '[data-tip="dashboard-tune"]' },
     ],
     tip: 'These picks come from your profile. In "Your targeting", press "Edit codes & keywords" to change your NAICS codes (numbers for types of work) and keywords.',
   },
