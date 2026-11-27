@@ -213,6 +213,14 @@ describe('research mode sees the files the customer attached (P0)', () => {
     delete process.env.VAULT_ASK_MINDY_UPLOADS;
   });
 
+  it('a research turn builds documents with the "How They Buy Now" heading check on (refused once, then saved)', async () => {
+    flagOn();
+    process.env.VAULT_GENERATED_FILES = 'true';
+    await ask(REPORT_Q);
+    expect((h.genOpts as { retryForHeading?: boolean } | null)?.retryForHeading).toBe(true);
+    delete process.env.VAULT_GENERATED_FILES;
+  });
+
   it('nothing attached: no ATTACHED FILES block at all', async () => {
     flagOn();
     await ask(Q);

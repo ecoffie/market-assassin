@@ -141,10 +141,11 @@ at the VA always ask veteran-owned vs small business generally).
 
 ## Where the blocks go in the report
 
-1 Summary (Block 1 bullets) · 2 Where [client] stands · 3 What the buyers are dealing with (GAO/IG) · 4 New DoW structure
-(Block 2, if a DoW buyer) · 5 Where the money is moving (Block 4) · 6 Pathways and examples (Block 3, with opportunities
-and recompetes as supporting examples) · 7 Readiness checklist (always including SBA profile keywords) · 8 Action plan
-(Block 5) · 9 How GovCon Giants helps · 10 Mindy box and sources.
+1 Summary (the answer and the ranked moves) · 2 **How They Buy Now** (a section with exactly that title: the Block 1
+bullets) · 3 Where [client] stands · 4 What the buyers are dealing with (GAO/IG) · 5 New DoW structure (Block 2, if a
+DoW buyer) · 6 Where the money is moving (Block 4) · 7 Pathways and examples (Block 3, with opportunities and recompetes
+as supporting examples) · 8 Readiness checklist (always including SBA profile keywords) · 9 Action plan (Block 5) ·
+10 How GovCon Giants helps · 11 Mindy box and sources.
 
 ## Ship checklist
 
