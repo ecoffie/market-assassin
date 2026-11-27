@@ -59,7 +59,8 @@ describe.runIf(!!CHROME)('Vault document: on-screen preview and PDF carry the sa
     expect(r.error).toBeNull();
     pdf = r.pdf!;
     pages = await pdfPages(pdf);
-    const raw = PDFTOTEXT ? execFileSync(PDFTOTEXT, ['-enc', 'UTF-8', '-', '-'], { input: pdf, encoding: 'utf8' }) : pages.join(' ');
+    // -raw: reading order. The default layout mode reorders a line that wraps around an inline label chip.
+    const raw = PDFTOTEXT ? execFileSync(PDFTOTEXT, ['-enc', 'UTF-8', '-raw', '-', '-'], { input: pdf, encoding: 'utf8' }) : pages.join(' ');
     text = raw.replace(new RegExp(MODEL.title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), ' ').replace(RUNNING, ' ');
   }, 90_000);
 

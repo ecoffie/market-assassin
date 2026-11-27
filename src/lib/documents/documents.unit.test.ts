@@ -1243,7 +1243,7 @@ describe('reference layout (Design & Output, 2026-11-25)', () => {
   it('the default theme opens with a letterhead: brand, contact lines, title, byline and the metadata table', () => {
     const html = renderHtml({ ...SAMPLE_REPORT, meta: { ...SAMPLE_REPORT.meta, attention: 'A. Reader' } });
     expect(html).toContain('<section class="cover letterhead">');
-    expect(html).toMatch(/<p class="byline">Prepared for Example Company \(fixture\) · November 17, 2026<\/p>/);
+    expect(html).toMatch(/<p class="byline">Prepared for Example Company \(fixture\)<\/p>/);
     expect(html).toContain('<dt>Attention</dt><dd>A. Reader</dd>');
   });
   it('a checklist bullets block renders as checkboxes; ordered lists and plain bullets are unchanged', () => {
@@ -1338,5 +1338,23 @@ describe('sources list carries no retrieval date (Eric, 2026-11-27)', () => {
     expect(doc).not.toContain('2026-11-27');
     expect(doc).toContain('GAO-25-106719, Nov 20 2024: Federal Real Property');
     expect(doc).toContain('HE125425CE002');
+  });
+});
+
+describe('document cover carries no date (Eric, 2026-11-27)', () => {
+  it('HTML/PDF and Word covers show no Date row and no date in the byline', async () => {
+    const m = { ...clone(), date: '2026-11-17' };
+    const html = renderHtml(m);
+    const cover = html.slice(html.indexOf('<section class="cover'), html.indexOf('</section>', html.indexOf('<section class="cover')));
+    expect(cover).not.toContain('<dt>Date</dt>');
+    expect(cover).not.toContain('November 17, 2026');
+    const doc = strFromU8(unzipSync(new Uint8Array(await renderDocx(m)))['word/document.xml']);
+    expect(doc).not.toContain('November 17, 2026');
+    expect(doc).not.toMatch(/>Date</);
+  });
+  it('a dated cited title or an opportunity deadline in the body still renders', () => {
+    const m = clone();
+    m.sections[0].blocks.unshift({ type: 'paragraph', id: 'dl', text: 'Responses are due December 17, 2026.', claim: 'recommendation' });
+    expect(renderHtml(m)).toContain('Responses are due December 17, 2026.');
   });
 });
