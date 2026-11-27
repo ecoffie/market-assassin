@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { CONNECTED_FILES_BUDGET, loadConnectedFilesContext, MAX_CONNECTED_FILES } from './read-file-tool';
+import { CONNECTED_FILES_BUDGET, loadConnectedFilesContext, MAX_CONNECTED_FILES, TextCache } from './read-file-tool';
 import { FILE_HANDLE_TTL_SEC, signFileHandle } from './files';
 import type { ChatActingScope } from '@/lib/chat/chat-acting-scope';
 
@@ -27,7 +27,8 @@ function providerFetch(bodies: Record<string, string>, metaOverride: Record<stri
     return new Response(JSON.stringify({ id, name: `${id}.txt`, size: (bodies[id] ?? '').length, file: { mimeType: 'text/plain' }, webUrl: 'https://onedrive.live.com/x', lastModifiedDateTime: '2026-11-20T00:00:00Z', ...metaOverride }));
   });
 }
-const deps = (f: ReturnType<typeof vi.fn>, token = okToken) => ({ accessTokenFor: token, fetch: f as unknown as typeof fetch, now: () => NOW });
+// A fresh text cache per call unless a test passes one: cases reuse file ids with different contents.
+const deps = (f: ReturnType<typeof vi.fn>, token = okToken, cache = new TextCache()) => ({ accessTokenFor: token, fetch: f as unknown as typeof fetch, now: () => NOW, cache });
 
 describe('loadConnectedFilesContext: verified files are read by the server', () => {
   it('a verified file is read and fenced with its source; the planner gets the name only', async () => {
@@ -124,5 +125,44 @@ describe('bounded per turn', () => {
     const bodies = Object.fromEntries(hs.map((_, i) => [`item-${i}`, `text ${i}`]));
     const c = await loadConnectedFilesContext([...hs, hs[0]], own, 'q', { deps: deps(providerFetch(bodies)) });
     expect(c).toMatchObject({ accepted: MAX_CONNECTED_FILES, dropped: 2 });
+  });
+});
+
+describe('scale and fail-soft (Agent 4 review, 2026-11-27)', () => {
+  it('a file attached to every turn is downloaded once; metadata and the connection are still re-checked each turn', async () => {
+    const cache = new TextCache();
+    const f = providerFetch({ 'item-1': 'Capability text.' });
+    const token = vi.fn(okToken.getMockImplementation()!);
+    for (let i = 0; i < 3; i++) {
+      const c = await loadConnectedFilesContext([handle()], own, 'q', { deps: deps(f, token as never, cache) });
+      expect(c.block).toContain('Capability text.');
+    }
+    const urls = f.mock.calls.map((x) => String(x[0]));
+    expect(urls.filter((u) => /\/content$|alt=media|\/export/.test(u))).toHaveLength(1);
+    expect(urls.length).toBe(1 + 3); // one download, metadata on every turn
+    expect(token).toHaveBeenCalledTimes(3);
+  });
+
+  it('a changed file (new modified time) is read again', async () => {
+    const cache = new TextCache();
+    await loadConnectedFilesContext([handle()], own, 'q', { deps: deps(providerFetch({ 'item-1': 'Old text.' }), okToken, cache) });
+    const c = await loadConnectedFilesContext([handle()], own, 'q', { deps: deps(providerFetch({ 'item-1': 'New text.' }, { lastModifiedDateTime: '2026-11-27T00:00:00Z' }), okToken, cache) });
+    expect(c.block).toContain('New text.');
+  });
+
+  it('the cache is bounded by entries and characters', () => {
+    const c = new TextCache(2, 10);
+    c.set('a', '1234', null); c.set('b', '1234', null); c.set('c', '1234', null);
+    expect(c.size).toBe(2);
+    expect(c.get('a')).toBeNull();
+    c.set('d', 'x'.repeat(11), null);
+    expect(c.get('d')).toBeNull();
+  });
+
+  it('a store or decrypt error becomes a plain "could not be reached" line; the turn continues', async () => {
+    const boom = vi.fn(async () => { throw new Error('connected-apps: load failed (PGRST)'); });
+    const c = await loadConnectedFilesContext([handle()], own, 'q', { deps: deps(providerFetch({ 'item-1': 'x' }), boom as never) });
+    expect(c).toMatchObject({ accepted: 1, read: 0, failed: 1 });
+    expect(c.block).toMatch(/could not be reached right now/);
   });
 });

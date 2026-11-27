@@ -192,7 +192,8 @@ Slice A (this branch):
 - **Rate limit.** `/start` allows 20 per user per hour.
 
 Slice A.2 (`feat/connected-apps-slice-a2`):
-- the file-read timeouts and a streamed size cap;
-- the per-session text cache;
-- rate limits on `/browse`, `/selections` and `/picker-token`;
-- fail-soft reads.
+- **Timeouts.** File metadata and OneDrive listing calls time out at 12 s, downloads at 15 s.
+- **Streamed size cap.** `readCapped` counts bytes as they stream and cancels at 15 MB, because a chunked Google export has no content-length.
+- **Text cache.** Extracted text is kept in memory per (scope, connection, file, modified time): at most 64 files, 8M characters, 1 hour. A file attached to every turn is downloaded once. The connection and the file's metadata are still re-checked on every turn, and a changed file is read again. Nothing is persisted.
+- **Rate limits.** Per user, per 10 minutes: `/browse` 120, `/selections` 60, `/picker-token` 60. The shared KV helper fails open if KV is down.
+- **Fail-soft reads.** A store or decryption error while reading a file becomes "this file could not be reached right now". The chat turn continues instead of ending in `stream_failed`.
