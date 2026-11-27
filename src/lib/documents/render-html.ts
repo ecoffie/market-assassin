@@ -281,7 +281,7 @@ export function renderHtml(stored: DocModel, opts: RenderHtmlOptions = {}): stri
       .map((s) => {
         const bits = [escapeHtml(s.label)];
         if (s.recordId) bits.push(`<span class="meta">(${escapeHtml(s.recordId)})</span>`);
-        // No "Retrieved <date>" (Eric, 2026-11-27: no data dates in front of the customer); retrievedAt stays in the model.
+        if (s.retrievedAt) bits.push(`<span class="meta">Retrieved ${escapeHtml(s.retrievedAt)}.</span>`);
         if (s.url) bits.push(`<span class="meta">${escapeHtml(s.url)}</span>`);
         return `<li>${bits.join(' ')}</li>`;
       })
