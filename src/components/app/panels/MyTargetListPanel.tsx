@@ -11,6 +11,7 @@
  * Outreach log per target (Slice 3D) will hang off a row-expand or
  * a per-target detail page — left as a follow-up.
  */
+import { FAR_THRESHOLDS_CITATION, microPurchaseLabel, satLabel } from '@/lib/far/thresholds';
 import MindyLoader from '@/components/app/MindyLoader';
 import { useState, useEffect, useCallback } from 'react';
 import { Search, Target, Sparkles, Handshake, MapPin, Star, Lightbulb, AlertTriangle, Mic, FileText, Laptop, Ticket, Calendar, type LucideIcon } from 'lucide-react';
@@ -704,8 +705,8 @@ export default function MyTargetListPanel({
                           className="px-2 py-0.5 rounded bg-surface text-ink-soft"
                           title={
                             (t.sat_ratio || 0) > 0
-                              ? `${Math.round(t.sat_ratio * 100)}% of this office's sampled contracts are under the $350K Simplified Acquisition Threshold — easier-entry territory.`
-                              : 'No small-dollar contracts (<$350K) appeared in our USAspending sample. Our pipeline pulls awards sorted by amount + date, which skews toward larger contracts. True small-contract count requires the SAM Contract Data API (pending approval).'
+                              ? `${Math.round(t.sat_ratio * 100)}% of this office's sampled contracts are under the ${satLabel} Simplified Acquisition Threshold (${FAR_THRESHOLDS_CITATION}) — easier-entry territory.`
+                              : `No small-dollar contracts (under ${satLabel}) appeared in our USAspending sample. Our pipeline pulls awards sorted by amount + date, which skews toward larger contracts. True small-contract count requires the SAM Contract Data API (pending approval).`
                           }
                         >
                           {(t.sat_ratio || 0) > 0 ? `${Math.round(t.sat_ratio * 100)}% SAT` : 'SAT —'}

@@ -14,6 +14,7 @@
  * access decision, and so the grouping is unit-testable (nav-groups.unit.test.ts asserts every
  * panel the sidebar used to expose lands in exactly one group).
  */
+import { forecastsLabel } from '@/lib/marketing-stats';
 import {
   type LucideIcon,
   MessageSquare,
@@ -102,7 +103,7 @@ export const NAV_PANELS: Record<string, NavPanelDef> = {
     id: 'forecasts',
     legacyLabel: 'Upcoming Buys',
     icon: Telescope,
-    description: '33,000+ planned',
+    description: `${forecastsLabel} planned`,
     tier: ['pro', 'team', 'enterprise'],
   },
   recompetes: {

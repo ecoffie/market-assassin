@@ -1,4 +1,5 @@
 'use client';
+import { COACH_CLIENT_LIMITS } from '@/lib/mindy/coach-limits';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Search, Pin, CheckCircle2, Circle, Download, FileText } from 'lucide-react';
 import type { AppPanel } from '../UnifiedSidebar';
@@ -331,7 +332,7 @@ export default function CoachPanel({
               <span className="text-sm text-ink-soft"><span className="font-semibold text-white">$99</span>/mo</span>
             </div>
             <p className="mt-2 text-sm text-ink-soft">
-              Adds My Clients to your Pro plan — up to <span className="font-medium text-white">3 client workspaces</span>. Perfect if you consult for a handful of businesses.
+              Adds My Clients to your Pro plan — up to <span className="font-medium text-white">{COACH_CLIENT_LIMITS.coachAddon} client workspaces</span>. Perfect if you consult for a handful of businesses.
             </p>
             <a
               href={coachAddonUrl}
@@ -344,7 +345,7 @@ export default function CoachPanel({
           {/* Secondary: Teams, for scale. */}
           <div className="mt-3 rounded-xl border border-hairline bg-ground/40 p-4">
             <p className="text-sm text-muted">
-              Running more than 3 clients? <span className="text-slate-200 font-medium">Mindy Teams</span> ($499/mo) includes up to 5 client workspaces plus shared team seats.{' '}
+              Running more than {COACH_CLIENT_LIMITS.coachAddon} clients? <span className="text-slate-200 font-medium">Mindy Teams</span> ($499/mo) includes up to {COACH_CLIENT_LIMITS.team} client workspaces plus shared team seats.{' '}
               <a href="/market-intelligence#teams" className="text-blue-300 hover:text-blue-200 underline underline-offset-2">Compare Teams →</a>
             </p>
           </div>
