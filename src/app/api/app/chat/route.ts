@@ -1353,6 +1353,9 @@ export async function POST(request: NextRequest) {
             const rmTrace: Record<string, unknown> = {
               engine: 'research_mode', model, beta: true, label: RESEARCH_BETA_LABEL,
               ...(turnImages.length ? { screenshots: turnImages.length } : {}),
+              // Counts only (never file text): proves the attached files reached the research model.
+              ...(documentContext ? { documents: documentContext.docCount } : {}),
+              ...(connectedFiles?.block ? { connected_files: connectedFiles.read } : {}),
               ...(researchCap ? { research_cap: { plan: researchCap.plan, cap: researchCap.cap, used: researchCap.used, ...(researchCap.countUnknown ? { count_unknown: true } : {}) } } : {}),
             };
             // Awaited: after() keeps the function alive only until this turn settles, so the save must finish first.
@@ -1415,8 +1418,9 @@ export async function POST(request: NextRequest) {
                 client, model,
                 // Fixed prompt first (cached across steps and turns), then today's date and the profile after the breakpoint.
                 // App actions (allowlisted users only) go in the per-turn part so the cached prefix stays identical for all.
+                // Attached files (uploads + Drive/OneDrive) go there too, like the standard path's system blocks.
                 system: RESEARCH_SYSTEM_STATIC,
-                systemDynamic: researchSystemDynamic({ today, profileBlock: userProfileBlock }) + (actions ? `\n\n${APP_ACTIONS_NOTE}` : ''),
+                systemDynamic: researchSystemDynamic({ today, profileBlock: userProfileBlock, attachments: [documentContext?.block, connectedFiles?.block] }) + (actions ? `\n\n${APP_ACTIONS_NOTE}` : ''),
                 conversation,
                 tools: rmTools,
                 effort: process.env.ASK_MINDY_RESEARCH_EFFORT || 'high',

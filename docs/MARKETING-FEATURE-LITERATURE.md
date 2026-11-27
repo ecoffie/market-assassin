@@ -7849,3 +7849,13 @@ the notices. Test: `federal-events-ranking.unit.test.ts`.
 
 **Proof:** Not yet customer-visible. Mindy reads only the file you pick: the selection is signed for your workspace and expires after 24 hours, and Mindy cannot browse or search your drive. File text is treated as reference data, never as instructions. Source: `src/lib/connected-apps/files.ts`, `read-file-tool.ts`. Behind `CONNECTED_APPS` (off).
 
+
+## Deep research reads the file you attach, 2026-11-27
+
+**What:** When you attach your capability statement (uploaded from your computer, or picked from Google Drive or OneDrive) and ask Mindy's deep research for a market report, a capability statement or a plain "what does this company do", Mindy now works from that file. The company in the file is the subject, even when it differs from the company saved in your profile, and names, codes, UEI and CAGE are quoted as the file states them.
+
+**Why:** Consultants and teaming partners research companies other than their own. Before this fix, deep research ignored the attachment and answered for the profile company instead, so a report for a prospect came back about you.
+
+**SEO:** AI market research from capability statement, federal market report for a company, capability statement analysis AI, government contracting research assistant.
+
+**Proof:** Found in the 2026-11-27 production dry run: an uploaded EFS capability statement produced a report on the saved profile company, and a Google Drive file and a OneDrive file each got "no file attached". Tests now prove the attached file's text reaches the research model on every step (`src/lib/ask-mindy/research-attachments.unit.test.ts`, red on the previous code, green with the fix). Deep research is in beta for selected accounts.
