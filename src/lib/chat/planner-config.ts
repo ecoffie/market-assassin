@@ -52,13 +52,23 @@ function parseTargets(raw: string | undefined): PlannerTarget[] {
  * Ordered planner chain. The first entry is the planner; later entries are fallbacks,
  * each already filtered to the compatibility list and to providers with a configured key.
  */
+/**
+ * Over-budget downgrade (Eric, 2026-11-25: quality first). A user past the monthly LLM budget used to be moved
+ * SILENTLY to gpt-4o-mini, and Claude was switched off for them: about a third of production chat turns ran on the
+ * weaker model. The downgrade now applies only when CHAT_BUDGET_DOWNGRADE=true (an explicit cost lever).
+ */
+export function budgetDowngradeActive(env: Env, overBudget: boolean): boolean {
+  return overBudget && env.CHAT_BUDGET_DOWNGRADE === 'true';
+}
+
 export function resolvePlannerChain(env: Env, opts: { overBudget: boolean }): PlannerTarget[] {
+  const downgrade = budgetDowngradeActive(env, opts.overBudget);
   const openaiPrimary: PlannerTarget = {
     provider: 'openai',
-    model: opts.overBudget ? env.LLM_OPENAI_MODEL || 'gpt-4o-mini' : env.CHAT_OPENAI_MODEL || 'gpt-4o',
+    model: downgrade ? env.LLM_OPENAI_MODEL || 'gpt-4o-mini' : env.CHAT_OPENAI_MODEL || 'gpt-4o',
   };
   const chain: PlannerTarget[] = [];
-  const claudeEnabled = env.CHAT_CLAUDE_ENABLED === 'true' && !!env.ANTHROPIC_API_KEY && !opts.overBudget;
+  const claudeEnabled = env.CHAT_CLAUDE_ENABLED === 'true' && !!env.ANTHROPIC_API_KEY && !downgrade;
   if (claudeEnabled) chain.push({ provider: 'anthropic', model: env.CHAT_CLAUDE_MODEL || 'claude-sonnet-5' });
   chain.push(openaiPrimary);
   for (const t of parseTargets(env.CHAT_PLANNER_FALLBACKS)) chain.push(t);

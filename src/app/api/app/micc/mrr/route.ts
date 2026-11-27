@@ -64,7 +64,6 @@ function headerRow(labels: string[]): TableRow {
 }
 
 async function renderDocx(m: MrrResult): Promise<Buffer> {
-  const today = new Date(m.generatedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
   const c: (Paragraph | Table)[] = [];
   const H = (t: string) => c.push(new Paragraph({ heading: HeadingLevel.HEADING_2, spacing: { before: 220, after: 80 }, children: [new TextRun({ text: t, bold: true })] }));
   const P = (t: string, opts: { italic?: boolean; color?: string } = {}) => c.push(new Paragraph({ spacing: { after: 100 }, children: [new TextRun({ text: t, italics: opts.italic, color: opts.color, size: 20 })] }));
@@ -73,7 +72,7 @@ async function renderDocx(m: MrrResult): Promise<Buffer> {
   // Title
   c.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 60 }, children: [new TextRun({ text: 'MARKET RESEARCH REPORT', bold: true, size: 28 })] }));
   c.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 40 }, children: [new TextRun({ text: m.input.title || '[Requirement Title]', size: 22 })] }));
-  c.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 200 }, children: [new TextRun({ text: `Auto-drafted ${today} · data sections from USASpending award data · CO to complete bracketed sections`, italics: true, size: 16, color: '888888' })] }));
+  c.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 200 }, children: [new TextRun({ text: 'Auto-drafted · data sections from USASpending award data · CO to complete bracketed sections', italics: true, size: 16, color: '888888' })] }));
 
   // Part 1 bracketed
   c.push(new Paragraph({ spacing: { after: 60 }, children: [new TextRun({ text: 'Part 1 — General Information', bold: true, size: 22 })] }));
@@ -111,7 +110,7 @@ async function renderDocx(m: MrrResult): Promise<Buffer> {
         ] })),
       ],
     }));
-    P(`Source: USASpending award data, as of ${today}.`, { italic: true, color: '888888' });
+    P('Source: USASpending award data.', { italic: true, color: '888888' });
   }
 
   BRACKET('§10 Non-Commercial Rationale (if applicable) · §13 Mandatory Sources · §14 Market Research Techniques Used: [CO to complete]');
@@ -130,7 +129,7 @@ async function renderDocx(m: MrrResult): Promise<Buffer> {
         ] })),
       ],
     }));
-    P(`Ranked by relevance (won the exact PSC > related > NAICS). Source: USASpending, as of ${today}.`, { italic: true, color: '888888' });
+    P('Ranked by relevance (won the exact PSC > related > NAICS). Source: USASpending.', { italic: true, color: '888888' });
   }
 
   // §12 Small Business Opportunities — auto

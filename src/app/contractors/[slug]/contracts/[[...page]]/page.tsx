@@ -17,7 +17,7 @@ import { formatMoneyCompact as fmtMoney } from '@/lib/format-money';
 import { resolveContractorForPage, loadContractsPage } from '@/lib/seo/contractor-page-data';
 import { SeoTemporarilyUnavailableError } from '@/lib/seo/seo-unavailable';
 import { SubpageLayout } from '@/components/contractors/SubpageLayout';
-import { getAwardsSourceAsOf } from '@/lib/awards-serving';
+import { getAwardsSourceAsOf, SERVED_MAX_PAGES } from '@/lib/awards-serving';
 import { awardHref, servableAwardIds } from '@/lib/seo/award-links';
 import { contractorIndexable } from '@/lib/seo/contractor-index-tier';
 
@@ -45,6 +45,16 @@ interface PageProps {
   params: Promise<{ slug: string; page?: string[] }>;
 }
 
+/**
+ * Pages past SERVED_MAX_PAGES are never built: the product deliberately shows only the most recent
+ * SERVED_MAX_PAGES × 50 award actions (awards-serving.ts). Such a URL is not "temporarily unavailable" — it is
+ * outside what Mindy publishes — so it 308-redirects to the listing instead of spending a cold-budget unit and
+ * returning a 5xx all day (2026-11-23/24: 209 page-4 500s, one URL retried 53×). HELD for Eric's decision.
+ */
+function beyondServedPages(pageNum: number): boolean {
+  return pageNum > SERVED_MAX_PAGES;
+}
+
 function parsePage(page?: string[]): number {
   if (!page || page.length === 0) return 1;
   const n = parseInt(page[0], 10);
@@ -54,6 +64,8 @@ function parsePage(page?: string[]): number {
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug, page } = await params;
   const pageNum = parsePage(page);
+  // Before any read: a page we never build must not spend a cold-budget unit in metadata either.
+  if (beyondServedPages(pageNum)) permanentRedirect(`/contractors/${slug}/contracts`);
   const resolution = await resolveContractorForPage(slug);
   if (resolution.kind !== 'found') return { title: 'Contractor Not Found | Mindy' };
   const recipient = resolution.recipient;
@@ -123,6 +135,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 export default async function ContractorContractsPage({ params }: PageProps) {
   const { slug, page } = await params;
   const pageNum = parsePage(page);
+  if (beyondServedPages(pageNum)) permanentRedirect(`/contractors/${slug}/contracts`);
   const tail = pageNum > 1 ? `/contracts/${pageNum}` : '/contracts';
   // found / redirect / confirmed-not-found / unavailable — shared with the profile page.
   const resolution = await resolveContractorForPage(slug);
@@ -148,7 +161,8 @@ export default async function ContractorContractsPage({ params }: PageProps) {
   // `available` now means "there are funded actions to list". A real answer of zero renders
   // the confirmed-empty state below (noindexed in generateMetadata), never a cold cache.
   const available = total > 0;
-  const totalPages = Math.ceil(total / PAGE_SIZE);
+  // Only built pages are linked: never advertise a page past SERVED_MAX_PAGES.
+  const totalPages = Math.min(Math.ceil(total / PAGE_SIZE), SERVED_MAX_PAGES);
   // Past the end of a REAL listing → not found. Safe now: `data` is always a real answer.
   if (pageNum > 1 && awards.length === 0) notFound();
 

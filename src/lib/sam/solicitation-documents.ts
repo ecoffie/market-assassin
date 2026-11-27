@@ -477,7 +477,17 @@ export interface SolicitationDocumentsInput {
   documents?: DocTextRequest[];
   /** Restrict the response to these document_ids. */
   documentIds?: string[];
+  /**
+   * Ask Mindy research mode (Eric 2026-11-25: no live SAM calls): serve only what Mindy already holds (the stored
+   * description, warm pursuit documents, the on-demand cache). Never fetch the description or attachments from SAM;
+   * the response says what was not fetched.
+   */
+  samCacheOnly?: boolean;
 }
+
+/** Limitation text when research mode declined a live SAM fetch. */
+export const SAM_CACHE_ONLY_LIMITATION =
+  'Research mode: Mindy served only what it already holds for this notice; it did not fetch the description or attachments from SAM. Missing text here is not evidence the notice has none.';
 
 export async function getSolicitationDocuments(
   input: SolicitationDocumentsInput,
@@ -579,9 +589,13 @@ export async function getSolicitationDocuments(
           : resolvedNoticeId;
       // Bounded multi-key failover (entity pattern) — single rotated key used to
       // leave the body empty on a 429 day even when another key still had quota.
-      const fetched: NoticedescFetchResult = await fetchNoticeDescriptionWithFailover(linkOrId);
+      const fetched: NoticedescFetchResult = input.samCacheOnly
+        ? ({ text: '' } as NoticedescFetchResult)
+        : await fetchNoticeDescriptionWithFailover(linkOrId);
       descriptionText = fetched.text;
-      if (!fetched.text.trim()) {
+      if (input.samCacheOnly) {
+        noticedescLimitation = SAM_CACHE_ONLY_LIMITATION;
+      } else if (!fetched.text.trim()) {
         base.degraded = true;
         noticedescLimitation = noticedescRetrievalLimitation(fetched);
       } else {
@@ -669,6 +683,12 @@ export async function getSolicitationDocuments(
     base.documents = await toOutputDocs(supabase, cached, inlineCap, input);
     base.source = 'cache';
     return applyHonestyMeta(base, mergeListed(listedFromCache, warmListed, cachedListed), input.textMode, noticedescLimitation, cached.length);
+  }
+
+  // Research mode stops before the live download: what Mindy holds is the answer.
+  if (input.samCacheOnly) {
+    base.source = base.description || base.sow_text ? 'cache' : 'none';
+    return applyHonestyMeta(base, mergeListed(listedFromCache, warmListed), input.textMode, noticedescLimitation ?? SAM_CACHE_ONLY_LIMITATION);
   }
 
   // ── Layer 3: COLD FETCH — on-demand download + extract (public SAM) ────────

@@ -12,7 +12,7 @@
  * Presentational only: ProposalsPanel owns the state, the upload and the drafting.
  */
 import { useRef } from 'react';
-import { ArrowLeft, Check, FileText, Loader2, Upload } from 'lucide-react';
+import { ArrowLeft, Check, ChevronDown, ExternalLink, FileText, Loader2, Upload } from 'lucide-react';
 import { noticeTypeLabel, classifyNoticeType } from '@/lib/utils/notice-type';
 import { ProposalStepTracker } from './ProposalSteps';
 
@@ -198,13 +198,18 @@ export function NewProposalStart({
 /* ─────────────────────────────── New · step 2 ─────────────────────────────── */
 
 export function NewProposalReady({
-  title, subtitle, documentNames, loadingDocs, loadMessage, sectionLabels, requirementCount,
+  title, subtitle, documentNames, documents, samUrl, onOpenDoc, loadingDocs, loadMessage, sectionLabels, requirementCount,
   hasSource, canDraft, drafting, elapsedSec, draftError, cancelled,
   onDraft, onStop, onOpenEditor, onAddFiles, onBack, onAllTools,
 }: {
   title: string;
   subtitle?: string;
   documentNames: string[];
+  /** The documents Mindy read, for the "where is this from?" list. docId = pulled from SAM.gov. */
+  documents?: { name: string; docId?: string }[];
+  /** The solicitation on SAM.gov, so the user can check the source. */
+  samUrl?: string | null;
+  onOpenDoc?: (docId: string) => void;
   loadingDocs: boolean;
   loadMessage?: string | null;
   sectionLabels: string[];
@@ -239,7 +244,33 @@ export function NewProposalReady({
           {loadingDocs ? (
             <p className="text-sm text-muted inline-flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" />{loadMessage || 'Mindy is pulling the solicitation documents…'}</p>
           ) : documentNames.length > 0 ? (
-            <p className="text-sm font-semibold text-emerald-500 inline-flex items-center gap-1.5"><Check className="h-4 w-4" />Mindy read {documentNames.length === 1 ? documentNames[0] : `${documentNames.length} documents`}</p>
+            // Owner, 2026-11-24: show WHICH documents and the SAM.gov page, so people can verify the source.
+            <details className="group" data-testid="source-documents">
+              <summary className="cursor-pointer list-none text-sm font-semibold text-emerald-500 inline-flex items-center gap-1.5 min-h-[44px]">
+                <Check className="h-4 w-4" />Mindy read {documentNames.length === 1 ? documentNames[0] : `${documentNames.length} documents`}
+                <span className="text-xs font-medium text-muted underline">Show sources</span>
+                <ChevronDown className="h-4 w-4 text-muted transition-transform group-open:rotate-180" aria-hidden="true" />
+              </summary>
+              <ul className="mt-2 rounded-lg border border-hairline divide-y divide-hairline text-sm">
+                {(documents ?? documentNames.map((name) => ({ name, docId: undefined as string | undefined }))).map((d, i) => (
+                  <li key={`${d.name}-${i}`} className="flex items-center justify-between gap-3 px-3 py-2">
+                    <span className="inline-flex items-center gap-2 min-w-0 text-ink"><FileText className="h-4 w-4 shrink-0 text-muted" aria-hidden="true" /><span className="truncate">{d.name}</span></span>
+                    {d.docId && onOpenDoc ? (
+                      <button type="button" onClick={() => onOpenDoc(d.docId!)} className="shrink-0 min-h-[36px] px-2 text-xs font-semibold text-[#006aff] hover:underline">Open</button>
+                    ) : (
+                      <span className="shrink-0 text-xs text-muted">Uploaded by you</span>
+                    )}
+                  </li>
+                ))}
+                {samUrl && (
+                  <li className="px-3 py-2">
+                    <a href={samUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#006aff] hover:underline min-h-[36px]">
+                      View the solicitation on SAM.gov<ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+                    </a>
+                  </li>
+                )}
+              </ul>
+            </details>
           ) : (
             <p className="text-sm text-amber-500">{loadMessage || 'No documents yet — add the RFP so Mindy has something to write from.'}</p>
           )}

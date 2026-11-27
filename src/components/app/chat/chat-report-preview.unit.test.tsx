@@ -85,3 +85,84 @@ describe('ChatReportPreview', () => {
     expect(el.querySelector('a[href="https://getmindy.ai/reports/abc"]')).toBeTruthy();
   });
 });
+
+// Standalone Ask Mindy milestone (2026-11-25): a packaged market report must open, export as a PDF and come
+// back when the conversation is reopened. History keeps only its id and title; the pane re-reads the hosted
+// page /reports/<id> (no auth), and Download PDF is a real link to /reports/<id>/pdf in a new tab.
+describe('ChatReportPreview: packaged market report export and reopen', () => {
+  const REPORT_ID = 'Ej6xTestReportId0000a';
+  const HOSTED = '<!doctype html><html><body><h2>Facilities maintenance</h2><p>HOSTED REPORT BODY</p></body></html>';
+  const realFetch = globalThis.fetch;
+  const pageFetch = vi.fn();
+  beforeEach(() => { fetchMock.mockReset(); pageFetch.mockReset(); document.body.innerHTML = ''; (globalThis as { fetch: unknown }).fetch = pageFetch; });
+  afterEach(() => { document.body.innerHTML = ''; (globalThis as { fetch: unknown }).fetch = realFetch; });
+
+  async function mount(props: Parameters<typeof ChatReportPreview>[0]) {
+    const el = document.createElement('div');
+    document.body.appendChild(el);
+    const root = createRoot(el);
+    await act(async () => { root.render(<ChatReportPreview {...props} />); });
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+    return el;
+  }
+  const pdfLink = (el: HTMLElement) => el.querySelector('[data-testid="chat-report-pdf"]') as HTMLAnchorElement | null;
+
+  it('a live report with a saved id offers Download PDF as a real link that opens a new tab', async () => {
+    const el = await mount({ email: 'o@x.com', inline: { html: HOSTED, title: 'Facilities maintenance', url: `https://getmindy.ai/reports/${REPORT_ID}`, reportId: REPORT_ID } });
+    const a = pdfLink(el)!;
+    expect(a.getAttribute('href')).toBe(`/reports/${REPORT_ID}/pdf`);
+    expect(a.getAttribute('target')).toBe('_blank');
+    expect(a.getAttribute('rel')).toBe('noopener');
+    expect(a.hasAttribute('download')).toBe(false); // an error page must never be saved as a PDF
+    expect(a.getAttribute('title')).toBe('Opens in a new tab');
+    expect(a.textContent).toBe('Download PDF');
+    expect(pageFetch).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('a live report that was NOT saved (no id) offers no PDF, and a malformed id is ignored', async () => {
+    const a = await mount({ email: 'o@x.com', inline: { html: HOSTED, title: 'T', url: null, reportId: null } });
+    expect(pdfLink(a)).toBeNull();
+    const b = await mount({ email: 'o@x.com', inline: { html: HOSTED, title: 'T', url: null, reportId: '../admin' } });
+    expect(pdfLink(b)).toBeNull();
+  });
+
+  it('a reopened conversation re-reads the hosted report and shows it with Download PDF and the hosted link', async () => {
+    pageFetch.mockResolvedValueOnce({ status: 200, ok: true, text: async () => HOSTED });
+    const el = await mount({ email: 'o@x.com', savedReport: { id: REPORT_ID, title: 'Facilities maintenance' } });
+    expect(pageFetch.mock.calls.map((c) => String(c[0]))).toEqual([`/reports/${REPORT_ID}`]);
+    expect(fetchMock).not.toHaveBeenCalled(); // not the Vault preview route
+    const frame = el.querySelector('[data-testid="chat-report-frame"]') as HTMLIFrameElement;
+    expect(frame.getAttribute('srcdoc')).toContain('HOSTED REPORT BODY');
+    expect(frame.getAttribute('sandbox')).toBe('');
+    expect(el.querySelector('[data-testid="chat-report-title"]')?.textContent).toBe('Facilities maintenance');
+    expect(pdfLink(el)?.getAttribute('href')).toBe(`/reports/${REPORT_ID}/pdf`);
+    expect([...el.querySelectorAll('a')].some((x) => x.getAttribute('href') === `/reports/${REPORT_ID}` && x.textContent === 'Open hosted link')).toBe(true);
+  });
+
+  it.each([404, 410])('a removed or expired report (%s) says so honestly', async (status) => {
+    pageFetch.mockResolvedValueOnce({ status, ok: false, text: async () => '' });
+    const el = await mount({ email: 'o@x.com', savedReport: { id: REPORT_ID, title: 'T' } });
+    expect(el.querySelector('[data-testid="chat-report-gone"]')?.textContent).toMatch(/no longer available/);
+    expect(el.querySelector('[data-testid="chat-report-frame"]')).toBeNull();
+    expect(pdfLink(el)).toBeNull();
+  });
+
+  it('a server or network failure offers Try again, which re-reads the report', async () => {
+    pageFetch.mockResolvedValueOnce({ status: 503, ok: false, text: async () => '' });
+    const el = await mount({ email: 'o@x.com', savedReport: { id: REPORT_ID, title: 'T' } });
+    const retry = el.querySelector('[data-testid="chat-report-error"] button') as HTMLButtonElement;
+    expect(retry.textContent).toBe('Try again');
+    pageFetch.mockResolvedValueOnce({ status: 200, ok: true, text: async () => HOSTED });
+    await act(async () => { retry.click(); });
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+    expect(pageFetch).toHaveBeenCalledTimes(2);
+    expect((el.querySelector('[data-testid="chat-report-frame"]') as HTMLIFrameElement).getAttribute('srcdoc')).toContain('HOSTED REPORT BODY');
+  });
+
+  it('a malformed saved id makes no request and shows "no longer available"', async () => {
+    const el = await mount({ email: 'o@x.com', savedReport: { id: '../admin', title: 'T' } });
+    expect(pageFetch).not.toHaveBeenCalled();
+    expect(el.querySelector('[data-testid="chat-report-gone"]')).not.toBeNull();
+  });
+});

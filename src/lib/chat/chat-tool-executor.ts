@@ -99,6 +99,11 @@ export interface ChatToolExecutorOptions {
    * callers that bound the whole operation themselves). The Ask Mindy route always sets it.
    */
   toolTimeoutMs?: (name: string) => number;
+  /**
+   * Ask Mindy research mode: every registry tool runs with McpToolContext.samCacheOnly, so SAM-backed tools read
+   * Mindy's caches only and never call live SAM (Eric, 2026-11-25). Hosted MCP never sets it.
+   */
+  samCacheOnly?: boolean;
 }
 
 /** A logging call may never hold up a turn: telemetry waits at most this long. */
@@ -371,6 +376,7 @@ export function createChatToolExecutor(opts: ChatToolExecutorOptions) {
         : (await deps.runMcpTool(name, args, {
             userEmail: opts.userEmail,
             ...(opts.vaultEmail && VAULT_GROUNDED_TOOLS.has(name) ? { vaultEmail: opts.vaultEmail } : {}),
+            ...(opts.samCacheOnly ? { samCacheOnly: true } : {}),
           })).result)();
       result = limitMs == null ? await run : await withTimeout(run, limitMs, `tool:${name}`);
     } catch (err) {

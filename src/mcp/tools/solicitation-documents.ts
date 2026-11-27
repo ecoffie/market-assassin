@@ -130,6 +130,7 @@ export function scopeDocumentSignal(res: Pick<SolicitationDocumentsResult, 'sow_
 
 export async function solicitationDocuments(
   input: SolicitationDocumentsToolInput,
+  opts: { samCacheOnly?: boolean } = {},
 ): Promise<SolicitationDocumentsToolResult> {
   const noticeId = (input.notice_id || '').trim();
   const res = await getSolicitationDocuments({
@@ -138,6 +139,7 @@ export async function solicitationDocuments(
     textOffset: input.text_offset,
     documents: input.documents,
     documentIds: input.document_ids,
+    samCacheOnly: opts.samCacheOnly === true,
   });
 
   // A continuation presents the token the previous response issued; verify it here so the

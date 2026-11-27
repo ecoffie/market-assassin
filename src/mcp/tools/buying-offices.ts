@@ -21,6 +21,7 @@
  * Registered in the shared registry for Ask Mindy only. Hidden from the public MCP catalog
  * (public-catalog-config.ts) until an owner review decides otherwise.
  */
+import { loadAwardsWarehouseCoverage, type AwardsWarehouseCoverage } from '@/lib/awards-ingest/read-warehouse-coverage';
 import {
   bqDateString,
   normalizeCities,
@@ -117,7 +118,15 @@ export interface BuyingOfficesResult {
     source: string;
     applied_filters: Record<string, unknown>;
     ignored_args: IgnoredArg[];
+    /** Kept for existing readers: the latest action loaded for the LAST fiscal year in the window (FY end once complete). */
     as_of: string | null;
+    /** The fiscal-year window the ranking covers (FY = Oct 1 to Sep 30). as_of is bounded by it. */
+    window: { fy_from: number; fy_to: number; date_from: string | null; date_to: string | null; label: string; defaulted: boolean };
+    /**
+     * How current the award warehouse is (its latest loaded action date), independent of the window. Show THIS as data
+     * freshness; null = the coverage clock could not be read (unknown, not stale).
+     */
+    data_current_through: string | null;
     lag_note: string;
     /** Defense publication lag, only when a Defense office is in the returned rows; null otherwise. */
     defense_lag?: WarehouseDefenseLag | null;
@@ -146,7 +155,7 @@ interface Row {
 
 const LAG_NOTE =
   'Source: USASpending contract actions in the Mindy BigQuery warehouse (prime contracts only; ingested weekly). ' +
-  'as_of is the latest action date loaded for the last fiscal year in the window, not today.';
+  'as_of is the latest action date loaded for the last fiscal year in the window, not today; data_current_through is how current the warehouse is.';
 
 /**
  * Office key expressions per ranking role. A fixed whitelist: no user text reaches SQL structure.
@@ -328,6 +337,7 @@ export async function getBuyingOffices(
   directory?: {
     lookup: (codes: string[]) => Promise<{ names: Map<string, DirectoryOfficeName>; failed: boolean }>;
   },
+  coverage: () => Promise<AwardsWarehouseCoverage | null> = loadAwardsWarehouseCoverage,
 ): Promise<BuyingOfficesResult> {
   const ignored: IgnoredArg[] = [];
   const st = normalizeStateArg(input.state);
@@ -414,10 +424,19 @@ export async function getBuyingOffices(
   if (cities.length && !state) notes.push('City matched in every state because no state was given; pass state to disambiguate.');
   if (fy.window.defaulted) notes.push(`No window given: defaulted to the latest three complete fiscal years (${windowLabel(fy.window)}).`);
 
+  // Warehouse freshness, separate from the window (Eric's EFS Digital chip read "as of 2026-09-30" = FY2026's end, while
+  // the warehouse held actions through 2026-11-20). Soft read: an unreadable clock is unknown, never a stale date.
+  const warehouse = await coverage().catch(() => null);
   const baseMeta = {
     source: 'BigQuery usaspending.awards (USASpending contract actions)',
     applied_filters: applied,
     ignored_args: ignored,
+    window: {
+      fy_from: fy.window.fy_from, fy_to: fy.window.fy_to,
+      date_from: fy.window.date_from ?? null, date_to: fy.window.date_to ?? null,
+      label: windowLabel(fy.window), defaulted: !!fy.window.defaulted,
+    },
+    data_current_through: warehouse?.clocks?.sourceActionMax ?? null,
     lag_note: LAG_NOTE,
   };
 

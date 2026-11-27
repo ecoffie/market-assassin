@@ -8,7 +8,7 @@
  */
 import { describe, it, expect, vi, beforeAll } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { FULL_REPORT } from '@/lib/market/__fixtures__/market-report-full';
+import { FULL_REPORT, FULL_REPORT_WITH_DECISION } from '@/lib/market/__fixtures__/market-report-full';
 import { CHROME, PDFTOTEXT, launch, pdfPages, htmlLines, printLayout, squash, norm } from './report-harness';
 
 const getMarketReport = vi.fn();
@@ -57,16 +57,36 @@ const SECTIONS = [
   'Upcoming forecasts',
 ];
 
-describe.runIf(!!CHROME)('market report PDF — full report', () => {
+type Decision = (typeof FULL_REPORT_WITH_DECISION)['payload']['decision'];
+
+/**
+ * Both shapes a customer downloads: the packaged report, and the report Ask Mindy's intelligence gate publishes,
+ * which leads with its checked decision ("What to pursue", #2421). The brief adds one page.
+ */
+const CASES: Array<{ name: string; report: typeof FULL_REPORT; budget: number; sections: string[]; decision?: Decision }> = [
+  { name: 'full report', report: FULL_REPORT, budget: PAGE_BUDGET, sections: SECTIONS },
+  {
+    name: 'full report led by the decision brief',
+    report: FULL_REPORT_WITH_DECISION as unknown as typeof FULL_REPORT,
+    budget: PAGE_BUDGET + 1,
+    sections: ['What to pursue', ...SECTIONS],
+    decision: FULL_REPORT_WITH_DECISION.payload.decision,
+  },
+];
+
+for (const { name, report, budget, sections, decision } of CASES)
+describe.runIf(!!CHROME)(`market report PDF — ${name}`, () => {
   let pdf: Buffer;
   let pages: string[];
-  const html = renderStoredReportHtml(FULL_REPORT as never);
+  const html = renderStoredReportHtml(report as never);
+  const SECTIONS = sections;
+  const PAGE_BUDGET = budget;
 
   beforeAll(async () => {
-    getMarketReport.mockResolvedValue(FULL_REPORT);
+    getMarketReport.mockResolvedValue(report);
     const res = await GET(
-      new Request(`https://getmindy.ai/reports/${FULL_REPORT.id}/pdf`, { headers: { 'x-forwarded-for': '203.0.113.20' } }),
-      { params: Promise.resolve({ id: FULL_REPORT.id }) },
+      new Request(`https://getmindy.ai/reports/${report.id}/pdf`, { headers: { 'x-forwarded-for': '203.0.113.20' } }),
+      { params: Promise.resolve({ id: report.id }) },
     );
     expect(res.status, await res.clone().text().then((t) => t.slice(0, 200))).toBe(200);
     pdf = Buffer.from(await res.arrayBuffer());
@@ -81,9 +101,12 @@ describe.runIf(!!CHROME)('market report PDF — full report', () => {
 
   it('carries every section, in reading order', () => {
     const text = squash(pages.join('\n'));
-    const at = SECTIONS.map((h) => text.indexOf(squash(h)));
-    expect(SECTIONS.filter((_, i) => at[i] < 0), 'sections missing from the PDF').toEqual([]);
-    expect([...at].sort((a, b) => a - b)).toEqual(at);
+    // Every heading is present, and each one is found AFTER the one before it (body text such as "listed under
+    // Who to call" can name a section earlier in the report, so a plain first match is not the heading).
+    expect(SECTIONS.filter((h) => !text.includes(squash(h))), 'sections missing from the PDF').toEqual([]);
+    let from = 0;
+    const outOfOrder = SECTIONS.filter((h) => { const i = text.indexOf(squash(h), from); if (i < 0) return true; from = i + 1; return false; });
+    expect(outOfOrder, 'sections out of reading order').toEqual([]);
   });
 
   it('omits nothing the report shows: every visible line is in the PDF', () => {
@@ -108,7 +131,7 @@ describe.runIf(!!CHROME)('market report PDF — full report', () => {
 
   it('keeps every person, contractor, recompete and forecast row', () => {
     const text = norm(pages.join('\n'));
-    const s = FULL_REPORT.payload.sections;
+    const s = report.payload.sections;
     const names = [
       ...s.contacts.people.map((p) => p.email),
       ...s.competition.contractors.map((c) => c.recipient_name),
@@ -150,6 +173,20 @@ describe.runIf(!!CHROME)('market report PDF — full report', () => {
     expect(unexpected(layout.clippedText, KNOWN_PRINT_DEFECTS.clippedText), 'text cut off by an ellipsis or line clamp in print').toEqual([]);
     expect(layout.minCellFontPx).toBeGreaterThanOrEqual(9);
   }, 60_000);
+
+  it.runIf(!!decision)('leads with the decision and keeps every pursuit whole on one page', () => {
+    const d = decision!;
+    const text = norm(pages.join('\n'));
+    // The brief comes before the market figures.
+    expect(text.indexOf(norm('What to pursue'))).toBeLessThan(text.indexOf(norm('Total market')));
+    // Every pursuit's title, reasons, barrier and next move, plus what was ruled out and what is not yet known.
+    const parts = [d.headline, d.ruled_out, ...d.gaps, ...(d.also_consider ?? []),
+      ...d.pursuits.flatMap((p) => [p.title, ...p.why, p.next_move, ...(p.barrier ? [p.barrier] : [])])];
+    expect(parts.filter((x) => !text.includes(norm(x))), 'decision text missing from the PDF').toEqual([]);
+    // A pursuit is read as one unit: its title and its next move print on the same page.
+    const pageOf = (x: string) => pages.findIndex((p) => norm(p).includes(norm(x)));
+    expect(d.pursuits.filter((p) => pageOf(p.title) !== pageOf(p.next_move)).map((p) => p.title), 'pursuit split across pages').toEqual([]);
+  });
 });
 
 describe.runIf(!CHROME)('market report PDF — full report (skipped: no Chromium binary here)', () => {

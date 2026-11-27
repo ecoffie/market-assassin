@@ -6,8 +6,12 @@
  */
 export const SETUP_MCP_URL = 'https://mcp.getmindy.ai/mcp';
 
+/** Plain-words gloss for "MCP" on its first use on the page (beginners never heard the term). */
+export const MCP_PLAIN_GLOSS =
+  'MCP (Model Context Protocol) is the open standard AI assistants use to connect to outside tools like Mindy.';
+
 export const ANY_ASSISTANT_LINE =
-  'Mindy works with any AI assistant that can add a remote MCP connector by its URL. This guide shows Claude and ChatGPT step by step; Copilot, Cursor and others follow the same pattern.';
+  `Mindy works with any AI assistant that can add a remote MCP connector by its URL. ${MCP_PLAIN_GLOSS} This guide shows Claude and ChatGPT step by step; Copilot, Cursor and others follow the same pattern.`;
 
 export const OTHER_ASSISTANTS = {
   heading: 'Other assistants (Copilot, Cursor and others)',
@@ -74,3 +78,14 @@ export const AI_SECTIONS_CLASS = 'setup-ai-sections';
  */
 export const AI_CHOOSER_CSS =
   `.${AI_SECTIONS_CLASS}:has(> section[data-ai]:target) > section[data-ai]:not(:target){display:none}`;
+
+/**
+ * The first question a beginner is told to ask once Claude is connected. Plain words only:
+ * a person who does not know their NAICS code must not be stuck here (the homepage promises
+ * "Mindy picks the codes for you").
+ */
+export const CLAUDE_FIRST_ASK =
+  'Use Mindy to find federal contracts for [what you sell] that are ending in the next 6 months.';
+
+/** Under the first-question cards when no saved market is known. */
+export const FIRST_QUESTIONS_NO_MARKET_NOTE = 'Tell Mindy what you sell and these get specific to your market.';

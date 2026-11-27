@@ -9,7 +9,8 @@
 import type { Block, Claim, DocModel, TableBlock } from './model';
 import { chartToSvg } from './charts';
 import { hex, resolveTheme, type Theme } from './theme';
-import { assumptionOrigin, keepDash, stripHeadingNumber, citationIndex, citeMarker, claimClass, claimLabel, claimsPresent, formatColumn, formatDocDate, parseInline, unverifiedStatements } from './format';
+import { INTER_LATIN_FONT_FACE } from '@/lib/fonts/inter-latin-embedded';
+import { assumptionOrigin, clientCopy, keepDash, stripHeadingNumber, citationIndex, citeMarker, claimClass, claimLabel, claimsPresent, formatColumn, formatDocDate, parseInline, unverifiedStatements } from './format';
 
 /**
  * The document page may load nothing but itself: no scripts, no network, no frames; only its own
@@ -18,7 +19,7 @@ import { assumptionOrigin, keepDash, stripHeadingNumber, citationIndex, citeMark
  * (A4, real-browser probe on #2107), so the PDF lockdown alone does not stop it. The render route
  * sends the same value as an HTTP header on the degraded HTML.
  */
-export const DOC_HTML_CSP = "default-src 'none'; style-src 'unsafe-inline'; img-src data:";
+export const DOC_HTML_CSP = "default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:";
 
 export function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
@@ -46,12 +47,13 @@ function themeCss(t: Theme): string {
   const band = t.headingStyle === 'band';
   const r = t.table.headerRadiusPx;
   return `
+${INTER_LATIN_FONT_FACE}
 @page { size: Letter; margin: 0.9in 0.85in 0.95in 0.85in; }
 * { box-sizing: border-box; }
 html { -webkit-print-color-adjust: exact; print-color-adjust: exact; background: ${c('pageBg')}; }
-body { margin: 0; color: ${c('ink')}; background: ${c('pageBg')}; font-family: ${t.fonts.pdf}; font-size: 10.5pt; line-height: 1.5; }
+body { margin: 0; color: ${c('ink')}; background: ${c('pageBg')}; font-family: 'Mindy Report Inter', ${t.fonts.pdf}; font-size: 10.5pt; line-height: 1.5; }
 .doc { max-width: 7.2in; margin: 0 auto; }
-.cover { padding: ${t.cover === 'brand-band' ? '0.2in' : '1.4in'} 0 0.5in; margin-bottom: 0.35in; break-after: page; }
+.cover { padding: ${t.cover === 'rule' ? '0.3in' : '0.05in'} 0 0.1in; margin-bottom: 0.25in; }
 .cover.rule .titleblock { border-bottom: 2px solid ${c('accent2')}; padding-bottom: 18px; }
 .brandband { display: flex; align-items: center; justify-content: space-between; gap: 16px; border-radius: 12px; padding: 16px 20px; margin-bottom: 0.45in; color: ${c('white')}; background: linear-gradient(90deg, ${hex((t.gradient ?? [k.accent, k.accent])[0])}, ${hex((t.gradient ?? [k.accent, k.accent])[1])}); }
 .brandband .mark { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 8px; background: ${c('white')}; color: ${c('accent')}; font-weight: 800; font-size: 18pt; margin-right: 12px; }
@@ -66,9 +68,23 @@ body { margin: 0; color: ${c('ink')}; background: ${c('pageBg')}; font-family: $
 .cover dt { color: ${c('meta')}; } .cover dd { margin: 0; color: ${c('meta')}; }
 .cover .card { background: ${c('panelBg')}; border: 1px solid ${c('rule')}; border-radius: 10px; padding: 14px 18px; }
 .cover .card dt { color: ${c('accent')}; font-weight: 700; } .cover .card dd { color: ${c('ink')}; }
-.reading { margin-top: 0.5in; padding: 12px 14px; border: 1px solid ${c('rule')}; border-radius: 6px; font-size: 9pt; color: ${c('meta')}; background: ${c('panelBg')}; }
+.reading { break-inside: avoid; margin-top: 0.22in; padding: 12px 14px; border: 1px solid ${c('rule')}; border-radius: 6px; font-size: 9pt; color: ${c('meta')}; background: ${c('panelBg')}; }
 .reading b { color: ${c('ink')}; }
-.toc { break-after: page; }
+.letterhead .lh { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding-bottom: 12px; margin-bottom: 0.3in; border-bottom: 2px solid ${c('accent2')}; }
+.letterhead .who { display: flex; align-items: center; }
+.letterhead .mark { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 7px; background: ${c('accent2')}; color: ${c('white')}; font-weight: 800; font-size: 15pt; margin-right: 10px; }
+.letterhead .name { font-weight: 700; font-size: 13pt; line-height: 1.1; color: ${c('accent')}; }
+.letterhead .tag { font-size: 7pt; letter-spacing: .14em; font-weight: 600; color: ${c('accent2')}; }
+.letterhead .contact { text-align: right; font-size: 8pt; line-height: 1.45; color: ${c('muted')}; }
+.letterhead h1 { font-size: 21pt; margin: 0 0 4px; }
+.letterhead .byline { font-size: 9.5pt; color: ${c('meta')}; margin: 0 0 16px; }
+.letterhead dl.card { display: grid; grid-template-columns: 1.7in 1fr; gap: 0; padding: 0; border-radius: 0; font-size: 9.5pt; }
+.letterhead dl.card dt, .letterhead dl.card dd { padding: 7px 12px; border-bottom: 1px solid ${c('rule')}; }
+.letterhead dl.card dt { background: ${c('rowFill')}; }
+ul.checklist { list-style: none; padding-left: 4px; }
+ul.checklist li { position: relative; padding-left: 24px; margin: 5px 0; }
+ul.checklist li::before { content: ''; position: absolute; left: 0; top: 0.22em; width: 11px; height: 11px; border: 1.5px solid ${c('accent2')}; border-radius: 2px; }
+.toc { break-after: auto; margin-bottom: 0.2in; }
 .toc ol { list-style: none; padding-left: 0; } .toc li { margin: 4px 0; }
 .toc li .n { display: inline-block; width: 2em; color: ${c('accent')}; font-weight: 600; }
 ${band
@@ -152,7 +168,8 @@ function blockHtml(b: Block, numberOf: (id: string) => number | null, theme: The
       return `<p>${lab(b.claim)}${inline(b.text)}${sup(b.cites)}${originHtml(b)}</p>`;
     case 'bullets': {
       const tag = b.ordered ? 'ol' : 'ul';
-      return `<${tag}>${b.items.map((it) => `<li>${lab(it.claim)}${inline(it.text)}${sup(it.cites)}${originHtml(it)}</li>`).join('')}</${tag}>`;
+      const cls = !b.ordered && b.style === 'checklist' ? ' class="checklist"' : '';
+      return `<${tag}${cls}>${b.items.map((it) => `<li>${lab(it.claim)}${inline(it.text)}${sup(it.cites)}${originHtml(it)}</li>`).join('')}</${tag}>`;
     }
     case 'table':
       return tableHtml(b, citeMarker(b.cites, numberOf));
@@ -180,8 +197,14 @@ body { padding: 20px 24px 40px; }
 .tablewrap { overflow-x: auto; }
 `;
 
+/**
+ * Contents list threshold. Professional strategy plans of 15+ sections read without one; a contents list on
+ * a short document only adds a near-empty page. Long documents still get it, inline after the cover.
+ */
+export const TOC_MIN_SECTIONS = 12;
+
 export interface RenderHtmlOptions {
-  /** Include a contents page (default true when there are 4+ sections). */
+  /** Include a contents list (default: only long documents, TOC_MIN_SECTIONS+ top-level sections). It never forces a page of its own. */
   toc?: boolean;
   /**
    * On-screen reading (the Map's in-chat report pane) instead of print: same markup and theme, but the
@@ -190,16 +213,17 @@ export interface RenderHtmlOptions {
   screen?: boolean;
 }
 
-export function renderHtml(model: DocModel, opts: RenderHtmlOptions = {}): string {
+export function renderHtml(stored: DocModel, opts: RenderHtmlOptions = {}): string {
+  const model = clientCopy(stored);
   const theme = resolveTheme(model.theme);
   const { ordered, numberOf } = citationIndex(model);
-  const showToc = opts.toc ?? model.sections.length >= 4;
+  const showToc = opts.toc ?? model.sections.filter((s) => (s.level ?? 1) === 1).length >= TOC_MIN_SECTIONS;
   const present = claimsPresent(model);
   const unverified = unverifiedStatements(model);
 
   const meta: string[] = [];
   if (model.preparedFor) meta.push(`<dt>Prepared for</dt><dd>${escapeHtml(model.preparedFor)}</dd>`);
-  meta.push(`<dt>Date</dt><dd>${escapeHtml(formatDocDate(model.date))}</dd>`);
+  // No document date on the cover (Eric, 2026-11-27): a saved report with a date reads as out of date later.
   meta.push(`<dt>Prepared with</dt><dd>Mindy</dd>`);
   if (ordered.length) meta.push(`<dt>Sources</dt><dd>${ordered.length} cited source${ordered.length === 1 ? '' : 's'}</dd>`);
 
@@ -207,7 +231,7 @@ export function renderHtml(model: DocModel, opts: RenderHtmlOptions = {}): strin
     '<b>How to read this document.</b> Facts carry a numbered citation like <sup class="cite">[1]</sup> that points to the Sources section.',
     present.has('assumption') ? 'Statements marked <span class="label assumption">Planning assumption</span> are premises stated for this analysis, not recorded facts; each says where it comes from. Check them before relying on them.' : '',
     present.has('recommendation') ? 'Statements marked <span class="label recommendation">Recommendation</span> are suggested actions.' : '',
-    unverified.length ? `Statements marked <span class="label unverified">Unverified — no source</span> could not be traced to a source and are listed in the Unverified statements section.` : '',
+    unverified.length ? `Statements marked <span class="label unverified">Unverified: no source</span> could not be traced to a source and are listed in the Unverified statements section.` : '',
   ].filter(Boolean).join(' ');
 
   // Cover. Both styles use ONLY the model's own metadata — nothing is generated for the cover.
@@ -217,9 +241,11 @@ export function renderHtml(model: DocModel, opts: RenderHtmlOptions = {}): strin
   if (typeof model.meta?.attention === 'string' && model.meta.attention.trim()) card.push(`<dt>Attention</dt><dd>${escapeHtml(model.meta.attention)}</dd>`);
   card.push(`<dt>Prepared by</dt><dd>${escapeHtml(brand.name)}</dd>`);
   if (model.subtitle) card.push(`<dt>What this is</dt><dd>${escapeHtml(model.subtitle)}</dd>`);
-  card.push(`<dt>Date</dt><dd>${escapeHtml(formatDocDate(model.date))}</dd>`);
   if (ordered.length) card.push(`<dt>Sources</dt><dd>${ordered.length} cited source${ordered.length === 1 ? '' : 's'}</dd>`);
-  const cover = theme.cover === 'brand-band'
+  const byline = model.preparedFor ? `Prepared for ${escapeHtml(model.preparedFor)}` : '';
+  const cover = theme.cover === 'letterhead'
+    ? `<section class="cover letterhead"><div class="lh"><div class="who"><span class="mark">${escapeHtml(brand.mark)}</span><div><div class="name">${escapeHtml(brand.name)}</div><div class="tag">${escapeHtml(brand.tagline)}</div></div></div><div class="contact">${brand.contactLines.map(escapeHtml).join('<br>')}</div></div><h1>${escapeHtml(keepDash(model.title))}</h1>${byline ? `<p class="byline">${byline}</p>` : ''}<dl class="card">${card.join('')}</dl><div class="reading">${reading}</div></section>`
+    : theme.cover === 'brand-band'
     ? `<section class="cover brand"><div class="brandband"><div class="who"><span class="mark">${escapeHtml(brand.mark)}</span><div><div class="name">${escapeHtml(brand.name)}</div><div class="tag">${escapeHtml(brand.tagline)}</div></div></div><div class="contact">${brand.contactLines.map(escapeHtml).join('<br>')}</div></div><h1>${escapeHtml(keepDash(model.title))}</h1>${model.subtitle ? `<p class="subtitle">${escapeHtml(model.subtitle)}</p>` : ''}<dl class="card">${card.join('')}</dl><div class="reading">${reading}</div></section>`
     : `<section class="cover rule"><div class="titleblock"><div class="kicker">Report</div><h1>${escapeHtml(keepDash(model.title))}</h1>${model.subtitle ? `<p class="subtitle">${escapeHtml(model.subtitle)}</p>` : ''}<dl>${meta.join('')}</dl></div><div class="reading">${reading}</div></section>`;
 
@@ -254,7 +280,8 @@ export function renderHtml(model: DocModel, opts: RenderHtmlOptions = {}): strin
       .map((s) => {
         const bits = [escapeHtml(s.label)];
         if (s.recordId) bits.push(`<span class="meta">(${escapeHtml(s.recordId)})</span>`);
-        if (s.retrievedAt) bits.push(`<span class="meta">Retrieved ${escapeHtml(s.retrievedAt)}.</span>`);
+        // No retrieval (data-freshness) date in client copy (Eric, 2026-11-27). retrievedAt stays in the stored model
+        // for provenance; a date inside the cited document's own title is part of the label and is kept.
         if (s.url) bits.push(`<span class="meta">${escapeHtml(s.url)}</span>`);
         return `<li>${bits.join(' ')}</li>`;
       })

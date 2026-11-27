@@ -1,0 +1,225 @@
+/**
+ * Ask Mindy controls the Map (beta) — the REAL drawer script in jsdom. An {type:'action'} stream event runs through
+ * the function behind today's button (spied here), shows "<what changed> · Beta · Undo", and Undo restores the exact
+ * snapshot. Only when the server capability says actions are on; invalid actions are rejected whole; ≤3 per turn.
+ */
+import { describe, it, expect, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { TextEncoder as NodeTextEncoder, TextDecoder as NodeTextDecoder } from 'node:util';
+import { JSDOM } from 'jsdom';
+
+const MAP = readFileSync(join(__dirname, 'route.ts'), 'utf8');
+function drawerScript(): string {
+  const a = MAP.indexOf('const ASK_MINDY_JS = `<script>');
+  const b = MAP.indexOf('</script>`;', a);
+  return MAP.slice(a + 'const ASK_MINDY_JS = `<script>'.length, b).replace(/\\\\/g, '\\');
+}
+const token = (email: string) => Buffer.from(JSON.stringify({ email, exp: Date.now() + 3_600_000 })).toString('base64').replace(/=+$/, '') + '.sig';
+const SNAP = { mode: 'open', filters: { q: 'roofing', horizons: { open: true, recompete: false, forecast: false } }, bbox: { w: -100, s: 30, e: -80, n: 40 } };
+
+type WriteReply = { status: number; json: Record<string, unknown> };
+function boot(opts: { actions: boolean; writes?: WriteReply[]; signedOut?: boolean }) {
+  const dom = new JSDOM(
+    '<!doctype html><html><body><div id="amkOv"></div><aside id="amk" aria-hidden="true"><div class="amk-hd"><div id="amkCtx"></div><button id="amkX"></button></div>'
+    + '<div id="amkBody"></div><div class="amk-foot"><div class="amk-in"><textarea id="amkIn"></textarea><button id="amkSend"></button></div></div></aside></body></html>',
+    { url: 'https://getmindy.ai/opportunity-map', runScripts: 'outside-only' },
+  );
+  const w = dom.window as unknown as Record<string, unknown> & Window & { eval: (s: string) => unknown };
+  const store: Record<string, string> = opts.signedOut ? {} : { mi_beta_auth_token: token('pro@example.com') };
+  Object.defineProperty(w, 'localStorage', { value: { getItem: (k: string) => store[k] ?? null, setItem: (k: string, v: string) => { store[k] = v; }, removeItem: (k: string) => { delete store[k]; } } });
+  w.TextDecoder = NodeTextDecoder as never;
+  w.__mindyViewCtx = () => ({ count: 3, scope: 'all' });
+  // The existing map functions behind today's buttons — spied.
+  const applied: unknown[] = [];
+  w.__applySavedSearch = vi.fn((ss: unknown) => { applied.push(JSON.parse(JSON.stringify(ss))); });
+  w.__mapSnapshot = () => JSON.parse(JSON.stringify(SNAP));
+  w.__horizons = { open: true, recompete: false, forecast: false };
+  w.toggleHorizon = vi.fn();
+  w.__isolateHorizon = vi.fn();
+  w.__mapNationalView = vi.fn();
+  w.openOppDrawer = vi.fn();
+  w.__STATE_CENTROIDS = { FL: [28.6, -82.4] };
+  w.__STATE_NAMES = { FL: 'Florida', GA: 'Georgia' };
+  const tracked: Array<Record<string, unknown>> = [];
+  w.__track = (_c: string, ev: string, p: Record<string, unknown>) => { if (ev === 'ask_mindy_action') tracked.push(p); };
+  let ctrl: ReadableStreamDefaultController<Uint8Array> | null = null;
+  const enc = new NodeTextEncoder();
+  const writes: Array<Record<string, unknown>> = [];
+  let wi = 0;
+  w.openSignInModal = vi.fn();
+  w.fetch = vi.fn((url: string, init?: { body?: string }) => {
+    if (url === '/api/app/mindy-actions') {
+      writes.push(JSON.parse(String(init?.body)));
+      const r = (opts.writes ?? [])[wi++] ?? { status: 200, json: { ok: true, message: 'Done.' } };
+      return Promise.resolve({ ok: r.status < 300, status: r.status, json: async () => r.json });
+    }
+    if (url.startsWith('/api/app/chat/capabilities')) return Promise.resolve({ ok: true, status: 200, json: async () => ({ success: true, screenshots: false, actions: opts.actions }) });
+    if (url !== '/api/app/chat' && url.startsWith('/api/app/')) return Promise.resolve({ ok: true, status: 200, json: async () => ({ uploads: false, suggestions: [] }) });
+    const stream = new ReadableStream<Uint8Array>({ start(c) { ctrl = c; } });
+    return Promise.resolve({ ok: true, status: 200, body: stream, json: async () => ({}) });
+  }) as never;
+  w.eval(drawerScript());
+  const doc = w.document;
+  const tick = () => new Promise((r) => setTimeout(r, 15));
+  const push = async (e: Record<string, unknown>) => { ctrl!.enqueue(enc.encode(`data: ${JSON.stringify(e)}\n\n`)); await tick(); await tick(); };
+  const end = async () => { ctrl!.close(); await tick(); await tick(); };
+  const send = async (q: string) => { await tick(); (doc.getElementById('amkIn') as HTMLTextAreaElement).value = q; (doc.getElementById('amkSend') as HTMLButtonElement).click(); await tick(); };
+  (w as unknown as { openAskMindy: () => void }).openAskMindy();
+  const notes = () => [...doc.querySelectorAll('[data-testid="amk-action-note"]')].map((n) => n.textContent);
+  return { w, doc, push, end, send, applied, tracked, notes, writes, settle: tick };
+}
+const act = (name: string, args: Record<string, unknown>, id = 'x' + Math.random().toString(36).slice(2, 8)) => ({ type: 'action', id, name, args });
+
+describe('Ask Mindy controls the Map', () => {
+  it('apply_view merges onto the current view through __applySavedSearch; the note says what changed · Beta · Undo; Undo restores the snapshot', async () => {
+    const t = boot({ actions: true });
+    await t.send('show VA construction work in Florida');
+    await t.push(act('map.apply_view', { q: 'construction', filters: { state: 'FL', agency: 'Department of Veterans Affairs' } }));
+    expect(t.applied[0]).toEqual({ mode: 'open', filters: { q: 'construction', horizons: { open: true, recompete: false, forecast: false }, state: 'FL', agency: 'Department of Veterans Affairs' } });
+    expect(t.notes()[0]).toBe('Filtered to "construction" · Florida · Department of Veterans Affairs · Beta · Undo');
+    (t.doc.querySelector('[data-testid="amk-action-undo"]') as HTMLButtonElement).click();
+    expect(t.applied[1]).toEqual(SNAP);
+    expect(t.doc.querySelector('[data-testid="amk-action-undo"]')!.textContent).toBe('Undone');
+    expect(t.tracked.map((p) => p.outcome)).toEqual(['ran', 'undone']);
+  });
+
+  it('replace:true starts from a clean view; horizons merge; recompete mode passes through', async () => {
+    const t = boot({ actions: true });
+    await t.send('q');
+    await t.push(act('map.apply_view', { replace: true, filters: { naics: '236220' }, horizons: { recompete: true }, mode: 'recompete' }));
+    expect(t.applied[0]).toEqual({ mode: 'recompete', filters: { naics: '236220', horizons: { open: true, recompete: true, forecast: false } } });
+  });
+
+  it('search, horizons and go_to call the existing functions', async () => {
+    const t = boot({ actions: true });
+    await t.send('q');
+    await t.push(act('map.search', { q: 'cybersecurity' }));
+    expect((t.applied[0] as { filters: { q: string } }).filters.q).toBe('cybersecurity');
+    await t.push(act('map.set_horizons', { isolate: 'forecast' }));
+    expect(t.w.__isolateHorizon).toHaveBeenCalledWith('forecast');
+    await t.push(act('map.go_to', { state: 'FL' }));
+    const bb = (t.applied[1] as { bbox: Record<string, number> }).bbox;
+    expect(bb.s).toBeLessThan(28.6); expect(bb.n).toBeGreaterThan(28.6);
+    expect(t.notes()).toEqual(['Filtered to "cybersecurity" · Beta · Undo', 'Showing Coming soon · Beta · Undo', 'Zoomed to Florida · Beta · Undo']);
+  });
+
+  it('only one Undo is live: the previous action loses its Undo', async () => {
+    const t = boot({ actions: true });
+    await t.send('q');
+    await t.push(act('map.search', { q: 'roofing' }));
+    await t.push(act('map.search', { q: 'paving' }));
+    const undos = [...t.doc.querySelectorAll('[data-testid="amk-action-undo"]')] as HTMLButtonElement[];
+    expect(undos[0].disabled).toBe(true);
+    expect(undos[1].disabled).toBe(false);
+  });
+
+  it('an invalid action is rejected whole with one plain note and nothing changes', async () => {
+    const t = boot({ actions: true });
+    await t.send('q');
+    await t.push(act('map.apply_view', { filters: { onclick: 'alert(1)' } }));
+    await t.push(act('map.drop_tables', {}));
+    expect(t.applied).toEqual([]);
+    expect(t.notes()).toEqual(['Mindy suggested a change this page can’t make · Beta']);
+    expect(t.tracked.map((p) => p.outcome)).toEqual(['rejected:invalid', 'rejected:invalid']);
+  });
+
+  it('at most 3 actions run per turn', async () => {
+    const t = boot({ actions: true });
+    await t.send('q');
+    for (const q of ['aa', 'bb', 'cc', 'dd']) await t.push(act('map.search', { q }));
+    expect(t.applied).toHaveLength(3);
+  });
+
+  it('without the server capability, actions are ignored entirely', async () => {
+    const t = boot({ actions: false });
+    await t.send('q');
+    await t.push(act('map.search', { q: 'cybersecurity' }));
+    await t.push({ type: 'token', content: 'Answer.' });
+    await t.end();
+    expect(t.applied).toEqual([]);
+    expect(t.notes()).toEqual([]);
+  });
+
+  it('open_record waits for the answer and opens only an id this turn returned; national view uses the existing control', async () => {
+    const t = boot({ actions: true });
+    await t.send('q');
+    await t.push(act('map.open_record', { notice_id: '0009f2dae25541e4a2782d4807461bd0' }));
+    await t.push(act('map.open_record', { notice_id: 'injected0000000000000000000000ff' }));
+    await t.push(act('map.go_to', { national: true }));
+    expect(t.w.openOppDrawer).not.toHaveBeenCalled(); // not before the answer is in
+    await t.push({ type: 'token', content: 'Start with [the Navy recompete](/opportunity-map?opp=0009f2dae25541e4a2782d4807461bd0).' });
+    await t.push({ type: 'done' });
+    await t.end();
+    expect(t.w.openOppDrawer).toHaveBeenCalledTimes(1);
+    expect(t.w.openOppDrawer).toHaveBeenCalledWith('0009f2dae25541e4a2782d4807461bd0');
+    expect(t.w.__mapNationalView).toHaveBeenCalled();
+    expect(t.notes()).toEqual(['Showing the whole country · Beta · Undo', 'Opened the opportunity · Beta']);
+    expect(t.tracked.map((p) => p.outcome)).toEqual(['ran', 'ran', 'rejected:unsourced']);
+  });
+
+  const PID = '11111111-2222-4333-8444-555555555555';
+  const click = async (t: { doc: Document; settle: () => Promise<unknown> }, id: string) => { (t.doc.querySelector(`[data-testid="${id}"]`) as HTMLButtonElement).click(); await t.settle(); await t.settle(); };
+
+  it('save_search asks first; Save posts the CURRENT view (never model filters) and shows the result with a link', async () => {
+    const t = boot({ actions: true, writes: [{ status: 200, json: { ok: true, message: "Saved 'VA construction FL' · weekly alerts", target: { kind: 'saved_search', id: 'x', href: '/opportunity-map?ss=abc&src=ask_mindy' } } }] });
+    await t.send('save this with weekly alerts');
+    await t.push(act('map.save_search', { name: 'VA construction FL', alert_frequency: 'weekly' }, 'w1'));
+    const box = t.doc.querySelector('[data-testid="amk-action-confirm"]')!;
+    expect(box.textContent).toContain('Save this view as "VA construction FL" with weekly alerts? · Beta');
+    expect(t.writes).toEqual([]); // nothing written before the click
+    await click(t, 'amk-action-yes');
+    expect(t.writes[0]).toEqual({ email: 'pro@example.com', action_id: 'w1', name: 'save_search', args: { name: 'VA construction FL', alert_frequency: 'weekly', mode: 'open', filters: SNAP.filters }, confirmed: true });
+    expect(box.textContent).toContain("Saved 'VA construction FL' · weekly alerts");
+    expect((t.doc.querySelector('[data-testid="amk-action-link"]') as HTMLAnchorElement).getAttribute('href')).toBe('/opportunity-map?ss=abc&src=ask_mindy');
+    expect(t.tracked.map((p) => p.outcome)).toEqual(['confirmed', 'saved']);
+  });
+
+  it('Not now writes nothing', async () => {
+    const t = boot({ actions: true });
+    await t.send('q');
+    await t.push(act('map.update_alert', { search_id: PID, alert_frequency: 'off' }));
+    expect(t.doc.querySelector('[data-testid="amk-action-confirm"]')!.textContent).toContain('Change this saved search to no alerts?');
+    await click(t, 'amk-action-no');
+    expect(t.writes).toEqual([]);
+    expect(t.doc.querySelector('[data-testid="amk-action-confirm"]')!.textContent).toContain('Not saved.');
+  });
+
+  it('add_to_pursuits waits for the answer, needs a sourced id, confirms, and can be undone by pursuit id', async () => {
+    const t = boot({ actions: true, writes: [{ status: 200, json: { ok: true, message: "Added 'GAOA BRF Roofing' to My Pursuits", target: { kind: 'pursuit', id: PID, href: '/app?panel=pipeline' } } }, { status: 200, json: { ok: true, message: 'Removed.' } }] });
+    await t.send('add the roofing one');
+    await t.push(act('map.add_to_pursuits', { kind: 'opportunity', notice_id: '0009f2dae25541e4a2782d4807461bd0' }));
+    await t.push(act('map.add_to_pursuits', { kind: 'opportunity', notice_id: 'injected0000000000000000000000ff' }));
+    expect(t.doc.querySelector('[data-testid="amk-action-confirm"]')).toBeNull();
+    await t.push({ type: 'token', content: 'The [GAOA roofing job](/opportunity-map?opp=0009f2dae25541e4a2782d4807461bd0).' });
+    await t.push({ type: 'done' });
+    await t.end();
+    expect(t.doc.querySelectorAll('[data-testid="amk-action-confirm"]').length).toBe(1);
+    await click(t, 'amk-action-yes');
+    expect(t.writes[0]).toMatchObject({ name: 'add_to_pursuits', args: { kind: 'opportunity', notice_id: '0009f2dae25541e4a2782d4807461bd0' }, confirmed: true });
+    await click(t, 'amk-action-undo');
+    expect(t.writes[1]).toMatchObject({ name: 'remove_from_pursuits', args: { pursuit_id: PID }, confirmed: true });
+    expect(t.doc.querySelector('[data-testid="amk-action-undo"]')!.textContent).toBe('Undone');
+    expect(t.tracked.map((p) => p.outcome)).toEqual(['rejected:unsourced', 'confirmed', 'saved', 'undone']);
+  });
+
+  it('a failed write shows the safe message (or our fallback) and offers no Undo', async () => {
+    const t = boot({ actions: true, writes: [{ status: 503, json: { ok: false, message: 'Mindy could not save that right now. Nothing was changed.' } }] });
+    await t.send('q');
+    await t.push(act('map.add_to_pursuits', { kind: 'recompete', contract_id: 'N0001920C0009' }));
+    await click(t, 'amk-action-yes');
+    expect(t.doc.querySelector('[data-testid="amk-action-confirm"]')!.textContent).toContain('Mindy could not save that right now. Nothing was changed.');
+    expect(t.doc.querySelector('[data-testid="amk-action-undo"]')).toBeNull();
+  });
+
+
+  it('the Map tells the server which surface it is (surface: map) so the right actions are offered', async () => {
+    const t = boot({ actions: true });
+    const bodies: Array<Record<string, unknown>> = [];
+    const orig = t.w.fetch as unknown as (u: string, i?: { body?: string }) => unknown;
+    t.w.fetch = ((u: string, i?: { body?: string }) => { if (u === '/api/app/chat') bodies.push(JSON.parse(String(i?.body))); return orig(u, i); }) as never;
+    await t.send('q');
+    expect(bodies[0]).toMatchObject({ display: 'narrow_panel', surface: 'map' });
+  });
+});
+

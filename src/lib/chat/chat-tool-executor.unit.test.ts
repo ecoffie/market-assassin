@@ -309,3 +309,15 @@ describe('free-by-design chat tools are logged NON-billable (so they stay free i
     expect(loggedBilling()).toBe('billable_success');
   });
 });
+
+describe('samCacheOnly (Ask Mindy research mode)', () => {
+  it('is passed to every registry tool only when the executor is built with it', async () => {
+    const runMcpTool = vi.fn(async () => ({ result: { ok: true }, credits: 0 }));
+    const mk = (samCacheOnly?: boolean) => createChatToolExecutor({ userEmail: 'a@b.com', chatSessionId: null, tier0: { defs: [], names: new Set(), execute: async () => ({}) }, deps: { runMcpTool: runMcpTool as never, logCall: (async () => {}) as never }, ...(samCacheOnly ? { samCacheOnly } : {}) });
+    const c = { id: 'x', function: { name: 'lookup_sam_entity', arguments: '{"name":"Acme"}' } };
+    await mk(true).executeRound([c], { model: 'm', provider: 'p' });
+    expect((runMcpTool.mock.calls[0] as unknown[])[2]).toMatchObject({ samCacheOnly: true });
+    await mk().executeRound([c], { model: 'm', provider: 'p' });
+    expect(((runMcpTool.mock.calls[1] as unknown[])[2] as Record<string, unknown>).samCacheOnly).toBeUndefined();
+  });
+});

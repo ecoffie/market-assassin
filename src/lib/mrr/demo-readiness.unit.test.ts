@@ -173,14 +173,15 @@ describe('SBA size standard from 13 CFR 121.201 (eCFR)', () => {
     expect(table.rows['541330'].exceptions).toHaveLength(1);
   });
 
-  it('cites the regulation with its as-of and last-amended dates', async () => {
+  it('cites the regulation with its last-amended date (a fact of the regulation), not a data-freshness date', async () => {
     const r = await resolveSizeStandard('236220', async () => table);
     expect(r.field.state).toBe('value');
     if (r.field.state !== 'value') return;
     expect(formatSizeStandard(r.field.value)).toBe(
-      '$45.0 million in average annual receipts (13 CFR 121.201 on eCFR, current as of 2026-10-05; section last amended 2023-03-17)',
+      '$45.0 million in average annual receipts (13 CFR 121.201 on eCFR; section last amended 2023-03-17)',
     );
-    expect(r.citation).toMatch(/13 CFR 121\.201, read from eCFR \(current as of 2026-10-05; section last amended 2023-03-17\)/);
+    expect(r.citation).toMatch(/13 CFR 121\.201, read from eCFR \(section last amended 2023-03-17\)/);
+    expect(r.citation).not.toContain('current as of');
     expect(r.field.evidence.url).toBe('https://www.ecfr.gov/current/title-13/section-121.201');
   });
 

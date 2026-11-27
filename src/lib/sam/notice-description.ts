@@ -18,6 +18,7 @@
  * outcomes, network/timeout (no status), and HTTP 200 with empty text.
  */
 
+import { markSamKeyRejected } from '@/lib/sam/key-health';
 import { getAllDistinctSAMKeys, getRotatedSAMKey } from './utils';
 
 const NOTICEDESC_BASE = 'https://api.sam.gov/prod/opportunities/v1/noticedesc';
@@ -208,6 +209,7 @@ export async function fetchNoticeDescriptionWithFailover(
             emptySuccess: false,
           };
         }
+        markSamKeyRejected(key, status); // 401/403 only; remembered for the process (key-health.ts)
         console.warn(
           `[noticedesc] key unusable (${status}) — failing over (${keysTried}/${ordered.length})`,
         );
