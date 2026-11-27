@@ -135,6 +135,30 @@ export function classifySource(url: string): SourceKind {
   return 'secondary';
 }
 
+/**
+ * No freshness dates in quotable text (Eric, 2026-11-27: "apply the no date rules everywhere"). A report may quote
+ * claim / change / status / affects / mistake / how-to-use, so an "as of <date>" clause there is rewritten to the
+ * same fact without the date. Each rewrite is listed here (auditable) and recorded on the row's notes; the file keeps
+ * Eric's original words. Document identifiers stay (EO 14275, M-25-31, "Sept 18, 2026 batch", effective dates).
+ * verified_on / recheck_interval_days stay internal.
+ */
+export const QUOTABLE_REWRITES: ReadonlyArray<{ from: string; to: string }> = [
+  { from: 'As of Nov 20, 2026, no Part 19 rule had been proposed.', to: 'No Part 19 rule has been proposed yet.' },
+  { from: 'Services announced their PAEs through 2026.', to: 'The services are announcing their PAEs.' },
+];
+
+/** A freshness phrase a report must not carry ("as of <date>", "through 2026", "checked on <date>"). */
+export const FRESHNESS_PHRASE = /\bas of\b|\bthrough 20\d\d\b|\bchecked (?:on|against sources on)\b/i;
+
+function dequote(text: string | null, applied: string[]): string | null {
+  if (!text) return text;
+  let out = text;
+  for (const r of QUOTABLE_REWRITES) {
+    if (out.includes(r.from)) { out = out.replace(r.from, r.to); applied.push(`"${r.from}" → "${r.to}"`); }
+  }
+  return out;
+}
+
 const NOT_VERIFIED = /\[Not fully verified(?::\s*([^\]]*))?\]/g;
 const URL_RE = /https?:\/\/[^\s;)]+/g;
 
@@ -168,18 +192,20 @@ export function parseRulesKb(markdown: string): RuleEntry[] {
       const urls = [...new Set([...[...block.matchAll(URL_RE)].map((u) => u[0].replace(/[.,]$/, '')), ...(meta.also ?? [])])];
       const isPractice = part === 'C';
       const legal = meta.legal_status;
+      const rewrites: string[] = [];
+      const q = (t: string | null) => dequote(t, rewrites);
       out.push({
         claim_id: `KB-${n}`,
         entry_no: n,
         part,
         claim: headingRaw.replace(NOT_VERIFIED, '').trim(),
-        change: isPractice ? null : field(block, 'Change'),
+        change: q(isPractice ? null : field(block, 'Change')),
         source_text: isPractice ? null : field(block, 'Source'),
-        status_text: isPractice ? null : field(block, 'Status'),
-        affects: isPractice ? null : field(block, 'Affects'),
-        common_mistake: isPractice ? null : field(block, 'Common mistake'),
-        how_to_use: isPractice ? null : field(block, 'How to use it'),
-        practice_text: isPractice ? block.trim() : null,
+        status_text: q(isPractice ? null : field(block, 'Status')),
+        affects: q(isPractice ? null : field(block, 'Affects')),
+        common_mistake: q(isPractice ? null : field(block, 'Common mistake')),
+        how_to_use: q(isPractice ? null : field(block, 'How to use it')),
+        practice_text: isPractice ? q(block.trim()) : null,
         keywords: meta.keywords ?? [],
         sources: urls.map((url) => ({ url, kind: classifySource(url) })),
         legal_status: legal,
@@ -190,7 +216,7 @@ export function parseRulesKb(markdown: string): RuleEntry[] {
         status: headingUnverified ? 'unverified' : 'current',
         verified_on: RULES_KB_CHECKED_ON,
         supersedes: null,
-        notes: meta.notes ?? null,
+        notes: [meta.notes, rewrites.length ? `Quotable text rewritten without a freshness date (no-date rule): ${rewrites.join('; ')}` : null].filter(Boolean).join(' ') || null,
       });
     }
   }

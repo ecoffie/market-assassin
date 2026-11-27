@@ -6,7 +6,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
-  parseRulesKb, buildRegisterRows, rankRuleClaims, checkClaims, classifySource, RULES_KB_DOC, type SourcesSnapshot,
+  QUOTABLE_REWRITES, FRESHNESS_PHRASE, parseRulesKb, buildRegisterRows, rankRuleClaims, checkClaims, classifySource, RULES_KB_DOC, type SourcesSnapshot,
 } from './rules-kb';
 
 const MD = readFileSync(join(process.cwd(), RULES_KB_DOC), 'utf8');
@@ -25,7 +25,8 @@ describe('parse', () => {
     for (const e of entries.filter((x) => x.part !== 'C')) {
       for (const f of [e.change, e.source_text, e.status_text, e.affects, e.common_mistake, e.how_to_use]) {
         expect(f, `${e.claim_id}`).toBeTruthy();
-        expect(MD.includes(f!.split('\n')[0].slice(0, 80)), `${e.claim_id} field not verbatim`).toBe(true);
+        const rewritten = QUOTABLE_REWRITES.some((r) => f!.includes(r.to));
+        if (!rewritten) expect(MD.includes(f!.split('\n')[0].slice(0, 80)), `${e.claim_id} field not verbatim`).toBe(true);
       }
     }
   });
@@ -36,6 +37,24 @@ describe('parse', () => {
   });
   it('a changed file shape fails loudly, never a partial parse', () => {
     expect(() => parseRulesKb(MD.replace('### 7. ', '### 77. '))).toThrow();
+  });
+});
+
+describe('no freshness dates in quotable text (Eric 2026-11-27)', () => {
+  it('no claim a report can quote carries "as of <date>" / "through 2026"', () => {
+    for (const e of entries) {
+      for (const f of [e.claim, e.change, e.status_text, e.affects, e.common_mistake, e.how_to_use, e.practice_text]) {
+        expect(FRESHNESS_PHRASE.test(f ?? ''), `${e.claim_id}: ${f}`).toBe(false);
+      }
+    }
+  });
+  it('every rewrite applied and recorded on the row; document identifiers stay', () => {
+    expect(byId['KB-1'].status_text).toContain('No Part 19 rule has been proposed yet.');
+    expect(byId['KB-1'].notes).toMatch(/rewritten without a freshness date/);
+    expect(byId['KB-11'].status_text).toContain('The services are announcing their PAEs.');
+    for (const r of QUOTABLE_REWRITES) expect(MD).toContain(r.from); // the file keeps Eric's original words
+    expect(byId['KB-10'].source_text).toMatch(/M-25-31/);
+    expect(byId['KB-1'].caveats[0]).toMatch(/Sept 18, 2026 batch/); // a document identifier, kept
   });
 });
 
