@@ -48,9 +48,30 @@ describe('parseWriteAction', () => {
   });
   it('maps alert choices: off/paused/none → off', () => {
     for (const v of ['off', 'paused', 'none']) {
-      const p = parseWriteAction('update_alert', { search_id: 'a', alert_frequency: v });
+      const p = parseWriteAction('update_alert', { search_id: '11111111-1111-4111-8111-111111111111', alert_frequency: v });
       expect(p.ok && p.action.name === 'update_alert' && p.action.args.alert).toBe('off');
     }
+  });
+});
+
+describe('server-side arg rules (same as the client registry)', () => {
+  it.each([
+    ['save_search', { name: 'x'.repeat(81), filters: {} }],
+    ['save_search', { name: '<script>', filters: {} }],
+    ['update_alert', { search_id: 'not-a-uuid', alert_frequency: 'daily' }],
+    ['add_to_pursuits', { notice_id: 'abc' }],
+    ['add_to_pursuits', { notice_id: "abc123'; drop" }],
+    ['add_to_pursuits', { kind: 'recompete', contract_id: 'C'.repeat(65) }],
+    ['remove_from_pursuits', { pursuit_id: 'p-1' }],
+    ['remove_from_pursuits', { notice_id: 'a,b.c' }],
+  ])('%s refuses %j', (name, args) => {
+    expect(parseWriteAction(name, args).ok).toBe(false);
+  });
+  it('raw database errors never reach the customer message', async () => {
+    const d = deps({ removeOwnedPursuit: vi.fn(async () => ({ kind: 'error' as const, message: 'relation "user_pipeline" permission denied' })) });
+    const r = await executeWriteAction(act('remove_from_pursuits', { pursuit_id: '11111111-1111-4111-8111-111111111111' }), 'a', CTX, d);
+    expect(r).toMatchObject({ ok: false, error_code: 'write_failed' });
+    expect(r.message).not.toMatch(/relation|permission/);
   });
 });
 
@@ -80,8 +101,8 @@ describe('save_search / update_alert', () => {
   });
   it('update_alert is owner-scoped through updateSavedSearch; not_found is reported', async () => {
     const d = deps({ updateSavedSearch: vi.fn(async () => ({ ok: false as const, code: 'not_found', message: 'x' })) });
-    const r = await executeWriteAction(act('update_alert', { search_id: 'other', alert_frequency: 'daily' }), 'a', CTX, d);
-    expect(d.updateSavedSearch).toHaveBeenCalledWith(expect.objectContaining({ userEmail: CTX.email, id: 'other' }));
+    const r = await executeWriteAction(act('update_alert', { search_id: '11111111-1111-4111-8111-111111111111', alert_frequency: 'daily' }), 'a', CTX, d);
+    expect(d.updateSavedSearch).toHaveBeenCalledWith(expect.objectContaining({ userEmail: CTX.email, id: '11111111-1111-4111-8111-111111111111' }));
     expect(r).toMatchObject({ ok: false, error_code: 'not_found' });
   });
 });
@@ -104,7 +125,7 @@ describe('add_to_pursuits', () => {
   });
   it('an unknown notice writes nothing', async () => {
     const d = deps();
-    const r = await executeWriteAction(act('add_to_pursuits', { notice_id: 'nope' }), 'a', CTX, d);
+    const r = await executeWriteAction(act('add_to_pursuits', { notice_id: 'nope1234' }), 'a', CTX, d);
     expect(r).toMatchObject({ ok: false, error_code: 'not_found' });
     expect(d.createCanonicalPursuit).not.toHaveBeenCalled();
   });
@@ -140,7 +161,7 @@ describe('remove_from_pursuits', () => {
   });
   it('already gone → ok + already (idempotent)', async () => {
     const d = deps({ removeOwnedPursuit: vi.fn(async () => ({ kind: 'not_found' as const })) });
-    const r = await executeWriteAction(act('remove_from_pursuits', { pursuit_id: 'p-1' }), 'a', CTX, d);
+    const r = await executeWriteAction(act('remove_from_pursuits', { pursuit_id: '11111111-1111-4111-8111-111111111111' }), 'a', CTX, d);
     expect(r).toMatchObject({ ok: true, already: true });
   });
 });

@@ -42,6 +42,10 @@ export interface WriteActionResult {
 }
 
 const str = (v: unknown) => (typeof v === 'string' ? v.trim() : '');
+// Same arg rules as the client registry (Agent 2, #2502), enforced here so the server never relies on the client.
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const NOTICE_ID = /^[A-Za-z0-9_-]{6,64}$/;
+const PLAIN = (s: string, max: number) => s.length <= max && !/[\u0000-\u001f<>]/.test(s);
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
 
 function parseAlert(v: unknown): AlertChoice | null {
@@ -58,6 +62,7 @@ export function parseWriteAction(name: unknown, args: unknown): { ok: true; acti
     case 'save_search': {
       const label = str(a.name);
       if (!label) return { ok: false, error: 'save_search needs a name' };
+      if (!PLAIN(label, 80)) return { ok: false, error: 'name must be plain text of at most 80 characters' };
       const mode = str(a.mode) || 'open';
       if (mode !== 'open' && mode !== 'recompete') return { ok: false, error: 'mode must be open or recompete' };
       if (!isObj(a.filters)) return { ok: false, error: 'save_search needs filters (the Map search to save)' };
@@ -68,7 +73,7 @@ export function parseWriteAction(name: unknown, args: unknown): { ok: true; acti
     case 'update_alert': {
       const id = str(a.search_id);
       const alert = parseAlert(a.alert_frequency);
-      if (!id) return { ok: false, error: 'update_alert needs search_id' };
+      if (!UUID.test(id)) return { ok: false, error: 'update_alert needs a valid search_id' };
       if (!alert) return { ok: false, error: 'alert_frequency must be daily, weekly or off' };
       return { ok: true, action: { name: 'update_alert', args: { search_id: id, alert } } };
     }
@@ -76,12 +81,12 @@ export function parseWriteAction(name: unknown, args: unknown): { ok: true; acti
       const kind = str(a.kind) || (a.contract_id ? 'recompete' : 'opportunity');
       if (kind === 'opportunity') {
         const notice = str(a.notice_id);
-        if (!notice) return { ok: false, error: 'add_to_pursuits (opportunity) needs notice_id' };
+        if (!NOTICE_ID.test(notice)) return { ok: false, error: 'add_to_pursuits (opportunity) needs a valid notice_id' };
         return { ok: true, action: { name: 'add_to_pursuits', args: { kind, notice_id: notice } } };
       }
       if (kind === 'recompete') {
         const cid = str(a.contract_id);
-        if (!cid) return { ok: false, error: 'add_to_pursuits (recompete) needs contract_id' };
+        if (!cid || !PLAIN(cid, 64)) return { ok: false, error: 'add_to_pursuits (recompete) needs a valid contract_id' };
         return { ok: true, action: { name: 'add_to_pursuits', args: { kind, contract_id: cid } } };
       }
       return { ok: false, error: 'kind must be opportunity or recompete' };
@@ -90,6 +95,7 @@ export function parseWriteAction(name: unknown, args: unknown): { ok: true; acti
       const pid = str(a.pursuit_id);
       const notice = str(a.notice_id);
       if (!pid && !notice) return { ok: false, error: 'remove_from_pursuits needs pursuit_id or notice_id' };
+      if (pid ? !UUID.test(pid) : !NOTICE_ID.test(notice)) return { ok: false, error: 'remove_from_pursuits needs a valid pursuit_id or notice_id' };
       return { ok: true, action: { name: 'remove_from_pursuits', args: { ...(pid ? { pursuit_id: pid } : { notice_id: notice }) } } };
     }
     default:
@@ -126,6 +132,8 @@ export interface WriteActionCtx {
   origin: string;
 }
 
+/** Codes whose upstream message can be a raw database/infra error. */
+const TECHNICAL_CODES = new Set(['scheduler_unavailable', 'write_failed', 'lookup_failed']);
 const PURSUITS_PATH = '/app?panel=pipeline';
 const alertLabel = (row: SavedRow) => (row.alerts_enabled ? `${row.alert_frequency} alerts` : 'alerts off');
 const toPrefs = (a: AlertChoice) => (a === 'off' ? { alertsEnabled: false, alertFrequency: 'paused' } : { alertsEnabled: true, alertFrequency: a });
@@ -138,7 +146,11 @@ export async function executeWriteAction(
   deps: WriteActionDeps,
 ): Promise<WriteActionResult> {
   const base = { action_id: actionId, name: action.name };
-  const fail = (error_code: string, message: string): WriteActionResult => ({ ...base, ok: false, error_code, message });
+  // `message` is shown to the customer verbatim (Agent 2): never a raw database error, at most 300 characters.
+  const fail = (error_code: string, message: string): WriteActionResult => ({
+    ...base, ok: false, error_code,
+    message: (TECHNICAL_CODES.has(error_code) ? 'Mindy could not save that right now. Nothing was changed. Please try again.' : message).slice(0, 300),
+  });
 
   if (action.name === 'save_search') {
     const r = await deps.createSavedSearch({
