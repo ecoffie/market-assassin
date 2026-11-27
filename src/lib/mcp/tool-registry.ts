@@ -87,6 +87,7 @@ import { getVehicleSpendMix } from '@/mcp/tools/vehicle-spend-mix';
 import { draftProposal, draftProposalSection } from '@/mcp/tools/draft-proposal';
 import { exportProposal } from '@/mcp/tools/export-proposal';
 import { getBalance } from '@/lib/mcp/credits';
+import { getCompanyProfile, savePastPerformance } from '@/mcp/tools/company-profile';
 import { tierFor } from '@/lib/mcp/entitlements';
 
 export interface McpToolContext {
@@ -173,6 +174,9 @@ export const TOOL_CREDITS: Readonly<Record<string, number>> = {
   update_market_schedule: 0,
   delete_market_schedule: 0,
   list_market_schedules: 0,
+  // Free: reading/filling the caller's OWN company record (Vault) — it makes every draft tool better.
+  get_company_profile: 0,
+  save_past_performance: 0,
   export_proposal: 10,
   build_proposal_structure: 10,
   scan_proposal_compliance: 10,
@@ -1224,6 +1228,54 @@ const SCHEDULE_MARKET_SEARCH_TOOL_DEF = {
   },
 };
 
+const COMPANY_PROFILE_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'get_company_profile',
+    description:
+      "What Mindy knows about the caller's OWN company: name, UEI, NAICS, certifications, saved past performance " +
+      '(title, customer, role, period, value, scope), and counts of capabilities and key personnel. Every proposal ' +
+      'and capability-statement draft is grounded in this record. Returns `missing` (what to add next) and, when no ' +
+      'past performance is saved, guidance on what legitimately counts. Free read. A section listed in `unavailable` ' +
+      'could not be read — its count is null, never zero.',
+    parameters: { type: 'object', properties: {} },
+  },
+};
+
+const SAVE_PAST_PERFORMANCE_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'save_past_performance',
+    description:
+      "Save ONE real project to the caller's own company record so proposal and capability-statement drafts can cite it. " +
+      'Federal, state/local, commercial and subcontract work all count when relevant. Interview the user for the facts ' +
+      '(what, for whom, role, when, value, what they did, results, a reference) — never invent, embellish or save an ' +
+      'example project. confirm_real=true is required: the user confirms the company or its key personnel actually did ' +
+      'this work. Free. Adds a row; never overwrites.',
+    parameters: {
+      type: 'object',
+      properties: {
+        title: { type: 'string', description: 'Project or contract name, e.g. "Grounds maintenance, Dayton parks".' },
+        customer: { type: 'string', description: 'Who it was for: agency, city/state, commercial client, or the prime you subcontracted to.' },
+        scope: { type: 'string', description: 'What the company did, 2–4 plain sentences.' },
+        role: { type: 'string', enum: ['prime', 'sub', 'jv_partner', 'key_personnel'], description: 'The company\'s role.' },
+        outcomes: { type: 'string', description: 'Results the user can document. Leave out if none.' },
+        period_start: { type: 'string', description: 'YYYY-MM-DD' },
+        period_end: { type: 'string', description: 'YYYY-MM-DD (omit if ongoing)' },
+        value: { type: 'number', description: 'Contract value in dollars.' },
+        contract_number: { type: 'string' },
+        reference_name: { type: 'string' },
+        reference_title: { type: 'string' },
+        reference_email: { type: 'string' },
+        reference_phone: { type: 'string' },
+        naics_codes: { type: 'array', items: { type: 'string' }, description: 'Optional 2–6 digit NAICS codes for this work.' },
+        confirm_real: { type: 'boolean', description: 'Must be true: the user confirmed this is real work the company did.' },
+      },
+      required: ['title', 'customer', 'scope', 'confirm_real'],
+    },
+  },
+};
+
 const LIST_MARKET_SCHEDULES_TOOL_DEF = {
   type: 'function' as const,
   function: {
@@ -2116,6 +2168,8 @@ export function listMcpTools(): Array<Record<string, unknown>> {
     CRM_CONTACTS_TOOL_DEF,
     SCHEDULE_MARKET_SEARCH_TOOL_DEF,
     LIST_MARKET_SCHEDULES_TOOL_DEF,
+    COMPANY_PROFILE_TOOL_DEF,
+    SAVE_PAST_PERFORMANCE_TOOL_DEF,
     UPDATE_MARKET_SCHEDULE_TOOL_DEF,
     DELETE_MARKET_SCHEDULE_TOOL_DEF,
     CONTRACTOR_AWARD_HISTORY_TOOL_DEF,
@@ -2188,6 +2242,8 @@ export function isMcpTool(name: string): boolean {
     name === 'add_contacts_to_crm' ||
     name === 'schedule_market_search' ||
     name === 'list_market_schedules' ||
+    name === 'get_company_profile' ||
+    name === 'save_past_performance' ||
     name === 'update_market_schedule' ||
     name === 'delete_market_schedule' ||
     name === 'get_contractor_award_history' ||
@@ -2723,6 +2779,19 @@ async function dispatchMcpTool(
           ? (args.bbox as { w: number; s: number; e: number; n: number })
           : undefined,
     })) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'get_company_profile') {
+    // Owner comes from the VERIFIED caller — never from args.
+    const result = (await getCompanyProfile({ userEmail: ctx.userEmail, vaultEmail: ctx.vaultEmail })) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'save_past_performance') {
+    // Owner comes from the VERIFIED caller — never from args.
+    // Writes only to the caller's own record — never a coach's client workspace (ctx.vaultEmail).
+    const result = (await savePastPerformance({ ...args, userEmail: ctx.userEmail, vaultEmail: undefined })) as unknown as Record<string, unknown>;
     return { result, credits };
   }
 

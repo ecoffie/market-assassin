@@ -66,6 +66,8 @@ const LINE: Record<string, string> = {
   search_federal_events: 'Industry days, matchmaking and sources-sought events for an agency',
   get_federal_event_series: 'The recurring conference calendar: AFCEA, NDIA, SAME, APEX',
   get_legislation_status: 'NDAA and bill status from Mindy’s stored Congress record',
+  get_company_profile: 'Your company record every draft uses, and what is still missing',
+  save_past_performance: 'Save a real project so proposals cite your work, not placeholders',
   evaluate_bid_decision: 'Bid or no-bid: 5 eliminator gates and a 10-factor scorecard',
   extract_compliance_matrix: 'Every shall, must and Section L/M/C requirement, source-verified',
   get_solicitation_documents: 'The full RFP text and every attachment',

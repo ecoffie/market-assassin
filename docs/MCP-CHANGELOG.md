@@ -7,9 +7,31 @@ accurately from this file.
 
 Authoritative counts (never trust a grep — tools register via two paths: explicit
 `*_TOOL_DEF` consts in `src/lib/mcp/tool-registry.ts` AND the TIER1/TIER2 chat defs):
-- **Internal registry, `listMcpTools()` = 65.** Mindy Chat and tool-to-tool composition use it.
-- **Public catalog, `listPublicMcpTools()` = 54.** What the hosted HTTP edge lists and accepts.
+- **Internal registry, `listMcpTools()` = 67.** Mindy Chat and tool-to-tool composition use it.
+- **Public catalog, `listPublicMcpTools()` = 56.** What the hosted HTTP edge lists and accepts.
   The difference is the hidden set in `src/lib/mcp/public-catalog-config.ts`.
+
+---
+
+## November 2026 — Company profile tools (public 54 → 56, internal 65 → 67)
+
+Research (`docs/research/2026-11-22-contractor-problems-and-industries.md`) ranked "no past
+performance" and "proposal workload" among the top three contractor problems. Every draft tool
+already reads the Vault, but an MCP user could neither see nor fill it.
+
+- **`get_company_profile`** (free, read-only) — the caller's own company record: name, UEI, NAICS,
+  certifications, saved past performance, counts of capabilities and key personnel, `missing`
+  (what to add next), and guidance on what counts as past performance when none is saved. A
+  section whose read failed is in `unavailable` with a null count, never 0.
+- **`save_past_performance`** (free, additive) — adds ONE real project (federal, state/local,
+  commercial or subcontract) to the caller's Vault, the same row the app's Vault page writes
+  (`source='mcp'`), then embeds it for requirement matching. `confirm_real=true` is required.
+  It writes ONLY to the verified caller's own record: never a coach's client workspace, never an
+  email from args.
+
+### Docs kept in sync
+
+- Capabilities artifact (`31ec6de1-1dcf-4a04-aa43-30289bfc6c7c`) — 56 tools (republish at merge).
 
 ---
 
@@ -25,7 +47,7 @@ getmindy.ai/jobs.
 
 ### Docs kept in sync
 
-- Capabilities artifact (`31ec6de1-1dcf-4a04-aa43-30289bfc6c7c`) — 54 tools.
+- Capabilities artifact (`31ec6de1-1dcf-4a04-aa43-30289bfc6c7c`) — 56 tools.
 
 ---
 
@@ -53,7 +75,7 @@ Source: `tasks/mcp-tool-portfolio-audit-2026-10-02.md` (Phase 0 + Phase 1).
 
 ### Docs kept in sync
 
-- Capabilities artifact (`31ec6de1-1dcf-4a04-aa43-30289bfc6c7c`) — 54 tools.
+- Capabilities artifact (`31ec6de1-1dcf-4a04-aa43-30289bfc6c7c`) — 56 tools.
 
 ---
 
