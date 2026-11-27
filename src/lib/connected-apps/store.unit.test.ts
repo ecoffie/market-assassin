@@ -7,10 +7,11 @@ import { decryptSecret as decrypt } from '@/lib/crypto/secretbox';
 /** Minimal in-memory stand-in for the PostgREST chains the store uses. */
 function fakeDb() {
   const rows: Array<Record<string, unknown>> = [];
+  const conflicts: string[] = [];
   let n = 0;
   const make = () => {
     const filters: Array<[string, string, unknown]> = [];
-    let op: 'select' | 'update' | 'upsert' = 'select';
+    let op: 'select' | 'update' | 'upsert' | 'delete' = 'select';
     let patch: Record<string, unknown> = {};
     const match = (r: Record<string, unknown>) => filters.every(([k, kind, v]) => (kind === 'eq' ? r[k] === v : r[k] !== v));
     const q: Record<string, unknown> = {
@@ -19,24 +20,28 @@ function fakeDb() {
       neq: (k: string, v: unknown) => { filters.push([k, 'neq', v]); return q; },
       order: () => q,
       update: (p: Record<string, unknown>) => { op = 'update'; patch = p; return q; },
-      upsert: (row: Record<string, unknown>) => {
+      delete: () => { op = 'delete'; return q; },
+      upsert: (row: Record<string, unknown>, opts?: { onConflict?: string }) => {
         op = 'upsert';
-        const hit = rows.find((r) => r.scope_key === row.scope_key && r.provider === row.provider && r.provider_account_id === row.provider_account_id);
+        conflicts.push(String(opts?.onConflict));
+        // Same key as the unique index: (scope_key, provider, provider_account_id, owner_email).
+        const hit = rows.find((r) => r.scope_key === row.scope_key && r.provider === row.provider && r.provider_account_id === row.provider_account_id && r.owner_email === row.owner_email);
         if (hit) Object.assign(hit, row);
         else rows.push({ id: `id-${++n}`, created_at: new Date().toISOString(), refresh_token_enc: null, ...row });
         patch = row;
         return q;
       },
-      single: async () => ({ data: rows.find((r) => r.scope_key === patch.scope_key && r.provider_account_id === patch.provider_account_id) ?? null, error: null }),
+      single: async () => ({ data: rows.find((r) => r.scope_key === patch.scope_key && r.provider_account_id === patch.provider_account_id && r.owner_email === patch.owner_email) ?? null, error: null }),
       maybeSingle: async () => ({ data: rows.find(match) ?? null, error: null }),
       then: (res: (v: unknown) => unknown) => {
         if (op === 'update') { rows.filter(match).forEach((r) => Object.assign(r, patch)); return Promise.resolve({ data: null, error: null }).then(res); }
+        if (op === 'delete') { for (let i = rows.length - 1; i >= 0; i--) if (match(rows[i])) rows.splice(i, 1); return Promise.resolve({ data: null, error: null }).then(res); }
         return Promise.resolve({ data: rows.filter(match), error: null }).then(res);
       },
     };
     return q;
   };
-  return { rows, db: { from: () => make() } as unknown as SupabaseClient };
+  return { rows, conflicts, db: { from: () => make() } as unknown as SupabaseClient };
 }
 
 const KEY = 'token-key-test-0123456789abcdef01234567';
@@ -45,7 +50,7 @@ beforeEach(() => {
   process.env.CONNECTED_APPS_TOKEN_ENC_KEY = KEY;
   process.env.CRM_TOKEN_ENC_KEY = 'shared-crm-key-test';
 });
-const decryptSecret = (v: string) => decrypt(v, { secret: KEY, salt: 'mindy-connected-apps-v1' });
+const decryptSecret = (v: string) => decrypt(v, { secret: KEY, salt: 'mindy-connected-apps-v1', id: 'k1' });
 
 const tokens = (o: Partial<{ accessToken: string; refreshToken: string | null; expiresAt: number }> = {}) => ({ accessToken: 'at-1', refreshToken: 'rt-1', expiresAt: Date.now() + 3600_000, grantedScopes: ['openid'], ...o });
 const conn = (scopeKey: string, accountId = 'g-1', ownerEmail = 'a@b.com') => ({ scopeKey, ownerEmail, provider: 'google' as const, accountId, email: 'owner@acme.com', name: 'Owner', tokens: tokens() });
@@ -63,7 +68,7 @@ describe('connected accounts store', () => {
     const { db, rows } = fakeDb();
     const v = await saveConnection(conn('own:a@b.com'), db);
     expect(v).not.toHaveProperty('refresh_token_enc');
-    expect(String(rows[0].refresh_token_enc)).toMatch(/^v1:/);
+    expect(String(rows[0].refresh_token_enc)).toMatch(/^v2:k1:/); // key id travels with the ciphertext
     expect(decryptSecret(String(rows[0].refresh_token_enc))).toBe('rt-1');
     expect(JSON.stringify(rows[0])).not.toContain('rt-1');
     // Not readable with the shared CRM fallback key: the dedicated key is the only one.
@@ -136,8 +141,37 @@ describe('connected accounts store', () => {
     let revoked = '';
     expect(await disconnect('own:a@b.com', 'a@b.com', v.id, { db, revoke: async (_p, t) => { revoked = t; return 'revoked'; } })).toBe('disconnected');
     expect(revoked).toBe('rt-1');
-    expect(rows[0]).toMatchObject({ status: 'revoked', refresh_token_enc: null, access_token_enc: null });
-    expect(await accessTokenFor('own:a@b.com', 'a@b.com', v.id, { db })).toEqual({ ok: false, reason: 'revoked' });
+    expect(rows).toHaveLength(0); // the row (tokens and all) is deleted
+    expect(await accessTokenFor('own:a@b.com', 'a@b.com', v.id, { db })).toEqual({ ok: false, reason: 'not_found' });
     expect(await listConnections('own:a@b.com', 'a@b.com', db)).toEqual([]);
+  });
+
+  it('a reconnect after disconnect is a NEW connection id, so handles bound to the old id never work again', async () => {
+    const { db } = fakeDb();
+    const v1 = await saveConnection(conn('own:a@b.com'), db);
+    await disconnect('own:a@b.com', 'a@b.com', v1.id, { db, revoke: async () => 'revoked' });
+    const v2 = await saveConnection(conn('own:a@b.com'), db);
+    expect(v2.id).not.toBe(v1.id);
+    expect(await accessTokenFor('own:a@b.com', 'a@b.com', v1.id, { db })).toEqual({ ok: false, reason: 'not_found' });
+  });
+
+  it('a colleague connecting the same provider account gets their own row; the first person keeps theirs', async () => {
+    const { db, rows, conflicts } = fakeDb();
+    const mine = await saveConnection(conn('ws:w1', 'g-1', 'coach1@x.com'), db);
+    const theirs = await saveConnection({ ...conn('ws:w1', 'g-1', 'coach2@x.com'), tokens: tokens({ accessToken: 'at-2', refreshToken: 'rt-2' }) }, db);
+    expect(rows).toHaveLength(2);
+    expect(theirs.id).not.toBe(mine.id);
+    expect(await accessTokenFor('ws:w1', 'coach1@x.com', mine.id, { db })).toMatchObject({ ok: true, token: 'at-1' });
+    // The store upserts on the same four columns as the unique index (migration 20261127).
+    expect(conflicts.every((c) => c === 'scope_key,provider,provider_account_id,owner_email')).toBe(true);
+  });
+
+  it('a stored token that no longer decrypts marks the connection reauth_needed (fail soft, no throw)', async () => {
+    const { db, rows } = fakeDb();
+    const v = await saveConnection(conn('own:a@b.com'), db);
+    rows[0].access_token_enc = 'v2:k1:garbage:garbage:garbage';
+    rows[0].refresh_token_enc = 'v2:other-key:x:y:z';
+    expect(await accessTokenFor('own:a@b.com', 'a@b.com', v.id, { db })).toEqual({ ok: false, reason: 'reauth_needed' });
+    expect(rows[0].status).toBe('reauth_needed');
   });
 });

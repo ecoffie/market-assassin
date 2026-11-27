@@ -177,3 +177,22 @@ Not run yet. As of 2026-11-24 there are no `CONNECTED_APPS_*` variables in any e
 
 - **The callback can't re-check a client-workspace authorization**, because it receives no session header. The workspace binding is verified at `/start` and carried in a signed state that lives 10 minutes. Execution-time tools (Slice A part 2 onward) re-resolve the acting scope on every call, as spec §4 requires.
 - **Revoking a grant at the provider.** Google: when someone revokes access in their Google account, the next refresh returns `invalid_grant`, which marks the connection `reauth_needed`. Microsoft: same, via `invalid_grant` or `interaction_required`.
+
+## 6. Security review fixes before all customers (Agent 4, 2026-11-27)
+
+Slice A (this branch):
+- **Open redirect.** `safeReturnTo` refuses control characters and whitespace (URL parsing strips tab and newline, so `/\t/evil.com` became `//evil.com`), and the result must resolve to our own origin.
+- **Bounded provider calls.** The token, identity and revoke requests time out at 12 s (`PROVIDER_TIMEOUT_MS`).
+- **secretbox.** The scrypt key is derived once per (secret, salt) per process. Connected-apps ciphertext is written as `v2:<keyId>:…` (`CONNECTED_APPS_TOKEN_KEY_ID`, default `k1`), so the key can be rotated later. v1 ciphertext still reads.
+- **Fail soft.** A stored token that no longer decrypts marks the connection `reauth_needed` instead of throwing.
+- **One row per Mindy user.** The unique key is `(scope_key, provider, provider_account_id, owner_email)`, so a colleague who connects the same account gets their own row.
+  - Migration `20261127_connected_accounts_owner_unique.sql` is idempotent and works whether or not `20261124` was applied.
+  - **It must be applied before or with the deploy**, because the store upserts on the four columns.
+- **Disconnect deletes the row.** A reconnect gets a new id, so file handles from before the disconnect never work again.
+- **Rate limit.** `/start` allows 20 per user per hour.
+
+Slice A.2 (`feat/connected-apps-slice-a2`):
+- the file-read timeouts and a streamed size cap;
+- the per-session text cache;
+- rate limits on `/browse`, `/selections` and `/picker-token`;
+- fail-soft reads.
