@@ -165,3 +165,35 @@ export async function disconnect(scopeKey: string, ownerEmail: string, id: strin
   if (error) throw new Error(`connected-apps: disconnect failed (${error.code})`);
   return 'disconnected';
 }
+
+/**
+ * A short-lived access token limited to `scopes`, minted fresh from the refresh token and NOT stored. For a token
+ * that leaves the server (the Google Picker runs in the browser): once a connection allows email drafts, its stored
+ * access token carries gmail.compose too, which must never reach the browser. Fails closed: if the provider returns
+ * any scope outside `scopes`, or does not say which scopes it granted, no token is returned.
+ */
+export async function restrictedAccessTokenFor(
+  scopeKey: string,
+  ownerEmail: string,
+  id: string,
+  scopes: string[],
+  deps: { db?: SupabaseClient; refresh?: typeof refreshTokens; acceptAlso?: string[] } = {},
+): Promise<{ ok: true; token: string; provider: Provider; connection: ConnectionView } | { ok: false; reason: 'not_found' | 'revoked' | 'reauth_needed' | 'refresh_failed' | 'scope_not_restricted' }> {
+  const db = deps.db ?? getWriteClient();
+  const row = await loadRow(scopeKey, ownerEmail, id, db);
+  if (!row) return { ok: false, reason: 'not_found' };
+  if (row.status === 'revoked') return { ok: false, reason: 'revoked' };
+  if (row.status === 'reauth_needed' || !row.refresh_token_enc) return { ok: false, reason: 'reauth_needed' };
+  let refresh: string;
+  try { refresh = dec(row.refresh_token_enc); } catch { return { ok: false, reason: 'reauth_needed' }; }
+  try {
+    const t = await (deps.refresh ?? refreshTokens)(row.provider, refresh, fetch, scopes);
+    // Providers may echo a requested scope under its long name (Google: email -> .../userinfo.email).
+    const allowed = new Set([...scopes, ...(deps.acceptAlso ?? [])]);
+    if (!t.grantedScopes.length || t.grantedScopes.some((s) => !allowed.has(s))) return { ok: false, reason: 'scope_not_restricted' };
+    return { ok: true, token: t.accessToken, provider: row.provider, connection: view(row) };
+  } catch (err) {
+    if (err instanceof OAuthError && err.needsReauth) return { ok: false, reason: 'reauth_needed' };
+    return { ok: false, reason: 'refresh_failed' };
+  }
+}

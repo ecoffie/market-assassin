@@ -195,3 +195,44 @@ describe('ConnectedFiles', () => {
     } finally { vi.useRealTimers(); }
   });
 });
+
+describe('ConnectedFiles: email drafts (Slice B)', () => {
+  const google = (scopes: string[]) => ({ id: 'c-g', provider: 'google', connected_email: 'pat@acme.example.com', status: 'connected', granted_scopes: scopes });
+
+  it('a file-only account offers "Allow email drafts"; choosing it asks for file + draft and shows the note first', async () => {
+    h.list = { status: 200, body: { connections: [google(['https://www.googleapis.com/auth/drive.file'])], providers: [{ provider: 'google', available: true }], drafts: true } };
+    h.start = { status: 200, body: { authorize_url: 'https://accounts.google.com/o/oauth2/v2/auth?x=2', access_note: "Google's permission to save email drafts in your Gmail also covers sending. Mindy never sends." } };
+    await mount();
+    await click(button('Use a file from Drive or OneDrive'));
+    const allow = button('Allow email drafts in Gmail (pat@acme.example.com)');
+    expect(allow).toBeTruthy();
+    await click(allow);
+    const start = h.calls.find((c) => c.url.includes('/start'))!;
+    expect(JSON.parse(start.body!).capabilities).toEqual(['file', 'draft']);
+    expect(el.textContent).toContain('Mindy never sends');
+    expect(button('Continue to Google')).toBeTruthy();
+  });
+
+  it('an account that already allows drafts is not asked again', async () => {
+    h.list = { status: 200, body: { connections: [google(['https://www.googleapis.com/auth/drive.file', 'https://www.googleapis.com/auth/gmail.compose'])], providers: [{ provider: 'google', available: true }], drafts: true } };
+    await mount();
+    await click(button('Use a file from Drive or OneDrive'));
+    expect(button('Allow email drafts')).toBeUndefined();
+  });
+
+  it('not on the drafts allowlist (drafts: false): no "Allow email drafts" item, even for a files-only account', async () => {
+    h.list = { status: 200, body: { connections: [google(['https://www.googleapis.com/auth/drive.file'])], providers: [{ provider: 'google', available: true }], drafts: false } };
+    await mount();
+    await click(button('Use a file from Drive or OneDrive'));
+    expect(button('Allow email drafts')).toBeUndefined();
+    expect(button('Pick from Google Drive')).toBeTruthy();
+  });
+
+  it('connecting a new account still asks for files only', async () => {
+    await mount();
+    await click(button('Use a file from Drive or OneDrive'));
+    await click(button('Connect Google Drive'));
+    const start = h.calls.find((c) => c.url.includes('/start'))!;
+    expect(JSON.parse(start.body!).capabilities).toEqual(['file']);
+  });
+});
