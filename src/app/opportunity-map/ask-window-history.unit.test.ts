@@ -158,6 +158,7 @@ describe('History (GET /api/app/chat-sessions)', () => {
     expect(t.doc.getElementById('amk')!.classList.contains('amk-hist-open')).toBe(false);
     expect(t.bubbles()).toEqual(['U: Drone market?', 'A: Here is the report.']);
     expect(t.doc.querySelector('[data-testid="amk-report-card"] b')?.textContent).toBe('Drones');
+    expect(t.doc.querySelector('[data-testid="amk-report-card"] [data-testid="amk-report-my-documents"]')?.getAttribute('href')).toBe('/app?panel=vault&section=documents'); // reopened card keeps the link
     expect(t.calls.some((c) => c.url.startsWith('/api/app/vault/documents/preview'))).toBe(false); // card only, no auto-open
     await t.send('Revise it');
     expect(t.chatBodies[0].sessionId).toBe(SID2);

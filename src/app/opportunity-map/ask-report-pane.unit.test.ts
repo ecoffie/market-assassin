@@ -99,6 +99,19 @@ describe('Map Ask Mindy report pane', () => {
     expect(pane.querySelector('.amk-rep-v')!.textContent).toContain('Version 1');
   });
 
+  it('the card says where the file lives: "Saved to My Documents" opens Vault → Documents in the workspace, in a new tab (the Map session stays)', async () => {
+    const t = boot({ chat: createTurn(V1) });
+    (t.w as unknown as { openAskMindy: () => void }).openAskMindy();
+    await t.ask('Write a comprehensive market research report');
+    const card = t.doc.querySelector('[data-testid="amk-report-card"]')!;
+    expect(card.textContent).toContain('Version 1 - Saved to My Documents');
+    const a = card.querySelector('[data-testid="amk-report-my-documents"]') as HTMLAnchorElement;
+    expect(a.getAttribute('href')).toBe('/app?panel=vault&section=documents');
+    expect(a.getAttribute('target')).toBe('_blank');
+    expect(a.getAttribute('rel')).toBe('noopener');
+    expect(card.querySelector('.amk-repcard-open')?.textContent).toBe('Open document');
+  });
+
   it('Export menu opens formats and uses the existing download route', async () => {
     const t = boot({ chat: createTurn(V1) });
     (t.w as unknown as { openAskMindy: () => void }).openAskMindy();
