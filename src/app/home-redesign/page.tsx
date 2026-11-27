@@ -131,7 +131,7 @@ export default function HomeRedesign() {
               </p>
               <ul className="text-slate-400 text-sm space-y-2 mb-6">
                 <li className="flex items-center gap-2">
-                  <span className="text-emerald-500">✓</span> FY2026 NDAA: $848B Budget
+                  <span className="text-emerald-500">✓</span> FY2026 NDAA priorities
                 </li>
                 <li className="flex items-center gap-2">
                   <span className="text-emerald-500">✓</span> Opportunity Scout Workshop

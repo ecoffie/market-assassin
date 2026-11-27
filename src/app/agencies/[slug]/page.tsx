@@ -589,7 +589,7 @@ function SmallBusinessNote({ agency }: { agency: AgencySeo }) {
   // and from a curated list of agencies known to have strong programs.
   const STRONG_SB: Record<string, string> = {
     'department-of-veterans-affairs':
-      'VA is the most SDVOSB-friendly buyer in the federal government — the Vets First contracting program requires SDVOSB consideration before any other socioeconomic category. Get CVE verified and you have a structural advantage.',
+      'VA is the most SDVOSB-friendly buyer in the federal government — the Vets First contracting program requires SDVOSB consideration before any other socioeconomic category. Get certified through SBA’s Veteran Small Business Certification program (VetCert, veterans.certify.sba.gov) and you have a structural advantage.',
     'small-business-administration':
       'SBA sets small business policy and self-imposes high set-aside goals — 8(a), HUBZone, and WOSB awards are heavily concentrated here.',
     'department-of-agriculture':
@@ -599,7 +599,7 @@ function SmallBusinessNote({ agency }: { agency: AgencySeo }) {
     'general-services-administration':
       'GSA Multiple Award Schedule (MAS) is the gateway — once you&apos;re on Schedule, every federal agency can buy from you without re-competing.',
     'national-aeronautics-and-space-administration':
-      'NASA SBIR/STTR program is one of the most accessible R&D entry points in the federal market. Phase I awards are around $150K.',
+      'NASA SBIR/STTR program is one of the most accessible R&D entry points in the federal market.',
   };
 
   const note = STRONG_SB[agency.slug];
@@ -859,7 +859,7 @@ function HowMindyTracks({ agency }: { agency: AgencySeo }) {
             recompete signals land in a single morning email.
           </p>
           <p className="text-(--mp-muted) text-sm">
-            No more checking 12 portals. No more reading 80-page
+            No more checking portal after portal. No more reading long
             solicitations to figure out if you&apos;re even eligible.
           </p>
         </div>

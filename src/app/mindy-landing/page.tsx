@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import NoRefundNote from '@/components/NoRefundNote';
+import { OPPORTUNITY_COUNT, forecastsLabel } from '@/lib/marketing-stats';
 import type { Metadata } from 'next';
 import { MindySignupForm } from '@/components/mindy/MindySignupForm';
 import { MindyDayBar } from '@/components/mindy/MindyDayBar';
@@ -77,7 +78,7 @@ export default function MindyLandingPage() {
             name: 'I already have a BD person. Why do I need Mindy?',
             acceptedAnswer: {
               '@type': 'Answer',
-              text: "Mindy doesn't replace your BD team — she supercharges them. She handles the 20 hours/week of searching so your people can focus on relationships and proposals.",
+              text: "Mindy doesn't replace your BD team — she supercharges them. She handles the hours of searching so your people can focus on relationships and proposals.",
             },
           },
           {
@@ -160,7 +161,7 @@ export default function MindyLandingPage() {
             Win more federal contracts.
           </h1>
           <p className="text-lg md:text-xl text-ink-soft max-w-2xl mx-auto mb-8">
-            Mindy scans 88,000+ federal opportunities every night, tracks your competitors,
+            Mindy scans new federal opportunities every night, tracks your competitors,
             and delivers a personalized briefing before your first coffee.
           </p>
 
@@ -245,8 +246,8 @@ export default function MindyLandingPage() {
               brand, concrete scale + real usage substitutes for big-name logos. */}
           <div className="mt-8 grid grid-cols-2 md:grid-cols-4 gap-3 max-w-3xl mx-auto">
             {[
-              { n: '88,000+', l: 'opportunities tracked' },
-              { n: '90,000+', l: 'archived solicitations searchable' },
+              { n: `${OPPORTUNITY_COUNT.toLocaleString()}+`, l: 'opportunities tracked' },
+              { n: forecastsLabel, l: 'agency forecasts tracked' },
               { n: '9,900+', l: 'contractors using Mindy' },
               { n: 'Daily 6 AM', l: 'fresh scan, before coffee' },
             ].map((s) => (
@@ -372,12 +373,12 @@ export default function MindyLandingPage() {
 
         <div className="grid md:grid-cols-3 gap-6 mt-10">
           <div className="bg-surface/50 border border-hairline rounded-xl p-6 text-center">
-            <div className="text-4xl font-bold text-purple-400 mb-2">47</div>
-            <p className="text-ink-soft">People in Lockheed&apos;s BD department</p>
+            <div className="text-4xl font-bold text-purple-400 mb-2">BD teams</div>
+            <p className="text-ink-soft">Large primes staff whole departments to find work</p>
           </div>
           <div className="bg-surface/50 border border-hairline rounded-xl p-6 text-center">
-            <div className="text-4xl font-bold text-purple-400 mb-2">$2M</div>
-            <p className="text-ink-soft">Booz Allen spends on market intel tools</p>
+            <div className="text-4xl font-bold text-purple-400 mb-2">Paid tools</div>
+            <p className="text-ink-soft">And they pay for enterprise market intelligence</p>
           </div>
           <div className="bg-surface/50 border border-hairline rounded-xl p-6 text-center">
             <div className="text-4xl font-bold text-purple-400 mb-2">You?</div>
@@ -390,15 +391,15 @@ export default function MindyLandingPage() {
           <ul className="space-y-3 text-ink-soft">
             <li className="flex items-center gap-3">
               <span className="text-red-400">•</span>
-              <span><strong>1,500+</strong> new opportunities posted daily</span>
+              <span>New opportunities posted <strong>every day</strong></span>
             </li>
             <li className="flex items-center gap-3">
               <span className="text-red-400">•</span>
-              <span><strong>15+</strong> government websites to monitor</span>
+              <span><strong>Separate</strong> government websites to monitor</span>
             </li>
             <li className="flex items-center gap-3">
               <span className="text-red-400">•</span>
-              <span><strong>$750 billion</strong> in annual federal spending</span>
+              <span>Federal spending spread across <strong>every agency</strong></span>
             </li>
           </ul>
           <p className="mt-6 text-xl text-white font-semibold">
@@ -411,7 +412,7 @@ export default function MindyLandingPage() {
       <section className="bg-ground/50 py-20 px-4">
         <div className="max-w-4xl mx-auto">
           <h2 className="text-3xl md:text-4xl font-bold text-white text-center mb-4">
-            Everything a $150K Capture Manager Does.
+            Everything a Full-Time Capture Manager Does.
           </h2>
           <p className="text-xl text-purple-400 text-center mb-12">
             For less than your coffee budget.
@@ -424,7 +425,7 @@ export default function MindyLandingPage() {
                 <h3 className="text-lg font-bold text-white">Find Opportunities</h3>
               </div>
               <p className="text-ink-soft">
-                Scans SAM.gov, Grants.gov, agency forecasts, and 10+ sources — every single day.
+                Scans SAM.gov, Grants.gov, agency forecasts and more sources, every single day.
               </p>
             </div>
 
@@ -434,7 +435,7 @@ export default function MindyLandingPage() {
                 <h3 className="text-lg font-bold text-white">Know What&apos;s Coming</h3>
               </div>
               <p className="text-ink-soft">
-                Tracks 33,000+ forecasts so you&apos;re ready before it posts.
+                Tracks {forecastsLabel} forecasts so you&apos;re ready before it posts.
               </p>
             </div>
 
@@ -481,7 +482,7 @@ export default function MindyLandingPage() {
           <div className="text-center">
             <div className="w-16 h-16 rounded-full bg-purple-600 flex items-center justify-center mx-auto mb-4 text-2xl font-bold text-white">1</div>
             <h3 className="text-lg font-bold text-white mb-2">Tell Mindy About Your Business</h3>
-            <p className="text-muted">Your NAICS codes, target agencies, set-aside status. Takes 2 minutes.</p>
+            <p className="text-muted">Your NAICS codes, target agencies, set-aside status. Quick to set up.</p>
           </div>
 
           <div className="text-center">
@@ -519,7 +520,7 @@ export default function MindyLandingPage() {
                 <span className="text-4xl font-bold text-white">$149</span>
                 <span className="text-muted">/mo</span>
               </div>
-              <p className="text-purple-300 text-sm mb-6">The $150K capture manager in your pocket</p>
+              <p className="text-purple-300 text-sm mb-6">A capture manager in your pocket</p>
 
               <ul className="space-y-3 mb-8">
                 <li className="flex items-start gap-2 text-ink-soft text-sm">
@@ -627,7 +628,7 @@ export default function MindyLandingPage() {
           <div className="bg-surface border border-hairline rounded-xl p-6">
             <h3 className="text-lg font-bold text-white mb-2">I already have a BD person. Why do I need Mindy?</h3>
             <p className="text-ink-soft">
-              Mindy doesn&apos;t replace your BD team — she supercharges them. She handles the 20 hours/week
+              Mindy doesn&apos;t replace your BD team — she supercharges them. She handles the hours
               of searching so your people can focus on relationships and proposals.
             </p>
           </div>

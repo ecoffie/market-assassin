@@ -189,7 +189,7 @@ export default function AgenciesIndexPage() {
         {civilian.length > 0 && (
           <Group
             label="Cabinet — Civilian"
-            description="The other 12 cabinet departments. Strong set-aside programs at VA, USDA, and DOI."
+            description="The other cabinet departments. Strong set-aside programs at VA, USDA, and DOI."
             agencies={civilian}
           />
         )}
@@ -213,7 +213,7 @@ export default function AgenciesIndexPage() {
       <section className="px-4 pb-20">
         <div className="max-w-3xl mx-auto border border-(--mp-line) rounded-lg p-8 md:p-12 text-center bg-(--mp-wash)">
           <h2 className="text-3xl font-bold text-(--mp-ink) mb-4 font-(family-name:--mp-font-serif)">
-            Stop checking 12 portals. Let Mindy do it.
+            Stop checking portal after portal. Let Mindy do it.
           </h2>
           <p className="text-lg text-(--mp-body) mb-8 max-w-xl mx-auto">
             Mindy aggregates SAM.gov, agency forecast portals, NIH RePORTER,

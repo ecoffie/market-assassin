@@ -21,6 +21,7 @@
 import type { Metadata } from 'next';
 import { siteShareImages } from '@/lib/seo/share-image';
 import Link from 'next/link';
+import { forecastsLabel } from '@/lib/marketing-stats';
 
 export const metadata: Metadata = {
   title: '8(a) Contract Opportunities — Federal Set-Aside Alerts | Mindy',
@@ -41,7 +42,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: '8(a) Contract Opportunities — Daily Set-Aside Alerts | Mindy',
     description:
-      'Mindy filters SAM.gov, agency forecasts, and recompetes for 8(a) set-asides — including sole-source awards under $4.5M most firms never see.',
+      'Mindy filters SAM.gov, agency forecasts, and recompetes for 8(a) set-asides — including sole-source awards most firms never see.',
     type: 'website',
     url: 'https://getmindy.ai/set-asides/8a',
     images: siteShareImages(),
@@ -55,11 +56,11 @@ const faqs = [
   },
   {
     q: 'What\'s the difference between 8(a) sole-source and 8(a) competed?',
-    a: 'Sole-source means the contracting officer is awarding the contract to a single 8(a) firm without competition — allowed up to $4.5M for services and $8M for manufacturing. 8(a) competed means the procurement is restricted to 8(a) firms but multiple companies bid. Sole-source is faster, has no competition, and is the single biggest reason to pursue 8(a) certification — but you have to build the agency relationship before the CO will write the J&A justifying a sole-source to you specifically.',
+    a: 'Sole-source means the contracting officer is awarding the contract to a single 8(a) firm without competition, allowed up to the sole-source dollar limits set in the FAR. 8(a) competed means the procurement is restricted to 8(a) firms but multiple companies bid. Sole-source is faster, has no competition, and is the single biggest reason to pursue 8(a) certification — but you have to build the agency relationship before the CO will write the J&A justifying a sole-source to you specifically.',
   },
   {
     q: 'Do 8(a) sole-source awards show up on SAM.gov?',
-    a: 'Sometimes — sole-source awards are required to be publicly noticed, but the notice often appears only as an award announcement (after the fact), not as a competitive solicitation you can respond to. To find sole-source opportunities before they\'re awarded, you need to track agency forecasts, talk to OSDBU offices, and respond aggressively to Sources Sought notices. Mindy aggregates 33,000+ agency forecasts and surfaces Sources Sought separately for exactly this reason.',
+    a: `Sometimes — sole-source awards are required to be publicly noticed, but the notice often appears only as an award announcement (after the fact), not as a competitive solicitation you can respond to. To find sole-source opportunities before they\'re awarded, you need to track agency forecasts, talk to OSDBU offices, and respond aggressively to Sources Sought notices. Mindy aggregates ${forecastsLabel} agency forecasts and surfaces Sources Sought separately for exactly this reason.`,
   },
   {
     q: 'What agencies award the most 8(a) contracts?',
@@ -67,11 +68,11 @@ const faqs = [
   },
   {
     q: 'How long does the 8(a) program last?',
-    a: 'Nine years total, broken into a 4-year "developmental" stage and a 5-year "transitional" stage. The developmental stage is for building the business; the transitional stage requires you to win an increasing percentage of revenue from non-8(a) sources. You can only be 8(a) certified once — when your nine years are up, you graduate, and you can\'t reapply. The clock is real, which is why most successful 8(a) firms pursue mentor-protege joint ventures early to maximize the runway.',
+    a: 'Nine years total. You can only be 8(a) certified once — when your nine years are up, you graduate, and you can\'t reapply. The clock is real, which is why most successful 8(a) firms pursue mentor-protege joint ventures early to maximize the runway.',
   },
   {
     q: 'Can I bid on 8(a) contracts if I\'m not 8(a) certified?',
-    a: 'No. 8(a) set-asides are restricted to certified 8(a) firms only. If you\'re not certified, you can\'t bid. You can, however, subcontract to an 8(a) prime, or teach as a mentor in the SBA Mentor-Protege Program if you qualify as a large business. If you think you might qualify for 8(a), apply through certify.SBA.gov — the process takes 3–6 months.',
+    a: 'No. 8(a) set-asides are restricted to certified 8(a) firms only. If you\'re not certified, you can\'t bid. You can, however, subcontract to an 8(a) prime, or teach as a mentor in the SBA Mentor-Protege Program if you qualify as a large business. If you think you might qualify for 8(a), apply through certify.SBA.gov, and plan for the review to take a while.',
   },
   {
     q: 'What is the 8(a) Mentor-Protege Program?',
@@ -158,9 +159,9 @@ export default function EightAPage() {
             <span className="text-(--mp-navy)">Contract Opportunities</span>
           </h1>
           <p className="text-lg md:text-xl text-(--mp-body) max-w-2xl mx-auto mb-8">
-            The 8(a) program is the only federal set-aside with sole-source authority
-            up to $4.5M for services and $8M for manufacturing — meaning a contracting
-            officer can award you the contract without competition. Mindy surfaces
+            The 8(a) program gives contracting officers sole-source authority up to
+            the dollar limits set in the FAR, meaning a contracting officer can
+            award you the contract without competition. Mindy surfaces
             every 8(a) opportunity SAM.gov posts and tracks the agency forecasts where
             the next sole-source is brewing.
           </p>
@@ -240,7 +241,7 @@ export default function EightAPage() {
               <p className="text-(--mp-muted) text-sm">
                 Every federal agency publishes a forecast of upcoming procurements with
                 anticipated set-aside type. 8(a) forecasts are the earliest indicator
-                of a sole-source brewing 6–18 months out. Mindy aggregates 33,000+
+                of a sole-source brewing. Mindy aggregates {forecastsLabel}
                 forecasts in one feed.
               </p>
             </div>
@@ -257,7 +258,7 @@ export default function EightAPage() {
               <p className="text-(--mp-muted) text-sm">
                 Sources Sought is the agency asking &ldquo;is there a qualified 8(a) for this?&rdquo;
                 Your response is what convinces the CO to set it aside for 8(a) at all.
-                Two strong Sources Sought responses are worth more than ten RFP submissions.
+                A strong Sources Sought response can be worth more than a stack of RFP submissions.
               </p>
             </div>
           </div>
@@ -310,7 +311,7 @@ export default function EightAPage() {
                 Sole-source awards happen because a CO knows you can do the work and
                 writes a J&amp;A justifying you specifically. That requires capability
                 briefings, relationship-building with OSDBU, and capture work that
-                starts 6–12 months before any solicitation. Don&apos;t wait for a posting.
+                starts well before any solicitation. Don&apos;t wait for a posting.
               </p>
             </div>
             <div className="bg-(--mp-surface) border border-(--mp-line) rounded-lg p-5">
@@ -353,7 +354,7 @@ export default function EightAPage() {
               <h3 className="text-(--mp-ink) font-semibold mb-1">6. Track recompetes where the incumbent is also 8(a)</h3>
               <p className="text-(--mp-muted) text-sm">
                 When an 8(a) incumbent&apos;s contract is expiring, the recompete will
-                almost always be re-set aside as 8(a). Knowing 12 months in advance
+                almost always be re-set aside as 8(a). Knowing well in advance
                 gives you time to build a relationship before the solicitation drops.
                 Mindy flags these recompetes specifically.
               </p>
@@ -386,7 +387,7 @@ export default function EightAPage() {
             <div className="bg-(--mp-surface) border border-(--mp-line) rounded-lg p-5">
               <h3 className="text-(--mp-ink) font-semibold mb-1">8(a) recompete alerts</h3>
               <p className="text-(--mp-muted) text-sm">
-                12-month advance notice when an 8(a) incumbent contract is expiring —
+                Early notice when an 8(a) incumbent contract is expiring,
                 including the incumbent&apos;s name and award value.
               </p>
             </div>

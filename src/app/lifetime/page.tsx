@@ -9,6 +9,7 @@ import type { Metadata } from 'next';
 import { siteShareImages } from '@/lib/seo/share-image';
 import Link from 'next/link';
 import FoundersSeats from '@/components/lifetime/FoundersSeats';
+import { forecastsLabel } from '@/lib/marketing-stats';
 import { PRO_TRIAL_ANNUAL, PRO_TRIAL_MONTHLY } from '@/components/public-site/pricing/app-plan-links';
 import {
   FOUNDERS_LIFETIME_CAP,
@@ -31,7 +32,7 @@ const breakEvenMonths = foundersBreakEvenMonths();
 export const metadata: Metadata = {
   title: 'Mindy Founders Lifetime — $4,997 once, federal intelligence forever',
   description:
-    'Join the first 100 founding members. $4,997 one-time for lifetime Mindy Pro — daily briefings, recompete alerts, and every future feature. Same price as our legacy course lifetime.',
+    `Join the first ${FOUNDERS_LIFETIME_CAP} founding members. $4,997 one-time for lifetime Mindy Pro — daily briefings, recompete alerts, and every future feature. Same price as our legacy course lifetime.`,
   alternates: { canonical: 'https://getmindy.ai/lifetime' },
   openGraph: {
     title: 'Mindy Founders Lifetime — Buy once, use forever',
@@ -46,8 +47,8 @@ const proFeatures = [
   'AI-matched daily opportunity briefings',
   'Unlimited NAICS codes',
   'Competitor & incumbent tracking',
-  'Recompete alerts 12 months out',
-  '33,000+ agency forecasts (full access)',
+  'Recompete alerts before the solicitation drops',
+  `${forecastsLabel} agency forecasts (full access)`,
   'Weekly market deep dives',
   'Pipeline + teaming workspace',
   'Proposal Assist + Pricing Intel',
@@ -60,7 +61,7 @@ const founderPerks = [
   'Founding Member badge in Mindy',
   'Locked lifetime rate — never pay again',
   'Priority onboarding during launch window',
-  'One of only 100 founding seats',
+  `One of only ${FOUNDERS_LIFETIME_CAP} founding seats`,
 ];
 
 const faqs: Array<{ q: string; a: string }> = [
@@ -73,7 +74,7 @@ const faqs: Array<{ q: string; a: string }> = [
     a: 'Yes. One payment, no renewals, no expiration. Your access stays active as long as Mindy exists.',
   },
   {
-    q: 'What happens after 100 founders?',
+    q: `What happens after ${FOUNDERS_LIFETIME_CAP} founders?`,
     a: 'Founders Lifetime closes. New buyers choose Pro at $149/mo or $1,490/yr — unless we reopen lifetime at a higher price later.',
   },
   {
@@ -88,7 +89,7 @@ const jsonLd = {
     {
       '@type': 'Product',
       name: 'Mindy Founders Lifetime',
-      description: 'Lifetime access to Mindy Pro for founding members. Capped at 100 seats.',
+      description: `Lifetime access to Mindy Pro for founding members. Capped at ${FOUNDERS_LIFETIME_CAP} seats.`,
       brand: { '@type': 'Brand', name: 'Mindy' },
       offers: {
         '@type': 'Offer',

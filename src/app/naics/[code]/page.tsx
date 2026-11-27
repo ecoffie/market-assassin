@@ -670,10 +670,10 @@ export default async function NaicsCodePage({
                     and the recompete window already flagged.
                   </p>
                   <p className="text-(--mp-body) leading-relaxed">
-                    For active contracts, Mindy tracks expiration dates 6-18
-                    months out so you see the recompete before the
+                    For active contracts, Mindy tracks expiration dates well
+                    ahead so you see the recompete before the
                     solicitation drops. That&apos;s the window where capture
-                    actually moves the needle — not the 30 days after
+                    actually moves the needle, not the short window after
                     SAM.gov publishes the RFP.
                   </p>
                   <Link

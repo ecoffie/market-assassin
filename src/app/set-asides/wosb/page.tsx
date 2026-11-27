@@ -62,11 +62,11 @@ const faqs = [
   },
   {
     q: 'Can WOSB firms win sole-source contracts?',
-    a: 'Yes, but with conditions. WOSB and EDWOSB sole-source authority goes up to $4.5M for services and $8M for manufacturing — same thresholds as 8(a), HUBZone, and SDVOSB. The CO can sole-source to a WOSB or EDWOSB in the eligible NAICS codes when the requirement is below the threshold. WOSB sole-sources are less common than 8(a) sole-sources but do happen, especially at agencies actively pushing to meet the 5% federal-wide WOSB goal.',
+    a: 'Yes, but with conditions. WOSB and EDWOSB sole-source authority goes up to the dollar limits set in the FAR, the same kind of authority 8(a), HUBZone, and SDVOSB have. The CO can sole-source to a WOSB or EDWOSB in the eligible NAICS codes when the requirement is below the threshold. WOSB sole-sources are less common than 8(a) sole-sources but do happen, especially at agencies actively pushing to meet the federal-wide WOSB goal.',
   },
   {
     q: 'Does the federal government meet its WOSB goal?',
-    a: 'Historically, no — the 5% federal-wide WOSB goal has been chronically underperformed across most years. Like HUBZone, this gap is your opportunity: OSDBU offices and contracting officers are actively looking for qualified WOSBs to award work to. The shortfall means a certified WOSB with strong capability briefings can often find an agency that\'s motivated to award.',
+    a: 'Historically, no. The 5% federal-wide WOSB goal (15 U.S.C. 644(g)) has been chronically underperformed across most years. Like HUBZone, this gap is your opportunity: OSDBU offices and contracting officers are actively looking for qualified WOSBs to award work to. The shortfall means a certified WOSB with strong capability briefings can often find an agency that\'s motivated to award.',
   },
   {
     q: 'How does EDWOSB compare to 8(a) for women-owned firms?',
@@ -157,7 +157,7 @@ export default function WosbPage() {
             <span className="text-(--mp-navy)">Contract Opportunities</span>
           </h1>
           <p className="text-lg md:text-xl text-(--mp-body) max-w-2xl mx-auto mb-8">
-            The federal government has a statutory 5% WOSB goal — and consistently
+            The federal government has a statutory 5% WOSB goal (15 U.S.C. 644(g)), and consistently
             misses it. That gap is your opportunity. Mindy maps WOSB and EDWOSB
             eligibility to the specific NAICS codes where the set-aside applies, so
             you only see work your certification actually unlocks.
@@ -244,14 +244,14 @@ export default function WosbPage() {
               <h3 className="text-(--mp-ink) font-semibold mb-1">Agency forecasts</h3>
               <p className="text-(--mp-muted) text-sm">
                 Most agency forecasts identify anticipated WOSB or EDWOSB set-aside
-                designations 6–18 months out. Use forecasts to start agency
+                designations well ahead. Use forecasts to start agency
                 conversations early — before the RFP locks the requirement.
               </p>
             </div>
             <div className="bg-(--mp-surface) border border-(--mp-line) rounded-lg p-5">
               <h3 className="text-(--mp-ink) font-semibold mb-1">Subcontracting opportunities</h3>
               <p className="text-(--mp-muted) text-sm">
-                Large primes on contracts over $750K must submit subcontracting
+                Large primes on contracts above the dollar threshold set in the FAR must submit subcontracting
                 plans with small-business goals — including women-owned categories.
                 Certified WOSBs are sought-after teaming partners.
               </p>
@@ -267,7 +267,7 @@ export default function WosbPage() {
             Top Agencies Awarding WOSB Contracts
           </h2>
           <p className="text-(--mp-body) mb-6">
-            Because the federal government chronically misses the 5% WOSB goal,
+            Because the federal government chronically misses the WOSB goal,
             most agencies are actively trying to award more — but a handful drive
             the bulk of historical WOSB spend:
           </p>
@@ -315,10 +315,10 @@ export default function WosbPage() {
               </p>
             </div>
             <div className="bg-(--mp-surface) border border-(--mp-line) rounded-lg p-5">
-              <h3 className="text-(--mp-ink) font-semibold mb-1">3. Talk to OSDBU about the 5% gap</h3>
+              <h3 className="text-(--mp-ink) font-semibold mb-1">3. Talk to OSDBU about the goal gap</h3>
               <p className="text-(--mp-muted) text-sm">
                 Every agency has a scorecard. Ask the OSDBU where they stand
-                against the 5% WOSB goal. If they&apos;re behind, they will actively
+                against the WOSB goal. If they&apos;re behind, they will actively
                 help you find work that closes the gap — including sole-source
                 consideration in NAICS where the agency has weak performance.
               </p>
@@ -326,7 +326,7 @@ export default function WosbPage() {
             <div className="bg-(--mp-surface) border border-(--mp-line) rounded-lg p-5">
               <h3 className="text-(--mp-ink) font-semibold mb-1">4. Position as a teaming partner</h3>
               <p className="text-(--mp-muted) text-sm">
-                Large primes on $750K+ contracts must submit subcontracting plans
+                Large primes on contracts above the FAR threshold must submit subcontracting plans
                 with women-owned goals. Certified WOSBs are sought-after teaming
                 partners — especially on contracts where the prime is below their
                 WOSB subcontracting commitments.
@@ -346,7 +346,7 @@ export default function WosbPage() {
               <p className="text-(--mp-muted) text-sm">
                 When a WOSB incumbent contract is expiring, the recompete will
                 almost always be re-set aside as WOSB or EDWOSB. Mindy flags
-                these 12 months in advance — incumbent name and award value
+                these well in advance, incumbent name and award value
                 included so you can position before the solicitation drops.
               </p>
             </div>
@@ -380,8 +380,8 @@ export default function WosbPage() {
             <div className="bg-(--mp-surface) border border-(--mp-line) rounded-lg p-5">
               <h3 className="text-(--mp-ink) font-semibold mb-1">WOSB recompete alerts</h3>
               <p className="text-(--mp-muted) text-sm">
-                12-month advance notice when a WOSB or EDWOSB incumbent contract
-                is expiring — including incumbent name and award value.
+                Early notice when a WOSB or EDWOSB incumbent contract
+                is expiring, including incumbent name and award value.
               </p>
             </div>
             <div className="bg-(--mp-surface) border border-(--mp-line) rounded-lg p-5">

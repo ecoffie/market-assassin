@@ -293,8 +293,8 @@ export default async function GlossaryTermPage({
           </h2>
           <p className="text-lg text-(--mp-body) mb-8 max-w-xl mx-auto">
             Mindy delivers personalized federal opportunities every morning —
-            with the acquisition-speak already translated. 500+ small businesses
-            wake up to a Mindy briefing.
+            with the acquisition-speak already translated. Small businesses
+            already wake up to a Mindy briefing.
           </p>
           <Link
             href="/pricing"

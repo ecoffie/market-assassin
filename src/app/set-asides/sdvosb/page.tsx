@@ -54,7 +54,7 @@ const faqs = [
   },
   {
     q: 'How do I get SDVOSB certified?',
-    a: 'As of January 2023, SDVOSB certification moved from the VA Center for Verification and Evaluation (CVE) to the SBA. You apply through certify.SBA.gov. If you were previously CVE-verified, your status was migrated. The application requires VA documentation of your service-connected disability, ownership and control documentation, and small business size standard verification for your primary NAICS. Processing typically takes 60–90 days.',
+    a: 'As of January 2023, SDVOSB certification moved from the VA Center for Verification and Evaluation (CVE) to the SBA. You apply through certify.SBA.gov. If you were previously CVE-verified, your status was migrated. The application requires VA documentation of your service-connected disability, ownership and control documentation, and small business size standard verification for your primary NAICS.',
   },
   {
     q: 'What is VA Veterans First contracting?',
@@ -62,11 +62,11 @@ const faqs = [
   },
   {
     q: 'Can SDVOSB firms win sole-source contracts?',
-    a: 'Yes — up to $4.5M for services and $8M for manufacturing, same thresholds as 8(a) and HUBZone. A contracting officer can sole-source to an SDVOSB without competition when the requirement is below the threshold and the price is fair. SDVOSB sole-sources are more common at the VA (because of Veterans First) but happen across DoD, DHS, and other agencies too.',
+    a: 'Yes, up to the sole-source dollar limits set in the FAR, the same kind of authority 8(a) and HUBZone have. A contracting officer can sole-source to an SDVOSB without competition when the requirement is below the threshold and the price is fair. SDVOSB sole-sources are more common at the VA (because of Veterans First) but happen across DoD, DHS, and other agencies too.',
   },
   {
     q: 'Does the federal government meet its SDVOSB goal?',
-    a: 'Yes, consistently. The statutory federal-wide goal is 3% of prime contract dollars to SDVOSBs, and the government has met or exceeded this for many recent years. That makes SDVOSB one of the few set-aside categories that\'s working at scale. The competition inside SDVOSB is real because of this success — strong past performance and capture work matter more than just being certified.',
+    a: 'Yes, consistently. There is a statutory federal-wide goal for prime contract dollars to SDVOSBs (15 U.S.C. 644(g)), and the government has met or exceeded it for many recent years. That makes SDVOSB one of the few set-aside categories that\'s working at scale. The competition inside SDVOSB is real because of this success — strong past performance and capture work matter more than just being certified.',
   },
   {
     q: 'Can I be SDVOSB and 8(a) at the same time?',
@@ -74,7 +74,7 @@ const faqs = [
   },
   {
     q: 'What happens to my SDVOSB status if my disability rating changes?',
-    a: 'SDVOSB eligibility is tied to having a service-connected disability — the rating percentage doesn\'t matter (a 10% rating qualifies the same as a 100% rating). If your disability rating is removed entirely, you would lose SDVOSB eligibility at the next recertification. If the rating is reduced but still present, your eligibility continues. Most SDVOSB-related issues stem from ownership/control documentation, not the disability rating itself.',
+    a: 'SDVOSB eligibility is tied to having a service-connected disability — the rating percentage doesn\'t matter. If your disability rating is removed entirely, you would lose SDVOSB eligibility at the next recertification. If the rating is reduced but still present, your eligibility continues. Most SDVOSB-related issues stem from ownership/control documentation, not the disability rating itself.',
   },
 ];
 
@@ -159,7 +159,7 @@ export default function SdvosbPage() {
           <p className="text-lg md:text-xl text-(--mp-body) max-w-2xl mx-auto mb-8">
             SDVOSB is the only set-aside with a dedicated agency-level priority
             hierarchy — VA Veterans First — and the federal government consistently
-            meets its 3% SDVOSB goal. Mindy filters SAM.gov, agency forecasts, and
+            meets its SDVOSB goal. Mindy filters SAM.gov, agency forecasts, and
             recompetes for SDVOSB work agency-wide, plus a dedicated stream for VA
             Veterans First opportunities.
           </p>
@@ -228,7 +228,7 @@ export default function SdvosbPage() {
               <h3 className="text-(--mp-ink) font-semibold mb-1">SAM.gov SDVOSB set-asides (federal-wide)</h3>
               <p className="text-(--mp-muted) text-sm">
                 Filter SAM.gov by &ldquo;SDVOSB Set-Aside&rdquo; or &ldquo;SDVOSB Sole Source.&rdquo;
-                Available at every federal agency. The 3% federal-wide goal drives
+                Available at every federal agency. The federal-wide SDVOSB goal drives
                 consistent volume across DoD, DHS, GSA, and elsewhere.
               </p>
             </div>
@@ -254,7 +254,7 @@ export default function SdvosbPage() {
               <h3 className="text-(--mp-ink) font-semibold mb-1">Agency forecasts</h3>
               <p className="text-(--mp-muted) text-sm">
                 Forecasts often identify anticipated SDVOSB or VOSB set-asides
-                6–18 months ahead. The VA&apos;s forecast is especially useful
+                well ahead. The VA&apos;s forecast is especially useful
                 because Veterans First means most opportunities default to
                 veteran-owned firms.
               </p>
@@ -270,7 +270,7 @@ export default function SdvosbPage() {
             Top Agencies Awarding SDVOSB Contracts
           </h2>
           <p className="text-(--mp-body) mb-6">
-            Because the federal-wide 3% goal is consistently met, SDVOSB work is
+            Because the federal-wide SDVOSB goal is consistently met, SDVOSB work is
             spread across most agencies. But a handful dominate:
           </p>
           <div className="grid sm:grid-cols-2 gap-4">
@@ -318,8 +318,8 @@ export default function SdvosbPage() {
             <div className="bg-(--mp-surface) border border-(--mp-line) rounded-lg p-5">
               <h3 className="text-(--mp-ink) font-semibold mb-1">3. Pursue sole-source aggressively</h3>
               <p className="text-(--mp-muted) text-sm">
-                SDVOSB sole-source authority goes up to $4.5M services / $8M
-                manufacturing. Contracting officers can use it when they know you
+                SDVOSB sole-source authority goes up to the dollar limits set in
+                the FAR. Contracting officers can use it when they know you
                 — meaning capability briefings and relationship-building convert
                 directly to award value. Start before you need it.
               </p>
@@ -337,8 +337,8 @@ export default function SdvosbPage() {
               <h3 className="text-(--mp-ink) font-semibold mb-1">5. Track SDVOSB recompetes</h3>
               <p className="text-(--mp-muted) text-sm">
                 When an SDVOSB incumbent contract is expiring, the recompete will
-                almost always be re-set aside as SDVOSB. Mindy flags these 12 months
-                in advance — including incumbent name and award value so you can
+                almost always be re-set aside as SDVOSB. Mindy flags these well
+                in advance, including incumbent name and award value so you can
                 position before the solicitation drops.
               </p>
             </div>
@@ -370,8 +370,8 @@ export default function SdvosbPage() {
             <div className="bg-(--mp-surface) border border-(--mp-line) rounded-lg p-5">
               <h3 className="text-(--mp-ink) font-semibold mb-1">SDVOSB recompete alerts</h3>
               <p className="text-(--mp-muted) text-sm">
-                12-month advance notice when an SDVOSB incumbent contract is
-                expiring — incumbent name and award value included.
+                Early notice when an SDVOSB incumbent contract is
+                expiring, incumbent name and award value included.
               </p>
             </div>
             <div className="bg-(--mp-surface) border border-(--mp-line) rounded-lg p-5">
