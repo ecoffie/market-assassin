@@ -19,7 +19,7 @@
 import type Stripe from 'stripe';
 import { getStripe } from '@/lib/stripe';
 import { getWriteClient } from '@/lib/supabase/server-clients';
-import { customerMirrorRow } from './subscription-mirror';
+import { fillBlankCustomerEmail, customerMirrorRow } from './subscription-mirror';
 
 export const CHARGE_OVERLAP_DAYS = 30;
 const PAGE_SIZE = 100;
@@ -202,6 +202,15 @@ export async function syncChargesIncremental(opts: {
       if (bare.size) {
         const { error } = await db.from('stripe_customers').upsert([...bare.values()], { onConflict: 'id', ignoreDuplicates: true });
         if (error) return fail(`customer mirror failed: ${error.message}`);
+        // Deleted customers keep no email; the charge still carries it. Fill BLANK rows only (subscription-mirror).
+        for (const c of chunk) {
+          const id = typeof c.customer === 'string' ? c.customer : c.customer?.id;
+          if (!id || !bare.has(id)) continue;
+          const billing = c.billing_details?.email;
+          const filled = await fillBlankCustomerEmail(db, id, billing || c.receipt_email, billing ? 'charge_billing_details' : 'charge_receipt_email');
+          if (filled.filled) bare.delete(id); // one fill per customer per chunk
+          if (filled.error) console.error('[charge-sync] blank customer email fill failed (non-fatal):', filled.error);
+        }
       }
 
       const { error: chargeErr } = await db.from('stripe_charges').upsert(rows, { onConflict: 'id' });

@@ -60,6 +60,32 @@ export function customerMirrorRow(customer: Stripe.Customer | Stripe.DeletedCust
   };
 }
 
+/**
+ * A DELETED Stripe customer has no email left on the customer object, so the mirror used to keep its row with
+ * email '' forever — and a cancellation for that customer could never be linked to a Mindy account (36 of 65
+ * cancellations unlinkable, Agent 4 2026-11-27). The email survives on the customer's documents: the
+ * subscription's latest invoice (`customer_email`) and the charge (`billing_details.email` / `receipt_email`).
+ *
+ * fillBlankCustomerEmail writes that email ONLY into a row whose email is blank — it never overwrites a real
+ * email — and records where it came from in metadata.email_source. A missing email stays blank (unknown), never
+ * guessed.
+ */
+export async function fillBlankCustomerEmail(
+  db: { from: (t: string) => any }, // eslint-disable-line @typescript-eslint/no-explicit-any
+  customerId: string,
+  email: string | null | undefined,
+  source: 'latest_invoice' | 'charge_billing_details' | 'charge_receipt_email',
+): Promise<{ filled: boolean; error?: string }> {
+  const e = (email || '').trim().toLowerCase();
+  if (!customerId || !e || !e.includes('@')) return { filled: false };
+  const { count, error } = await db.from('stripe_customers')
+    .update({ email: e, metadata: { email_source: source }, updated_at: new Date().toISOString() }, { count: 'exact' })
+    .eq('id', customerId).eq('email', '');
+  if (error) return { filled: false, error: error.message };
+  if (count == null) return { filled: false, error: 'update count unknown' }; // unknown is not "filled"
+  return { filled: count > 0 };
+}
+
 export type MirrorResult =
   | { ok: true; subscriptionId: string; status: string }
   | { ok: false; subscriptionId: string; skipped?: 'test_mode'; error?: string };
@@ -71,7 +97,7 @@ export type MirrorResult =
  */
 export async function mirrorSubscription(subscriptionId: string): Promise<MirrorResult> {
   try {
-    const sub = await getStripe().subscriptions.retrieve(subscriptionId, { expand: ['customer'] });
+    const sub = await getStripe().subscriptions.retrieve(subscriptionId, { expand: ['customer', 'latest_invoice'] });
     // The mirror holds live data only (same rule as the daily sync).
     if (sub.livemode === false) return { ok: false, subscriptionId, skipped: 'test_mode' };
     const db = getWriteClient();
@@ -82,6 +108,13 @@ export async function mirrorSubscription(subscriptionId: string): Promise<Mirror
       .from('stripe_customers')
       .upsert(customerMirrorRow(sub.customer), { onConflict: 'id', ignoreDuplicates: !full });
     if (cErr) return { ok: false, subscriptionId, error: `customer mirror failed: ${cErr.message}` };
+    if (!full) {
+      // Deleted (or bare) customer: recover the email from the subscription's latest invoice, into a blank row only.
+      const inv = typeof sub.latest_invoice === 'object' && sub.latest_invoice ? sub.latest_invoice : null;
+      const custId = typeof sub.customer === 'string' ? sub.customer : sub.customer.id;
+      const filled = await fillBlankCustomerEmail(db, custId, inv?.customer_email, 'latest_invoice');
+      if (filled.error) console.error('[subscription-mirror] blank customer email fill failed (non-fatal):', filled.error);
+    }
     const { error: sErr } = await db.from('stripe_subscriptions').upsert(subscriptionMirrorRow(sub), { onConflict: 'id' });
     if (sErr) return { ok: false, subscriptionId, error: `subscription mirror failed: ${sErr.message}` };
     return { ok: true, subscriptionId, status: sub.status };

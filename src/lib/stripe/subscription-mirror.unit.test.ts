@@ -56,7 +56,7 @@ describe('mirrorSubscription', () => {
   it('re-reads Stripe and upserts customer then subscription, keyed on id', async () => {
     stripe.retrieve.mockResolvedValue(SUB);
     expect(await mirrorSubscription('sub_1')).toEqual({ ok: true, subscriptionId: 'sub_1', status: 'active' });
-    expect(stripe.retrieve).toHaveBeenCalledWith('sub_1', { expand: ['customer'] });
+    expect(stripe.retrieve).toHaveBeenCalledWith('sub_1', { expand: ['customer', 'latest_invoice'] });
     expect(upserts.map((u) => u.table)).toEqual(['stripe_customers', 'stripe_subscriptions']);
     expect(upserts[1].opts).toEqual({ onConflict: 'id' });
     expect(upserts[1].row).toMatchObject({ id: 'sub_1', customer_id: 'cus_1', status: 'active', plan_amount: 39900 });
