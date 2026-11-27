@@ -14,7 +14,9 @@
  *   1. EMAIL_ACTION_SECRET            (current)
  *   2. EMAIL_ACTION_SECRET_PREVIOUS   (optional; set during a future rotation of the dedicated secret)
  *   3. ADMIN_PASSWORD                 (legacy links) — accepted UNLESS EMAIL_ACTION_ACCEPT_ADMIN_LEGACY=off.
- * Turn (3) off once every link signed with ADMIN_PASSWORD has expired. The longest-lived verifier
+ * Turn (3) off once every link signed with ADMIN_PASSWORD has expired. EXCEPTION: unsubscribe links never expire, so
+ * they do NOT follow this flag — see unsubscribeVerificationSecrets() in src/lib/email/unsubscribe.ts, which keeps
+ * accepting ADMIN_PASSWORD until UNSUBSCRIBE_ACCEPT_ADMIN_LEGACY=off is set on purpose. The longest-lived verifier
  * accepts links for 7 days (auth-observability), so wait at least 7 days after setting
  * EMAIL_ACTION_SECRET.
  */

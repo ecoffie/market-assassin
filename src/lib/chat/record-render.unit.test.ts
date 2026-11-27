@@ -238,10 +238,11 @@ describe('pricing and keywords', () => {
 });
 
 describe('freshness: empty recent-window search', () => {
-  it('states the lag note verbatim and says it is not a verified zero', () => {
+  it('states the lag in words (no data date) and says it is not a verified zero', () => {
     const r = renderStatusChecks({ awards: [], _meta: { result_state: 'partial', as_of: '2026-11-13', lag_note: 'Contract actions by this agency are published with a ~90-day delay, so the data is only reliably current through about 2026-08-15. Treat an empty or thin result as "not yet published", NOT as "no award was made".' } })!;
     expect(r.text).toMatch(/NOT a verified zero/);
-    expect(r.text).toMatch(/reliably current through about 2026-08-15 only \(last loaded 2026-11-13\)/);
+    expect(r.text).toMatch(/about a 90-day delay, so awards from the last few months may not appear yet/);
+    expect(r.text).not.toMatch(/2026-08-15|2026-11-13|current through|last loaded/);
     expect(r.text).not.toMatch(/no award was made|Treat an empty/);
   });
   it('acc6 R5: an empty search with no lag note is rendered with its filters and never as proof of none', () => {
@@ -404,7 +405,8 @@ describe('run-1 acceptance fixes', () => {
   });
   it('no rendered text states a reporting-lag figure the tool did not provide', () => {
     const b = renderBuyingOffices({ scope: { naics: ['5613'] }, offices: [{ office_name: 'A', obligated: 10, share_pct: 100, award_count: 1 }], totals: { obligated: 10, award_count: 1, office_count: 1 }, notes: [], _meta: { as_of: '2026-09-30', lag_note: 'prime contracts only; ingested weekly' } })!;
-    expect(b.text).toMatch(/Data: latest action loaded 2026-09-30\./); // the 'ingested weekly' storage note is internal (2026-11-17)
+    expect(b.text).toMatch(/Data: USASpending posts contract actions with a delay, so the most recent actions may not appear yet\./); // the 'ingested weekly' storage note is internal (2026-11-17)
+    expect(b.text).not.toMatch(/2026-09-30|latest action loaded/); // no data date (2026-11-27)
     expect(b.text).not.toMatch(/90 days/);
   });
 });
@@ -481,7 +483,8 @@ describe('acc6c review fixes', () => {
   it('R8: SAM contacts keep the source label that they are not a small business liaison', () => {
     const r = renderSbloContact(res)!;
     expect(r.text).toMatch(/^No designated small business liaison is on record for Concord Professional Services, INC\. \(UEI NZ7CS4E6R7K6\)\./);
-    expect(r.text).toMatch(/labeled by the source as "registered SAM point of contact, not a designated small business liaison", as of 2026-08-15/);
+    expect(r.text).toMatch(/labeled by the source as "registered SAM point of contact, not a designated small business liaison":$/m);
+    expect(r.text).not.toMatch(/as of|2026-08-15/);
     expect(r.text).toMatch(/1\. Geoff Haas, President · government business POC/);
     expect(r.text).toMatch(/withholds these contacts' email and phone/);
   });
@@ -519,13 +522,15 @@ describe('release check: buying-office label follows rank_by', () => {
 
 describe('Data Core PR 3: SBLO email verification is visible in the chat answer', () => {
   const base = { company: 'CACI INTERNATIONAL INC', sblo_name: 'Yadira Beltre', title: 'Small Business Liaison Officer', email: 'yadira.beltre@caci.com', source: 'Jun 2026 research' };
-  it('an unverified personal email carries its research date', () => {
+  it('an unverified personal email says it was not re-verified (no date)', () => {
     const r = renderSbloContact({ contact: { ...base, verification: { email_kind: 'personal', email_status: 'unverified', fields: { email: { status: 'unverified', verified_at: '2026-06', source_url: null } } } }, _meta: { has_named_sblo: true } })!;
-    expect(r.text).toContain('yadira.beltre@caci.com (personal email, not re-verified since 2026-06)');
+    expect(r.text).toContain('yadira.beltre@caci.com (personal email, not re-verified; confirm it before using it)');
+    expect(r.text).not.toMatch(/2026-06/);
   });
   it('a stale email says the company page no longer shows it', () => {
     const r = renderSbloContact({ contact: { ...base, verification: { email_kind: 'personal', email_status: 'stale', fields: { email: { status: 'stale', verified_at: '2026-11-17', source_url: 'https://www.caci.com/x' } } } }, _meta: { has_named_sblo: true } })!;
-    expect(r.text).toContain('yadira.beltre@caci.com (personal email, no longer shown on the company\'s page as of 2026-11-17)');
+    expect(r.text).toContain('yadira.beltre@caci.com (personal email, no longer shown on the company\'s page; confirm it before using it)');
+    expect(r.text).not.toMatch(/as of|2026-11-17/);
   });
   it('a verified email and a contact without a verification block render exactly as before', () => {
     const v = renderSbloContact({ contact: { ...base, email: 'smallbusiness@caci.com', verification: { email_kind: 'role', email_status: 'verified', fields: { email: { status: 'verified', verified_at: '2026-11-17', source_url: 'https://www.caci.com/x' } } } }, _meta: { has_named_sblo: true } })!;

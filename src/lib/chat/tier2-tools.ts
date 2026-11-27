@@ -603,7 +603,7 @@ export function makeTier2Tools(email: string) {
           // A saved answer during an outage is free (Eric's rule: failed/incomplete answers are never charged).
           return { ...snap.value, degraded: true, served_from: 'last_good', snapshot_at: snap.fetchedAt,
             _meta: { billing_outcome: 'nonbillable_system_failure' },
-            note: `The contractor data source is unavailable right now. These results are a saved answer from ${snap.fetchedAt}; they may be out of date.` };
+            note: `The contractor data source is unavailable right now. These results are a saved answer from an earlier lookup; they may be out of date.` };
         }
         return { ok: false, error: 'source_unavailable', degraded: true, count: 0, items: [],
           note: 'The contractor data source is unavailable right now, so Mindy cannot say whether capable contractors exist. This is NOT "none found". Retry shortly.' };

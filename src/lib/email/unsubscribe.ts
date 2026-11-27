@@ -17,7 +17,24 @@
  *     provider's one-click "List-Unsubscribe=One-Click" request — performs the unsubscribe.
  */
 import { createHmac } from 'node:crypto';
-import { emailActionSigningSecret, emailActionVerificationSecrets, hexEquals } from '@/lib/email-action-secret';
+import { emailActionSigningSecret, hexEquals } from '@/lib/email-action-secret';
+
+/**
+ * Verification secrets for UNSUBSCRIBE links. Unlike other email-action links these never expire, so the generic
+ * EMAIL_ACTION_ACCEPT_ADMIN_LEGACY=off sunset (meant for links that live 7 days) must NOT apply: turning it off would
+ * silently break every unsubscribe link sent while ADMIN_PASSWORD was the signing secret. ADMIN_PASSWORD keeps
+ * verifying unsubscribe links unless UNSUBSCRIBE_ACCEPT_ADMIN_LEGACY=off is set explicitly (its own, separate sunset).
+ */
+export function unsubscribeVerificationSecrets(): string[] {
+  const legacyOff = (process.env.UNSUBSCRIBE_ACCEPT_ADMIN_LEGACY || '').trim().toLowerCase() === 'off';
+  const list = [
+    process.env.EMAIL_ACTION_SECRET,
+    process.env.EMAIL_ACTION_SECRET_PREVIOUS,
+    // While EMAIL_ACTION_SECRET is unset, ADMIN_PASSWORD IS the signing secret and must always verify.
+    !legacyOff || !process.env.EMAIL_ACTION_SECRET ? process.env.ADMIN_PASSWORD : undefined,
+  ].filter((x): x is string => Boolean(x));
+  return Array.from(new Set(list));
+}
 import { MINDY_SITE_URL } from '@/lib/mindy/email-branding';
 
 /** Footer placeholder; sendEmail() substitutes the recipient's signed URL. Never sent as-is. */
@@ -66,7 +83,7 @@ export function verifyUnsubscribe(e: string | null | undefined, t: string | null
   if (!e || !t) return null;
   const email = unb64url(e);
   if (!email || !email.includes('@')) return null;
-  for (const secret of emailActionVerificationSecrets()) {
+  for (const secret of unsubscribeVerificationSecrets()) {
     if (hexEquals(unsubscribeToken(email, secret), t)) return norm(email);
   }
   return null;

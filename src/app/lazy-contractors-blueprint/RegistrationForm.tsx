@@ -27,15 +27,15 @@ function readAttribution(): unknown {
   }
 }
 
-/** Google Calendar link: Nov 28, 11:00 AM–1:00 PM ET (16:00–18:00 UTC). */
+/** Google Calendar link: Nov 28, 11:00 AM–3:00 PM ET (16:00–20:00 UTC), the same window as the confirmation email. */
 const GCAL = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(EVENT.title + ' (live)')}`
-  + `&dates=20261128T160000Z/20261128T180000Z&details=${encodeURIComponent(`Free live event with Eric Coffie. Your join link comes by email. Live attendees get ${EVENT.claimCredits.toLocaleString('en-US')} free Mindy credits.\n${PAGE_URL}`)}`;
+  + `&dates=20261128T160000Z/20261128T200000Z&details=${encodeURIComponent(`Free live event with Eric Coffie. Your join link comes by email. Live attendees get ${EVENT.claimCredits.toLocaleString('en-US')} free Mindy credits.\n${PAGE_URL}`)}`;
 
 function icsHref(): string {
   const ics = [
     'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Mindy//Mindy Day//EN', 'BEGIN:VEVENT',
     'UID:mindy-day-2026-11-28@getmindy.ai', 'DTSTAMP:20261112T000000Z',
-    'DTSTART:20261128T160000Z', 'DTEND:20261128T180000Z',
+    'DTSTART:20261128T160000Z', 'DTEND:20261128T200000Z',
     `SUMMARY:${EVENT.title} (live)`,
     `DESCRIPTION:Free live event with Eric Coffie. Your join link comes by email. ${PAGE_URL}`,
     `URL:${PAGE_URL}`, 'END:VEVENT', 'END:VCALENDAR',

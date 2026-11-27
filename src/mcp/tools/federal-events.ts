@@ -8,11 +8,18 @@
  * credits: 5. `_meta` always ships; `_ai_hint` OFF by default.
  */
 import { isAttendableType, queryFederalEvents, type FederalEvent } from '@/lib/events/query';
+import type { RegionalEvent } from '@/lib/events/regional-catalog';
+import { normalizeStateCode } from '@/lib/utils/us-states';
 import { buildEventsIcs } from '@/lib/events/ics';
 import { mcpFlags } from '@/lib/mcp/flags';
 
 export interface FederalEventsToolInput {
-  agency: string;
+  /** Optional when a state / near is given. */
+  agency?: string;
+  /** State(s): codes or names ("CT", "Connecticut", ["CT","MA"], "CT, MA"). */
+  state?: string | string[];
+  /** "City, ST" (e.g. "Hartford, CT"): adds the state to the filter and orders that city's regional rows first. */
+  near?: string;
   months_ahead?: number;
   include_ai_discovery?: boolean;
   limit?: number;
@@ -21,8 +28,15 @@ export interface FederalEventsToolInput {
 }
 
 export interface FederalEventsToolResult {
-  queried: { agency: string; months_ahead: number };
+  queried: { agency: string; months_ahead: number; states?: string[]; near_city?: string | null };
   events: FederalEvent[];
+  /**
+   * State/regional matchmakers and APEX Accelerator events for the requested state(s), from official organizer
+   * pages. event_date null = no upcoming date stated: tell the user to check the organizer page (date_note).
+   */
+  regional_events?: RegionalEvent[];
+  /** Which requested states the regional catalog covers; for the rest, point to the fallback directory. */
+  regional_coverage?: { covered: string[]; not_covered: string[]; fallback: { name: string; url: string } };
   /** base64 VCALENDAR — present only when include_ics is set AND ≥1 event has a real date. */
   ics?: string;
   _ai_hint?: { summary: string; how_to_use: string; key_caveats: string[] };
@@ -47,15 +61,54 @@ export interface FederalEventsToolResult {
     ics_events?: number;
     /** Events left OUT of the .ics for having no real date — never guessed onto a day. */
     ics_skipped_undated?: number;
+    /**
+     * Location filter (present only when state/near was given). location_unknown: SAM events in the window whose
+     * state could not be established — say "N more with no stated location"; never present them as matches.
+     * null = the location lookup failed (unknown, not zero).
+     */
+    location_filter?: {
+      states: string[];
+      matched: number;
+      matched_by_place_of_performance: number;
+      matched_by_buying_office: number;
+      other_states: number;
+      location_unknown: number | null;
+    };
+    regional_count?: number;
+    /** Values that could not be read as a US state (never widen the search). */
+    ignored_states?: string[];
   };
+}
+
+/** Parse state / near into 2-letter codes. Unreadable values are reported, never guessed. */
+export function resolveEventLocation(state: unknown, near: unknown): { states: string[]; nearCity: string | null; ignored: string[] } {
+  const raw = Array.isArray(state) ? state.map(String) : typeof state === 'string' ? state.split(/\s*[,;\/&]\s*|\s+(?:or|and)\s+/i) : [];
+  const states: string[] = [];
+  const ignored: string[] = [];
+  for (const t of raw.map((x) => x.trim()).filter(Boolean)) {
+    const c = normalizeStateCode(t);
+    if (c) { if (!states.includes(c)) states.push(c); } else ignored.push(t);
+  }
+  let nearCity: string | null = null;
+  if (typeof near === 'string' && near.trim()) {
+    const m = near.trim().match(/^(.*?)[,\s]+([A-Za-z .]+)$/);
+    const st = m ? normalizeStateCode(m[2].trim()) : null;
+    if (st) { nearCity = m![1].trim() || null; if (!states.includes(st)) states.push(st); }
+    else ignored.push(near.trim());
+  }
+  return { states, nearCity, ignored };
 }
 
 export async function searchFederalEvents(input: FederalEventsToolInput): Promise<FederalEventsToolResult> {
   const agency = (input.agency || '').trim();
   const months = Math.min(Math.max(Number(input.months_ahead) || 4, 1), 12);
+  const loc = resolveEventLocation(input.state, input.near);
+  const hasLocation = loc.states.length > 0;
 
   const res = await queryFederalEvents({
     agency,
+    states: loc.states,
+    nearCity: loc.nearCity,
     monthsAhead: months,
     includeAiDiscovery: input.include_ai_discovery === true,
     includeCatalog: true,
@@ -66,11 +119,12 @@ export async function searchFederalEvents(input: FederalEventsToolInput): Promis
   // A failed SAM read with only curated rows left is still a failed search: return the rows, but do
   // not report (or bill) it as a completed lookup.
   const onlyCatalogAfterFailure = res.degraded && res.samCount === 0 && res.aiCount === 0;
-  const grounded = res.events.length > 0 && !onlyCatalogAfterFailure;
+  const grounded = (res.events.length > 0 || res.regional.length > 0) && !onlyCatalogAfterFailure;
   const attendableCount = res.events.filter((e) => isAttendableType(e.event_type)).length;
   const result: FederalEventsToolResult = {
-    queried: { agency, months_ahead: months },
+    queried: { agency, months_ahead: months, ...(hasLocation ? { states: loc.states, near_city: loc.nearCity } : {}) },
     events: res.events,
+    ...(hasLocation ? { regional_events: res.regional, regional_coverage: res.regionalCoverage ?? undefined } : {}),
     _meta: {
       grounded,
       degraded: res.degraded,
@@ -83,6 +137,8 @@ export async function searchFederalEvents(input: FederalEventsToolInput): Promis
       sam_attendable_total: res.samAttendableTotal,
       sam_notice_total: res.samNoticeTotal,
       ai_discovery: res.aiDiscovery,
+      ...(res.locationFilter ? { location_filter: res.locationFilter, regional_count: res.regional.length } : {}),
+      ...(loc.ignored.length ? { ignored_states: loc.ignored } : {}),
     },
   };
 
@@ -118,6 +174,22 @@ export async function searchFederalEvents(input: FederalEventsToolInput): Promis
           }`
         : 'No grounded events; tell the user none were found rather than inventing an industry day.',
       key_caveats: [
+        ...(res.locationFilter
+          ? [
+              `Location filter ${loc.states.join(', ')}: SAM events matched on place of performance, else the buying office state.${
+                res.locationFilter.location_unknown == null
+                  ? ' The location lookup failed, so events without a known state could not be checked — say so, never "none".'
+                  : res.locationFilter.location_unknown > 0
+                    ? ` ${res.locationFilter.location_unknown} more event(s) in the window have no stated location — say "N more with no stated location", never list them as in-state.`
+                    : ''
+              }`,
+              `regional_events are state matchmakers / APEX Accelerator events from official organizer pages; event_date null means no upcoming date is stated — tell the user to check the organizer page.${
+                res.regionalCoverage?.not_covered.length
+                  ? ` Not yet covered: ${res.regionalCoverage.not_covered.join(', ')} — point them to ${res.regionalCoverage.fallback.url}.`
+                  : ''
+              }`,
+            ]
+          : []),
         'AI-discovered events (source="ai") can be misdated or loosely attributed — always verify via the URL before committing travel.',
         ...(input.include_ics === true
           ? [

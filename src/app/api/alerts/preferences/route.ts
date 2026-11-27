@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { clearUnsubscribeSuppression } from '@/lib/email/unsubscribe-apply';
+import { clearUnsubscribeSuppression, frequencyToRestore } from '@/lib/email/unsubscribe-apply';
 import { naicsSourceForUserWrite } from '@/lib/profile/naics-provenance';
 import { KEYWORD_MAX_COUNT, validateKeywordSave } from '@/lib/keywords/sanitize';
 import { createClient } from '@supabase/supabase-js';
@@ -232,7 +232,7 @@ export async function POST(request: NextRequest) {
     // from NAICS when they're still empty (the slurpee never populated this field).
     const { data: existing, error: existingErr } = await getSupabase()
       .from('user_notification_settings')
-      .select('user_email, agencies, keywords, aggregated_profile, naics_codes')
+      .select('user_email, agencies, keywords, aggregated_profile, naics_codes, alert_frequency')
       .eq('user_email', rowEmail)
       .maybeSingle();
     if (existingErr) console.error('[alerts/preferences] settings query error:', existingErr.message);
@@ -266,6 +266,11 @@ export async function POST(request: NextRequest) {
 
     if (alertsEnabled !== undefined) {
       record.alerts_enabled = Boolean(alertsEnabled);
+      // Turning alerts ON without naming a cadence: a row left at 'paused' (unsubscribe) would stay silent. Restore the
+      // cadence stored at unsubscribe time, else the default — never leave alerts "on" but paused.
+      if (record.alerts_enabled && frequency === undefined && (existing?.alert_frequency ?? 'paused') === 'paused') {
+        record.alert_frequency = await frequencyToRestore(getSupabase(), rowEmail);
+      }
     }
 
     // Briefings

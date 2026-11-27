@@ -60,11 +60,12 @@ describe('get_sblo_contact verification reporting', () => {
     expect(r._meta.email_kind).toBeNull();
   });
 
-  it('the hint labels an unverified personal email with its research date instead of presenting it as current', async () => {
+  it('the hint labels an unverified personal email as not re-verified (no date) instead of presenting it as current', async () => {
     flags.aiHint = true;
     lookup.mockResolvedValue({ contact: contactFrom(snapshotRow, '2026-06'), candidates: [], matchType: 'exact' });
     const r = await getSbloContact({ company: 'CACI' });
     expect(r._ai_hint!.summary).toContain('yadira.beltre@caci.com');
-    expect(r._ai_hint!.summary).toMatch(/not re-verified since 2026-06/);
+    expect(r._ai_hint!.summary).toMatch(/not re-verified; confirm it before using it/);
+    expect(r._ai_hint!.summary).not.toMatch(/2026-06|as of/); // verified_at stays in the data (2026-11-27)
   });
 });

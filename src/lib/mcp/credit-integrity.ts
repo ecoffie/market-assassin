@@ -144,6 +144,8 @@ export const REQUIRED_ONE_OF: Readonly<Record<string, readonly string[]>> = {
   search_agency_opps_by_office: ['agency', 'dodaac'],
   // A nationwide all-industry office ranking is refused by the tool itself; refuse it here first.
   get_buying_offices: ['state', 'naics', 'psc'],
+  // Events need a buyer or a place: agency, or a state / "City, ST" location filter (2026-11-27).
+  search_federal_events: ['agency', 'state', 'near'],
   get_current_acquisition_intelligence: [
     'agency', 'office', 'dodaac', 'capability', 'keywords', 'naics', 'psc', 'notice_ids', 'contract_ids', 'piids',
   ],

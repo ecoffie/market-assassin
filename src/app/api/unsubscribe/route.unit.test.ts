@@ -16,7 +16,13 @@ vi.mock('@supabase/supabase-js', () => ({
       Object.assign(b, {
         upsert: async (row: unknown) => { h.writes.push({ table, op: 'upsert', row }); return { error: null }; },
         update: (row: unknown) => { h.writes.push({ table, op: 'update', row, filter }); return b; },
-        eq: async (c: string, v: unknown) => { filter[c] = v; return { count: 1, error: null }; },
+        select: () => b,
+        maybeSingle: async () => ({ data: { alert_frequency: 'weekly' }, error: null }),
+        eq: (c: string, v: unknown) => {
+          filter[c] = v;
+          const r = { count: 1, error: null };
+          return Object.assign(Object.create(b), { then: (res: (v: unknown) => void) => res(r) });
+        },
       });
       return b;
     },
@@ -57,7 +63,7 @@ describe('/api/unsubscribe', () => {
     const r = await POST(req(new URL('https://getmindy.ai/api/unsubscribe'), { method: 'POST', body: form, headers: { 'content-type': 'application/x-www-form-urlencoded' } }));
     expect(r.status).toBe(200);
     expect(await r.text()).toContain("You're unsubscribed");
-    expect(h.writes[0]).toMatchObject({ table: 'email_suppressions', op: 'upsert', row: { user_email: 'pat@example.com', reason: 'unsubscribe', source: 'unsubscribe_page', email_type: 'daily_alert' } });
+    expect(h.writes[0]).toMatchObject({ table: 'email_suppressions', op: 'upsert', row: { user_email: 'pat@example.com', reason: 'unsubscribe', source: 'unsubscribe_page', email_type: 'daily_alert', metadata: { previous_alert_frequency: 'weekly' } } });
     expect(h.writes[1]).toMatchObject({ table: 'user_notification_settings', op: 'update', row: { alerts_enabled: false, briefings_enabled: false }, filter: { user_email: 'pat@example.com' } });
   });
   it('RFC 8058 one-click POST (e/t in the URL, body List-Unsubscribe=One-Click) → 200 plain', async () => {

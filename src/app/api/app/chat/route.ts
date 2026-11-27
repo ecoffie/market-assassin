@@ -148,6 +148,7 @@ import { getNaics } from '@/lib/codes/lookup';
 import { capabilityPlannerNote, interpretCapabilityNaics } from '@/lib/market/capability-naics';
 import { guardUnstatedStates, guardUnstatedCities } from '@/lib/chat/stated-filters';
 import { parseDisplayHint, displayHintNote } from '@/lib/chat/display-hint';
+import { appActionsEnabledFor, parseActionSurface, actionNamesFor, createAppActionProposer, proposeAppActionToolDef, PROPOSE_APP_ACTION, APP_ACTIONS_NOTE, type AppActionProposer } from '@/lib/chat/app-actions/propose';
 import { QUESTION_OVER_PROFILE, OUTREACH_AND_PLAN_RULES } from '@/lib/ask-mindy/outreach-rules';
 import { compileIntent, enforceIntent, dedupeToolCalls, isMapScopeNote, splitViewPreamble } from '@/lib/chat/intent-compiler';
 import { sessionTitleFrom } from '@/lib/chat/view-preamble';
@@ -253,6 +254,8 @@ interface ChatRequest {
   replay_only?: boolean;
   /** How the surface shows the answer ('narrow_panel' = the Map drawer). A system note, never user text. */
   display?: string;
+  /** Which page is asking ('map' | 'app'): selects the app actions offered (src/lib/chat/app-actions/propose.ts). */
+  surface?: string;
 }
 
 // Retained only for the `chat_messages.cited_sources` column shape — Ask Mindy
@@ -323,7 +326,7 @@ VOICE:
 - Direct, plain language. Federal acronyms are fine (NAICS, OSBP, FAR, IDIQ, 8(a), HUBZone, WOSB, SDVOSB, SAM, GSA). Tech/sales jargon (TAL, ICP, ABM, GTM) is not.
 - NEVER say "I'm an AI" or "as a language model". You're Mindy.
 - Keep responses tight. Most answers are 3-6 sentences or a short numbered list. No essays.
-- ANSWER FIRST. The first sentence answers the question that was asked: for "which agencies should I target first" it names the first target and why; for "who should I contact" it names the contact. How you ranked, which data you used, its time window and freshness come AFTER the answer in at most two short sentences. Never open with methodology, data caveats or a list of steps you took.
+- ANSWER FIRST. The first sentence answers the question that was asked: for "which agencies should I target first" it names the first target and why; for "who should I contact" it names the contact. How you ranked, which data you used, its time window and any lag caveat (in words, no data date) come AFTER the answer in at most two short sentences. Never open with methodology, data caveats or a list of steps you took.
 
 TODAY: {today} (US Eastern). Use this date for every time calculation. When the user asks about a window such as "the next 18 months", compute its end date from today and compare every date you report against it. Never call a date inside the window "outside" it, or the reverse.
 
@@ -362,10 +365,10 @@ Tool-use rules:
 - Buying-office lists show 10 offices at a time. When the user asks for more (for example "show offices 11 to 20" or "the next 10"), call get_buying_offices again with exactly the same filters plus display_offset = the first requested office number minus 1.
 - Only pass search filters the user stated or clearly implied. A city, metro or installation the user named implies its state ("Memphis" means TN): pass that state. Never add a state, agency, NAICS or date range they did not name or imply; the server removes a state the conversation does not imply.
 - Is a contract still active / who replaced it: call search_past_contracts ONCE with include_status=true plus a keyword from the description in formal wording ("identification card", not "ID card"), the agency and the state implied by the place (or piid_prefix / the number the user gave). Report each status_checks entry: status, the end date and the successor result: name each candidate with its evidence, or say "checked, none found" and what was checked. Do not ask the user for a contract number first.
-- If a result has _meta.lag_note, say the data is current through that date and recent awards may not be published yet. Never say no award was made.
+- If a result has _meta.lag_note, say in words, without a date, that recent awards may not be published yet (for example "USASpending posts awards with about a 90-day delay, so recent awards may not appear yet"). Never say no award was made.
 - Incumbents: name one only when _meta.incumbent_finding is "identified". Otherwise follow _meta.absence_note: say you could not identify (or confirm) an incumbent and what was searched. Never say "there is no incumbent", "no one holds it", "it appears there is no incumbent" or "this is a new requirement" unless a record says so; not finding a prior award is not proof that none exists.
-- Small-business contact at a buying office or agency (small business specialist, SBLO, OSDBU/OSBP): call search_federal_contacts for the office AND lookup_federal_osbp for its department in the same step. If the office search names no small-business specialist, give the department's small business office from lookup_federal_osbp (office, director, email and phone exactly as returned, with its verified date), and say it is the agency-level small business office, not that buying office's own specialist. Do not stop at "I couldn't confirm a contact" when that lookup returned an office.
-- Contacts at a company: call get_sblo_contact. If it has no named liaison but returns registered_points_of_contact, name those people with their titles, say they are the firm's registered SAM points of contact (not a designated small business liaison) as of the as_of date, and never state an email or phone the tool did not return.
+- Small-business contact at a buying office or agency (small business specialist, SBLO, OSDBU/OSBP): call search_federal_contacts for the office AND lookup_federal_osbp for its department in the same step. If the office search names no small-business specialist, give the department's small business office from lookup_federal_osbp (office, director, email and phone exactly as returned), and say it is the agency-level small business office, not that buying office's own specialist. Do not stop at "I couldn't confirm a contact" when that lookup returned an office.
+- Contacts at a company: call get_sblo_contact. If it has no named liaison but returns registered_points_of_contact, name those people with their titles, say they are the firm's registered SAM points of contact (not a designated small business liaison), and never state an email or phone the tool did not return.
 - Who buys a kind of work in a city or metro: call get_buying_offices with the state, the core city in city (it expands to the metro automatically), and the NAICS. Name each contracting office with its code, the customer agencies in top_funding_offices, the obligated dollars, and where the work is performed; never say the office is located in the city.
 - How much spending runs through schedules, BPAs or IDIQs: call get_vehicle_spend_mix and give dollars and percent for each bucket, plus the verified, heuristic and unresolved shares. unavailable or scope_too_broad is not a zero: say so and narrow the window.
 - Keywords for a company: call derive_company_keywords with brand_exclude set to the company name the user gave. Present keywords and occupational_titles, and cite each one's keyword_sources. Never list a city, state or company name as a keyword.
@@ -1277,8 +1280,15 @@ export async function POST(request: NextRequest) {
           const readPage = researchTurn
             ? makeReadWebPageTool({ allowedUrls: () => turnWebUrls, onPageText: (t) => { turnDocumentTexts.push(t); } })
             : null;
-          const privateDefs = [...TIER0_TOOL_DEFS, SEARCH_WEB_TOOL_DEF, ...(readPage ? [READ_WEB_PAGE_TOOL_DEF] : []), ...(myDocs ? [MY_DOCUMENTS_TOOL_DEF] : []), ...(genDoc ? [CREATE_DOCUMENT_TOOL_DEF] : []), ...(emailDraft ? [EMAIL_DRAFT_TOOL_DEF] : [])];
-          const privateNames = new Set([...TIER0_TOOL_NAMES, SEARCH_WEB, ...(readPage ? [READ_WEB_PAGE] : []), ...(myDocs ? [FIND_MY_DOCUMENTS] : []), ...(genDoc ? [CREATE_DOCUMENT] : []), ...(emailDraft ? [CREATE_EMAIL_DRAFT] : [])]);
+          // App actions (beta, ASK_MINDY_APP_ACTIONS + allowlist): never on card turns, and only where the asking page has
+          // at least one registered action. The model's call is validated against the registry before anything is sent.
+          const actionSurface = parseActionSurface(body);
+          const actions: AppActionProposer | null = !cardCtx && appActionsEnabledFor(auth.email) && actionNamesFor(actionSurface).length
+            ? createAppActionProposer({ surface: actionSurface, hasPro: chatPro, emit: (evt) => send(evt) })
+            : null;
+          const actionDefs = actions ? [proposeAppActionToolDef(actions.surface)] : [];
+          const privateDefs = [...TIER0_TOOL_DEFS, ...actionDefs, SEARCH_WEB_TOOL_DEF, ...(readPage ? [READ_WEB_PAGE_TOOL_DEF] : []), ...(myDocs ? [MY_DOCUMENTS_TOOL_DEF] : []), ...(genDoc ? [CREATE_DOCUMENT_TOOL_DEF] : []), ...(emailDraft ? [EMAIL_DRAFT_TOOL_DEF] : [])];
+          const privateNames = new Set([...TIER0_TOOL_NAMES, ...(actions ? [PROPOSE_APP_ACTION] : []), SEARCH_WEB, ...(readPage ? [READ_WEB_PAGE] : []), ...(myDocs ? [FIND_MY_DOCUMENTS] : []), ...(genDoc ? [CREATE_DOCUMENT] : []), ...(emailDraft ? [CREATE_EMAIL_DRAFT] : [])]);
           const executor = createChatToolExecutor({
             userEmail: auth.email!,
             ...(actingScope.kind === 'client' ? { vaultEmail: actingScope.vaultEmail } : {}),
@@ -1288,6 +1298,12 @@ export async function POST(request: NextRequest) {
               defs: privateDefs,
               names: privateNames,
               execute: (n, a) => {
+                if (actions && n === PROPOSE_APP_ACTION) {
+                  const r = actions.propose(a);
+                  const last = actions.log[actions.log.length - 1];
+                  if (last) turnTrace.notices.push(`app_action:${last.name || 'unknown'}:${last.outcome}`);
+                  return Promise.resolve(r);
+                }
                 if (n === SEARCH_WEB) {
                   return searchWeb.execute(a).then((r) => {
                     for (const x of (r.results as Array<{ url?: string }> | undefined) || []) if (x?.url) turnWebUrls.push(String(x.url));
@@ -1320,7 +1336,13 @@ export async function POST(request: NextRequest) {
             toolTimeoutMs: (n) => toolTimeoutMs(n, deadlines),
             // Research mode: SAM-backed tools read Mindy's caches only (zero live SAM calls).
             ...(researchTurn ? { samCacheOnly: true } : {}),
+            // App actions: every successful result is this turn's evidence for map.open_record.
+            ...(actions ? { onResult: (n: string, c: string) => actions.observeToolResult(n, c) } : {}),
           });
+          if (actions) {
+            turnTrace.notices.push(`app_actions_offered:${actions.surface}`);
+            if (!researchTurn) messages.push({ role: 'system', content: APP_ACTIONS_NOTE });
+          }
 
           // ── RESEARCH MODE: Claude runs its own loop over the same catalog (src/lib/ask-mindy/research-mode.ts). ──
           if (researchTurn) {
@@ -1392,8 +1414,9 @@ export async function POST(request: NextRequest) {
               const loop = await runResearchLoop({
                 client, model,
                 // Fixed prompt first (cached across steps and turns), then today's date and the profile after the breakpoint.
+                // App actions (allowlisted users only) go in the per-turn part so the cached prefix stays identical for all.
                 system: RESEARCH_SYSTEM_STATIC,
-                systemDynamic: researchSystemDynamic({ today, profileBlock: userProfileBlock }),
+                systemDynamic: researchSystemDynamic({ today, profileBlock: userProfileBlock }) + (actions ? `\n\n${APP_ACTIONS_NOTE}` : ''),
                 conversation,
                 tools: rmTools,
                 effort: process.env.ASK_MINDY_RESEARCH_EFFORT || 'high',

@@ -8,6 +8,8 @@ import { LCB_CLAIM_QUESTIONS as Q } from '@/lib/events/lazy-contractors-blueprin
 type State = 'before' | 'open' | 'after';
 
 const SIGN_IN_HREF = `/app?next=${encodeURIComponent('/lazy-contractors-blueprint/claim')}`;
+/** There is no free account: newcomers start the 14-day trial first (owner decision, 2026-11-27). */
+const TRIAL_HREF = '/pricing';
 
 export default function ClaimForm({ initialState, credits }: { initialState: State; credits: number }) {
   // Read the browser's Mindy session after mount (localStorage), so server and client render the same first frame.
@@ -90,8 +92,9 @@ export default function ClaimForm({ initialState, credits }: { initialState: Sta
     return (
       <div className="mp-panel" style={{ display: 'grid', gap: 14 }}>
         <p className="mp-label">Sign in to claim</p>
-        <p className="mp-standfirst">Sign in to Mindy (or create your free account) with the email you registered with. You&apos;ll come right back here.</p>
+        <p className="mp-standfirst">Already use Mindy? Sign in with the email you registered with. You&apos;ll come right back here.</p>
         <div><ButtonLink href={SIGN_IN_HREF}>Sign in to claim {credits} credits</ButtonLink></div>
+        <p className="mp-meta">New to Mindy? First <a className="mp-link" href={TRIAL_HREF}>start your 14-day free trial</a> using the same email you registered with, then come back to this page and sign in.</p>
       </div>
     );
   }
