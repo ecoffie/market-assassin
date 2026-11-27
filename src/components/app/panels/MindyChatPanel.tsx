@@ -15,6 +15,7 @@
  * render as a small footer under that bubble.
  */
 
+import { canBrowseKnowledgeBase } from '@/lib/knowledge-base/access';
 import { customerErrorMessage, CUSTOMER_ERROR_MESSAGES } from '@/lib/chat/customer-errors';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Menu, MessageCircle, BookOpen, Lock, FileText, X } from 'lucide-react';
@@ -760,7 +761,7 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
             )}
             {/* KB entry point (Eric: KB lives off the sidebar; reached from chat
                 where its citations come from). */}
-            {onPanelChange && (
+            {onPanelChange && canBrowseKnowledgeBase(email) && (
               <button
                 onClick={() => onPanelChange('knowledge-base')}
                 className="inline-flex items-center gap-1.5 text-xs text-muted hover:text-slate-200 px-3 py-1.5 rounded border border-hairline hover:border-slate-600 transition-colors"
@@ -866,6 +867,14 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
                           // Falls back to the inline drawer if navigation isn't
                           // wired.
                           const target = citationTarget(c);
+                          if (target === 'kb' && c.document_id && !canBrowseKnowledgeBase(email)) {
+                            // Customers cannot open corpus documents: the source shows as a plain label.
+                            return (
+                              <span key={i} className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded bg-surface/60 border border-hairline/60 text-ink-soft">
+                                <FileText className="h-3 w-3 shrink-0" strokeWidth={2} /> {label}
+                              </span>
+                            );
+                          }
                           if (target === 'kb' && c.document_id) {
                             return (
                               <button

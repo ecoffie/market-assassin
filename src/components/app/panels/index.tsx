@@ -1,5 +1,6 @@
 'use client';
 
+import { canBrowseKnowledgeBase } from '@/lib/knowledge-base/access';
 import { Suspense, lazy } from 'react';
 import type { AppPanel, AppTier } from '../UnifiedSidebar';
 import { parseSettingsSection, parseVaultSection } from '@/lib/app/deep-link-params';
@@ -143,7 +144,10 @@ export default function PanelContainer({ activePanel, email, tier, onPanelChange
       case 'target-list':
         return <MyTargetListPanel email={email} tier={tier} onPanelChange={onPanelChange} />;
       case 'knowledge-base':
-        return <KnowledgeBasePanel email={email} initialDocId={typeof panelContext?.doc === 'string' ? panelContext.doc : undefined} />;
+        // Staff only (Eric, 2026-11-27). A customer who follows an old link lands in Mindy Chat instead.
+        return canBrowseKnowledgeBase(email)
+          ? <KnowledgeBasePanel email={email} initialDocId={typeof panelContext?.doc === 'string' ? panelContext.doc : undefined} />
+          : <MindyChatPanel email={email} tier={tier} onPanelChange={onPanelChange} />;
       case 'coach':
         return <CoachPanel email={email} onPanelChange={onPanelChange} />;
       case 'grants':
