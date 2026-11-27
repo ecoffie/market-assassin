@@ -97,7 +97,7 @@ export default function OsbpSmbResearchPanel({ email }: Props) {
       <div className="bg-ground border border-surface rounded-xl p-5 space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
-            <label className="block text-xs text-faint mb-1">PSC Code <span className="text-emerald-400/70">(what you\'re buying — best match)</span></label>
+            <label className="block text-xs text-faint mb-1">PSC Code <span className="text-emerald-400/70">(what you&apos;re buying — best match)</span></label>
             <input value={psc} onChange={e => setPsc(e.target.value)} placeholder="J998 (ship repair)"
               className="w-full px-3 py-2 bg-surface border border-hairline rounded-lg text-white text-sm placeholder-faint focus:border-emerald-500 focus:outline-none uppercase" />
           </div>
@@ -164,7 +164,7 @@ export default function OsbpSmbResearchPanel({ email }: Props) {
                 </div>
                 <div className="text-right shrink-0">
                   <div className="text-sm font-semibold text-emerald-400">{fmt$(r.total_obligated)}</div>
-                  <div className="text-xs text-faint">{r.award_count.toLocaleString()} contracts · {r.agency_count} agencies</div>
+                  <div className="text-xs text-faint">{r.award_count.toLocaleString()} {r.award_count === 1 ? 'contract' : 'contracts'} · {r.agency_count} {r.agency_count === 1 ? 'agency' : 'agencies'}</div>
                   <div className="text-[11px] text-slate-600">relevance {r.match_score}</div>
                 </div>
               </div>
@@ -182,7 +182,7 @@ export default function OsbpSmbResearchPanel({ email }: Props) {
       )}
 
       {!rows && !loading && (
-        <p className="text-sm text-faint">Enter the PSC of what you\'re buying (e.g. J998 ship repair) to find every small business that\'s won that work.</p>
+        <p className="text-sm text-faint">Enter the PSC of what you&apos;re buying (e.g. J998 ship repair) to find every small business that&apos;s won that work.</p>
       )}
     </div>
   );
