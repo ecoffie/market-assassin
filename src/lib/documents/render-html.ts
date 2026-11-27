@@ -11,7 +11,7 @@ import { chartToSvg } from './charts';
 import { hex, resolveTheme, type Theme } from './theme';
 import { INTER_LATIN_FONT_FACE } from '@/lib/fonts/inter-latin-embedded';
 import { CAP_LIMIT_STEPS, extractCapability, isCapabilityStatement, type CapEntry, type CapField, type CapLimits } from './capability-statement';
-import { assumptionOrigin, clientCopy, keepDash, stripHeadingNumber, citationIndex, citeMarker, claimClass, claimLabel, claimsPresent, formatColumn, formatDocDate, parseInline, unverifiedStatements } from './format';
+import { assumptionOrigin, clientCopy, publicRecordId, keepDash, stripHeadingNumber, citationIndex, citeMarker, claimClass, claimLabel, claimsPresent, formatColumn, formatDocDate, parseInline, unverifiedStatements } from './format';
 
 /**
  * The document page may load nothing but itself: no scripts, no network, no frames; only its own
@@ -142,7 +142,11 @@ function labelChip(claim: Claim | undefined): string {
 }
 
 function tableHtml(b: TableBlock, marker: string): string {
-  const head = b.columns.map((c) => `<th class="${c.align === 'right' || ['usd', 'int', 'pct'].includes(c.format ?? '') ? 'num' : ''}">${escapeHtml(c.label)}</th>`).join('');
+  // A table whose only caption is its citation used to print the marker as a stray line of its own ("[3]") above
+  // the table. With no caption text, label or origin, the marker rides on the last header cell instead.
+  const citeOnly = !!marker && !b.caption && !labelChip(b.claim) && !originHtml(b);
+  const last = b.columns.length - 1;
+  const head = b.columns.map((c, i) => `<th class="${c.align === 'right' || ['usd', 'int', 'pct'].includes(c.format ?? '') ? 'num' : ''}">${escapeHtml(c.label)}${citeOnly && i === last ? ` <sup class="cite">${marker}</sup>` : ''}</th>`).join('');
   const cells = b.columns.map((c) => formatColumn(b.rows.map((r) => r[c.key] ?? null), c.format));
   const body = b.rows
     .map((r, ri) => `<tr>${b.columns
@@ -154,7 +158,7 @@ function tableHtml(b: TableBlock, marker: string): string {
       })
       .join('')}</tr>`)
     .join('');
-  const cap = [labelChip(b.claim), b.caption ? inline(b.caption) : '', marker ? `<sup class="cite">${marker}</sup>` : ''].filter(Boolean).join(' ') + originHtml(b);
+  const cap = citeOnly ? '' : [labelChip(b.claim), b.caption ? inline(b.caption) : '', marker ? `<sup class="cite">${marker}</sup>` : ''].filter(Boolean).join(' ') + originHtml(b);
   return `<div class="tablewrap">${cap ? `<div class="caption">${cap}</div>` : ''}<table${b.columns.length >= 6 ? ' class="wide"' : ''}><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div>`;
 }
 
@@ -227,7 +231,7 @@ export function renderCapabilityHtml(model: DocModel, opts: RenderHtmlOptions = 
   const cap = extractCapability(model, opts.capLimits ?? CAP_LIMIT_STEPS[0]);
   const entry = (e: CapEntry) => `<li>${e.lead ? `<strong>${escapeHtml(e.lead)}</strong>${e.text ? ` &middot; ${inline(e.text)}` : ''}` : inline(e.text)}</li>`;
   const block = (heading: string, items: CapEntry[], cls = '') => (items.length ? `<section class="cs-sec ${cls}"><h2>${escapeHtml(heading)}</h2><ul>${items.map(entry).join('')}</ul></section>` : '');
-  const fields = (list: CapField[]) => `<dl>${list.map((f) => `<dt>${escapeHtml(f.label)}</dt><dd>${inline(f.value)}</dd>`).join('')}</dl>`;
+  const fields = (list: CapField[]) => `<dl>${list.map((f) => `${f.label ? `<dt>${escapeHtml(f.label)}</dt>` : ''}<dd${f.label ? '' : ' class="line"'}>${inline(f.value)}</dd>`).join('')}</dl>`;
   const [g0, g1] = theme.gradient ?? [k.accent, k.accent];
   const css = `${INTER_LATIN_FONT_FACE}
 @page { size: Letter; margin: 0.45in 0.5in; }
@@ -251,9 +255,12 @@ body { margin: 0; color: ${c(k.ink)}; background: ${c(k.white)}; font-family: 'M
 .cs-box dl { margin: 0 0 10px; }
 .cs-box dt { font-size: 7.5pt; letter-spacing: .06em; text-transform: uppercase; color: ${c(k.muted)}; font-weight: 700; margin-top: 6px; }
 .cs-box dd { margin: 1px 0 0; font-weight: 600; word-break: break-word; }
+.cs-box dd.line { margin-top: 4px; }
+.cs-lead { margin: 0 0 11px; font-size: 10pt; line-height: 1.45; }
 .cs-foot { margin-top: 12px; padding-top: 6px; border-top: 1px solid ${c(k.rule)}; font-size: 7.5pt; color: ${c(k.muted)}; }
 ${opts.screen ? 'body { padding: 20px 24px; } .cs { max-width: 8.2in; }' : ''}`;
   const left = [
+    ...cap.overview.map((p) => `<p class="cs-lead">${inline(p)}</p>`),
     block('Core Competencies', cap.competencies),
     block('Past Performance', cap.pastPerformance, 'pp'),
     block('Differentiators', cap.differentiators),
@@ -336,7 +343,8 @@ export function renderHtml(stored: DocModel, opts: RenderHtmlOptions = {}): stri
     ? `<section class="sources"><h2>Sources</h2><ol>${ordered
       .map((s) => {
         const bits = [escapeHtml(s.label)];
-        if (s.recordId) bits.push(`<span class="meta">(${escapeHtml(s.recordId)})</span>`);
+        const rid = publicRecordId(s);
+        if (rid) bits.push(`<span class="meta">(${escapeHtml(rid)})</span>`);
         // No retrieval (data-freshness) date in client copy (Eric, 2026-11-27). retrievedAt stays in the stored model
         // for provenance; a date inside the cited document's own title is part of the label and is kept.
         if (s.url) bits.push(`<span class="meta">${escapeHtml(s.url)}</span>`);

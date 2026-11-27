@@ -22,17 +22,22 @@ import type { Block, DocModel, DocSection } from './model';
 import { labeledUnits } from './model';
 
 export const CAPABILITY_STATEMENT_KIND = 'capability_statement' as const;
+/** What the customer fills in when no completed project is on record (coaching itself stays in the chat answer). */
+export const PAST_PERFORMANCE_PLACEHOLDER = '[Add a completed project: agency or client, the work, and the value]';
 
 export function isCapabilityStatement(model: Pick<DocModel, 'title'> & { kind?: unknown }): boolean {
   if (model.kind === CAPABILITY_STATEMENT_KIND) return true;
   return /\bcapabilit(?:y|ies)\s+statement\b/i.test(String(model.title || ''));
 }
 
-export type CapRole = 'competencies' | 'past_performance' | 'differentiators' | 'company_data' | 'contact' | 'other';
+export type CapRole = 'overview' | 'competencies' | 'past_performance' | 'differentiators' | 'company_data' | 'contact' | 'skip' | 'other';
 
 /** A section's place on the page, from its heading. */
 export function capRole(heading: string): CapRole {
   const h = heading.toLowerCase();
+  // Report furniture never printed on a capability statement (sources stay in the stored model).
+  if (/\bsources?\b|\bcitations?\b|\bhow to read\b|\bmethod(?:ology)?\b|\bcoverage\b|\bnotes? for\b/.test(h)) return 'skip';
+  if (/\b(?:company\s+)?overview\b|\babout\b|\bwho we are\b|\bsummary\b|\bintroduction\b/.test(h)) return 'overview';
   if (/\b(?:core\s+)?competenc|\bcapabilities\b|\bwhat we do\b|\bservices\b/.test(h)) return 'competencies';
   if (/\bpast\s+performance\b|\bexperience\b|\bcontracts?\s+(?:won|held|history)\b|\bselected\s+projects?\b/.test(h)) return 'past_performance';
   if (/\bdifferentiat|\bwhy\s+(?:us|choose)\b|\bwhat\s+sets\b/.test(h)) return 'differentiators';
@@ -58,6 +63,8 @@ export interface Capability {
   competencies: CapEntry[];
   pastPerformance: CapEntry[];
   differentiators: CapEntry[];
+  /** One or two short sentences under the header band, from an overview section. */
+  overview: string[];
   other: Array<{ heading: string; items: CapEntry[] }>;
   companyData: CapField[];
   contact: CapField[];
@@ -114,23 +121,29 @@ export function extractCapability(model: DocModel, limits: CapLimits = CAP_LIMIT
   const trimmed: string[] = [];
   const cap: Capability = {
     name: companyName(model.title), tagline: model.subtitle?.trim() || null,
-    competencies: [], pastPerformance: [], differentiators: [], other: [], companyData: [], contact: [], footer: null, trimmed,
+    overview: [], competencies: [], pastPerformance: [], differentiators: [], other: [], companyData: [], contact: [], footer: null, trimmed,
   };
   const dataSources = new Set<string>();
   for (const sec of model.sections) {
     if (sec.role === 'about') continue; // method / how-to-read text is not printed on a capability statement
     const role = capRole(sec.heading);
-    const all = units(sec, resolved);
+    if (role === 'skip') continue;
+    // Coaching ("add your first completed project...") belongs in the chat answer, never on the page: callouts are
+    // left off; Past Performance then carries a clean [bracketed] placeholder for the customer to fill.
+    const coached = sec.blocks.some((b) => b.type === 'callout');
+    if (coached) trimmed.push(`${sec.heading}: coaching note left off the page`);
+    const all = units({ ...sec, blocks: sec.blocks.filter((b) => b.type !== 'callout') }, resolved);
     const kept = all.filter((u) => {
       if (u.unverified) { trimmed.push(`unverified, left off: ${clip(u.text || u.lead || '', 60)}`); return false; }
       return true;
     });
     if (role === 'company_data' || role === 'contact') {
       for (const u of kept) {
-        const f = field(u);
+        // A contact line may be plain ("Jordan Example, President"): one item per line, no label.
+        const f = field(u) ?? (role === 'contact' ? { label: '', value: u.text } : null);
         if (!f) continue;
         // A company fact on the face must cite a source: an unsourced UEI, certification or set-aside is never shown.
-        if (!u.sourced) { trimmed.push(`unsourced ${role === 'contact' ? 'contact' : 'company data'}, left off: ${f.label}`); continue; }
+        if (!u.sourced) { trimmed.push(`unsourced ${role === 'contact' ? 'contact' : 'company data'}, left off: ${f.label || clip(f.value, 40)}`); continue; }
         (role === 'contact' ? cap.contact : cap.companyData).push({ label: f.label, value: clip(f.value, 160) });
       }
       for (const b of sec.blocks) for (const u of labeledUnits(b)) for (const c of u.cites ?? []) if (ids.has(c)) dataSources.add(c);
@@ -142,13 +155,17 @@ export function extractCapability(model: DocModel, limits: CapLimits = CAP_LIMIT
       if (entries.length > max) trimmed.push(`${label}: kept ${max} of ${entries.length}`);
       list.push(...entries.slice(0, Math.max(0, max - list.length)));
     };
-    if (role === 'competencies') take(cap.competencies, limits.competencies, 'core competencies');
+    if (role === 'overview') { cap.overview.push(...entries.slice(0, 1).map((e) => clip(e.lead ? `${e.lead} ${e.text}` : e.text, Math.min(320, limits.itemChars + 80)))); if (entries.length > 1) trimmed.push(`${sec.heading}: kept the first paragraph`); }
+    else if (role === 'competencies') take(cap.competencies, limits.competencies, 'core competencies');
     else if (role === 'past_performance') take(cap.pastPerformance, limits.pastPerformance, 'past performance');
     else if (role === 'differentiators') take(cap.differentiators, limits.differentiators, 'differentiators');
     else if (limits.other > 0 && entries.length) {
       if (entries.length > limits.other) trimmed.push(`${sec.heading}: kept ${limits.other} of ${entries.length}`);
       cap.other.push({ heading: sec.heading, items: entries.slice(0, limits.other) });
     } else if (entries.length) trimmed.push(`${sec.heading}: left off to fit one page`);
+  }
+  if (!cap.pastPerformance.length || model.sections.some((s) => capRole(s.heading) === 'past_performance' && s.blocks.some((b) => b.type === 'callout'))) {
+    cap.pastPerformance.push({ text: PAST_PERFORMANCE_PLACEHOLDER });
   }
   cap.companyData.sort((a, b) => dataRank(a.label) - dataRank(b.label));
   const srcs = model.sources.filter((s) => dataSources.has(s.id));

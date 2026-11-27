@@ -33,7 +33,7 @@ import {
 } from 'docx';
 import type { Block, ChartBlock, DocModel, TableBlock, TableColumn } from './model';
 import { resolveTheme, type Theme } from './theme';
-import { assumptionOrigin, clientCopy, DOC_STAGE_MARK, keepDash, stripHeadingNumber, chartShownByAdjacentTable, citationIndex, citeMarker, claimLabel, claimsPresent, formatColumn, formatChartValue, formatDocDate, usdColumnDecimals, parseInline, unverifiedStatements } from './format';
+import { assumptionOrigin, clientCopy, publicRecordId, DOC_STAGE_MARK, keepDash, stripHeadingNumber, chartShownByAdjacentTable, citationIndex, citeMarker, claimLabel, claimsPresent, formatColumn, formatChartValue, formatDocDate, usdColumnDecimals, parseInline, unverifiedStatements } from './format';
 import { extractCapability, isCapabilityStatement, type CapEntry, type CapField } from './capability-statement';
 import { TOC_MIN_SECTIONS } from './render-html';
 
@@ -195,6 +195,13 @@ function blockToDocx(b: Block, numberOf: Numberer, shownByAdjacentTable = false)
         children: [...labelRun(it.claim), ...runs(it.text), ...citeRun(it.cites, numberOf), ...originRun(it)],
       }));
     case 'table': {
+      // A citation-only caption rides on the last header cell (never a stray "[3]" line above the table).
+      const marker = citeMarker(b.cites, numberOf);
+      const citeOnly = !!marker && !b.caption && !claimLabel(b.claim) && !assumptionOrigin(b);
+      if (citeOnly) {
+        const cols = b.columns.map((c, i) => (i === b.columns.length - 1 ? { ...c, label: `${c.label} ${marker}` } : c));
+        return [table(cols, b.rows), spacer()];
+      }
       const cap = caption(b.caption, b.claim, b.cites, numberOf, undefined, b.origin);
       return [...(cap ? [cap] : []), table(b.columns, b.rows), spacer()];
     }
@@ -347,7 +354,8 @@ export function buildDocx(stored: DocModel): Document {
     children.push(new Paragraph({ heading: HeadingLevel.HEADING_1, children: [new TextRun({ font: FONT, text: 'Sources' })] }));
     ordered.forEach((src, i) => {
       const parts: TextRun[] = [new TextRun({ font: FONT, text: `[${i + 1}] `, bold: true, size: 18, color: NAVY }), new TextRun({ font: FONT, text: src.label, size: 18 })];
-      if (src.recordId) parts.push(new TextRun({ font: FONT, text: ` (${src.recordId})`, size: 18, color: MUTED }));
+      const rid = publicRecordId(src);
+      if (rid) parts.push(new TextRun({ font: FONT, text: ` (${rid})`, size: 18, color: MUTED }));
       // No retrieval (data-freshness) date in client copy (Eric, 2026-11-27); retrievedAt stays in the stored model.
       if (src.url) parts.push(new TextRun({ font: FONT, text: ` ${src.url}`, size: 18, color: MUTED }));
       children.push(new Paragraph({ spacing: { after: 80 }, indent: { left: 360, hanging: 360 }, children: parts }));
@@ -417,11 +425,12 @@ function buildCapabilityDocx(model: DocModel): Document {
   const fields = (title: string, list: CapField[]) => (list.length ? [
     new Paragraph({ spacing: { before: 60, after: 40 }, children: [new TextRun({ font: FONT, text: title.toUpperCase(), bold: true, size: 17, color: NAVY, characterSpacing: 20 })] }),
     ...list.flatMap((f) => [
-      new Paragraph({ spacing: { before: 60 }, children: [new TextRun({ font: FONT, text: f.label.toUpperCase(), bold: true, size: 14, color: MUTED })] }),
-      new Paragraph({ spacing: { after: 20 }, children: [new TextRun({ font: FONT, text: f.value, bold: true, size: 18 })] }),
+      ...(f.label ? [new Paragraph({ spacing: { before: 60 }, children: [new TextRun({ font: FONT, text: f.label.toUpperCase(), bold: true, size: 14, color: MUTED })] })] : []),
+      new Paragraph({ spacing: { before: f.label ? 0 : 50, after: 20 }, children: [new TextRun({ font: FONT, text: f.value, bold: true, size: 18 })] }),
     ]),
   ] : []);
   const left = [
+    ...cap.overview.map((p) => new Paragraph({ spacing: { after: 120 }, children: runs(p, { size: 20 }) })),
     ...section('Core Competencies', cap.competencies),
     ...section('Past Performance', cap.pastPerformance),
     ...section('Differentiators', cap.differentiators),

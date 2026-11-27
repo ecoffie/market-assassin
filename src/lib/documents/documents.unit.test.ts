@@ -1358,3 +1358,37 @@ describe('document cover carries no date (Eric, 2026-11-27)', () => {
     expect(renderHtml(m)).toContain('Responses are due December 17, 2026.');
   });
 });
+
+describe('shared renderer fixes from the capability statement screenshots (2026-11-27)', () => {
+  const withCiteOnlyTable = (): DocModel => ({
+    ...clone(),
+    sources: [...clone().sources, { id: 'up', kind: 'upload', label: 'Company-profile.docx', recordId: '67e4223f-0000-4000-8000-00000000abcd' }],
+    sections: [{ id: 'cd', heading: 'Company data', blocks: [
+      { type: 'table', id: 't', claim: 'fact', cites: ['s1'], columns: [{ key: 'f', label: 'Field' }, { key: 'v', label: 'Value' }], rows: [{ f: 'UEI', v: 'ABC123DEF456' }] },
+      { type: 'paragraph', id: 'p', claim: 'fact', cites: ['up'], text: 'From the company profile.' },
+    ] }],
+  });
+
+  it('a table cited without a caption carries its marker on the last header cell, never as a stray line above the table (HTML/PDF)', () => {
+    const html = renderHtml(withCiteOnlyTable());
+    expect(html).not.toMatch(/<div class="caption"><sup class="cite">\[\d+\]<\/sup><\/div>/);
+    expect(html).toMatch(/<th class="">Value <sup class="cite">\[1\]<\/sup><\/th>/);
+  });
+
+  it('Word: same, the marker is in the last header cell and there is no caption paragraph holding only "[n]"', async () => {
+    const doc = strFromU8(unzipSync(new Uint8Array(await renderDocx(withCiteOnlyTable())))['word/document.xml']);
+    expect(doc).toContain('Value [1]');
+    expect(doc).not.toMatch(/<w:pStyle w:val="Caption"\/>(?:(?!<\/w:p>).)*\[1\](?:(?!<\/w:p>).)*<\/w:p>/);
+  });
+
+  it('an upload source shows its file name only, never the internal Vault id (HTML/PDF and Word); public record ids stay', async () => {
+    const html = renderHtml(withCiteOnlyTable());
+    const sources = html.slice(html.indexOf('<h2>Sources</h2>'));
+    expect(sources).toContain('Company-profile.docx');
+    expect(sources).not.toContain('67e4223f');
+    const doc = strFromU8(unzipSync(new Uint8Array(await renderDocx(withCiteOnlyTable())))['word/document.xml']);
+    expect(doc).toContain('Company-profile.docx');
+    expect(doc).not.toContain('67e4223f');
+    expect(renderHtml(SAMPLE_REPORT)).toContain('(EX-QUERY-1)');
+  });
+});

@@ -68,3 +68,53 @@ export const CAPABILITY_STATEMENT: DocModel = {
     { id: 'sec-about', heading: 'How to read this', role: 'about', blocks: [{ type: 'paragraph', id: 'p-about', claim: 'context', text: 'This statement summarizes the company for federal buyers.' }] },
   ],
 };
+
+/**
+ * Shaped like the real output Eric flagged (2026-11-27): written WITHOUT kind (the title says "Capability
+ * Statement"), on the briefing theme, with the sections the model actually wrote: Company Overview, Core
+ * Capabilities, Past Performance carrying a coaching NOTE callout, Differentiators, Leadership, a Company Data
+ * FIELD/VALUE table cited as a whole, plain Contact lines, a Sources section and a How to read section. The
+ * upload source carries an internal Vault UUID. Synthetic company and identifiers.
+ */
+export const CAPABILITY_STATEMENT_AS_WRITTEN: DocModel = {
+  schema: DOC_SCHEMA,
+  theme: 'briefing',
+  title: 'Harborline Build LLC Capability Statement',
+  subtitle: 'General contracting and facility renovation for federal sites in Hawaii, led by a team with two decades of federal construction work.',
+  preparedFor: 'Harborline Build LLC',
+  date: '2026-11-27',
+  sources: [
+    { id: 's1', kind: 'tool', label: 'SAM.gov entity registration: Harborline Build LLC (synthetic)', recordId: 'HRBLN0000TEST' },
+    { id: 's2', kind: 'upload', label: 'Harborline-company-profile.docx', recordId: '67e4223f-0000-4000-8000-00000000abcd' },
+    { id: 's3', kind: 'usaspending', label: 'USAspending award record (synthetic)', recordId: 'W9128A26C0001' },
+  ],
+  sections: [
+    { id: 'ov', heading: 'Company Overview', blocks: [{ type: 'paragraph', id: 'ov1', claim: 'fact', cites: ['s2'], text: 'Harborline Build is a small general contractor in Honolulu that renovates offices, clinics and housing for public owners.' }] },
+    { id: 'cc', heading: 'Core Capabilities', blocks: [{ type: 'bullets', id: 'cc1', items: [
+      { text: 'Interior renovation and tenant improvement', claim: 'fact', cites: ['s2'] },
+      { text: 'Roofing and envelope repair', claim: 'fact', cites: ['s2'] },
+      { text: 'ADA accessibility upgrades', claim: 'fact', cites: ['s2'] },
+      { text: 'Construction management and scheduling', claim: 'fact', cites: ['s2'] },
+    ] }] },
+    { id: 'pp', heading: 'Past Performance', blocks: [
+      { type: 'paragraph', id: 'pp1', claim: 'fact', cites: ['s3'], text: 'Related experience: barracks renovation at Schofield Barracks, $1.2M, a Coastline Holdings LLC contract, not a Harborline Build contract.' },
+      { type: 'callout', id: 'pp-note', tone: 'note', claim: 'recommendation', text: 'Add your first completed project here before you hand this out.' },
+    ] },
+    { id: 'df', heading: 'Differentiators', blocks: [{ type: 'bullets', id: 'df1', items: [
+      { text: 'Local crews on Oahu, Maui and the Big Island', claim: 'fact', cites: ['s2'] },
+      { text: 'Owner on every site visit', claim: 'fact', cites: ['s2'] },
+    ] }] },
+    { id: 'ld', heading: 'Leadership and Team', blocks: [{ type: 'paragraph', id: 'ld1', claim: 'fact', cites: ['s2'], text: 'Led by a principal with twenty years of federal construction management.' }] },
+    { id: 'cd', heading: 'Company Data', blocks: [{ type: 'table', id: 'cd1', claim: 'fact', cites: ['s1'], columns: [{ key: 'f', label: 'Field' }, { key: 'v', label: 'Value' }], rows: [
+      { f: 'UEI', v: 'HRBLN0000TEST' }, { f: 'CAGE', v: '0HRB1' }, { f: 'NAICS', v: '236220 (primary), 238160' },
+      { f: 'Small business', v: 'Yes, under NAICS 236220' }, { f: 'Registration expires', v: '2027-05-14' },
+    ] }] },
+    { id: 'ct', heading: 'Contact', blocks: [{ type: 'bullets', id: 'ct1', items: [
+      { text: 'Kai Example, Owner', claim: 'fact', cites: ['s2'] },
+      { text: '(555) 010-0142', claim: 'fact', cites: ['s2'] },
+      { text: 'kai@example.com', claim: 'fact', cites: ['s2'] },
+    ] }] },
+    { id: 'src', heading: 'Sources', blocks: [{ type: 'paragraph', id: 'src1', claim: 'fact', cites: ['s1', 's2'], text: 'Company data from the SAM.gov registration and the company profile.' }] },
+    { id: 'how', heading: 'How to read this', role: 'about', blocks: [{ type: 'paragraph', id: 'how1', claim: 'context', text: 'Facts carry a citation.' }] },
+  ],
+};

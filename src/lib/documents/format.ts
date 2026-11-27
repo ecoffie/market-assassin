@@ -15,6 +15,16 @@ export const NOT_AVAILABLE = 'Not available';
  */
 export const DOC_STAGE_MARK = 'Beta';
 
+/**
+ * The record id a reader may see next to a source. An upload or Vault document's id is an internal identifier (a
+ * Vault UUID), not a reference anyone outside Mindy can use: the file name (the label) is shown alone. Public record
+ * ids (award, notice, solicitation, UEI) are shown.
+ */
+export function publicRecordId(s: Pick<DocSource, 'kind' | 'recordId'>): string | null {
+  if (!s.recordId || s.kind === 'upload' || s.kind === 'vault') return null;
+  return s.recordId;
+}
+
 export function formatCell(v: CellValue, format: ColumnFormat = 'text'): string {
   if (v === null || v === undefined || (typeof v === 'string' && v.trim() === '')) return NOT_AVAILABLE;
   if (typeof v === 'string') return v;

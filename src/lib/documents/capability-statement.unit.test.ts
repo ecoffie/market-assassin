@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { strFromU8, unzipSync } from 'fflate';
-import { CAPABILITY_STATEMENT } from './__fixtures__/capability-statement';
+import { CAPABILITY_STATEMENT, CAPABILITY_STATEMENT_AS_WRITTEN } from './__fixtures__/capability-statement';
 import { SAMPLE_REPORT } from './__fixtures__/sample-report';
-import { capRole, companyName, extractCapability, isCapabilityStatement } from './capability-statement';
+import { capRole, companyName, extractCapability, isCapabilityStatement, PAST_PERFORMANCE_PLACEHOLDER } from './capability-statement';
 import { renderHtml } from './render-html';
 import { renderDocx } from './render-docx';
 import type { DocModel } from './model';
@@ -94,5 +94,49 @@ describe('capability statement: Word', () => {
     expect([...order].sort((a, b) => a - b)).toEqual(order);
     expect(doc).not.toMatch(/>Sources<|How to read|HUBZone|Trusted by every agency|November 27, 2026/);
     expect(doc).toContain('w:w="12240"');
+  });
+});
+
+describe('capability statement as the model actually writes it (Eric’s screenshots, 2026-11-27)', () => {
+  const html = renderHtml(CAPABILITY_STATEMENT_AS_WRITTEN);
+  const text = visible(html);
+
+  it('the title alone selects the layout, even on the briefing theme: no REPORT kicker, cover meta, gold rule, How to read or section bars', () => {
+    expect(html).toContain('<main class="cs">');
+    expect(html).toContain('<div class="kick">Capability Statement</div>');
+    expect(text).not.toMatch(/\bReport\b|Prepared for|Prepared with|cited sources|How to read/);
+    expect(html).not.toMatch(/class="cover|class="titleblock|class="reading/);
+  });
+
+  it('overview leads; Core Capabilities, Past Performance, Differentiators, then Leadership; Company Data and Contact on the right', () => {
+    expect(html).toContain('<p class="cs-lead">Harborline Build is a small general contractor');
+    const at = ['Core Competencies', 'Past Performance', 'Differentiators', 'Leadership and Team', 'Company Data', 'Point of Contact'].map((h) => html.indexOf(`<h2>${h}</h2>`));
+    expect(at.every((i) => i > 0)).toBe(true);
+    expect([...at].sort((a, b) => a - b)).toEqual(at);
+  });
+
+  it('the coaching NOTE is not printed; Past Performance keeps the honest framing plus a [bracketed] placeholder', () => {
+    expect(text).not.toContain('Add your first completed project here');
+    expect(text).toContain('a Coastline Holdings LLC contract, not a Harborline Build contract');
+    expect(text).toContain(PAST_PERFORMANCE_PLACEHOLDER);
+  });
+
+  it('Company Data becomes a label:value box (no FIELD/VALUE header row); the registration expiry date stays; contact lines one per line', () => {
+    expect(text).not.toMatch(/\bField\b.*\bValue\b/);
+    expect(html).toContain('<dt>Registration expires</dt><dd>2027-05-14</dd>');
+    for (const l of ['Kai Example, Owner', '(555) 010-0142', 'kai@example.com']) expect(html).toContain(`<dd class="line">${l}</dd>`);
+  });
+
+  it('no Sources section, no citation markers, no internal upload id anywhere on the page', () => {
+    expect(html).not.toMatch(/<h2>Sources<\/h2>|class="cite"/);
+    expect(html).not.toContain('67e4223f');
+  });
+
+  it('Word follows the same rules', async () => {
+    const doc = strFromU8(unzipSync(new Uint8Array(await renderDocx(CAPABILITY_STATEMENT_AS_WRITTEN)))['word/document.xml']);
+    expect(doc).toContain('CAPABILITY STATEMENT');
+    expect(doc).not.toMatch(/Add your first completed project|67e4223f|How to read|>Sources</);
+    expect(doc).toContain(PAST_PERFORMANCE_PLACEHOLDER.replace(/&/g, '&amp;'));
+    expect(doc).toContain('Registration expires'.toUpperCase());
   });
 });

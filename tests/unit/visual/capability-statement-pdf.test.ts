@@ -3,7 +3,7 @@
  * sections in order, and an over-long statement is trimmed to fit rather than spilling onto page 2.
  */
 import { describe, it, expect, beforeAll } from 'vitest';
-import { CAPABILITY_STATEMENT } from '@/lib/documents/__fixtures__/capability-statement';
+import { CAPABILITY_STATEMENT, CAPABILITY_STATEMENT_AS_WRITTEN } from '@/lib/documents/__fixtures__/capability-statement';
 import type { DocModel } from '@/lib/documents/model';
 import { renderPdf, pdfPageCount } from '@/lib/documents/render-pdf';
 import { htmlToPdf } from '@/lib/pdf/launch-browser';
@@ -31,6 +31,13 @@ describe.runIf(!!CHROME)('capability statement PDF', () => {
     for (const s of ['Ridgeline Facility Services LLC', 'Core Competencies', 'Past Performance', 'Differentiators', 'Company Data', 'Point of Contact', 'RDGLN0000TEST', 'Company data from the SAM.gov registration']) expect(t).toContain(norm(s));
     expect(text).not.toMatch(/Page 1 of|Beta|Sources|How to read/);
   });
+
+  it('the statement as the model actually writes it (no kind, briefing theme, coaching note, Sources section) is one page', async () => {
+    const r = await render(CAPABILITY_STATEMENT_AS_WRITTEN);
+    expect(pdfPageCount(r.pdf!)).toBe(1);
+    const t = (await pdfPages(r.pdf!)).join(' ');
+    expect(t).not.toMatch(/REPORT|Sources|How to read|67e4223f|Add your first completed project/);
+  }, 90_000);
 
   it('an over-long statement is trimmed to the top items and still prints on one page', async () => {
     const m: DocModel = JSON.parse(JSON.stringify(CAPABILITY_STATEMENT));
