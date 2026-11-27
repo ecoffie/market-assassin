@@ -183,8 +183,8 @@ export default function GrantsPanel({ email }: GrantsPanelProps) {
               <span className="text-xl">💰</span>
             </div>
             <div>
-              <p className="text-xs text-gray-500 uppercase tracking-wider">Annual Funding</p>
-              <p className="text-2xl font-bold text-white">$700B+</p>
+              <p className="text-xs text-gray-500 uppercase tracking-wider">Source</p>
+              <p className="text-2xl font-bold text-white">Grants.gov</p>
             </div>
           </div>
         </div>
@@ -392,7 +392,7 @@ export default function GrantsPanel({ email }: GrantsPanelProps) {
       {grants.length === 0 && !error && (
         <div className="bg-gradient-to-br from-emerald-900/30 to-green-900/30 border border-emerald-500/30 rounded-xl p-6 text-center">
           <p className="text-gray-300 mb-2">
-            <strong className="text-white">Access $700B+ in federal grant funding!</strong>
+            <strong className="text-white">Find federal grant funding that fits your profile.</strong>
           </p>
           <p className="text-gray-400 text-sm">
             Search by keyword, agency, or category to find grants that match your organization&apos;s mission.

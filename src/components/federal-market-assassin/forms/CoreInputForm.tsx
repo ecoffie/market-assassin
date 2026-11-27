@@ -305,7 +305,7 @@ export default function CoreInputForm({ onSubmit, loading, initialValues }: Core
               <div>
                 <h3 className="font-semibold text-cyan-300 mb-0.5 text-sm">What happens next?</h3>
                 <p className="text-xs text-slate-400">
-                  The system will analyze <strong className="text-cyan-400">5,000+ contracts</strong> from USAspending.gov to find agencies that match your profile.
+                  The system will analyze <strong className="text-cyan-400">contract awards</strong> from USAspending.gov to find agencies that match your profile.
                   You&apos;ll then select which agencies to include in your comprehensive reports.
                 </p>
               </div>

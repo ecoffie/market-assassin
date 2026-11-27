@@ -1,3 +1,4 @@
+import { SIMPLIFIED_ACQUISITION_THRESHOLD } from '@/lib/far/thresholds';
 import { NextRequest, NextResponse } from 'next/server';
 import { CoreInputs } from '@/types/federal-market-assassin';
 import {
@@ -184,7 +185,7 @@ export async function POST(request: NextRequest) {
                           setAside.toLowerCase().includes('veteran');
 
       if (hasSetAside) {
-        if (amount < 250000) {
+        if (amount < SIMPLIFIED_ACQUISITION_THRESHOLD) {
           winProbability = 'high'; // High win probability: Set-aside + small contract
         } else if (amount < 1000000) {
           winProbability = 'high'; // Still high for set-asides under $1M

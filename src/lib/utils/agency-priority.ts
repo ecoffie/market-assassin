@@ -1,8 +1,8 @@
 import type { AgencyBudgetData } from '@/types/federal-market-assassin';
 import { getBudgetForAgency } from '@/lib/utils/budget-authority';
 
-export const SIMPLIFIED_ACQUISITION_THRESHOLD = 350000;
-export const MICRO_PURCHASE_THRESHOLD = 15000;
+// One source, cited (FAR 2.101): src/lib/far/thresholds.ts.
+export { SIMPLIFIED_ACQUISITION_THRESHOLD, MICRO_PURCHASE_THRESHOLD } from '@/lib/far/thresholds';
 
 interface AgencyPriorityInput {
   name?: string | null;

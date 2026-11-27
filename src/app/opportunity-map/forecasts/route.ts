@@ -13,6 +13,7 @@
  * location filter, so the ~43% un-mappable ones are included and honestly flagged). Location-less
  * rows show "○ no location" rather than a fake place — never a guessed pin.
  */
+import { forecastsLabel } from '@/lib/marketing-stats';
 import { NextResponse, type NextRequest } from 'next/server';
 import { SUBPAGE_APP_SHELL_CSS, applyAppShell, isAppShellRequest } from '../app-shell';
 import { LOGIN_MODAL_CSS, LOGIN_MODAL_HTML, LOGIN_MODAL_JS } from '../login-modal';
@@ -126,7 +127,7 @@ const PAGE = `<!DOCTYPE html><html lang="en" class="mindy-map"><head>
 <div class="wrap">
   <div class="kick">Coming Soon · forecasts</div>
   <h1>Upcoming federal forecasts</h1>
-  <div class="sub"><b>33,000+</b> planned procurements 6–18 months out — including the ones with no map location. Filter by your NAICS, agency, state or fiscal year to see what's coming before it hits SAM.</div>
+  <div class="sub"><b>${forecastsLabel}</b> planned procurements 6–18 months out — including the ones with no map location. Filter by your NAICS, agency, state or fiscal year to see what's coming before it hits SAM.</div>
   <div class="fbar">
     <input class="q" id="fq" placeholder="Search title or keyword…" autocomplete="off">
     <input class="sm" id="fnaics" placeholder="NAICS (e.g. 541512)" autocomplete="off">

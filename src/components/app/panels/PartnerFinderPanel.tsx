@@ -210,7 +210,7 @@ export default function PartnerFinderPanel({ email, tier }: PartnerFinderPanelPr
           <Users className="h-5 w-5" strokeWidth={2} /> Partner Finder
         </h2>
         <p className="mt-1 text-sm text-ink-soft">
-          Search 71,000+ contractors by what their award history says they actually do — not by NAICS code.
+          Search contractors by what their award history says they actually do — not by NAICS code.
         </p>
       </div>
 

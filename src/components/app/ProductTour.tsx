@@ -72,7 +72,7 @@ const STEPS: TourStep[] = [
     panel: 'contractors',
     element: '[data-tour="nav-contractors"]',
     title: 'Contractors — partners to team with, primes to beat',
-    description: 'Search 3,500+ federal contractors. Find a prime to team with on a bid, or size up the competition.',
+    description: 'Search federal contractors. Find a prime to team with on a bid, or size up the competition.',
   },
   {
     title: "🎉 You're set",

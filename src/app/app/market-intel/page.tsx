@@ -866,11 +866,11 @@ function MarketIntelDashboard() {
                 (only ~3-7 active). Set-asides like 8(a)/SDVOSB are a STRUCTURED
                 field, not keyword — they live in the Set-Aside filter, not here. */}
             {[
-              { kw: 'IDIQ', label: 'IDIQ', hint: 'Indefinite delivery contracts — the big enterprise vehicles (195+ active)' },
+              { kw: 'IDIQ', label: 'IDIQ', hint: 'Indefinite delivery contracts — the big enterprise vehicles' },
               { kw: 'broad agency announcement', label: 'BAA', hint: 'Broad Agency Announcement — R&D / innovation' },
               { kw: 'commercial solutions', label: 'CSO', hint: 'Commercial Solutions Opening — fast commercial buying' },
               { kw: 'other transaction', label: 'OTA', hint: 'Other Transaction Authority — prototypes + follow-on production (Army MICC uses this for construction)' },
-              { kw: 'blanket purchase', label: 'BPA', hint: 'Blanket Purchase Agreement — recurring buys off a vehicle (29+ active)' },
+              { kw: 'blanket purchase', label: 'BPA', hint: 'Blanket Purchase Agreement — recurring buys off a vehicle' },
             ].map(v => (
               <button
                 key={v.label}

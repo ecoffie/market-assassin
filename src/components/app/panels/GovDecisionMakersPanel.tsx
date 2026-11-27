@@ -411,7 +411,7 @@ export default function GovDecisionMakersPanel({ email }: Props) {
         <div className="bg-ground border border-emerald-500/20 rounded-xl p-4">
           <div className="flex items-baseline justify-between mb-1">
             <h3 className="inline-flex items-center gap-1.5 text-sm font-semibold text-white"><Contact className="h-4 w-4 shrink-0" strokeWidth={2} /> Full contact rosters by buying office</h3>
-            <span className="text-xs text-faint">{officeRosters.length} offices · 100% list</span>
+            <span className="text-xs text-faint">{officeRosters.length} offices · full rosters</span>
           </div>
           <p className="text-[11px] text-faint mb-3">The complete people list for a specific contracting office — not an agency sample. Click an office to see everyone.</p>
           <div className="flex flex-wrap gap-2">
