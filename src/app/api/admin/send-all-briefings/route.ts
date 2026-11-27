@@ -12,6 +12,7 @@
  * accepted and type=all sends daily + weekly only.
  */
 
+import { reportedOffers, offersCompetitionLevel } from '@/lib/opportunities/offers';
 import { NextRequest, NextResponse } from 'next/server';
 import { expandNaicsForBriefing as expandNaicsCodes } from '@/lib/briefings/naics-briefing-expansion';
 import Anthropic from '@anthropic-ai/sdk';
@@ -171,7 +172,8 @@ interface ContractForBriefing {
   daysUntilExpiration: number;
   setAside: string;
   description: string;
-  numberOfBids?: number;
+  /** null = not reported on the award (never 0). */
+  numberOfBids?: number | null;
   competitionLevel?: string;
 }
 
@@ -303,12 +305,9 @@ function getSupabase() {
             const endDate = periodPerf.end_date || award['End Date'] || '';
             const daysUntil = endDate ? Math.ceil((new Date(endDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : 180;
 
-            const numberOfBids = parseInt(contractData.number_of_offers_received || '0', 10) || 0;
-            let competitionLevel: 'sole_source' | 'low' | 'medium' | 'high' = 'medium';
-            if (numberOfBids === 0) competitionLevel = 'sole_source';
-            else if (numberOfBids <= 2) competitionLevel = 'low';
-            else if (numberOfBids <= 5) competitionLevel = 'medium';
-            else competitionLevel = 'high';
+            // Not reported → null + 'unknown' — never "0 bids" / sole source (offers.ts).
+            const numberOfBids = reportedOffers(contractData.number_of_offers_received);
+            const competitionLevel = offersCompetitionLevel(numberOfBids);
 
             allContracts.push({
               contractNumber: detail.piid || award['Award ID'],
@@ -319,7 +318,7 @@ function getSupabase() {
               naicsCode: naics,
               expirationDate: endDate,
               daysUntilExpiration: daysUntil,
-              setAside: contractData.extent_competed_description || 'Full & Open',
+              setAside: contractData.type_set_aside_description || 'Not reported',
               description: detail.description || `Federal contract in NAICS ${naics}`,
               numberOfBids,
               competitionLevel,
@@ -976,6 +975,7 @@ DISPLACEMENT ANGLES TO IDENTIFY:
 - 8(a) → unrestricted transitions
 - M&A integration friction
 - Performance issues (low numberOfBids = vulnerable)
+- numberOfBids null / competitionLevel "unknown" means the offer count was NOT REPORTED: say "offers not reported", never "0 bids", "sole source" or "1 bidder"
 - Contracts with competitionLevel "sole_source" or "low" are high priority
 
 Return ONLY valid JSON with exactly 5 opportunities, 2 teaming plays, and 3 must-watch items.`;
