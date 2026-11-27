@@ -1,10 +1,13 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Contact, Search } from 'lucide-react';
 import type { AppTier } from '../UnifiedSidebar';
 import { authedFetch } from '../authHeaders';
 import MindyLoader from '@/components/app/MindyLoader';
+import TabAskBox from '@/components/app/TabAskBox';
+import { isTabAskEnabled, type TabAskCount } from '@/lib/app/tab-ask';
+import { relationshipsAskAdapter, relationshipsRequest, type RelationshipsAskParams } from '@/lib/app/tab-ask-adapters/relationships';
 
 interface RelationshipsPanelProps {
   email: string | null;
@@ -94,6 +97,12 @@ function stageColor(stage: string): string {
   }
 }
 
+// Row caps the relationships route applies (getSavedContacts .limit(100); mapContractorCandidates
+// limit 25, reported as truncated:false). A full page at the cap may hide more rows — Ask Mindy's count
+// says "N+" there instead of claiming an exact number.
+const SAVED_CONTACTS_CAP = 100;
+const PARTNER_CANDIDATES_CAP = 25;
+
 function typeForTab(tab: TabId): ContactType | 'all' {
   if (tab === 'buyers') return 'government_buyer';
   if (tab === 'osbp') return 'osbp';
@@ -130,6 +139,26 @@ export default function RelationshipsPanel({ email, tier, panelContext }: Relati
   // saving attaches to an agency, not a pursuit.
   const [targetAgencies, setTargetAgencies] = useState<string[]>([]);
   const [attachAgency, setAttachAgency] = useState('');
+
+  // ── Ask Mindy on this tab (OFF unless NEXT_PUBLIC_TAB_ASK=on) ────────────────────────────────
+  // An answer sets THIS tab's own filters and lets the tab's existing loads run (exactly as typing in
+  // the boxes does); the load that fills the list settles the pending ask with its row count. With the
+  // switch off both refs stay null/false, so every load and effect behaves exactly as before.
+  const tabAskOn = isTabAskEnabled();
+  const askPending = useRef<{ view: TabId; resolve: (count: TabAskCount) => void } | null>(null);
+  // Clear restores the previous list from a snapshot; these skip the ONE auto-load each restore would trigger.
+  const skipAutoLoad = useRef({ saved: false, candidates: false });
+  const [askSnapshot, setAskSnapshot] = useState<null | {
+    activeTab: TabId; searchQuery: string; naicsFilter: string; agencyFilter: string;
+    candidates: RelationshipContact[]; candidatesTotal: number; candidatesTruncated: boolean;
+    savedContacts: RelationshipContact[]; links: ContactLink[]; notice: string | null;
+  }>(null);
+  const settleAsk = useCallback((view: TabId, count: TabAskCount) => {
+    const pending = askPending.current;
+    if (!pending || pending.view !== view) return;
+    askPending.current = null;
+    pending.resolve(count);
+  }, []);
 
   useEffect(() => {
     if (!email) return;
@@ -202,7 +231,11 @@ export default function RelationshipsPanel({ email, tier, panelContext }: Relati
     if (!data.success) throw new Error(data.error || 'Failed to load relationships');
     setSavedContacts(data.contacts || []);
     setLinks(data.links || []);
-  }, [activeTab, email, searchQuery]);
+    if (activeTab === 'network') {
+      const n = (data.contacts || []).length;
+      settleAsk('network', { shown: n, more: n >= SAVED_CONTACTS_CAP });
+    }
+  }, [activeTab, email, searchQuery, settleAsk]);
 
   const loadPursuits = useCallback(async () => {
     if (!email) return;
@@ -235,16 +268,20 @@ export default function RelationshipsPanel({ email, tier, panelContext }: Relati
       setCandidatesTotal(typeof data.total === 'number' ? data.total : (data.candidates || []).length);
       setCandidatesTruncated(!!data.truncated);
       if ((data.candidates || []).length === 0 && data.dataSourceStatus) setNotice(data.dataSourceStatus);
+      const n = (data.candidates || []).length;
+      settleAsk(activeTab, { shown: n, more: !!data.truncated || (activeTab === 'partners' && n >= PARTNER_CANDIDATES_CAP) });
     } catch (err) {
       console.error('Relationship search failed:', err);
       setError('Failed to search relationships.');
+      settleAsk(activeTab, null);
     } finally {
       setSearching(false);
       setLoading(false);
     }
-  }, [activeTab, agencyFilter, email, naicsFilter, searchQuery]);
+  }, [activeTab, agencyFilter, email, naicsFilter, searchQuery, settleAsk]);
 
   useEffect(() => {
+    if (skipAutoLoad.current.saved) { skipAutoLoad.current.saved = false; return; }
     async function load() {
       if (!email) {
         setLoading(false);
@@ -258,15 +295,17 @@ export default function RelationshipsPanel({ email, tier, panelContext }: Relati
       } catch (err) {
         console.error('Failed to load relationship data:', err);
         setError('Failed to load saved relationships.');
+        settleAsk('network', null);
       } finally {
         setLoading(false);
       }
     }
 
     load();
-  }, [email, loadPursuits, loadSavedContacts]);
+  }, [email, loadPursuits, loadSavedContacts, settleAsk]);
 
   useEffect(() => {
+    if (skipAutoLoad.current.candidates) { skipAutoLoad.current.candidates = false; return; }
     if (activeTab === 'network') {
       setCandidates([]);
       return;
@@ -409,6 +448,61 @@ export default function RelationshipsPanel({ email, tier, panelContext }: Relati
     }
   };
 
+  const handleTabAsk = (p: RelationshipsAskParams): Promise<TabAskCount> => {
+    const next = relationshipsRequest(p, activeTab);
+    if (!askSnapshot) {
+      setAskSnapshot({
+        activeTab, searchQuery, naicsFilter, agencyFilter,
+        candidates, candidatesTotal, candidatesTruncated, savedContacts, links, notice,
+      });
+    }
+    askPending.current?.resolve(null);
+    // Which of the tab's own auto-loads will this state change trigger? (the same ones typing triggers)
+    const savedLoadFires = next.view !== activeTab || next.search !== searchQuery;
+    const candidateLoadFires = savedLoadFires || next.naics !== naicsFilter || next.agency !== agencyFilter;
+    return new Promise<TabAskCount>((resolve) => {
+      askPending.current = { view: next.view, resolve };
+      setActiveTab(next.view);
+      setSearchQuery(next.search);
+      setNaicsFilter(next.naics);
+      setAgencyFilter(next.agency);
+      setNotice(null);
+      setError(null);
+      // Same question twice: nothing changed, so no auto-load fires — run the tab's load directly.
+      if (next.view === 'network' && !savedLoadFires) loadSavedContacts().catch(() => settleAsk('network', null));
+      if (next.view !== 'network' && !candidateLoadFires) void searchCandidates();
+    });
+  };
+
+  const clearTabAsk = () => {
+    const s = askSnapshot;
+    if (!s) return;
+    askPending.current?.resolve(null);
+    askPending.current = null;
+    skipAutoLoad.current = {
+      saved: s.activeTab !== activeTab || s.searchQuery !== searchQuery,
+      candidates: s.activeTab !== activeTab || s.searchQuery !== searchQuery
+        || s.naicsFilter !== naicsFilter || s.agencyFilter !== agencyFilter,
+    };
+    setActiveTab(s.activeTab);
+    setSearchQuery(s.searchQuery);
+    setNaicsFilter(s.naicsFilter);
+    setAgencyFilter(s.agencyFilter);
+    setCandidates(s.candidates);
+    setCandidatesTotal(s.candidatesTotal);
+    setCandidatesTruncated(s.candidatesTruncated);
+    setSavedContacts(s.savedContacts);
+    setLinks(s.links);
+    setNotice(s.notice);
+    setError(null);
+    setAskSnapshot(null);
+  };
+
+  // Keyed so it stays mounted (keeping its answer line) while a reload shows the loader.
+  const askBox = tabAskOn
+    ? <TabAskBox key="tab-ask" adapter={relationshipsAskAdapter} onAsk={handleTabAsk} onClear={clearTabAsk} />
+    : null;
+
   // v2: on My Network, sort by agency so contacts cluster — "who do I know at
   // each target agency" (Eric). Group headers are rendered inline on change.
   const networkSorted = useMemo(() => {
@@ -420,7 +514,9 @@ export default function RelationshipsPanel({ email, tier, panelContext }: Relati
   const activeTabConfig = TABS.find(tab => tab.id === activeTab) || TABS[0];
 
   if (loading) {
-    return <MindyLoader title="Loading your relationships" steps={["People you work with", "Agencies", "Recent activity"]} />;
+    const loader = <MindyLoader title="Loading your relationships" steps={["People you work with", "Agencies", "Recent activity"]} />;
+    if (askBox) return <div className="p-6 space-y-6">{askBox}{loader}</div>;
+    return loader;
   }
 
   return (
@@ -466,6 +562,8 @@ export default function RelationshipsPanel({ email, tier, panelContext }: Relati
           </div>
         </div>
       </div>
+
+      {askBox}
 
       {/* TWO distinct modes (Eric: confusing that "my saved" and "search to
           find new" looked like the same kind of tab). Row 1 = what you HAVE.
