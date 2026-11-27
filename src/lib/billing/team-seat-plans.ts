@@ -29,7 +29,7 @@ export interface TeamSeatPlan {
   annualUsd: number;
   annualPerMonthUsd: number;
   credits: number;
-  /** Stripe price ids, from env (unset until Eric creates the prices). */
+  /** Stripe price ids: monthly from TEAM_SEAT_MONTHLY_PRICE_IDS (env can override); annual env-only. */
   monthlyPriceId: string | null;
   annualPriceId: string | null;
 }
@@ -37,6 +37,19 @@ export interface TeamSeatPlan {
 const envPrice = (name: string): string | null => {
   const v = (process.env[name] || '').trim();
   return v.startsWith('price_') ? v : null;
+};
+
+/**
+ * Live monthly Stripe prices, created 2026-11-27 on the Mindy app product (MINDY_APP_PRODUCT,
+ * prod_UI5RXVGKsdywuf) so cancellation and trial-onboarding logic treat them like every other
+ * Mindy plan. Price ids are not secrets. An env var STRIPE_TEAM_<N>_SEATS_MONTHLY_PRICE still wins.
+ * Annual prices are not created yet (annual pricing is unapproved), so annual stays env-only.
+ */
+export const TEAM_SEAT_MONTHLY_PRICE_IDS: Record<TeamSeatCount, string> = {
+  2: 'price_1UgRmNK5zyiZ50PBB0eGUTYw',
+  3: 'price_1UgRmiK5zyiZ50PBUawhanUw',
+  4: 'price_1UgRn2K5zyiZ50PBEOLJgMT4',
+  5: 'price_1UgRnIK5zyiZ50PB2dZhuXH7',
 };
 
 export const TEAM_SEAT_PLANS: TeamSeatPlan[] = TEAM_SEAT_COUNTS.map((seats) => {
@@ -48,7 +61,7 @@ export const TEAM_SEAT_PLANS: TeamSeatPlan[] = TEAM_SEAT_COUNTS.map((seats) => {
     annualUsd,
     annualPerMonthUsd: Math.round(annualUsd / 12),
     credits: seats * TEAM_SEAT_CREDITS_PER_USER,
-    monthlyPriceId: envPrice(`STRIPE_TEAM_${seats}_SEATS_MONTHLY_PRICE`),
+    monthlyPriceId: envPrice(`STRIPE_TEAM_${seats}_SEATS_MONTHLY_PRICE`) ?? TEAM_SEAT_MONTHLY_PRICE_IDS[seats],
     annualPriceId: envPrice(`STRIPE_TEAM_${seats}_SEATS_ANNUAL_PRICE`),
   };
 });

@@ -71,11 +71,11 @@ describe('team seat display config (PROPOSED, display only)', () => {
     for (const o of TEAM_SEAT_PRICING.options) expect(teamSeatPlan(o.seats)?.monthlyUsd).toBe(o.monthlyUsd);
   });
 
-  it('has no checkout yet: every button goes to contact sales and takes no money', () => {
+  it('every size goes to its own monthly seat checkout and takes payment', () => {
     for (const o of TEAM_SEAT_PRICING.options) {
-      expect(o.checkoutUrl).toBe('');
-      expect(teamSeatCtaHref(o)).toBe(SALES_URL);
-      expect(teamSeatTakesPayment(o)).toBe(false);
+      expect(o.checkoutUrl).toBe(`/api/checkout/team-seats?seats=${o.seats}&billing=monthly`);
+      expect(teamSeatCtaHref(o)).toBe(o.checkoutUrl);
+      expect(teamSeatTakesPayment(o)).toBe(true);
     }
   });
 
@@ -125,15 +125,14 @@ describe('/pricing with the seat switch ON (server render)', () => {
     ]);
   });
 
-  it('renders the 2-user Team card from the mockup, button to sales, no trial or refund line', () => {
+  it('renders the 2-user Team card from the mockup, button to the 2-seat checkout with the no-refund note', () => {
     const t = teamCard(doc);
     expect(t.querySelector('.price .now')?.textContent).toBe('$249');
     expect(t.querySelector('.per')?.textContent).toBe('/ mo, billed monthly. Add seats any time.');
     const cta = t.querySelector('a.cta')!;
     expect(cta.textContent).toBe('Start with 2 seats');
-    expect(cta.getAttribute('href')).toBe(SALES_URL);
-    expect(t.querySelector('.trial')).toBeNull();
-    expect(t.querySelector('[data-no-refund-note]')).toBeNull();
+    expect(cta.getAttribute('href')).toBe('/api/checkout/team-seats?seats=2&billing=monthly');
+    expect(t.querySelector('[data-no-refund-note]')).not.toBeNull();
     expect(t.querySelector('.lead')?.textContent).toBe('Win more as a team.');
     expect(t.querySelector('.base')?.textContent).toBe('All Pro features, plus');
     expect([...t.querySelectorAll('li b')].map((b) => b.textContent)).toEqual([
@@ -194,7 +193,7 @@ describe('/pricing seat toggle (client)', () => {
     expect(state()).toMatchObject({ price: '$249', cta: 'Start with 2 seats', first: '2 users included', checked: 'false' });
     await act(async () => { radio('5 users').click(); });
     expect(state()).toEqual({
-      price: '$599', cta: 'Start with 5 seats', href: SALES_URL,
+      price: '$599', cta: 'Start with 5 seats', href: '/api/checkout/team-seats?seats=5&billing=monthly',
       first: '5 users included', firstDetail: 'Room for the whole business development team on one plan.', checked: 'true',
     });
     expect([...teamCard(host).querySelectorAll('li b')].slice(1).map((b) => b.textContent)).toEqual([
