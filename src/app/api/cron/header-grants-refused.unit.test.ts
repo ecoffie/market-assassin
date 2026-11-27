@@ -27,6 +27,11 @@ vi.mock('@/lib/supabase/server-clients', () => ({
 }));
 vi.mock('@/lib/send-email', () => ({ sendEmail: vi.fn(async () => { calls.email++; return true; }) }));
 vi.mock('@/lib/admin-identity', () => ({ verifyAdminAuth: vi.fn(async () => ({ ok: false })) }));
+// lazy-blueprint-sms sends whichever text is in its schedule window (src/lib/events/lazy-blueprint-sms-sequence.ts).
+// Inside a window (e.g. 2026-11-27 17:00-23:00 UTC) the route reaches GHL, which is not configured here, and the auth
+// test failed on the clock rather than on auth. GHL is mocked so this file only tests authorization, at any time.
+vi.mock('@/lib/ghl/event-registration', () => ({ listContactsByTag: vi.fn(async () => []), changeContactTags: vi.fn(async () => {}) }));
+vi.mock('@/lib/ghl/sms', () => ({ sendSmsToContact: vi.fn(async () => ({ ok: true })) }));
 
 const ROUTES = [
   'admin/alert-status',
