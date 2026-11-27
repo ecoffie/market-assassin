@@ -40,6 +40,7 @@ import { contractIdentityNote, contractEvidence, contractEvidenceNote, priorAwar
 import { ledgerForTrace } from '@/lib/chat/ledger-persistence';
 import { askMindyStrategyPlanEnabledFor, isStrategyPlanRequest, STRATEGY_PLAN_CHAT_CONTRACT, strategyPlanCheck, strategyProfileNote, strategyCompanyContext, strategyFitNote, type StrategyProfileInput } from '@/lib/ask-mindy/strategy-plan';
 import { isUserOverBudget, recordLlmUsage } from '@/lib/llm/usage-cost';
+import { researchClient } from '@/lib/ask-mindy/research-client';
 import { makeTier0Tools, TIER0_TOOL_DEFS, TIER0_TOOL_NAMES } from '@/lib/chat/tier0-tools';
 import { makeMyDocumentsTool, MY_DOCUMENTS_TOOL_DEF, FIND_MY_DOCUMENTS } from '@/lib/chat/my-documents-tool';
 import { makeSearchWebTool, SEARCH_WEB_TOOL_DEF, SEARCH_WEB, callerKeyFor } from '@/lib/chat/search-web-tool';
@@ -1323,7 +1324,7 @@ export async function POST(request: NextRequest) {
               }));
               return { id: c.id, content, isError: r.record.status !== 'success' };
             };
-            const client = new Anthropic();
+            const client = researchClient();
             try {
               const loop = await runResearchLoop({
                 client, model,

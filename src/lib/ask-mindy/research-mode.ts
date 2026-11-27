@@ -37,7 +37,7 @@ export const RESEARCH_MAX_CALLS = 30;
 export const RESEARCH_SYNTHESIS_AT_CALLS = 24;
 export const RESEARCH_SYNTHESIS_AT_SHARE = 0.8;
 /** Output budget for the step that writes the report document (a full doc_model is long). */
-const REPORT_STEP_MAX_TOKENS = 32_000;
+export const REPORT_STEP_MAX_TOKENS = 32_000;
 /** Time kept back for the final answer once the loop must stop. */
 export const FINAL_RESERVE_MS = 75_000;
 const MAX_STEPS = 40;
