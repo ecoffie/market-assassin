@@ -189,7 +189,7 @@ describe('create_document', () => {
     expect(r).toMatchObject({ ok: true, unverified_count: 1, omitted_count: 1 });
     const blocks = s.docs()[0].doc_model.sections[0].blocks;
     expect(blocks.map((b: R) => [b.id, b.claim])).toEqual([['p1', 'fact'], ['p2', 'unverified']]); // critical p3 omitted
-    expect(String(r.note)).toMatch(/Unverified — no source/);
+    expect(String(r.note)).toMatch(/Unverified: no source/);
     expect(String(r.note)).toMatch(/left out/);
   });
 

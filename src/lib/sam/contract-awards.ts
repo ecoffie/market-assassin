@@ -8,6 +8,7 @@
  * - Competition type
  */
 
+import { reportedOffers } from '@/lib/opportunities/offers';
 import {
   SAM_API_CONFIGS,
   makeSAMRequest,
@@ -52,7 +53,8 @@ export interface ContractAward {
   periodOfPerformanceStartDate: string;
   periodOfPerformanceCurrentEndDate: string;
   periodOfPerformancePotentialEndDate: string;
-  numberOfOffersReceived: number;
+  /** null = not reported on the award (never 0). */
+  numberOfOffersReceived: number | null;
   extentCompeted: string;
   extentCompetedDescription: string;
   typeOfContractPricing: string;
@@ -65,7 +67,7 @@ export interface ContractAward {
   // Computed fields
   isBaseAward: boolean;
   modificationCount?: number;
-  competitionLevel?: 'sole_source' | 'low' | 'medium' | 'high';
+  competitionLevel?: 'sole_source' | 'low' | 'medium' | 'high' | 'unknown';
   daysUntilExpiration?: number;
 }
 
@@ -114,10 +116,11 @@ const EXTENT_COMPETED_MAP: Record<string, string> = {
 /**
  * Get competition level from bid count
  */
-function getCompetitionLevel(numberOfOffers: number, extentCompeted: string): ContractAward['competitionLevel'] {
+function getCompetitionLevel(numberOfOffers: number | null, extentCompeted: string): ContractAward['competitionLevel'] {
   if (extentCompeted === 'C' || extentCompeted === 'B') {
     return 'sole_source';
   }
+  if (numberOfOffers === null) return 'unknown';
   if (numberOfOffers <= 2) return 'low';
   if (numberOfOffers <= 5) return 'medium';
   return 'high';
@@ -160,8 +163,8 @@ function transformAward(raw: Record<string, unknown>): ContractAward {
   const awardeeUei = getNestedValue(awardDetails, 'awardeeData.awardeeUEIInformation.uniqueEntityId') as string || '';
 
   // Competition info - numberOfOffersReceived is in awardDetails.competitionInformation
-  const numberOfOffersStr = getNestedValue(awardDetails, 'competitionInformation.numberOfOffersReceived') as string || '0';
-  const numberOfOffers = parseInt(numberOfOffersStr, 10) || 0;
+  // Not reported → null (offers.ts). It used to default to 0, which read as "0 bidders" and classified as 'low'.
+  const numberOfOffers = reportedOffers(getNestedValue(awardDetails, 'competitionInformation.numberOfOffersReceived'));
   const extentCompeted = getNestedValue(coreData, 'competitionInformation.extentCompeted.code') as string || '';
   const extentCompetedName = getNestedValue(coreData, 'competitionInformation.extentCompeted.name') as string || '';
 

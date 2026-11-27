@@ -70,7 +70,7 @@ export async function GET(request: NextRequest) {
     }));
 
     // Stats
-    const withBidCount = result.contracts.filter(c => c.numberOfOffersReceived > 0).length;
+    const withBidCount = result.contracts.filter(c => c.numberOfOffersReceived !== null).length;
     const soleSource = result.contracts.filter(c => c.competitionLevel === 'sole_source').length;
     const lowCompetition = result.contracts.filter(c => c.competitionLevel === 'low').length;
 

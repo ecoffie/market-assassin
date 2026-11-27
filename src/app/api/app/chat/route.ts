@@ -40,6 +40,7 @@ import { contractIdentityNote, contractEvidence, contractEvidenceNote, priorAwar
 import { ledgerForTrace } from '@/lib/chat/ledger-persistence';
 import { askMindyStrategyPlanEnabledFor, isStrategyPlanRequest, STRATEGY_PLAN_CHAT_CONTRACT, strategyPlanCheck, strategyProfileNote, strategyCompanyContext, strategyFitNote, type StrategyProfileInput } from '@/lib/ask-mindy/strategy-plan';
 import { isUserOverBudget, recordLlmUsage } from '@/lib/llm/usage-cost';
+import { researchClient } from '@/lib/ask-mindy/research-client';
 import { makeTier0Tools, TIER0_TOOL_DEFS, TIER0_TOOL_NAMES } from '@/lib/chat/tier0-tools';
 import { makeMyDocumentsTool, MY_DOCUMENTS_TOOL_DEF, FIND_MY_DOCUMENTS } from '@/lib/chat/my-documents-tool';
 import { makeSearchWebTool, SEARCH_WEB_TOOL_DEF, SEARCH_WEB, callerKeyFor } from '@/lib/chat/search-web-tool';
@@ -124,10 +125,11 @@ import { intelligenceGateEnabledFor, runIntelligenceGate, type GateResult } from
 import Anthropic from '@anthropic-ai/sdk';
 import {
   researchModeEnabledFor, researchModel, researchSystemPrompt, toAnthropicTools, runResearchLoop, groundAnswer, progressLine,
-  RESEARCH_TURN_MS, RESEARCH_DEADLINE_MS, RESEARCH_NO_ANSWER, researchToolDefs, wantsReport, type ResearchCall,
+  RESEARCH_TURN_MS, RESEARCH_DEADLINE_MS, RESEARCH_NO_ANSWER, RESEARCH_BETA_LABEL, researchToolDefs, billedInputTokens, describeResearchError, RESEARCH_SYSTEM_STATIC, researchSystemDynamic, type ResearchCall, wantsReport,
 } from '@/lib/ask-mindy/research-mode';
 import { toolLabel } from '@/lib/chat/context-sources';
 import { researchCapDecision } from '@/lib/ask-mindy/research-caps';
+import { COMPETITION_AND_START_PLAYBOOK } from '@/lib/ask-mindy/competition-playbook';
 import { parseChatImages, imageContentBlocks, SCREENSHOT_NOT_READ } from '@/lib/chat/chat-images';
 import { researchCapDeps } from '@/lib/ask-mindy/research-caps-deps';
 import { gateEligible, extractWorkPhrase, profileForGate } from '@/lib/ask-mindy/gate-intent';
@@ -862,6 +864,8 @@ export async function POST(request: NextRequest) {
               : `\n\n${findContract}`;
         const rulesBlock = !rulesLayer ? '' : federalMarketProfileAsk ? `\n\n${ASK_MINDY_RULES_LAYER}` : `\n\n${askMindyRulesPromptBlock()}`;
         const systemPrompt = SYSTEM_PROMPT_TEMPLATE.replace('{today}', today).replace('{userProfile}', userProfileBlock)
+          // The least-competition / where-to-start method (Claude + MCP's), for standard answers too (same tools).
+          + `\n\n${COMPETITION_AND_START_PLAYBOOK}`
           + hostContract
           + rulesBlock;
         // Step 2–8: self-report → pathways → vehicles → market size → contacts → web gap → write-up.
@@ -1287,9 +1291,11 @@ export async function POST(request: NextRequest) {
           // ── RESEARCH MODE: Claude runs its own loop over the same catalog (src/lib/ask-mindy/research-mode.ts). ──
           if (researchTurn) {
             const rmStarted = Date.now();
+            // Beta label: the chat tags this answer and its progress line (only research turns carry it).
+            send({ type: 'mode', mode: 'research', beta: true, label: RESEARCH_BETA_LABEL });
             const model = researchModel();
             const rmTrace: Record<string, unknown> = {
-              engine: 'research_mode', model,
+              engine: 'research_mode', model, beta: true, label: RESEARCH_BETA_LABEL,
               ...(turnImages.length ? { screenshots: turnImages.length } : {}),
               ...(researchCap ? { research_cap: { plan: researchCap.plan, cap: researchCap.cap, used: researchCap.used, ...(researchCap.countUnknown ? { count_unknown: true } : {}) } } : {}),
             };
@@ -1345,11 +1351,14 @@ export async function POST(request: NextRequest) {
               }));
               return { id: c.id, content, isError: r.record.status !== 'success' };
             };
-            const client = new Anthropic();
+            const client = researchClient();
             try {
               const loop = await runResearchLoop({
                 client, model,
-                system: researchSystemPrompt({ today, profileBlock: userProfileBlock }) + (actions ? `\n\n${APP_ACTIONS_NOTE}` : ''),
+                // Fixed prompt first (cached across steps and turns), then today's date and the profile after the breakpoint.
+                // App actions (allowlisted users only) go in the per-turn part so the cached prefix stays identical for all.
+                system: RESEARCH_SYSTEM_STATIC,
+                systemDynamic: researchSystemDynamic({ today, profileBlock: userProfileBlock }) + (actions ? `\n\n${APP_ACTIONS_NOTE}` : ''),
                 conversation,
                 tools: rmTools,
                 effort: process.env.ASK_MINDY_RESEARCH_EFFORT || 'high',
@@ -1366,7 +1375,9 @@ export async function POST(request: NextRequest) {
                   return out;
                 },
               });
-              void recordLlmUsage({ userEmail: auth.email, tool: 'chat', job: 'research_mode', provider: 'anthropic', model, usage: { prompt_tokens: loop.usage.input, completion_tokens: loop.usage.output } });
+              // Cost: cached input priced as billed (reads 0.1x, writes 1.25x); the raw counts go to the trace.
+              void recordLlmUsage({ userEmail: auth.email, tool: 'chat', job: 'research_mode', provider: 'anthropic', model, usage: { prompt_tokens: billedInputTokens(loop.usage), completion_tokens: loop.usage.output } });
+              rmTrace.usage = { input: loop.usage.input, cache_read: loop.usage.cacheRead, cache_write: loop.usage.cacheWrite, output: loop.usage.output };
               Object.assign(rmTrace, { stop: loop.stop, steps: loop.steps, call_count: loop.calls, calls: callLog, results_cut: loop.resultsCut, sam_cache_only: true });
               if (!loop.text) { await finish(RESEARCH_NO_ANSWER, {}, rmSources); return; }
               send({ type: 'progress', message: 'Checking every figure against the sources.', phase: 'checking' });
@@ -1390,8 +1401,19 @@ export async function POST(request: NextRequest) {
               }
               await finish(grounded.text, {}, rmSources);
             } catch (err) {
-              console.error('[chat] research mode failed:', (err as Error)?.message);
-              Object.assign(rmTrace, { stop: 'error', calls: callLog });
+              // The failure keeps its cost and its cause: usage accrued before the error is logged, and the trace records
+              // the error class (e.g. credit_balance_too_low), status and message, not just "error".
+              const failure = describeResearchError(err);
+              console.error('[chat] research mode failed:', failure.class, failure.status ?? '', failure.message);
+              if (failure.progress) {
+                const u = failure.progress.usage;
+                void recordLlmUsage({ userEmail: auth.email, tool: 'chat', job: 'research_mode_failed', provider: 'anthropic', model, usage: { prompt_tokens: billedInputTokens(u), completion_tokens: u.output } });
+                rmTrace.usage = { input: u.input, cache_read: u.cacheRead, cache_write: u.cacheWrite, output: u.output };
+              }
+              Object.assign(rmTrace, {
+                stop: 'error', calls: callLog,
+                error: { class: failure.class, status: failure.status, message: failure.message, ...(failure.progress ? { steps: failure.progress.steps, call_count: failure.progress.calls } : {}) },
+              });
               await finish('I could not finish this research because a service did not respond. Please try again in a moment.', {}, rmSources);
             }
             return;

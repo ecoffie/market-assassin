@@ -151,8 +151,9 @@ function samAwardToRecompete(award: ContractAward): RecompeteContract {
     expirationRisk: getExpirationRisk(daysUntilExpiration),
 
     // NEW: Competition intelligence
-    numberOfBids: award.numberOfOffersReceived,
-    competitionLevel: award.competitionLevel,
+    // Not reported → undefined (unknown), never 0.
+    numberOfBids: award.numberOfOffersReceived ?? undefined,
+    competitionLevel: award.competitionLevel === 'unknown' ? undefined : award.competitionLevel,
     competitionType: award.extentCompetedDescription,
   };
 }

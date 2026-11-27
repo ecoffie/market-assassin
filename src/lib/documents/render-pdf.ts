@@ -13,7 +13,8 @@
  */
 import type { DocModel } from './model';
 import { renderHtml, escapeHtml } from './render-html';
-import { keepDash } from './format';
+import { DOC_STAGE_MARK, keepDash, noEmDash } from './format';
+export { DOC_STAGE_MARK };
 import { htmlToPdf } from '@/lib/pdf/launch-browser';
 
 export interface PdfRender {
@@ -24,15 +25,17 @@ export interface PdfRender {
 }
 
 /** Page header + "Page X of Y" footer. Chromium substitutes the classed spans. */
+
 export function pdfOptions(model: DocModel): Record<string, unknown> {
-  const title = escapeHtml(keepDash(model.title.length > 90 ? `${model.title.slice(0, 89)}…` : model.title));
+  const t = noEmDash(model.title, 'heading');
+  const title = escapeHtml(keepDash(t.length > 90 ? `${t.slice(0, 89)}…` : t));
   const style = 'font-family: Helvetica, Arial, sans-serif; font-size: 7.5pt; color: #6b7280; width: 100%; padding: 0 0.85in;';
   return {
     format: 'Letter',
     printBackground: true,
     displayHeaderFooter: true,
     headerTemplate: `<div style="${style} display:flex; justify-content:space-between;"><span>${title}</span><span>Prepared with Mindy</span></div>`,
-    footerTemplate: `<div style="${style} text-align:center;">Page <span class="pageNumber"></span> of <span class="totalPages"></span></div>`,
+    footerTemplate: `<div style="${style} text-align:center;">Page <span class="pageNumber"></span> of <span class="totalPages"></span>${DOC_STAGE_MARK ? ` &nbsp;&middot;&nbsp; ${escapeHtml(DOC_STAGE_MARK)}` : ''}</div>`,
     margin: { top: '0.9in', right: '0.85in', bottom: '0.95in', left: '0.85in' },
   };
 }

@@ -134,7 +134,6 @@ function generateFullHtmlBody(briefing: RecompeteBriefing, dateStr: string, time
       <tr><td style="padding:24px 28px;">
         <h1 style="margin:0;font-size:22px;font-weight:700;color:#ffffff;">Recompete Alerts (Daily Displacement Intel)</h1>
         <p style="margin:8px 0 0;font-size:13px;color:#ffffff;opacity:0.9;">Your personalized recompete intelligence briefing</p>
-        <p style="margin:4px 0 0;font-size:12px;color:#ffffff;opacity:0.7;">As of ${dateStr}, ${timeStr}</p>
       </td></tr>
     </table>
 
@@ -267,7 +266,6 @@ function renderScorecardEntry(entry: PriorityScorecardEntry): string {
  */
 function generateFullTextBody(briefing: RecompeteBriefing, dateStr: string, timeStr: string): string {
   let text = `RECOMPETE ALERTS (DAILY DISPLACEMENT INTEL)
-As of ${dateStr}, ${timeStr}
 
 ================================================================================
 1) TOP ${briefing.opportunities.length} RECOMPETE OPPORTUNITIES (RANKED)
@@ -411,7 +409,6 @@ function generateCondensedHtmlBody(briefing: CondensedBriefing, dateStr: string,
         <span style="display:inline-block;background:rgba(255,255,255,0.2);padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:12px;color:#ffffff;">Daily Intel</span>
         <h1 style="margin:0;font-size:24px;font-weight:700;color:#ffffff;">Displacement Briefing</h1>
         <p style="margin:8px 0 0;font-size:14px;color:#ffffff;opacity:0.9;">Top recompete opportunities ranked by vulnerability</p>
-        <p style="margin:4px 0 0;font-size:12px;color:#ffffff;opacity:0.7;">${dateStr} • ${timeStr}</p>
       </td></tr>
     </table>
 
@@ -485,7 +482,6 @@ function generateCondensedHtmlBody(briefing: CondensedBriefing, dateStr: string,
  */
 function generateCondensedTextBody(briefing: CondensedBriefing, dateStr: string, timeStr: string): string {
   let text = `Daily Recompete Alerts — Displacement Intel
-As of: ${dateStr}, ${timeStr}
 
 Top ${briefing.opportunities.length} recompete opportunities (ranked)
 `;

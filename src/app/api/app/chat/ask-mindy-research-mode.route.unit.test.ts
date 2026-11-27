@@ -57,6 +57,7 @@ const ENV_KEYS = ['OPENAI_API_KEY', 'SUPABASE_SERVICE_ROLE_KEY', 'ASK_MINDY_INTE
 const saved: Record<string, string | undefined> = {};
 const openaiCalls: string[] = [];
 const openaiTools: string[] = [];
+const openaiSystems: string[] = [];
 const EMAIL = 'erika@example.com';
 const Q = 'Give me a full assessment of Ridgeline Digital.';
 type Block = Record<string, unknown>;
@@ -67,7 +68,7 @@ beforeEach(() => {
   process.env.OPENAI_API_KEY = 'sk-test';
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'srk-test';
   for (const k of ENV_KEYS.slice(2)) delete process.env[k];
-  openaiCalls.length = 0; openaiTools.length = 0; h.inserts.length = 0; h.overBudget = false; h.capUsed = 0; h.afterFns.length = 0;
+  openaiCalls.length = 0; openaiTools.length = 0; openaiSystems.length = 0; h.inserts.length = 0; h.overBudget = false; h.capUsed = 0; h.afterFns.length = 0;
   h.runMcpTool.mockReset();
   h.runMcpTool.mockImplementation(async (name: string) => ({ result: { ok: true, grounded: true, tool: name, note: 'obligated $1.2M' }, credits: 0 }));
   h.runGate.mockReset(); h.extract.mockReset(); h.extract.mockImplementation(async () => 'digital marketing');
@@ -80,6 +81,7 @@ beforeEach(() => {
     openaiCalls.push(String(url));
     const body = JSON.parse(String(init.body || '{}')) as Record<string, unknown>;
     for (const t of ((body.tools as Array<{ function?: { name?: string } }>) || [])) openaiTools.push(String(t.function?.name));
+    for (const m of ((body.messages as Array<{ role?: string; content?: unknown }>) || [])) if (m.role === 'system') openaiSystems.push(String(m.content));
     return isPlannerCall(body) ? plannerResponse([]) : answerStream(['Existing path answer.']);
   }));
   vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -116,7 +118,11 @@ describe('research mode in the chat route', () => {
     expect(h.create).toHaveBeenCalledTimes(2);
     const first = h.create.mock.calls[0][0] as { model: string; system: string; tools: Array<{ name: string }> };
     expect(first.model).toBe('claude-opus-5-5');
-    expect(first.system).toContain('IDENTITY FIRST');
+    expect(JSON.stringify(first.system)).toContain('IDENTITY FIRST');
+    const sys = first.system as unknown as Array<{ text: string; cache_control?: unknown }>;
+    expect(sys[0].cache_control).toEqual({ type: 'ephemeral' });
+    expect(sys[0].text).not.toMatch(/Today is/);
+    expect(sys[1].text).toMatch(/Today is/);
     const names = first.tools.map((t) => t.name);
     expect(names).toEqual(expect.arrayContaining(['find_opportunities', 'search_contractors', 'search_web', 'read_web_page']));
     for (const t of ['lookup_sam_entity', 'get_contractor_award_history', 'get_solicitation_incumbent', 'get_solicitation_documents', 'get_buying_offices']) expect(names).toContain(t);
@@ -212,7 +218,8 @@ describe('research mode in the chat route', () => {
     expect(h.create).not.toHaveBeenCalled();
     expect(openaiCalls.length).toBeGreaterThan(0);
     const t = text(ev);
-    expect(t.startsWith("You've used today's 10 in-depth research answers, so this one is a standard answer. In-depth research resets tomorrow.")).toBe(true);
+    expect(t.startsWith("You've used today's 10 research answers on the beta. Standard answers are unlimited; research answers reset tomorrow.")).toBe(true);
+    expect(ev.some((e) => e.type === 'mode')).toBe(false);
     expect(t).toContain('Existing path answer.');
     const trace = await savedTrace();
     expect(JSON.stringify(trace)).toContain('research_cap:reached:10/10:pro_monthly');
@@ -322,5 +329,39 @@ describe('research mode in the chat route', () => {
   it('ordinary turns register no keep-alive', async () => {
     await ask(Q);
     expect(h.afterFns).toHaveLength(0);
+  });
+
+  it('a research turn is labelled beta: a mode event before the answer, and the label in the saved trace; standard turns carry none', async () => {
+    flagOn();
+    const ev = await ask(Q);
+    const mode = ev.find((e) => e.type === 'mode') as Record<string, unknown> | undefined;
+    expect(mode).toEqual({ type: 'mode', mode: 'research', beta: true, label: 'Research · Beta' });
+    expect(ev.findIndex((e) => e.type === 'mode')).toBeLessThan(ev.findIndex((e) => e.type === 'token'));
+    expect(await savedTrace()).toMatchObject({ engine: 'research_mode', beta: true, label: 'Research · Beta' });
+    h.inserts.length = 0;
+    delete process.env.ASK_MINDY_RESEARCH_MODE;
+    const std = await ask(Q);
+    expect(std.some((e) => e.type === 'mode')).toBe(false);
+  });
+
+  it('a provider failure mid-run is traced with its class and the usage it had already cost', async () => {
+    flagOn();
+    let step = 0;
+    h.create.mockImplementation(async () => {
+      if (++step === 1) return { content: [{ type: 'tool_use', id: 'tu1', name: 'find_opportunities', input: { query: 'x' } }], stop_reason: 'tool_use', usage: { input_tokens: 700, output_tokens: 30, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 } };
+      throw Object.assign(new Error('credit'), { status: 400, error: { type: 'error', error: { type: 'invalid_request_error', message: 'Your credit balance is too low to access the Anthropic API.' } } });
+    });
+    const ev = await ask(Q);
+    expect(text(ev)).toMatch(/could not finish this research/);
+    expect(await savedTrace()).toMatchObject({
+      stop: 'error',
+      usage: { input: 700, output: 30 },
+      error: { class: 'credit_balance_too_low', status: 400, steps: 1, call_count: 1 },
+    });
+  });
+
+  it('standard answers carry the least-competition / where-to-start method too', async () => {
+    await ask('Where can I find opportunities where no one is bidding? I want to sell HVAC where there is the least competition.');
+    expect(openaiSystems.join('\n')).toContain('LEAST COMPETITION / WHERE TO START');
   });
 });

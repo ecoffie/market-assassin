@@ -49,9 +49,15 @@ export interface AwardDetail {
   multipleOrSingleAward?: string | null;
   /** Latest transaction's set-aside description, as reported. Null when not reported. */
   setAsideDescription?: string | null;
+  /**
+   * How this award was competed, classified from THIS record's latest_transaction_contract_data (competition-facts.ts):
+   * extent competed, set-aside, offers received (null = not reported, never 1 or 0), other-than-full-and-open reason.
+   */
+  competition?: CompetitionFacts;
 }
 
 import { CONTRACT_CODES, IDV_CODES } from '@/lib/usaspending/award-type-codes';
+import { classifyCompetition, type CompetitionFacts } from '@/lib/opportunities/competition-facts';
 
 export type AwardCeilingSource =
   | 'base_and_all_options'
@@ -216,6 +222,14 @@ export async function fetchAwardDetailChecked(generatedId: string, fetcher: type
       usaSpendingUrl: `https://www.usaspending.gov/award/${encodeURIComponent(generatedId)}`,
       multipleOrSingleAward: d.latest_transaction_contract_data?.multiple_or_single_award_description || null,
       setAsideDescription: d.latest_transaction_contract_data?.type_set_aside_description || null,
+      competition: classifyCompetition(d.latest_transaction_contract_data ? {
+        extent_competed: d.latest_transaction_contract_data.extent_competed ?? null,
+        extent_competed_description: d.latest_transaction_contract_data.extent_competed_description ?? null,
+        type_set_aside_description: d.latest_transaction_contract_data.type_set_aside_description ?? null,
+        other_than_full_and_open_description: d.latest_transaction_contract_data.other_than_full_and_open_description ?? null,
+        number_of_offers_received: d.latest_transaction_contract_data.number_of_offers_received ?? null,
+        business_categories: Array.isArray(d.recipient?.business_categories) ? d.recipient.business_categories : null,
+      } : null),
     } };
   } catch (err) {
     return { state: 'unavailable', reason: `detail error: ${(err as Error)?.message || String(err)}` };

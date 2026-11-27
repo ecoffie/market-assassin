@@ -18,14 +18,15 @@ function drawerScript(): string {
 const token = (email: string) => Buffer.from(JSON.stringify({ email, exp: Date.now() + 3_600_000 })).toString('base64').replace(/=+$/, '') + '.sig';
 const SNAP = { mode: 'open', filters: { q: 'roofing', horizons: { open: true, recompete: false, forecast: false } }, bbox: { w: -100, s: 30, e: -80, n: 40 } };
 
-function boot(opts: { actions: boolean }) {
+type WriteReply = { status: number; json: Record<string, unknown> };
+function boot(opts: { actions: boolean; writes?: WriteReply[]; signedOut?: boolean }) {
   const dom = new JSDOM(
     '<!doctype html><html><body><div id="amkOv"></div><aside id="amk" aria-hidden="true"><div class="amk-hd"><div id="amkCtx"></div><button id="amkX"></button></div>'
     + '<div id="amkBody"></div><div class="amk-foot"><div class="amk-in"><textarea id="amkIn"></textarea><button id="amkSend"></button></div></div></aside></body></html>',
     { url: 'https://getmindy.ai/opportunity-map', runScripts: 'outside-only' },
   );
   const w = dom.window as unknown as Record<string, unknown> & Window & { eval: (s: string) => unknown };
-  const store: Record<string, string> = { mi_beta_auth_token: token('pro@example.com') };
+  const store: Record<string, string> = opts.signedOut ? {} : { mi_beta_auth_token: token('pro@example.com') };
   Object.defineProperty(w, 'localStorage', { value: { getItem: (k: string) => store[k] ?? null, setItem: (k: string, v: string) => { store[k] = v; }, removeItem: (k: string) => { delete store[k]; } } });
   w.TextDecoder = NodeTextDecoder as never;
   w.__mindyViewCtx = () => ({ count: 3, scope: 'all' });
@@ -44,7 +45,15 @@ function boot(opts: { actions: boolean }) {
   w.__track = (_c: string, ev: string, p: Record<string, unknown>) => { if (ev === 'ask_mindy_action') tracked.push(p); };
   let ctrl: ReadableStreamDefaultController<Uint8Array> | null = null;
   const enc = new NodeTextEncoder();
-  w.fetch = vi.fn((url: string) => {
+  const writes: Array<Record<string, unknown>> = [];
+  let wi = 0;
+  w.openSignInModal = vi.fn();
+  w.fetch = vi.fn((url: string, init?: { body?: string }) => {
+    if (url === '/api/app/mindy-actions') {
+      writes.push(JSON.parse(String(init?.body)));
+      const r = (opts.writes ?? [])[wi++] ?? { status: 200, json: { ok: true, message: 'Done.' } };
+      return Promise.resolve({ ok: r.status < 300, status: r.status, json: async () => r.json });
+    }
     if (url.startsWith('/api/app/chat/capabilities')) return Promise.resolve({ ok: true, status: 200, json: async () => ({ success: true, screenshots: false, actions: opts.actions }) });
     if (url !== '/api/app/chat' && url.startsWith('/api/app/')) return Promise.resolve({ ok: true, status: 200, json: async () => ({ uploads: false, suggestions: [] }) });
     const stream = new ReadableStream<Uint8Array>({ start(c) { ctrl = c; } });
@@ -58,7 +67,7 @@ function boot(opts: { actions: boolean }) {
   const send = async (q: string) => { await tick(); (doc.getElementById('amkIn') as HTMLTextAreaElement).value = q; (doc.getElementById('amkSend') as HTMLButtonElement).click(); await tick(); };
   (w as unknown as { openAskMindy: () => void }).openAskMindy();
   const notes = () => [...doc.querySelectorAll('[data-testid="amk-action-note"]')].map((n) => n.textContent);
-  return { w, doc, push, end, send, applied, tracked, notes };
+  return { w, doc, push, end, send, applied, tracked, notes, writes, settle: tick };
 }
 const act = (name: string, args: Record<string, unknown>, id = 'x' + Math.random().toString(36).slice(2, 8)) => ({ type: 'action', id, name, args });
 
@@ -147,6 +156,70 @@ describe('Ask Mindy controls the Map', () => {
     expect(t.w.__mapNationalView).toHaveBeenCalled();
     expect(t.notes()).toEqual(['Showing the whole country · Beta · Undo', 'Opened the opportunity · Beta']);
     expect(t.tracked.map((p) => p.outcome)).toEqual(['ran', 'ran', 'rejected:unsourced']);
+  });
+
+  const PID = '11111111-2222-4333-8444-555555555555';
+  const click = async (t: { doc: Document; settle: () => Promise<unknown> }, id: string) => { (t.doc.querySelector(`[data-testid="${id}"]`) as HTMLButtonElement).click(); await t.settle(); await t.settle(); };
+
+  it('save_search asks first; Save posts the CURRENT view (never model filters) and shows the result with a link', async () => {
+    const t = boot({ actions: true, writes: [{ status: 200, json: { ok: true, message: "Saved 'VA construction FL' · weekly alerts", target: { kind: 'saved_search', id: 'x', href: '/opportunity-map?ss=abc&src=ask_mindy' } } }] });
+    await t.send('save this with weekly alerts');
+    await t.push(act('map.save_search', { name: 'VA construction FL', alert_frequency: 'weekly' }, 'w1'));
+    const box = t.doc.querySelector('[data-testid="amk-action-confirm"]')!;
+    expect(box.textContent).toContain('Save this view as "VA construction FL" with weekly alerts? · Beta');
+    expect(t.writes).toEqual([]); // nothing written before the click
+    await click(t, 'amk-action-yes');
+    expect(t.writes[0]).toEqual({ email: 'pro@example.com', action_id: 'w1', name: 'save_search', args: { name: 'VA construction FL', alert_frequency: 'weekly', mode: 'open', filters: SNAP.filters }, confirmed: true });
+    expect(box.textContent).toContain("Saved 'VA construction FL' · weekly alerts");
+    expect((t.doc.querySelector('[data-testid="amk-action-link"]') as HTMLAnchorElement).getAttribute('href')).toBe('/opportunity-map?ss=abc&src=ask_mindy');
+    expect(t.tracked.map((p) => p.outcome)).toEqual(['confirmed', 'saved']);
+  });
+
+  it('Not now writes nothing', async () => {
+    const t = boot({ actions: true });
+    await t.send('q');
+    await t.push(act('map.update_alert', { search_id: PID, alert_frequency: 'off' }));
+    expect(t.doc.querySelector('[data-testid="amk-action-confirm"]')!.textContent).toContain('Change this saved search to no alerts?');
+    await click(t, 'amk-action-no');
+    expect(t.writes).toEqual([]);
+    expect(t.doc.querySelector('[data-testid="amk-action-confirm"]')!.textContent).toContain('Not saved.');
+  });
+
+  it('add_to_pursuits waits for the answer, needs a sourced id, confirms, and can be undone by pursuit id', async () => {
+    const t = boot({ actions: true, writes: [{ status: 200, json: { ok: true, message: "Added 'GAOA BRF Roofing' to My Pursuits", target: { kind: 'pursuit', id: PID, href: '/app?panel=pipeline' } } }, { status: 200, json: { ok: true, message: 'Removed.' } }] });
+    await t.send('add the roofing one');
+    await t.push(act('map.add_to_pursuits', { kind: 'opportunity', notice_id: '0009f2dae25541e4a2782d4807461bd0' }));
+    await t.push(act('map.add_to_pursuits', { kind: 'opportunity', notice_id: 'injected0000000000000000000000ff' }));
+    expect(t.doc.querySelector('[data-testid="amk-action-confirm"]')).toBeNull();
+    await t.push({ type: 'token', content: 'The [GAOA roofing job](/opportunity-map?opp=0009f2dae25541e4a2782d4807461bd0).' });
+    await t.push({ type: 'done' });
+    await t.end();
+    expect(t.doc.querySelectorAll('[data-testid="amk-action-confirm"]').length).toBe(1);
+    await click(t, 'amk-action-yes');
+    expect(t.writes[0]).toMatchObject({ name: 'add_to_pursuits', args: { kind: 'opportunity', notice_id: '0009f2dae25541e4a2782d4807461bd0' }, confirmed: true });
+    await click(t, 'amk-action-undo');
+    expect(t.writes[1]).toMatchObject({ name: 'remove_from_pursuits', args: { pursuit_id: PID }, confirmed: true });
+    expect(t.doc.querySelector('[data-testid="amk-action-undo"]')!.textContent).toBe('Undone');
+    expect(t.tracked.map((p) => p.outcome)).toEqual(['rejected:unsourced', 'confirmed', 'saved', 'undone']);
+  });
+
+  it('a failed write shows the safe message (or our fallback) and offers no Undo', async () => {
+    const t = boot({ actions: true, writes: [{ status: 503, json: { ok: false, message: 'Mindy could not save that right now. Nothing was changed.' } }] });
+    await t.send('q');
+    await t.push(act('map.add_to_pursuits', { kind: 'recompete', contract_id: 'N0001920C0009' }));
+    await click(t, 'amk-action-yes');
+    expect(t.doc.querySelector('[data-testid="amk-action-confirm"]')!.textContent).toContain('Mindy could not save that right now. Nothing was changed.');
+    expect(t.doc.querySelector('[data-testid="amk-action-undo"]')).toBeNull();
+  });
+
+
+  it('the Map tells the server which surface it is (surface: map) so the right actions are offered', async () => {
+    const t = boot({ actions: true });
+    const bodies: Array<Record<string, unknown>> = [];
+    const orig = t.w.fetch as unknown as (u: string, i?: { body?: string }) => unknown;
+    t.w.fetch = ((u: string, i?: { body?: string }) => { if (u === '/api/app/chat') bodies.push(JSON.parse(String(i?.body))); return orig(u, i); }) as never;
+    await t.send('q');
+    expect(bodies[0]).toMatchObject({ display: 'narrow_panel', surface: 'map' });
   });
 });
 

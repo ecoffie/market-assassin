@@ -135,4 +135,26 @@ describe('Map Ask Mindy window: research progress', () => {
     expect((t.doc.querySelector('.amk-rp-steps') as HTMLElement).hidden).toBe(true);
     expect(t.q('amk-research-toggle')!.textContent).toBe('Show steps');
   });
+
+  it('a research-beta turn shows its tag on the progress line and above the answer', async () => {
+    const t = boot();
+    await t.send('Assess Ridgeline');
+    await t.push({ type: 'mode', mode: 'research', beta: true, label: 'Research · Beta' });
+    await t.push({ type: 'progress', message: 'Checking awards.' });
+    expect(t.q('amk-research-tag')!.textContent).toBe('Research · Beta');
+    expect(t.q('amk-beta-tag')!.textContent).toBe('Research · Beta');
+    await t.push({ type: 'token', content: 'Answer.' });
+    await t.push({ type: 'done' });
+    await t.end();
+    expect(t.doc.querySelectorAll('[data-testid="amk-beta-tag"]').length).toBe(1);
+  });
+
+  it('a progress line without a mode event has no tag', async () => {
+    const t = boot();
+    await t.send('q');
+    await t.push({ type: 'progress', message: 'Checking awards.' });
+    expect(t.q('amk-research-tag')).toBeNull();
+    expect(t.q('amk-beta-tag')).toBeNull();
+  });
 });
+

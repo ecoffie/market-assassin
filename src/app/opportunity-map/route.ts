@@ -10945,12 +10945,15 @@ const ASK_MINDY_CSS =
   + '.amk-in textarea:focus{border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.12)}'
   + '.amk-send{flex:none;width:40px;height:40px;border:0;border-radius:11px;background:#2563eb;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center}'
   + '.amk-send:disabled{opacity:.45;cursor:default}.amk-send svg{width:18px;height:18px}'
+  + '.amk-beta{display:inline-block;margin:0 0 6px;border:1px solid #c7d2fe;background:#eef2ff;color:#4338ca;border-radius:999px;padding:1px 8px;font:600 10.5px Inter,system-ui,sans-serif}.amk-rp-tag:empty{display:none}.amk-rp-tag{display:inline-block;margin:0 4px 0 2px;border:1px solid #c7d2fe;background:#eef2ff;color:#4338ca;border-radius:999px;padding:0 6px;font:600 10px Inter,system-ui,sans-serif;vertical-align:1px}'
+  + '@media(prefers-color-scheme:dark){.amk-beta,.amk-rp-tag{background:rgba(99,102,241,.15);border-color:rgba(129,140,248,.4);color:#c7d2fe}}'
   + '.amk-rp{margin:0 0 8px;border:1px solid #e6ebf0;border-radius:10px;background:#f8fafc;padding:8px 10px;font:500 12.5px Inter,system-ui,sans-serif;color:#334155}.amk-rp-hd b{font-weight:600;color:#0f172a}.amk-rp-time,.amk-rp-n{color:#6b7787;font-variant-numeric:tabular-nums}'
   + '.amk-rp-spin{display:inline-block;width:11px;height:11px;margin-right:6px;vertical-align:-1px;border:2px solid #c7d2fe;border-top-color:#6366f1;border-radius:50%;animation:amkspin .9s linear infinite}@keyframes amkspin{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){.amk-rp-spin{animation:none}}'
   + '.amk-rp-cur{margin-top:3px;color:#475569}.amk-rp-still{margin-top:3px;font-size:11.5px;color:#6b7787}.amk-rp-still[hidden]{display:none}.amk-rp-tog{margin-top:4px;border:0;background:none;padding:0;cursor:pointer;font:600 11.5px Inter,system-ui,sans-serif;color:#6b7787}.amk-rp-tog:hover{color:#334155}'
   + '.amk-rp-steps{margin:4px 0 0;padding:0 0 0 16px;font-size:12px;color:#64748b}.amk-rp-steps[hidden]{display:none}.amk-rp-sum{background:none;border:0;padding:0;color:#6b7787;font-size:12px}'
   + '@media(prefers-color-scheme:dark){.amk-rp{background:#0d141d;border-color:#202b39;color:#cdd8e4}.amk-rp-hd b{color:#eaf1f8}.amk-rp-cur{color:#b6c3d1}.amk-rp-sum{background:none}}'
   + '.amk-actnote{margin:0 0 6px;font:500 12px Inter,system-ui,sans-serif;color:#334155;background:#f1f5ff;border:1px solid #dbe4ff;border-radius:8px;padding:5px 9px}.amk-actbeta{font-weight:700;color:#4338ca}.amk-actundo{border:0;background:none;padding:0;cursor:pointer;font:600 12px Inter,system-ui,sans-serif;color:#2563eb;text-decoration:underline}.amk-actundo:disabled{color:#6b7787;text-decoration:none;cursor:default}'
+  + '.amk-actyes,.amk-actno{margin-left:6px;border-radius:6px;padding:2px 9px;cursor:pointer;font:600 11.5px Inter,system-ui,sans-serif}.amk-actyes{border:1px solid #2563eb;background:#2563eb;color:#fff}.amk-actno{border:1px solid #cbd5e1;background:#fff;color:#334155}.amk-actyes:disabled,.amk-actno:disabled{opacity:.55;cursor:default}.amk-actconfirm a{color:#2563eb;font-weight:600}'
   + '@media(prefers-color-scheme:dark){.amk-actnote{background:#122033;border-color:#1f3a5c;color:#cdd8e4}.amk-actbeta{color:#c7d2fe}.amk-actundo{color:#7fb0ff}}'
   + '.amk-notices{margin-top:8px;display:flex;flex-direction:column;gap:4px}.amk-notice{font:500 12px Inter,system-ui,sans-serif;color:#92400e;background:#fffbeb;border:1px solid #fde68a;border-radius:7px;padding:4px 8px}'
   + '@media(prefers-color-scheme:dark){.amk-notice{color:#fcd34d;background:rgba(245,158,11,.1);border-color:rgba(245,158,11,.25)}}'
@@ -11211,7 +11214,7 @@ const ASK_MINDY_JS = `<script>(function(){
   function readView(){ try{ var o=JSON.parse(sessionStorage.getItem(VIEW_KEY)||'null'); return (o&&o.email&&o.email===email()&&(o.ws||'')===wsKey()&&Array.isArray(o.history))?o:null; }catch(e){ return null; } }
   function renderConversation(msgs){
     body.innerHTML='';
-    msgs.forEach(function(m){ if(!m||typeof m.content!=='string') return; var d=addMsg(m.role==='user'?'user':'assistant', m.content); if(m.role!=='user'&&m.files&&m.files.length) repCard(cleanFiles(m.files),d); if(m.role!=='user'){ var r=savedReport(m.report); if(r) repSavedCard(r,d); } });
+    msgs.forEach(function(m){ if(!m||typeof m.content!=='string') return; var d=addMsg(m.role==='user'?'user':'assistant', m.content); if(m.role!=='user'&&m.files&&m.files.length) repCard(cleanFiles(m.files),d); if(m.role!=='user'){ var r=savedReport(m.report); if(r) repSavedCard(r,d); if(m.tag) betaTag(d,betaLabel(m.tag)); } });
     body.scrollTop=body.scrollHeight; // a reopened conversation shows its end (its report card) above the composer
   }
   function newChat(){
@@ -11269,7 +11272,7 @@ const ASK_MINDY_JS = `<script>(function(){
         sessionId=sid;
         history=d.messages.filter(function(m){ return m&&(m.role==='user'||m.role==='assistant')&&typeof m.content==='string'; }).map(function(m){
           var h={role:m.role,content:m.content}; var f=m.deliverables&&Array.isArray(m.deliverables.files)?m.deliverables.files:null; if(f&&f.length) h.files=f;
-          var r=m.market_report?savedReport({id:m.market_report.report_id,title:m.market_report.title}):null; if(r) h.report=r; return h; });
+          var r=m.market_report?savedReport({id:m.market_report.report_id,title:m.market_report.title}):null; if(r) h.report=r; if(m.role==='assistant'&&m.research_mode) h.tag=betaLabel(m.research_mode.label); return h; });
         clearFollowups(); hideHistory(); renderConversation(history); saveView();
         try{ if(window.__track) window.__track('tool_use','map_chat_reopen',{messages:history.length}); }catch(e){}
       })
@@ -11461,7 +11464,11 @@ const ASK_MINDY_JS = `<script>(function(){
     'map.search':['q'],
     'map.set_horizons':['open','recompete','forecast','isolate'],
     'map.go_to':['state','national'],
-    'map.open_record':['notice_id']
+    'map.open_record':['notice_id'],
+    'map.save_search':['name','alert_frequency'],
+    'map.update_alert':['search_id','alert_frequency'],
+    'map.add_to_pursuits':['kind','notice_id','contract_id'],
+    'map.remove_from_pursuits':['pursuit_id','notice_id']
   };
   var ACT_PLAIN=/^[A-Za-z0-9 ,.&()'/:_-]+$/, ACT_HZ=['open','recompete','forecast'];
   function actPlain(v,max){ if(typeof v!=='string') return null; var s=v.replace(/ +/g,' ').trim(); return (s&&s.length<=max&&ACT_PLAIN.test(s))?s:null; }
@@ -11471,6 +11478,7 @@ const ASK_MINDY_JS = `<script>(function(){
     var keys=MAP_ACTIONS[ev.name]; if(!keys) return null;
     var raw=(ev.args&&typeof ev.args==='object'&&!Array.isArray(ev.args))?ev.args:{}, a={}, k;
     for(k in raw){ if(!actHas(keys,k)) return null; }
+    if(ACT_WRITES[ev.name]){ var wa=actValidateWrite(ev.name,raw); return wa?{id:ev.id,name:ev.name,args:wa}:null; }
     if(ev.name==='map.apply_view'||ev.name==='map.search'){
       if(raw.q!=null){ var q=actPlain(raw.q,120); if(q==null||q.length<2) return null; a.q=q; }
       if(ev.name==='map.search'&&a.q==null) return null;
@@ -11492,6 +11500,70 @@ const ASK_MINDY_JS = `<script>(function(){
       if(typeof raw.notice_id!=='string'||!/^[A-Za-z0-9_-]{6,64}$/.test(raw.notice_id)) return null; a.notice_id=raw.notice_id;
     }
     return {id:ev.id,name:ev.name,args:a};
+  }
+  // Write actions (slice 2): never run without a click. One line: "<what> · Beta [Save] [Not now]". On Yes the drawer
+  // POSTs /api/app/mindy-actions (Agent 3; same session + workspace as the buttons; the route calls the existing lib).
+  // save_search saves EXACTLY the view on screen (filters/mode from the snapshot, never from the model).
+  var ACT_FREQ=['daily','weekly','off'], ACT_UUID=/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+  var ACT_WRITES={'map.save_search':'Save','map.update_alert':'Change','map.add_to_pursuits':'Add','map.remove_from_pursuits':'Remove'};
+  function actValidateWrite(name,raw){ var a={};
+    if(name==='map.save_search'){ var n=actPlain(raw.name,80); if(n==null||!actHas(ACT_FREQ,raw.alert_frequency)) return null; a.name=n; a.alert_frequency=raw.alert_frequency; return a; }
+    if(name==='map.update_alert'){ if(typeof raw.search_id!=='string'||!ACT_UUID.test(raw.search_id)||!actHas(ACT_FREQ,raw.alert_frequency)) return null; a.search_id=raw.search_id; a.alert_frequency=raw.alert_frequency; return a; }
+    if(name==='map.add_to_pursuits'){
+      if(raw.kind==='opportunity'&&typeof raw.notice_id==='string'&&/^[A-Za-z0-9_-]{6,64}$/.test(raw.notice_id)&&raw.contract_id==null){ a.kind='opportunity'; a.notice_id=raw.notice_id; return a; }
+      if(raw.kind==='recompete'&&raw.notice_id==null){ var c=actPlain(raw.contract_id,64); if(c==null) return null; a.kind='recompete'; a.contract_id=c; return a; }
+      return null; }
+    if(name==='map.remove_from_pursuits'){ var hp=raw.pursuit_id!=null, hn=raw.notice_id!=null; if(hp===hn) return null;
+      if(hp){ if(typeof raw.pursuit_id!=='string'||!ACT_UUID.test(raw.pursuit_id)) return null; a.pursuit_id=raw.pursuit_id; return a; }
+      if(typeof raw.notice_id!=='string'||!/^[A-Za-z0-9_-]{6,64}$/.test(raw.notice_id)) return null; a.notice_id=raw.notice_id; return a; }
+    return null;
+  }
+  function actFreqText(f){ return f==='off'?'no alerts':(f+' alerts'); }
+  function actConfirmText(act){ var a=act.args;
+    if(act.name==='map.save_search') return 'Save this view as "'+a.name+'" with '+actFreqText(a.alert_frequency)+'?';
+    if(act.name==='map.update_alert') return 'Change this saved search to '+actFreqText(a.alert_frequency)+'?';
+    if(act.name==='map.add_to_pursuits') return 'Add this '+(a.kind==='recompete'?'recompete':'opportunity')+' to My Pursuits?';
+    return 'Remove this from My Pursuits?';
+  }
+  function actPost(name,args,id){
+    return fetch('/api/app/mindy-actions',{method:'POST',headers:withWorkspace({'Content-Type':'application/json','x-mi-auth-token':tok()||'','x-user-email':email()}),
+      body:JSON.stringify({email:email(),action_id:id,name:name,args:args,confirmed:true})})
+      .then(function(r){ return r.json().then(function(d){ return {status:r.status,d:d||{}}; },function(){ return {status:r.status,d:{}}; }); },function(){ return {status:0,d:{}}; });
+  }
+  function actResultText(res){
+    if(res.status===401) return 'Please sign in again to let Mindy save this.';
+    var m=(res.d&&typeof res.d.message==='string')?res.d.message.replace(/ +/g,' ').trim():'';
+    if(m&&m.length<=300) return m;
+    return (res.d&&res.d.ok)?'Done.':'Mindy couldn’t save that right now. Nothing was changed.';
+  }
+  function actWrite(act,aEl){
+    if(!tok()||!email()){ actTrack(act,'rejected:signed_out'); if(window.openSignInModal) window.openSignInModal('let Mindy save this',function(){}); return; }
+    var box=document.createElement('div'); box.className='amk-actnote amk-actconfirm'; box.setAttribute('data-testid','amk-action-confirm'); box.setAttribute('role','group');
+    var t=document.createElement('span'); t.className='amk-acttext'; t.textContent=actConfirmText(act); box.appendChild(t);
+    box.appendChild(document.createTextNode(' · ')); var bt=document.createElement('span'); bt.className='amk-actbeta'; bt.textContent='Beta'; box.appendChild(bt); box.appendChild(document.createTextNode(' '));
+    var yes=document.createElement('button'); yes.type='button'; yes.className='amk-actyes'; yes.setAttribute('data-testid','amk-action-yes'); yes.textContent=ACT_WRITES[act.name];
+    var no=document.createElement('button'); no.type='button'; no.className='amk-actno'; no.setAttribute('data-testid','amk-action-no'); no.textContent='Not now';
+    box.appendChild(yes); box.appendChild(no);
+    var bub=aEl.querySelector('.bub'); aEl.insertBefore(box,bub||null); body.scrollTop=body.scrollHeight;
+    function settle(text){ yes.parentNode&&box.removeChild(yes); no.parentNode&&box.removeChild(no); t.textContent=text; }
+    no.onclick=function(){ actTrack(act,'declined'); settle('Not saved.'); };
+    yes.onclick=function(){
+      yes.disabled=true; no.disabled=true; actTrack(act,'confirmed');
+      var args={}, k; for(k in act.args){ args[k]=act.args[k]; }
+      if(act.name==='map.save_search'){ var snap=actSnapshot()||{mode:'open',filters:{}}; args.mode=snap.mode==='recompete'?'recompete':'open'; args.filters=snap.filters||{}; }
+      var route=act.name.replace(/^map[.]/,'');
+      actPost(route,args,act.id).then(function(res){
+        var ok=!!(res.d&&res.d.ok); actTrack(act,ok?'saved':'failed'); settle(actResultText(res));
+        var tg=res.d&&res.d.target;
+        if(ok&&tg&&typeof tg.href==='string'&&tg.href.charAt(0)==='/'&&tg.href.charAt(1)!=='/'){ box.appendChild(document.createTextNode(' · ')); var lk=document.createElement('a'); lk.href=tg.href; lk.textContent='Open'; lk.setAttribute('data-testid','amk-action-link'); box.appendChild(lk); }
+        // Undo (10 s) only where the route has an exact inverse: a NEW pursuit can be removed by its id.
+        if(ok&&!res.d.already&&act.name==='map.add_to_pursuits'&&tg&&typeof tg.id==='string'&&ACT_UUID.test(tg.id)){
+          box.appendChild(document.createTextNode(' · ')); var u=document.createElement('button'); u.type='button'; u.className='amk-actundo'; u.setAttribute('data-testid','amk-action-undo'); u.textContent='Undo'; box.appendChild(u);
+          var timer=setTimeout(function(){ if(u.parentNode) u.parentNode.removeChild(u); },10000);
+          u.onclick=function(){ clearTimeout(timer); u.disabled=true; actPost('remove_from_pursuits',{pursuit_id:tg.id},act.id+'-undo').then(function(r2){ actTrack(act,(r2.d&&r2.d.ok)?'undone':'undo_failed'); u.textContent=(r2.d&&r2.d.ok)?'Undone':'Couldn’t undo'; }); };
+        }
+      });
+    };
   }
   function actSnapshot(){ try{ if(typeof window.__mapSnapshot==='function') return window.__mapSnapshot(); }catch(e){} return null; }
   function actStateName(st){ var n=window.__STATE_NAMES; return (n&&n[st])||st; }
@@ -11543,6 +11615,7 @@ const ASK_MINDY_JS = `<script>(function(){
     var list=turn.pending||[]; turn.pending=[];
     for(var i=0;i<list.length;i++){ var act=list[i];
       if(String(evidence||'').indexOf(act.args.notice_id)<0){ actTrack(act,'rejected:unsourced'); continue; }
+      if(ACT_WRITES[act.name]){ actWrite(act,aEl); continue; }
       if(!actRun(act)){ actTrack(act,'rejected:unavailable'); continue; }
       actTrack(act,'ran'); actNote(aEl,actDescribe(act),null); }
   }
@@ -11554,7 +11627,8 @@ const ASK_MINDY_JS = `<script>(function(){
     turn.count++;
     // Opening a record waits for the answer to finish: the id must appear in what this turn actually returned
     // (the answer text or its sources), so an id from a prompt-injected page is never opened (Eric, 2026-11-27).
-    if(act.name==='map.open_record'){ (turn.pending||(turn.pending=[])).push(act); return; }
+    if(act.name==='map.open_record'||(act.name==='map.add_to_pursuits'&&act.args.notice_id)){ (turn.pending||(turn.pending=[])).push(act); return; }
+    if(ACT_WRITES[act.name]){ actWrite(act,aEl); return; }
     // Undo for this action only: the previous action's Undo is withdrawn (one level).
     if(actUndo&&actUndo.btn){ actUndo.btn.disabled=true; actUndo.btn.style.display='none'; }
     var snap=(act.name==='map.open_record')?null:actSnapshot();
@@ -11900,6 +11974,12 @@ const ASK_MINDY_JS = `<script>(function(){
       },function(){ fail('Your report could not be loaded. Check your connection and try again.',true); });
     try{ if(window.__track) window.__track('tool_use','map_market_report_reopen',{}); }catch(e){}
   }
+  // "Research · Beta" tag (research mode for everyone, labelled beta): from the research mode event of this turn (type mode, mode research,
+  // beta true, with a label), or from the research_mode label History returns. Server text shown as plain text, bounded.
+  // (literal, not a var: renderConversation can run at boot before a var assignment below has executed)
+  function betaLabel(raw){ var BETA_DEFAULT='Research · Beta'; if(typeof raw!=='string') return BETA_DEFAULT; var o=''; for(var i=0;i<raw.length;i++){ var c=raw.charCodeAt(i); o+=(c<32||c===127)?' ':raw.charAt(i); }
+    o=o.replace(/ +/g,' ').trim(); return (o&&o.length<=40)?o:BETA_DEFAULT; }
+  function betaTag(el,label){ if(!el||!label||el.querySelector('.amk-beta')) return; var t=document.createElement('span'); t.className='amk-beta'; t.setAttribute('data-testid','amk-beta-tag'); t.textContent=label; el.insertBefore(t,el.firstChild); }
   function addMsg(role, text){ var d=document.createElement('div'); d.className='amk-msg '+(role==='user'?'u':'a'); d.innerHTML=(role==='user')?esc(text):('<div class="bub"></div>'); if(role!=='user'){ var bb=d.querySelector('.bub'); if(text) paint(bb,text); else bb.textContent=''; } body.appendChild(d); body.scrollTop=body.scrollHeight; return d; }
   function upsell(){ body.innerHTML='<div class="amk-up"><h4>\\ud83d\\udd12 Ask Mindy is a Pro feature</h4><p>Get grounded, real-data answers on set-asides, agencies, opportunities, teaming and proposals \\u2014 with sources.</p><a href="/market-intelligence">Upgrade to Pro</a></div>'; }
   // opts (card chat only): turnId = reuse this question's id (retry/reopen); replay = only fetch the saved answer.
@@ -11933,7 +12013,7 @@ const ASK_MINDY_JS = `<script>(function(){
     if(ctrl){ stopBtn=document.createElement('button'); stopBtn.type='button'; stopBtn.className='amk-stop'; stopBtn.setAttribute('data-testid','amk-stop'); stopBtn.textContent='Stop';
       stopBtn.onclick=function(){ stopped=true; try{ ctrl.abort(); }catch(e){} }; aEl.appendChild(stopBtn); }
     function stoppedEnd(){
-      if(acc){ paint(bub,acc); history.push({role:'user',content:shown}); history.push(ledger?{role:'assistant',content:acc,sources:ledger}:{role:'assistant',content:acc}); }
+      if(acc){ paint(bub,acc); history.push({role:'user',content:shown}); history.push(ledger?{role:'assistant',content:acc,sources:ledger}:{role:'assistant',content:acc}); if(turnTag) history[history.length-1].tag=turnTag; }
       else bub.textContent='';
       var sn=document.createElement('div'); sn.className='amk-credits'; sn.setAttribute('data-testid','amk-stopped'); sn.textContent=acc?'You stopped this answer, so it may be incomplete.':'You stopped this answer.'; aEl.appendChild(sn);
       saveView(); release(); body.scrollTop=body.scrollHeight;
@@ -11943,7 +12023,7 @@ const ASK_MINDY_JS = `<script>(function(){
     // Research steps ('progress' events): a calm panel, not warnings. Timer, current step, count, Show steps, and a
     // "still working" line after 20 s of quiet. Collapses to "Researched · N steps · m:ss" once the answer starts
     // (or the turn ends any other way). A phase ('writing'|'checking') is the headline, not a step.
-    var rp=null;
+    var rp=null, turnTag=null;
     function rpFmt(ms){ var s=Math.max(0,Math.floor(ms/1000)); var r=s%60; return Math.floor(s/60)+':'+(r<10?'0':'')+r; }
     function rpCount(n){ return n===1?'1 step':(n+' steps'); }
     function rpList(){ var ol=rp.el.querySelector('.amk-rp-steps'); if(!ol)return; ol.innerHTML='';
@@ -11957,12 +12037,13 @@ const ASK_MINDY_JS = `<script>(function(){
       var text=String(ev.message||'').replace(/ +/g,' ').trim().slice(0,200); if(!text)return;
       if(!rp){
         var el=document.createElement('div'); el.className='amk-rp'; el.setAttribute('role','status'); el.setAttribute('aria-live','polite'); el.setAttribute('data-testid','amk-research');
-        el.innerHTML='<div class="amk-rp-hd"><span class="amk-rp-spin" aria-hidden="true"></span><b>Researching</b> <span class="amk-rp-time">0:00</span><span class="amk-rp-n"></span></div><div class="amk-rp-cur"></div><div class="amk-rp-still" hidden>Still working. Research answers can take a few minutes.</div><button type="button" class="amk-rp-tog" aria-expanded="false" data-testid="amk-research-toggle">Show steps</button><ol class="amk-rp-steps" hidden></ol>';
+        el.innerHTML='<div class="amk-rp-hd"><span class="amk-rp-spin" aria-hidden="true"></span><b>Researching</b> <span class="amk-rp-tag"></span><span class="amk-rp-time">0:00</span><span class="amk-rp-n"></span></div><div class="amk-rp-cur"></div><div class="amk-rp-still" hidden>Still working. Research answers can take a few minutes.</div><button type="button" class="amk-rp-tog" aria-expanded="false" data-testid="amk-research-toggle">Show steps</button><ol class="amk-rp-steps" hidden></ol>';
         aEl.insertBefore(el,bub); if(!started) bub.style.display='none';
         rp={steps:[],total:0,headline:null,start:Date.now(),last:Date.now(),el:el,done:false,timer:null};
         var tog=el.querySelector('.amk-rp-tog'), ol=el.querySelector('.amk-rp-steps');
         tog.onclick=function(){ var open=ol.hidden; ol.hidden=!open; tog.textContent=open?'Hide steps':'Show steps'; tog.setAttribute('aria-expanded',open?'true':'false'); if(open) rpList(); };
         rp.timer=setInterval(rpPaint,1000);
+        if(turnTag){ var rt=el.querySelector('.amk-rp-tag'); rt.textContent=turnTag; rt.setAttribute('data-testid','amk-research-tag'); }
       }
       if(rp.done)return;
       rp.last=Date.now();
@@ -11988,7 +12069,7 @@ const ASK_MINDY_JS = `<script>(function(){
     // source ledger saved with the report is what lets "revise it" resolve to THAT document. It rides along as
     // the oldest assistant turn (the server verifies the signature and the owner; a forged one is ignored).
     if(!oppCtx&&!history.length&&rep&&rep.ledger&&rep.email===em){ history.push({role:'assistant',content:'I saved your report'+(rep.title?' "'+rep.title+'"':'')+' to your Vault.',sources:rep.ledger}); }
-    var payload={email:em,message:sendMsg,sessionId:sessionId||undefined,history:history.slice(-8).map(function(h){ return h.sources?{role:h.role,content:h.content,sources:h.sources}:{role:h.role,content:h.content}; }),display:'narrow_panel'};
+    var payload={email:em,message:sendMsg,sessionId:sessionId||undefined,history:history.slice(-8).map(function(h){ return h.sources?{role:h.role,content:h.content,sources:h.sources}:{role:h.role,content:h.content}; }),display:'narrow_panel',surface:'map'};
     if(shotsAtSend.length) payload.images=shotsAtSend.map(function(x){ return {media_type:x.media_type,data:x.data}; });
     if(attAtSend){ payload.context={kind:'opportunity',notice_id:attAtSend.id}; try{ if(window.__track) window.__track('tool_use','ask_mindy_with_notice',{}); }catch(e){} }
     if(oppCtx){ payload.context={kind:'opportunity',notice_id:oppCtx.id}; payload.turn_id=turnId; if(opts.replay)payload.replay_only=true;
@@ -12032,6 +12113,8 @@ const ASK_MINDY_JS = `<script>(function(){
           parts.forEach(function(p){ var line=p.split('\\n').filter(function(l){return l.indexOf('data:')===0;}).map(function(l){return l.slice(5).trim();}).join(''); if(!line)return;
             var ev; try{ ev=JSON.parse(line); }catch(e){ return; }
             if(ev.type==='session'){ sessionId=ev.sessionId||sessionId; }
+            else if(ev.type==='mode'&&ev.mode==='research'&&ev.beta===true){ turnTag=betaLabel(ev.label); betaTag(aEl,turnTag);
+              if(rp&&!rp.done){ var rt=rp.el.querySelector('.amk-rp-tag'); if(rt){ rt.textContent=turnTag; rt.setAttribute('data-testid','amk-research-tag'); } } }
             else if(ev.type==='action'){ try{ onAction(ev,aEl,actTurn); }catch(e){} }
             else if(ev.type==='sources'){ ledger=(ev.ledger&&typeof ev.ledger==='object')?ev.ledger:null; if(turnDoc&&rep&&ledger){ rep.ledger=ledger; repWrite(); } }
             // create_document saved a document: a card under the answer and the report opens in the pane (view mode only).
@@ -12061,6 +12144,7 @@ const ASK_MINDY_JS = `<script>(function(){
           if(!started&&!acc&&!gotError)bub.textContent='Mindy had no answer for that \\u2014 try rephrasing.';
           if(!(turnId&&gotError&&!acc)){ history.push({role:'user',content:shown}); history.push(ledger?{role:'assistant',content:acc,sources:ledger}:{role:'assistant',content:acc}); }
           if(turnFiles&&history.length&&history[history.length-1].role==='assistant') history[history.length-1].files=turnFiles;
+          if(turnTag&&history.length&&history[history.length-1].role==='assistant') history[history.length-1].tag=turnTag;
           if(turnReport&&history.length&&history[history.length-1].role==='assistant') history[history.length-1].report=turnReport;
           saveCard(); saveView(); if(acc)paint(bub,acc);
           // Follow-ups only after a real outcome (report/files) or a finished Q&A answer — never mid-gather.

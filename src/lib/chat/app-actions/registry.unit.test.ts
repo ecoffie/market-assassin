@@ -75,6 +75,18 @@ describe('argsSchema agrees with validateAction (compiled with ajv)', () => {
     ['map.go_to', { lat: 1 }],
     ['map.open_record', { notice_id: '0009f2dae25541e4a2782d4807461bd0' }],
     ['map.open_record', { notice_id: '../admin' }],
+    ['map.save_search', { name: 'VA construction FL', alert_frequency: 'weekly' }],
+    ['map.save_search', { name: 'VA construction FL', alert_frequency: 'hourly' }],
+    ['map.save_search', { name: 'x', alert_frequency: 'daily', filters: { state: 'FL' } }],
+    ['map.update_alert', { search_id: '11111111-2222-4333-8444-555555555555', alert_frequency: 'off' }],
+    ['map.update_alert', { search_id: 'not-a-uuid', alert_frequency: 'off' }],
+    ['map.add_to_pursuits', { kind: 'opportunity', notice_id: '0009f2dae25541e4a2782d4807461bd0' }],
+    ['map.add_to_pursuits', { kind: 'recompete', contract_id: 'N0001920C0009' }],
+    ['map.add_to_pursuits', { kind: 'opportunity', contract_id: 'N0001920C0009' }],
+    ['map.add_to_pursuits', { kind: 'opportunity', notice_id: '0009f2dae25541e4a2782d4807461bd0', contract_id: 'X1' }],
+    ['map.remove_from_pursuits', { pursuit_id: '11111111-2222-4333-8444-555555555555' }],
+    ['map.remove_from_pursuits', { pursuit_id: '11111111-2222-4333-8444-555555555555', notice_id: '0009f2dae25541e4a2782d4807461bd0' }],
+    ['map.remove_from_pursuits', {}],
   ];
   for (const [name, args] of samples) {
     it(`${name} ${JSON.stringify(args)}`, () => {
@@ -83,4 +95,15 @@ describe('argsSchema agrees with validateAction (compiled with ajv)', () => {
       expect(schemaOk).toBe(clientOk);
     });
   }
+});
+
+import { routeActionName } from './registry';
+describe('write actions', () => {
+  it('are writes that need a confirm and a signed-in user; the route gets the bare name', () => {
+    for (const n of ['map.save_search', 'map.update_alert', 'map.add_to_pursuits', 'map.remove_from_pursuits']) {
+      expect(ACTIONS[n]).toMatchObject({ kind: 'write', needsConfirm: true, gate: 'signed_in' });
+    }
+    expect(routeActionName('map.save_search')).toBe('save_search');
+    expect(routeActionName('app.open_panel')).toBe('open_panel');
+  });
 });
