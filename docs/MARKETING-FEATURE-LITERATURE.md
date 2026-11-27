@@ -7859,3 +7859,13 @@ the notices. Test: `federal-events-ranking.unit.test.ts`.
 **SEO:** AI market research from capability statement, federal market report for a company, capability statement analysis AI, government contracting research assistant.
 
 **Proof:** Found in the 2026-11-27 production dry run: an uploaded EFS capability statement produced a report on the saved profile company, and a Google Drive file and a OneDrive file each got "no file attached". Tests now prove the attached file's text reaches the research model on every step (`src/lib/ask-mindy/research-attachments.unit.test.ts`, red on the previous code, green with the fix). Deep research is in beta for selected accounts.
+
+## PDFs from Google Drive and OneDrive now read correctly in Ask Mindy, 2026-11-27
+
+**What:** A PDF you pick from your connected Google Drive or OneDrive (a capability statement, a past-performance write-up) is now read by Ask Mindy the same way an uploaded PDF is.
+
+**Why:** Mindy was telling customers a normal text PDF "has no readable text" when it came from Drive or OneDrive, while the same file uploaded from the computer worked.
+
+**SEO:** read capability statement from Google Drive, AI capability statement analysis, OneDrive PDF government contracting assistant.
+
+**Proof:** Found in the 2026-11-27 production re-test: Encore_Capabilities_Statement_Suite380.pdf (a LibreOffice text PDF; Mindy's own extractor reads 2,603 characters from it locally) came back unreadable from Drive. The PDF reader's helper file was not shipped with the chat service; it now is (production build: chat bundle 123 MB of the 250 MB limit). Test: `src/lib/connected-apps/pdf-worker-bundle.unit.test.ts`. Connected apps are in limited release.
