@@ -12,7 +12,8 @@
  * Guardrails:
  *  - has_pii rows are NEVER returned.
  *  - INTERNAL doc_types (code, meta, raw Q&A) are excluded — only user-useful
- *    reference material (proposals, templates, training, podcasts) surfaces.
+ *    reference material (proposals, templates, training) surfaces.
+ *  - HIDDEN types (podcast insights, Eric 2026-11-27) are excluded the same way: hidden, not deleted.
  *  - Exit-strategy brand rule: we do NOT expose usage_rights / owner identity
  *    ("eric_owned"); the corpus is presented as "GovCon Giants curriculum".
  */
@@ -20,6 +21,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { fetchAllPaged } from '@/lib/supabase/paged-read';
 import { createClient } from '@supabase/supabase-js';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
+import { HIDDEN_KB_DOC_TYPES } from '@/lib/knowledge-base/hidden-types';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -52,8 +54,8 @@ function cleanTitle(raw: string, summary?: string, docTypeLabel?: string): strin
   return t.split(' ').map(w => /^[A-Z]{2,5}$/.test(w) ? w : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ').trim();
 }
 
-// Doc types that are NOT user-facing reference material.
-const EXCLUDED_TYPES = ['planner_app_code', 'meta_doc', 'qa_dataset'];
+// Doc types that are NOT user-facing reference material, plus the types customers may not browse (hidden-types.ts).
+const EXCLUDED_TYPES = ['planner_app_code', 'meta_doc', 'qa_dataset', ...HIDDEN_KB_DOC_TYPES];
 
 // Friendly labels for the UI filter pills.
 export const DOC_TYPE_LABELS: Record<string, string> = {
@@ -67,7 +69,6 @@ export const DOC_TYPE_LABELS: Record<string, string> = {
   slide_deck: 'Slide Decks',
   webinar_resource: 'Webinars',
   estimating_example: 'Estimating',
-  podcast_interview: 'Podcast Insights',
   misc: 'Reference',
 };
 

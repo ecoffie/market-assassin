@@ -14,6 +14,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { isHiddenKbDoc } from '@/lib/knowledge-base/hidden-types';
 import { createClient } from '@supabase/supabase-js';
 import { verifyUserOwnsEmail } from '@/lib/api-auth';
 import { canUseAskMindy } from '@/lib/access/chat-access';
@@ -67,7 +68,8 @@ export async function GET(request: NextRequest) {
   if (error) {
     return NextResponse.json({ error: 'lookup failed', detail: error.message }, { status: 500 });
   }
-  if (!data) {
+  // Hidden types (podcast insights) cannot be opened from the app, even by id: same answer as a missing document.
+  if (!data || isHiddenKbDoc(data)) {
     return NextResponse.json({ error: 'not found' }, { status: 404 });
   }
 
