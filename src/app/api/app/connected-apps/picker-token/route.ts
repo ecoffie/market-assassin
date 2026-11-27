@@ -13,7 +13,7 @@ import { accessTokenFor } from '@/lib/connected-apps/store';
 
 export async function POST(request: NextRequest) {
   const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
-  const g = await connectedAppsGate(request, body.email);
+  const g = await connectedAppsGate(request, body.email, 'picker_token');
   if ('error' in g) return g.error;
   const connectionId = String(body.connection_id || '');
   if (!connectionId) return NextResponse.json({ error: 'connection_id required' }, { status: 400 });

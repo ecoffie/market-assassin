@@ -19,6 +19,7 @@ import {
   ANY_ASSISTANT_LINE,
   OTHER_ASSISTANTS,
   CLAUDE_COMPUTER_NOTE,
+  CLAUDE_FIRST_ASK,
   AI_CHOOSER,
   AI_SECTIONS_CLASS,
   AI_CHOOSER_CSS,
@@ -62,9 +63,11 @@ function emphasize(body: string) {
 
 const CLAUDE: Step[] = [
   { n: 1, title: 'Open Settings', body: 'Click your name in the bottom-left corner, then *Settings* (or press *⌘ + ,*).', img: 'step-01.jpg' },
-  { n: 2, title: 'Go to Connectors', body: 'In the Settings window, look down the left sidebar. Under *Customize*, click *Connectors*.', img: 'step-02.jpg' },
-  { n: 3, title: 'Click "Add", then "Browse connectors"', body: 'The *Add* button is at the top right of the Connectors page.', img: 'step-03.jpg' },
-  { n: 4, title: 'Find Mindy and click "Connect to Claude"', body: 'Search *mindy*, open the Mindy result, and click the orange *Connect to Claude* button.', img: 'step-04.jpg' },
+  // Steps 2-4 follow the path seen on a live setup call (Nov 2026). Claude's menus vary by
+  // version, so step 2 keeps a fallback. The step-02..04 screenshots predate this path.
+  { n: 2, title: 'Open Plugins, then Connectors', body: 'In Settings, open *Plugins*, then click the *Connectors* tab. If you don\'t see Connectors, open *Plugins → Connectors*, or search Settings for "connector".', img: 'step-02.jpg' },
+  { n: 3, title: 'Click "Browse plugins"', body: 'On the Connectors tab, click *Browse plugins*.', img: 'step-03.jpg' },
+  { n: 4, title: 'Find Mindy and click "Add"', body: 'Search *Mindy*, then click *Add* on the Mindy result.', img: 'step-04.jpg' },
   { n: 5, title: 'Sign in to Mindy', body: 'A Mindy window opens. Sign in with Google, Microsoft, or email. New to Mindy? Start a 14-day free trial of Pro or Team first at [getmindy.ai/pricing](/pricing) (no charge for 14 days).', img: 'step-05.jpg' },
   { n: 6, title: 'Allow the connection', body: 'Mindy asks to connect to your account. Click *Allow*.', img: 'step-06.jpg' },
   { n: 7, title: 'Connected', body: 'Back in Claude you will see Mindy marked *Connected* with a green check.', img: 'step-07.jpg' },
@@ -165,7 +168,7 @@ export default function McpSetupPage() {
           <div className="mt-6 rounded-none border border-(--mp-ok-line) bg-(--mp-ok-bg) px-4 py-3">
             <p className="text-[14px] text-(--mp-body)">
               <span className="font-semibold text-(--mp-ok)">That&rsquo;s it for Claude.</span> Ask:{' '}
-              <span className="text-(--mp-ink)">&ldquo;Use Mindy to find contracts expiring in my NAICS in the next 6 months.&rdquo;</span>
+              <span className="text-(--mp-ink)">&ldquo;{CLAUDE_FIRST_ASK}&rdquo;</span>
             </p>
           </div>
           <p className="mt-3 text-[13px] text-(--mp-muted)">

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { authorizeUrl, exchangeCode, fetchIdentity, newBrowserBinding, OAuthError, pkcePair, safeReturnTo, signState, verifyState, STATE_TTL_SEC } from './oauth';
+import { authorizeUrl, exchangeCode, fetchIdentity, newBrowserBinding, OAuthError, pkcePair, revokeAtProvider, safeReturnTo, signState, verifyState, STATE_TTL_SEC } from './oauth';
 import { ACCESS_DISCLOSURE, connectedAppsEnabledFor, connectedAppsSecrets, FORBIDDEN_SCOPES, hasCapability, SCOPES, scopesFor } from './config';
 import crypto from 'node:crypto';
 
@@ -90,6 +90,31 @@ describe('dedicated secrets (no shared fallback)', () => {
 describe('safeReturnTo (no open redirect)', () => {
   it.each([['/app', '/app'], ['/app?panel=map', '/app?panel=map'], ['https://evil.com', '/app'], ['//evil.com', '/app'], ['/\\evil', '/app'], [null, '/app']])('%s -> %s', (raw, out) => {
     expect(safeReturnTo(raw)).toBe(out);
+  });
+  // URL parsing strips tab / CR / LF, so "/\t/evil.com" used to become "//evil.com" (Agent 4 review, verified).
+  it.each(['/\t/evil.com', '/\n/evil.com', '/\r/evil.com', '/ /evil.com', '/\u0000/evil.com', '/\u00a0/evil.com', '/\u2028/evil.com'])('control character or whitespace %j is refused', (raw) => {
+    expect(safeReturnTo(raw)).toBe('/app');
+  });
+  it('whatever it returns resolves to our own origin', () => {
+    for (const raw of ['/app?panel=ask#x', '/%2F%2Fevil.com', '/app/../app']) {
+      const out = safeReturnTo(raw);
+      expect(new URL(out, 'https://getmindy.ai').origin).toBe('https://getmindy.ai');
+    }
+  });
+});
+
+describe('provider calls are bounded', () => {
+  it('token, identity and revoke requests carry an abort signal', async () => {
+    const seen: Array<AbortSignal | undefined> = [];
+    const f = (async (_u: string, init?: RequestInit) => {
+      seen.push(init?.signal ?? undefined);
+      return new Response(JSON.stringify({ access_token: 'a', sub: '1', email: 'x@y.com' }), { status: 200 });
+    }) as unknown as typeof fetch;
+    await exchangeCode('google', 'c', 'v', f);
+    await fetchIdentity('google', 'at', f);
+    await revokeAtProvider('google', 't', f);
+    expect(seen).toHaveLength(3);
+    for (const sig of seen) expect(sig).toBeInstanceOf(AbortSignal);
   });
 });
 

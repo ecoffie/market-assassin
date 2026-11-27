@@ -30,6 +30,7 @@
  * Schedule: 13/15/17/19 UTC daily (timezone coverage)
  */
 
+import { unsubscribeUrl as signedUnsubscribeUrl } from '@/lib/email/unsubscribe';
 import { NextRequest, NextResponse } from 'next/server';
 import { eligibleSetAsidesCombined } from '@/lib/market/set-aside-eligibility';
 import { loadVaultEligibility } from '@/lib/market/vault-eligibility';
@@ -294,7 +295,7 @@ async function sendAlertEmail(
   const showSetupNudges = shouldShowAlertSetupNudges(user);
   const primaryCtaUrl = showSetupNudges ? mindySetupUrl : MINDY_APP_URL;
   const primaryCtaLabel = showSetupNudges ? 'Set Up Mindy — Free →' : 'Open Mindy Dashboard →';
-  const unsubscribeUrl = `${MINDY_SITE_URL}/api/alerts/unsubscribe?email=${encodeURIComponent(email)}`;
+  const unsubscribeUrl = signedUnsubscribeUrl(email, 'notification');
 
   const opportunitiesHtml = opportunities.slice(0, 15).map((opp, i) => {
     const daysUntil = getDaysUntil(opp.responseDeadline);

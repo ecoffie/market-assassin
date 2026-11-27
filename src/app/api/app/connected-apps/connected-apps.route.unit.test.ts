@@ -7,9 +7,12 @@ const h = vi.hoisted(() => ({
   save: vi.fn(),
   list: vi.fn(async () => []),
   disconnect: vi.fn(async () => 'disconnected'),
+  rlAllowed: true,
+  rlKeys: [] as string[],
 }));
 
 vi.mock('@/lib/api-auth', () => ({ verifyUserOwnsEmail: vi.fn(async (_r: unknown, email: string) => (h.authed ? { authenticated: true, email } : { authenticated: false, error: 'no' })) }));
+vi.mock('@/lib/rate-limit', () => ({ checkRateLimit: vi.fn(async (key: string, limit: number) => { h.rlKeys.push(key); return { allowed: h.rlAllowed, remaining: 0, limit, resetAt: Math.floor(Date.now() / 1000) + 60 }; }) }));
 vi.mock('@/lib/chat/chat-acting-scope', () => ({ resolveChatActingScope: vi.fn(async () => h.scope) }));
 vi.mock('@/lib/connected-apps/store', async (orig) => ({ ...(await orig<typeof import('@/lib/connected-apps/store')>()), saveConnection: h.save, listConnections: h.list, disconnect: h.disconnect }));
 
@@ -93,6 +96,15 @@ describe('POST /start', () => {
     expect(new URL(withDraft.authorize_url).searchParams.get('scope')).toContain('https://www.googleapis.com/auth/gmail.compose');
     expect(withDraft.access_note).toMatch(/only the files you pick/);
     expect(withDraft.access_note).toMatch(/Mindy never sends/);
+  });
+  it('rate-limited per user: a burst of consent starts gets 429 with Retry-After', async () => {
+    const { POST } = await import('./start/route');
+    h.rlAllowed = false;
+    const r = await POST(post({ ...startBody }));
+    h.rlAllowed = true;
+    expect(r.status).toBe(429);
+    expect(Number(r.headers.get('Retry-After'))).toBeGreaterThan(0);
+    expect(h.rlKeys.at(-1)).toBe('connected-apps:start:owner@acme.com');
   });
   it('returns the access note for the provider', async () => {
     const { POST } = await import('./start/route');

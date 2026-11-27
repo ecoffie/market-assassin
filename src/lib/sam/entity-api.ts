@@ -9,6 +9,7 @@
  * - Points of contact
  */
 
+import { markSamKeyRejected } from '@/lib/sam/key-health';
 import {
   getSAMAPIConfig,
   makeSAMRequest, getAllDistinctSAMKeys} from './utils';
@@ -23,6 +24,8 @@ export interface SAMEntity {
   cageCode: string;
   legalBusinessName: string;
   dbaName?: string;
+  /** SAM coreData.entityInformation.entityURL, verbatim (the company's self-reported website). Absent = not stated. */
+  entityUrl?: string;
   registrationStatus: 'Active' | 'Inactive' | 'Expired' | 'Unknown';
   registrationExpirationDate?: string;
   /** SAM purposeOfRegistrationDesc, verbatim (e.g. "All Awards", "Federal Assistance Awards"). */
@@ -167,6 +170,12 @@ function selfCertLabel(entry: unknown): string | null {
 /**
  * Transform raw API response to our SAMEntity type
  */
+function entityUrlOf(core: Record<string, unknown>): string | undefined {
+  const info = (core.entityInformation as Record<string, unknown>) || {};
+  const u = typeof info.entityURL === 'string' ? info.entityURL.trim() : '';
+  return u || undefined;
+}
+
 export function transformEntity(raw: Record<string, unknown>): SAMEntity {
   // SAM v3 Entity API response shape is nested:
   //   entityRegistration: { ueiSAM, legalBusinessName, registrationStatus, ... }
@@ -301,6 +310,9 @@ export function transformEntity(raw: Record<string, unknown>): SAMEntity {
     cageCode: String(er.cageCode || raw.cageCode || ''),
     legalBusinessName: String(er.legalBusinessName || raw.legalBusinessName || ''),
     dbaName: er.dbaName ? String(er.dbaName) : raw.dbaName ? String(raw.dbaName) : undefined,
+    // Website as identity evidence (Agent 4, 2026-11-25). The gov-buyer sync already writes `entity_url` from
+    // e.entityUrl, which this transformer never set, so the cache column stayed empty.
+    ...(entityUrlOf(core) ? { entityUrl: entityUrlOf(core) } : {}),
     registrationStatus: status as SAMEntity['registrationStatus'],
     registrationExpirationDate: expirationDate,
     purposeOfRegistration: er.purposeOfRegistrationDesc ? String(er.purposeOfRegistrationDesc) : undefined,
@@ -442,6 +454,8 @@ export async function searchEntities(
   const keyUnusable = (st?: number) => st === 429 || st === 401 || st === 403;
 
   if (keyUnusable(result.error?.status)) {
+    // Remember a REJECTED key (401/403) for the process so no path re-tries it (key-health.ts, 2026-11-25).
+    if (result.error?.status) markSamKeyRejected(config.apiKey, result.error.status, result.error.message);
     const pool = getAllDistinctSAMKeys().filter((k) => k !== config.apiKey);
     for (const key of pool) {
       console.warn(`[SAM Entity] key unusable (${result.error?.status}) — failing over (${pool.indexOf(key) + 1}/${pool.length})`);
@@ -449,6 +463,7 @@ export async function searchEntities(
         entityData: Record<string, unknown>[];
         totalRecords: number;
       }>({ ...config, apiKey: key }, '/entities', queryParams);
+      if (result.error?.status) markSamKeyRejected(key, result.error.status, result.error.message);
       if (!keyUnusable(result.error?.status)) break;
     }
   }

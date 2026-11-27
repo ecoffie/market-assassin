@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { unsubscribeUrl as signedUnsubscribeUrl } from '@/lib/email/unsubscribe';
 import { dailyAlertViewAllCta } from '@/lib/alerts/daily-alert-view-all';
 import { MINDY_DAY } from '@/lib/mindy/mindy-day';
 import { createClient } from '@supabase/supabase-js';
@@ -1714,7 +1715,7 @@ async function sendDailyAlertEmail(
     if (user.location_state) p.set('state', user.location_state);
     return `${MINDY_SITE_URL}/opportunity-map?${p.toString()}`;
   };
-  const unsubscribeUrl = `${MINDY_SITE_URL}/api/alerts/unsubscribe?email=${encodedEmail}`;
+  const unsubscribeUrl = signedUnsubscribeUrl(email, 'daily_alert');
   const preferencesUrl = `${MINDY_SITE_URL}/alerts/preferences?email=${encodedEmail}&token=${encodeURIComponent(preferencesAuth.token)}&ts=${preferencesAuth.ts}`;
   const mindyDashboardUrl = mindyDashboardUrlFor(email);
   const alertCta = getAlertEmailCta(preferencesUrl, mindyDashboardUrl, user);

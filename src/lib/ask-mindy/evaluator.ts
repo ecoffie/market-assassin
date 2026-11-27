@@ -8,8 +8,11 @@
 import Anthropic from '@anthropic-ai/sdk';
 import type { AnalystDecision } from './analyst';
 import type { RecordCheck } from './evidence-checks';
+import { ungroundedFigures } from './figure-grounding';
 
 export const EVALUATOR_MODEL_DEFAULT = 'claude-sonnet-5-5';
+/** Per-call ceiling when the caller gives none; the gate always passes the time it has left. */
+const DEFAULT_CALL_TIMEOUT_MS = 60_000;
 
 export type Criterion = 'relevant' | 'pursuable' | 'reasoned' | 'actionable' | 'clear';
 
@@ -27,10 +30,16 @@ export interface Evaluation {
   results: CriterionResult[];
   /** What to fix, for the one bounded retry. Empty on pass. */
   fix: string[];
+  /** Dollar figures and dates the answer states that the evidence does not contain (the figure text only). */
+  untraceableFigures?: string[];
 }
 
-/** Checks 1 and 2 in software: every pursuit cites a record that passed; "none found" is only honest when none passed. */
-export function softwareChecks(decision: AnalystDecision, checks: RecordCheck[]): CriterionResult[] {
+/**
+ * Checks 1 and 2 in software: every pursuit cites a record that passed; "none found" is only honest when none passed.
+ * `dropped`: pursuits software already removed (enforceDecision). The headline was written for the full list, so it
+ * can name a contract that is no longer there: that fails relevance until the answer is rewritten.
+ */
+export function softwareChecks(decision: AnalystDecision, checks: RecordCheck[], dropped: string[] = []): CriterionResult[] {
   const passing = new Set(checks.filter((c) => c.verdict === 'pursue').map((c) => c.contract_id));
   const cited = decision.pursuits.map((p) => p.contract_id);
   const allPassing = cited.every((id) => passing.has(id));
@@ -39,12 +48,15 @@ export function softwareChecks(decision: AnalystDecision, checks: RecordCheck[])
     : decision.pursuits.length === 0
       ? { criterion: 'relevant', pass: false, reason: `${passing.size} record(s) passed the checks but none is recommended.` }
       : { criterion: 'relevant', pass: allPassing, reason: allPassing ? 'Every pursuit is a record that passed the relevance checks.' : 'A pursuit cites a record that did not pass.' };
+  const relevantChecked: CriterionResult = dropped.length && relevant.pass
+    ? { criterion: 'relevant', pass: false, reason: `${dropped.length} recommended contract(s) could not be verified and were removed, so the summary may not match the list.` }
+    : relevant;
   const pursuable: CriterionResult = {
     criterion: 'pursuable',
     pass: allPassing && decision.pursuits.every((p) => !!p.next_move?.trim()),
     reason: allPassing ? 'Every pursuit passed the pursuability checks and has a move.' : 'A pursuit failed the pursuability checks.',
   };
-  return [relevant, pursuable];
+  return [relevantChecked, pursuable];
 }
 
 const RUBRIC = `You are an independent reviewer for Mindy, a federal contracting intelligence product. You grade an answer written for a small-business owner. You do not rewrite it.
@@ -80,10 +92,10 @@ export function verifyQuotedTerms(reason: string, decision: AnalystDecision): 'n
 }
 
 export async function evaluateDecision(
-  args: { question: string; evidence: string; decision: AnalystDecision; checks: RecordCheck[] },
-  opts: { client?: Anthropic; model?: string } = {},
+  args: { question: string; evidence: string; decision: AnalystDecision; checks: RecordCheck[]; dropped?: string[] },
+  opts: { client?: Anthropic; model?: string; /** Hard limit for this one call (the gate's deadline). */ timeoutMs?: number } = {},
 ): Promise<Evaluation & { usage: { input: number; output: number }; model: string }> {
-  const software = softwareChecks(args.decision, args.checks);
+  const software = softwareChecks(args.decision, args.checks, args.dropped || []);
   const client = opts.client ?? new Anthropic();
   const model = opts.model ?? process.env.ASK_MINDY_EVALUATOR_MODEL ?? EVALUATOR_MODEL_DEFAULT;
   const msg = await client.messages.create({
@@ -95,7 +107,7 @@ export async function evaluateDecision(
       role: 'user',
       content: `CUSTOMER QUESTION: ${args.question}\n\nEVIDENCE:\n${args.evidence}\n\nANSWER TO GRADE (JSON):\n${JSON.stringify(args.decision, null, 2)}`,
     }],
-  });
+  }, { timeout: opts.timeoutMs ?? DEFAULT_CALL_TIMEOUT_MS, maxRetries: 0 });
   if (msg.stop_reason === 'refusal' || msg.stop_reason === 'max_tokens') throw new Error(`evaluator stopped: ${msg.stop_reason}`);
   const text = msg.content.filter((b) => b.type === 'text').map((b) => (b as Anthropic.TextBlock).text).join('');
   const j = JSON.parse(text) as Record<'reasoned' | 'actionable' | 'clear', { pass: boolean; reason: string }> & { fix: string[] };
@@ -110,10 +122,18 @@ export async function evaluateDecision(
       clear.reason = `Reviewer's clarity objection cited only words that are not in the answer; not supported. (${clear.reason})`;
     }
   }
+  // Software, not judgment: every dollar amount and calendar date in the answer must be in the evidence.
+  const reasoned = judged.find((r) => r.criterion === 'reasoned');
+  const unfounded = ungroundedFigures(args.decision, args.evidence);
+  if (reasoned && unfounded.length) {
+    const named = `These figures could not be traced to the data: ${unfounded.join(', ')}.`;
+    reasoned.reason = reasoned.pass ? named : `${named} ${reasoned.reason}`;
+    reasoned.pass = false;
+  }
   const results = [...software, ...judged];
   // Eric 2026-11-24: factual grounding (relevant, pursuable, reasoned) and actionability block; clarity is ADVISORY.
   // A clarity-only failure neither triggers the retry nor withholds a grounded, actionable answer.
   const pass = results.filter((r) => BLOCKING.has(r.criterion)).every((r) => r.pass);
   const fix = pass ? [] : [...results.filter((r) => !r.pass && BLOCKING.has(r.criterion)).map((r) => `${r.criterion}: ${r.reason}`), ...(j.fix || [])];
-  return { pass, results, fix, usage: { input: msg.usage.input_tokens, output: msg.usage.output_tokens }, model };
+  return { pass, results, fix, untraceableFigures: unfounded.map((f) => f.slice(0, 40)).slice(0, 10), usage: { input: msg.usage.input_tokens, output: msg.usage.output_tokens }, model };
 }

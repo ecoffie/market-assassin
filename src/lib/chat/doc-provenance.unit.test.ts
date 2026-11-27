@@ -11,6 +11,18 @@ const REC = [
   { retrievedAt: '2026-11-23T09:00:00Z', asOf: null, url: 'https://sam.gov/opp/abc123/view', recordIds: ['abc123', '36C24727Q0042'] },
 ];
 
+const ON = { dataDateSubtitle: true };
+
+describe('default: no "Data as of" subtitle (Eric, 2026-11-27: record dates read as stale data)', () => {
+  it('an empty subtitle stays empty unless a caller opts in', () => {
+    const m = doc([{ id: 's1', kind: 'usaspending', label: 'A', recordId: 'W9124D26D0005' }]);
+    const r = applySourceProvenance(m, REC);
+    expect(r.model.subtitle).toBeUndefined();
+    expect(r.subtitleSet).toBe(false);
+    expect(r.model.sources[0]).toMatchObject({ retrievedAt: expect.any(String) });
+  });
+});
+
 describe('applySourceProvenance', () => {
   it('a url match fills the read date and the record id; a record-id match fills the read date and the link', () => {
     const r = applySourceProvenance(doc([
@@ -53,9 +65,9 @@ describe('applySourceProvenance', () => {
   });
 
   it('subtitle: set from the matched results\' own as-of date only when empty; no as-of → none; a model subtitle stays', () => {
-    expect(applySourceProvenance(doc([{ id: 's1', kind: 'usaspending', label: 'A', recordId: 'W9124D26D0005' }]), REC).model.subtitle).toBe('Data as of 2026-11-20');
-    expect(applySourceProvenance(doc([{ id: 's1', kind: 'sam_notice', label: 'N', recordId: 'abc123' }]), REC).model.subtitle).toBeUndefined();
-    expect(applySourceProvenance(doc([{ id: 's1', kind: 'usaspending', label: 'A', recordId: 'W9124D26D0005' }], 'Prepared for the board'), REC).model.subtitle).toBe('Prepared for the board');
+    expect(applySourceProvenance(doc([{ id: 's1', kind: 'usaspending', label: 'A', recordId: 'W9124D26D0005' }]), REC, ON).model.subtitle).toBe('Data as of 2026-11-20');
+    expect(applySourceProvenance(doc([{ id: 's1', kind: 'sam_notice', label: 'N', recordId: 'abc123' }]), REC, ON).model.subtitle).toBeUndefined();
+    expect(applySourceProvenance(doc([{ id: 's1', kind: 'usaspending', label: 'A', recordId: 'W9124D26D0005' }], 'Prepared for the board'), REC, ON).model.subtitle).toBe('Prepared for the board');
   });
 
   it('subtitle: a range when the matched results carry different as-of dates, a single date when they agree', () => {
@@ -68,12 +80,12 @@ describe('applySourceProvenance', () => {
       { id: 's1', kind: 'usaspending', label: 'A', recordId: 'W9124D26D0005' },
       { id: 's2', kind: 'sam_notice', label: 'B', recordId: '36C24727Q0042' },
     ]);
-    expect(applySourceProvenance(two, recs).model.subtitle).toBe('Data as of 2026-09-30 to 2026-11-20');
+    expect(applySourceProvenance(two, recs, ON).model.subtitle).toBe('Data as of 2026-09-30 to 2026-11-20');
     const agree = doc([
       { id: 's1', kind: 'usaspending', label: 'A', recordId: 'W9124D26D0005' },
       { id: 's3', kind: 'usaspending', label: 'C', recordId: 'HQ003422D0002' },
     ]);
-    expect(applySourceProvenance(agree, recs).model.subtitle).toBe('Data as of 2026-11-20');
+    expect(applySourceProvenance(agree, recs, ON).model.subtitle).toBe('Data as of 2026-11-20');
   });
 
   it('never mutates its input; with no records at all, every unverified date / link / id is still removed', () => {
@@ -99,5 +111,17 @@ describe('provenanceRecords', () => {
       { retrievedAt: '2026-11-23T09:00:00Z', asOf: '2026-11-20', url: 'https://sam.gov/opp/x/view', recordIds: ['x', 'K1'] },
       { retrievedAt: '2026-11-22T10:00:00Z', asOf: null, url: null, recordIds: ['W9124D26D0005'] },
     ]);
+  });
+});
+
+describe('the document subtitle reads the data date inside a source-date label', () => {
+  const recs = (asOf: string) => [{ retrievedAt: '2026-11-22T15:04:00Z', asOf, url: 'https://www.usaspending.gov/award/CONT_AWD_W9124D26D0005', recordIds: ['W9124D26D0005'] }];
+  const d = doc([{ id: 's1', kind: 'usaspending', label: 'A', recordId: 'W9124D26D0005' }]);
+  it('"data through" and "source dated" labels give their date', () => {
+    expect(applySourceProvenance(d, recs('FY2024–FY2026 · data through 2026-11-20'), ON).model.subtitle).toBe('Data as of 2026-11-20');
+    expect(applySourceProvenance(d, recs('source dated 2026-09-30'), ON).model.subtitle).toBe('Data as of 2026-09-30');
+  });
+  it('a SAM registration record date never becomes the document\'s data date', () => {
+    expect(applySourceProvenance(d, recs('SAM registration record from 2026-08-25'), ON).model.subtitle).toBeUndefined();
   });
 });

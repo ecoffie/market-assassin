@@ -18,9 +18,11 @@
  * Personalised when we know the user's market, honest when we don't — a generic question that
  * works beats a personalised one that quietly guesses at their industry.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
+import Link from 'next/link';
+import { FIRST_QUESTIONS_NO_MARKET_NOTE } from './setup-copy';
 
-type Job = { label: string; sub: string; q: (naics: string | null, title: string | null) => string };
+type Job = { label: string; sub: ReactNode; q: (naics: string | null, title: string | null) => string };
 
 const JOBS: Job[] = [
   {
@@ -41,11 +43,12 @@ const JOBS: Job[] = [
   },
   {
     label: 'Get ahead',
-    sub: 'Recompetes and early signals',
+    // "Recompete" is glossed on first use, linked the same way the pricing page does.
+    sub: <>Contracts coming back up for bid (<Link href="/glossary/recompete" className="underline underline-offset-2">recompetes</Link>) and early signals</>,
     q: (n, t) =>
       n
         ? `What contracts in NAICS ${n}${t ? ` (${t})` : ''} are coming up for recompete, and what early signals should I be watching before the RFP drops?`
-        : 'What contracts in my market are coming up for recompete, and what early signals should I watch before the RFP drops?',
+        : 'What contracts for what I sell are coming back up for bid, and what early signals should I watch before the request for proposals (RFP) is posted?',
   },
 ];
 
@@ -119,7 +122,7 @@ export default function FirstQuestions() {
       <p className="text-[13px] text-(--mp-muted)">
         Paste any of these into Claude or ChatGPT. {naics
           ? 'These use your saved market.'
-          : 'Add your NAICS codes in Mindy and these get specific to your market.'}
+          : FIRST_QUESTIONS_NO_MARKET_NOTE}
       </p>
     </div>
   );

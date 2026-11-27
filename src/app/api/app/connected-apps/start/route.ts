@@ -9,6 +9,9 @@ import { resolveChatActingScope } from '@/lib/chat/chat-acting-scope';
 import { ACCESS_DISCLOSURE, clientCreds, connectedAppsEnabledFor, connectedAppsSecrets, type Capability, type Provider } from '@/lib/connected-apps/config';
 import { authorizeUrl, BINDING_COOKIE, BINDING_COOKIE_PATH, newBrowserBinding, pkcePair, safeReturnTo, signState, STATE_TTL_SEC } from '@/lib/connected-apps/oauth';
 import { scopeKeyFor } from '@/lib/connected-apps/store';
+import { checkRateLimit } from '@/lib/rate-limit';
+
+const START_LIMIT_PER_HOUR = 20;
 
 // File access, and email drafts (Slice B: requested only when the customer first asks Mindy to save a draft).
 // Calendar is added with the tool that uses it.
@@ -21,6 +24,9 @@ export async function POST(request: NextRequest) {
   const auth = await verifyUserOwnsEmail(request, email);
   if (!auth.authenticated) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   if (!connectedAppsEnabledFor(auth.email)) return NextResponse.json({ error: 'not_enabled' }, { status: 404 });
+  // Per-user limit: consent starts are rare; a burst is a script or a loop.
+  const rl = await checkRateLimit(`connected-apps:start:${auth.email!.toLowerCase()}`, START_LIMIT_PER_HOUR, 3600);
+  if (!rl.allowed) return NextResponse.json({ error: 'rate_limited' }, { status: 429, headers: { 'Retry-After': String(Math.max(1, rl.resetAt - Math.floor(Date.now() / 1000))) } });
 
   const provider = body.provider as Provider;
   if (provider !== 'google' && provider !== 'microsoft') return NextResponse.json({ error: 'provider must be google or microsoft' }, { status: 400 });

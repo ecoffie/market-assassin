@@ -14,6 +14,7 @@
  */
 import crypto from 'node:crypto';
 import { connectedAppsSecrets, type Provider } from './config';
+import { providerSignal } from './oauth';
 import { extractByKind, inferKind, type ExtractKind } from '@/lib/documents/extract';
 
 export const FILE_HANDLE_TTL_SEC = 24 * 3600;
@@ -101,7 +102,7 @@ export async function fetchFileMeta(provider: Provider, token: string, fileId: s
   const url = provider === 'google'
     ? `https://www.googleapis.com/drive/v3/files/${id}?fields=id,name,mimeType,size,webViewLink,modifiedTime&supportsAllDrives=true`
     : `https://graph.microsoft.com/v1.0/me/drive/items/${id}?$select=id,name,size,file,webUrl,lastModifiedDateTime`;
-  const res = await f(url, { headers: { authorization: `Bearer ${token}` } });
+  const res = await f(url, { headers: { authorization: `Bearer ${token}` }, signal: providerSignal() });
   if (!res.ok) providerFail(res.status);
   const j = (await res.json()) as Record<string, unknown>;
   if (provider === 'google') {
@@ -125,12 +126,28 @@ export function assertReadable(meta: FileMeta): ExtractKind {
   return kind;
 }
 
-async function readCapped(res: Response): Promise<Buffer> {
+/** Downloads (a 15 MB file, or a Google export) get a little longer than metadata calls. */
+export const DOWNLOAD_TIMEOUT_MS = 15_000;
+
+/**
+ * Read the body counting bytes as they arrive and stop at the cap. A Google export is chunked with no
+ * content-length, so arrayBuffer() would buffer an unbounded body before any size check.
+ */
+export async function readCapped(res: Response, max = MAX_FILE_BYTES): Promise<Buffer> {
   const len = Number(res.headers.get('content-length') || 0);
-  if (len > MAX_FILE_BYTES) throw new FileReadError('too_large');
-  const buf = Buffer.from(await res.arrayBuffer());
-  if (buf.length > MAX_FILE_BYTES) throw new FileReadError('too_large');
-  return buf;
+  if (len > max) { void res.body?.cancel().catch(() => {}); throw new FileReadError('too_large'); }
+  if (!res.body) return Buffer.alloc(0);
+  const reader = res.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > max) { void reader.cancel().catch(() => {}); throw new FileReadError('too_large'); }
+    chunks.push(value);
+  }
+  return Buffer.concat(chunks, total);
 }
 
 export async function downloadFile(provider: Provider, token: string, meta: FileMeta, f: Fetch = fetch): Promise<Buffer> {
@@ -141,7 +158,7 @@ export async function downloadFile(provider: Provider, token: string, meta: File
       ? `https://www.googleapis.com/drive/v3/files/${id}/export?mimeType=${encodeURIComponent(exp.mime)}`
       : `https://www.googleapis.com/drive/v3/files/${id}?alt=media&supportsAllDrives=true`
     : `https://graph.microsoft.com/v1.0/me/drive/items/${id}/content`;
-  const res = await f(url, { headers: { authorization: `Bearer ${token}` } });
+  const res = await f(url, { headers: { authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS) });
   if (!res.ok) providerFail(res.status);
   return readCapped(res);
 }
@@ -183,7 +200,7 @@ export function driveListUrl(opts: { folderId?: string | null; query?: string | 
 }
 
 export async function listOneDrive(token: string, opts: { folderId?: string | null; query?: string | null }, f: Fetch = fetch): Promise<DriveEntry[]> {
-  const res = await f(driveListUrl(opts), { headers: { authorization: `Bearer ${token}` } });
+  const res = await f(driveListUrl(opts), { headers: { authorization: `Bearer ${token}` }, signal: providerSignal() });
   if (!res.ok) providerFail(res.status);
   const j = (await res.json()) as { value?: Array<Record<string, unknown>> };
   const out: DriveEntry[] = [];

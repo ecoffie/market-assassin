@@ -55,6 +55,7 @@ function boot(opts: { session?: Store; local?: Store; chat?: Array<Array<Record<
     const js = (status: number, json: unknown = {}) => Promise.resolve({ ok: status < 300, status, json: async () => json });
     if (url.startsWith('/api/app/vault/')) p = js(200, { uploads: false, generate: true, success: true, title: 'R', version: 1, html: '<p>R</p>', files: [] });
     else if (url.startsWith('/api/app/chat/suggestions')) p = js(200, { suggestions: [] });
+    else if (url.startsWith('/api/app/chat/capabilities')) p = js(200, { screenshots: false });
     else if (url.startsWith('/reports/')) {
       const h = opts.hosted ?? { status: 200, html: HOSTED_HTML };
       p = h === 'network-error' ? Promise.reject(new Error('offline')) : Promise.resolve({ ok: h.status < 300, status: h.status, text: async () => h.html ?? '' });
@@ -300,3 +301,43 @@ describe('a packaged market report comes back with its conversation (Claude Loca
     expect(t.calls.some((c) => c.url.startsWith('/reports/'))).toBe(false);
   });
 });
+
+describe('Research · Beta tag (research mode for everyone, labelled beta)', () => {
+  const tagTexts = (doc: Document) => [...doc.querySelectorAll('[data-testid="amk-beta-tag"]')].map((t) => t.textContent);
+  const LIST = { success: true, sessions: [{ id: SID2, title: 'Ridgeline', message_count: 4, updated_at: '2026-11-27T10:00:00Z' }] };
+  it('a research turn is tagged, the tag survives a reload, and it is never sent back to the server', async () => {
+    const a = boot({ chat: [[{ type: 'session', sessionId: SID }, { type: 'mode', mode: 'research', beta: true, label: 'Research · Beta' }, { type: 'token', content: 'Research answer.' }, { type: 'done' }]] });
+    a.open();
+    await a.send('Assess Ridgeline Digital');
+    expect(tagTexts(a.doc)).toEqual(['Research · Beta']);
+    const b = boot({ session: a.session, local: a.local });
+    b.open();
+    expect(tagTexts(b.doc)).toEqual(['Research · Beta']);
+    await b.send('Next?');
+    expect(JSON.stringify(b.chatBodies[0].history)).not.toContain('Research · Beta');
+  });
+
+  it('a standard turn is not tagged; a non-beta mode event adds no tag', async () => {
+    const a = boot({ chat: [[{ type: 'mode', mode: 'research', beta: false, label: 'x' }, { type: 'token', content: 'Plain.' }, { type: 'done' }]] });
+    a.open();
+    await a.send('hello');
+    expect(tagTexts(a.doc)).toEqual([]);
+  });
+
+  it('reopening from History tags only the research answer', async () => {
+    const one = { success: true, session: { id: SID2, title: 'Ridgeline' }, messages: [
+      { id: '1', role: 'user', content: 'Assess Ridgeline' },
+      { id: '2', role: 'assistant', content: 'Research answer.', research_mode: { label: 'Research · Beta' } },
+      { id: '3', role: 'user', content: 'thanks' },
+      { id: '4', role: 'assistant', content: 'Standard answer.' },
+    ] };
+    const t = boot({ sessions: { list: { status: 200, json: LIST }, one: { status: 200, json: one } } });
+    t.open();
+    t.click('[data-testid="amk-history-btn"]'); await t.settle();
+    t.click('.amk-hist-item'); await t.settle();
+    expect(tagTexts(t.doc)).toEqual(['Research · Beta']);
+    const tagged = t.doc.querySelector('[data-testid="amk-beta-tag"]')!.parentElement!;
+    expect(tagged.textContent).toContain('Research answer.');
+  });
+});
+

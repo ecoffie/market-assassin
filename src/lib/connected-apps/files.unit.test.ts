@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { assertReadable, downloadFile, fetchFileMeta, FileReadError, kindForMeta, MAX_FILE_BYTES, readFileText, signFileHandle, verifyFileHandle, FILE_HANDLE_TTL_SEC, type FileMeta } from './files';
+import { assertReadable, downloadFile, fetchFileMeta, FileReadError, kindForMeta, listOneDrive, MAX_FILE_BYTES, readCapped, readFileText, signFileHandle, verifyFileHandle, FILE_HANDLE_TTL_SEC, type FileMeta } from './files';
 import { newBrowserBinding, signState } from './oauth';
 
 beforeEach(() => {
@@ -122,5 +122,44 @@ describe('OneDrive chooser listing (Graph, Files.Read)', () => {
   it('a dead token is no_access, not an empty folder', async () => {
     const { listOneDrive } = await import('./files');
     await expect(listOneDrive('t', {}, (async () => json({}, 401)) as typeof fetch)).rejects.toThrow(/no_access/);
+  });
+});
+
+describe('bounded downloads (Agent 4 review, 2026-11-27)', () => {
+  const chunked = (chunks: number, size: number) => {
+    let sent = 0;
+    let cancelled = false;
+    const body = new ReadableStream<Uint8Array>({
+      pull(c) { if (sent >= chunks) { c.close(); return; } sent++; c.enqueue(new Uint8Array(size)); },
+      cancel() { cancelled = true; },
+    });
+    return { res: new Response(body), sent: () => sent, cancelled: () => cancelled };
+  };
+
+  it('a chunked body with no content-length stops at the cap instead of buffering it all', async () => {
+    const r = chunked(100, 1024);
+    await expect(readCapped(r.res, 10 * 1024)).rejects.toMatchObject({ code: 'too_large' });
+    expect(r.sent()).toBeLessThan(100);
+    expect(r.cancelled()).toBe(true);
+  });
+
+  it('a body under the cap is read whole', async () => {
+    const r = chunked(3, 1000);
+    expect((await readCapped(r.res, 10_000)).length).toBe(3000);
+  });
+
+  it('metadata, download and listing calls all carry an abort signal (timeout)', async () => {
+    const signals: Array<AbortSignal | undefined> = [];
+    const f = (async (u: string, init?: RequestInit) => {
+      signals.push(init?.signal ?? undefined);
+      if (String(u).endsWith('/content')) return new Response('text');
+      if (String(u).includes('children')) return new Response(JSON.stringify({ value: [] }));
+      return new Response(JSON.stringify({ id: 'i1', name: 'a.txt', size: 4, file: { mimeType: 'text/plain' } }));
+    }) as unknown as typeof fetch;
+    const meta = await fetchFileMeta('microsoft', 't', 'i1', f);
+    await downloadFile('microsoft', 't', meta, f);
+    await listOneDrive('t', {}, f);
+    expect(signals).toHaveLength(3);
+    for (const sig of signals) expect(sig).toBeInstanceOf(AbortSignal);
   });
 });

@@ -118,6 +118,36 @@ for (const [label, opts] of [['desktop 1440x900', { viewport: { width: 1440, hei
       const lastVisible = await page.evaluate(() => { const b = document.querySelector('.amk-rep-body').getBoundingClientRect(); const f = document.querySelector('.amk-rep-f'); const last = [...f.contentDocument.querySelectorAll('.sec')].pop(); const r = last.getBoundingClientRect(); const fr = f.getBoundingClientRect(); return fr.top + r.bottom <= b.bottom + 1 && fr.top + r.bottom > b.top; });
       check(`${tag} the last section is on screen at the end`, lastVisible);
       await page.keyboard.press('Home'); await page.waitForTimeout(300);
+      // Production retest 2026-11-25: a CLICK inside the report moves focus into the frame; the keys must still
+      // scroll the pane (they did nothing before). A real mouse click on report text, then the customer's keys.
+      const fr = await page.locator('.amk-rep-f').boundingBox();
+      const bodyBox = await page.locator('.amk-rep-body').boundingBox();
+      await page.mouse.click(fr.x + 40, Math.max(fr.y, bodyBox.y) + 60);
+      await page.waitForTimeout(200);
+      const focusInFrame = await page.evaluate(() => document.activeElement === document.querySelector('.amk-rep-f'));
+      for (let k = 0; k < 3; k++) await page.keyboard.press('PageDown');
+      await page.waitForTimeout(300);
+      const afterClickPd = (await pos()).top;
+      check(`${tag} after a click inside the report, Page Down x3 scrolls the pane`, afterClickPd > 0, `focusInFrame=${focusInFrame} scrollTop=${afterClickPd}`);
+      await page.keyboard.press('ArrowDown'); await page.waitForTimeout(200);
+      check(`${tag} after a click inside the report, Arrow Down scrolls further`, (await pos()).top > afterClickPd, String((await pos()).top));
+      await page.keyboard.press('End'); await page.waitForTimeout(300);
+      const endAfterClick = await pos();
+      check(`${tag} after a click inside the report, End reaches the last section`, endAfterClick.max > 0 && endAfterClick.top >= endAfterClick.max - 1, JSON.stringify(endAfterClick));
+      await page.keyboard.press('Home'); await page.waitForTimeout(300);
+      check(`${tag} after a click inside the report, Home returns to the top`, (await pos()).top === 0, String((await pos()).top));
+      // Headless Chromium hands an unhandled key from the (non-scrolling) frame on to the pane by itself, so the
+      // real presses above pass even without the fix; Cursor/Chrome 150 did NOT (production retest). A
+      // script-dispatched key never scrolls natively, so the pane moving proves the parent-side handler ran.
+      const synthetic = await page.evaluate(() => {
+        const d = document.querySelector('.amk-rep-f').contentDocument; const b = document.querySelector('.amk-rep-body');
+        const before = b.scrollTop;
+        const ev = new d.defaultView.KeyboardEvent('keydown', { key: 'PageDown', bubbles: true, cancelable: true });
+        (d.body.querySelector('p') || d.body).dispatchEvent(ev);
+        const after = b.scrollTop; b.scrollTop = 0;
+        return { before, after, prevented: ev.defaultPrevented };
+      });
+      check(`${tag} the parent-side key handler scrolls the pane for keys inside the report`, synthetic.after > synthetic.before && synthetic.prevented, JSON.stringify(synthetic));
       // 2. dead in-frame button hidden
       const inFrameBtn = await frame.evaluate(() => { const b = document.querySelector('.pdfbtn'); return b ? getComputedStyle(b).display : 'absent'; });
       check(`${tag} in-frame print button hidden`, inFrameBtn === 'none' || inFrameBtn === 'absent', inFrameBtn);

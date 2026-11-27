@@ -5,9 +5,12 @@ const h = vi.hoisted(() => ({
   authed: true,
   scope: { kind: 'own', email: 'owner@acme.com' } as Record<string, unknown>,
   token: vi.fn(),
+  rlAllowed: true,
+  rlKeys: [] as string[],
 }));
 
 vi.mock('@/lib/api-auth', () => ({ verifyUserOwnsEmail: vi.fn(async (_r: unknown, email: string) => (h.authed ? { authenticated: true, email } : { authenticated: false })) }));
+vi.mock('@/lib/rate-limit', () => ({ checkRateLimit: vi.fn(async (key: string, limit: number) => { h.rlKeys.push(key); return { allowed: h.rlAllowed, remaining: 0, limit, resetAt: Math.floor(Date.now() / 1000) + 60 }; }) }));
 vi.mock('@/lib/chat/chat-acting-scope', () => ({ resolveChatActingScope: vi.fn(async () => h.scope) }));
 vi.mock('@/lib/connected-apps/store', async (orig) => ({ ...(await orig<typeof import('@/lib/connected-apps/store')>()), accessTokenFor: h.token }));
 
@@ -133,5 +136,23 @@ describe('shared client workspace: every connection route is bound to the callin
     const r = await mod.POST(post(route, body));
     expect(h.token).toHaveBeenLastCalledWith('ws:w-9', 'coach-b@x.com', 'conn-of-coach-a');
     expect(r.status).toBe(404);
+  });
+});
+
+describe('per-user rate limits on the file routes (Agent 4 review, 2026-11-27)', () => {
+  it.each([
+    ['browse', 'connected-apps:browse:owner@acme.com'],
+    ['selections', 'connected-apps:selections:owner@acme.com'],
+    ['picker-token', 'connected-apps:picker_token:owner@acme.com'],
+  ])('%s: over the limit gets 429 with Retry-After and no provider call', async (route, key) => {
+    h.rlAllowed = false;
+    h.token.mockClear();
+    const { POST } = await import(`./${route}/route`);
+    const r = await POST(post(route, { email: 'owner@acme.com', connection_id: 'conn-1', file_id: 'f1' }));
+    h.rlAllowed = true;
+    expect(r.status).toBe(429);
+    expect(Number(r.headers.get('Retry-After'))).toBeGreaterThan(0);
+    expect(h.rlKeys.at(-1)).toBe(key);
+    expect(h.token).not.toHaveBeenCalled();
   });
 });

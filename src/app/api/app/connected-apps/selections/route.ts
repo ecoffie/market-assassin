@@ -13,7 +13,7 @@ import { assertReadable, fetchFileMeta, FileReadError, FILE_HANDLE_TTL_SEC, sign
 
 export async function POST(request: NextRequest) {
   const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
-  const g = await connectedAppsGate(request, body.email);
+  const g = await connectedAppsGate(request, body.email, 'selections');
   if ('error' in g) return g.error;
   const connectionId = String(body.connection_id || '');
   const fileId = String(body.file_id || '');

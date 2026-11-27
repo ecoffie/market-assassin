@@ -50,11 +50,27 @@ export function newBrowserBinding(): { cookie: string; hash: string } {
   return { cookie, hash: sha256(cookie) };
 }
 
-/** Only a same-origin absolute path may be a return target (no open redirect). */
+/**
+ * Only a same-origin absolute path may be a return target (no open redirect). Control characters and whitespace are
+ * refused outright: URL parsing strips tab/newline, so "/\t/evil.com" would otherwise become "//evil.com". The result
+ * must also resolve to the same origin.
+ */
+const RETURN_ORIGIN = 'https://return.invalid';
 export function safeReturnTo(raw: unknown): string {
-  const s = String(raw || '');
-  return s.startsWith('/') && !s.startsWith('//') && !s.includes('\\') ? s.slice(0, 500) : '/app';
+  const s = String(raw || '').slice(0, 500);
+  if (!s.startsWith('/') || s.startsWith('//') || s.includes('\\') || /[\u0000-\u0020\u007f-\u00a0\u1680\u2000-\u200b\u2028\u2029\u202f\u205f\u3000\ufeff]/.test(s)) return '/app';
+  try {
+    const u = new URL(s, RETURN_ORIGIN);
+    if (u.origin !== RETURN_ORIGIN) return '/app';
+    return u.pathname + u.search + u.hash;
+  } catch {
+    return '/app';
+  }
 }
+
+/** Every provider call is bounded: a hung provider never holds a request or a chat turn. */
+export const PROVIDER_TIMEOUT_MS = 12_000;
+export const providerSignal = () => AbortSignal.timeout(PROVIDER_TIMEOUT_MS);
 
 export function pkcePair(): { verifier: string; challenge: string } {
   const verifier = b64u(crypto.randomBytes(48));
@@ -145,6 +161,7 @@ async function tokenRequest(provider: Provider, params: Record<string, string>, 
   if (!creds) throw new Error(`connected-apps: ${provider} is not configured`);
   const res = await f(endpoints(provider).token, {
     method: 'POST',
+    signal: providerSignal(),
     headers: { 'content-type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({ client_id: creds.clientId, client_secret: creds.clientSecret, ...params }).toString(),
   });
@@ -178,7 +195,7 @@ export function refreshTokens(provider: Provider, refreshToken: string, f: Fetch
 
 /** The provider's immutable account id and email for the grant (what we show and key on). */
 export async function fetchIdentity(provider: Provider, accessToken: string, f: Fetch = fetch): Promise<{ accountId: string; email: string; name: string | null }> {
-  const res = await f(endpoints(provider).identity, { headers: { authorization: `Bearer ${accessToken}` } });
+  const res = await f(endpoints(provider).identity, { headers: { authorization: `Bearer ${accessToken}` }, signal: providerSignal() });
   if (!res.ok) throw new OAuthError(`identity_http_${res.status}`);
   const j = (await res.json()) as Record<string, unknown>;
   if (provider === 'google') {
@@ -193,6 +210,6 @@ export async function fetchIdentity(provider: Provider, accessToken: string, f: 
 export async function revokeAtProvider(provider: Provider, token: string, f: Fetch = fetch): Promise<'revoked' | 'not_supported' | 'failed'> {
   const url = endpoints(provider).revoke;
   if (!url) return 'not_supported';
-  const res = await f(url, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ token }).toString() }).catch(() => null);
+  const res = await f(url, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ token }).toString(), signal: providerSignal() }).catch(() => null);
   return res && res.ok ? 'revoked' : 'failed';
 }

@@ -36,7 +36,7 @@ describe('search_sam_opportunities filters', () => {
     const { calls } = await run({ state: 'VA, MD and DC' });
     expect(calls).toContainEqual(['or', 'pop_state.eq.VA,office_address->>state.eq.VA,pop_state.eq.MD,office_address->>state.eq.MD,pop_state.eq.DC,office_address->>state.eq.DC']);
     // ANDed with the first group: a row whose place of performance is another state can never match.
-    expect(calls).toContainEqual(['or', 'pop_state.is.null,pop_state.in.(VA,MD,DC)']);
+    expect(calls).toContainEqual(['or', 'pop_state.in.(VA,MD,DC),and(pop_state.is.null,or(pop_country.is.null,pop_country.eq."",pop_country.ilike.USA,pop_country.ilike.US,pop_country.ilike."UNITED STATES"))']);
   });
   it('the Florida case (#2076): work performed in Puerto Rico by a Florida office is never returned', async () => {
     const row = (id: string, pop: string | null, office: string) => ({
@@ -48,6 +48,19 @@ describe('search_sam_opportunities filters', () => {
     expect(ids.join(' ')).toContain('fl-work');
     expect(ids.join(' ')).toContain('no-pop');
     expect(ids.join(' ')).not.toContain('pr-work');
+  });
+  it('a no-state notice stated to be abroad is never returned for a US region, whatever the office (2026-11-24)', async () => {
+    const row = (id: string, country: string | null) => ({
+      notice_id: id, title: `Roads ${id}`, response_deadline: '2099-01-01', pop_state: null, pop_country: country, office_address: { state: 'DC' },
+    });
+    const { res } = await run({ state: 'VA, MD and DC' }, [row('zambia', 'ZMB'), row('domestic', 'USA'), row('unstated', null), row('us2', 'us'), row('us3', 'United States')]);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const ids = ((res as any).items as Array<{ notice_id?: string; title?: string }>).map((i) => i.notice_id ?? i.title).join(' ');
+    expect(ids).not.toContain('zambia');
+    expect(ids).toContain('domestic');
+    expect(ids).toContain('unstated');
+    expect(ids).toContain('us2');
+    expect(ids).toContain('us3');
   });
   it('no state asked → no location predicate at all', async () => {
     const { calls } = await run({});

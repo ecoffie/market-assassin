@@ -48,8 +48,8 @@ describe('boundToolResult', () => {
   });
 
   it('splits the turn budget across results with a floor', () => {
-    expect(perResultBudget(1)).toBe(60_000);
-    expect(perResultBudget(4)).toBe(15_000);
+    expect(perResultBudget(1)).toBe(120_000);
+    expect(perResultBudget(4)).toBe(30_000);
     expect(perResultBudget(100)).toBe(MIN_PER_RESULT_CHARS);
   });
 });

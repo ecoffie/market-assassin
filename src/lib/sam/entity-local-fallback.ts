@@ -30,7 +30,7 @@
  * <date>" rather than implying it re-checked SAM this second. Never present cached data as live.
  */
 import { createClient } from '@supabase/supabase-js';
-import { legalNameIlikePattern } from '@/lib/contractor/legal-name-stem';
+import { legalNameSearchStem } from '@/lib/contractor/legal-name-stem';
 import type { SAMEntity } from './entity-api';
 import { CERT_PROGRAMS, certFlag, type CertProgram, type CertificationRecord } from './certification-status';
 import { deriveRegistrationStatus } from './registration-status';
@@ -56,7 +56,7 @@ function db() {
 const LOCAL_ENTITY_COLUMNS =
   'uei, cage_code, legal_business_name, dba_name, physical_city, physical_state, physical_zip, '
   + 'physical_country, primary_naics, naics_codes, certifications, certification_records, '
-  + 'registration_status, registration_expiry, exclusion_flag, sam_url, points_of_contact, synced_at';
+  + 'registration_status, registration_expiry, exclusion_flag, sam_url, entity_url, points_of_contact, synced_at';
 
 /**
  * Shape a `sam_entities` row into the same SAMEntity the live API returns.
@@ -145,6 +145,7 @@ function toSamEntity(r: Record<string, unknown>): SAMEntity {
     cageCode: str(r.cage_code),
     legalBusinessName: str(r.legal_business_name),
     dbaName: str(r.dba_name) || undefined,
+    ...(str(r.entity_url).trim() ? { entityUrl: str(r.entity_url).trim() } : {}),
     // Honest provenance: derived from registration_expiry when present, so an
     // Active flag with a past expiry never reads Active (157k-row class, 2026-11-18).
     // Still AS OF `synced_at` — the caller receives `as_of` alongside it.
@@ -219,7 +220,24 @@ export async function localEntityByUEI(uei: string): Promise<LocalEntityHit | nu
  * Uses the legal-name stem so ", LLC" and "LLC" resolve to the same row.
  * Also searches DBA so a trade name is not reported as unregistered.
  */
-export async function lookupLocalEntitiesByName(name: string, limit = 10): Promise<
+/**
+ * Whole-word name filters for the local mirror (Eric, 2026-11-25: name-only entity resolution, EFS Digital case).
+ * The plain `%stem%` ILIKE matched INSIDE words: "EFS" returned CHIEFS, REEFS, DEFSEC, BELIEFS and filled the
+ * 25-row cap with them, and the name path ignored the caller's state. The ILIKE stays as the index-friendly
+ * prefilter (tokens in order, any separator); a POSIX word-boundary regex then keeps only whole-word matches.
+ */
+export function localNameFilters(name: string): { ilike: string; regex: string } | null {
+  const stem = legalNameSearchStem(name).replace(/[%_]/g, '').trim() || name.replace(/[%_]/g, '').trim();
+  const tokens = stem.split(/[^A-Za-z0-9]+/).filter(Boolean);
+  if (!tokens.length) return null;
+  const esc = (t: string) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return {
+    ilike: `%${tokens.join('%')}%`,
+    regex: `\\m${tokens.map(esc).join('[^[:alnum:]]+')}\\M`,
+  };
+}
+
+export async function lookupLocalEntitiesByName(name: string, limit = 10, state?: string): Promise<
   | { status: 'found'; hits: LocalEntityHit[] }
   | { status: 'absent' }
   | { status: 'unavailable'; detail: string }
@@ -228,23 +246,22 @@ export async function lookupLocalEntitiesByName(name: string, limit = 10): Promi
   if (!sb) return { status: 'unavailable', detail: 'Supabase client unavailable' };
   if (!name.trim()) return { status: 'absent' };
   const cap = Math.min(Math.max(limit, 1), 25);
-  const pattern = legalNameIlikePattern(name);
+  const f = localNameFilters(name);
+  if (!f) return { status: 'absent' };
+  const st = String(state ?? '').trim().toUpperCase();
+  const byName = (col: 'legal_business_name' | 'dba_name') => {
+    let q = sb.from('sam_entities').select(LOCAL_ENTITY_COLUMNS).ilike(col, f.ilike).filter(col, 'imatch', f.regex);
+    if (/^[A-Z]{2}$/.test(st)) q = q.eq('physical_state', st);
+    return q.limit(cap);
+  };
 
-  const { data: legal, error: legalErr } = await sb
-    .from('sam_entities')
-    .select(LOCAL_ENTITY_COLUMNS)
-    .ilike('legal_business_name', pattern)
-    .limit(cap);
+  const { data: legal, error: legalErr } = await byName('legal_business_name');
   if (legalErr) {
     console.error('[sam-local-fallback] legal-name query failed:', legalErr.message);
     return { status: 'unavailable', detail: legalErr.message };
   }
 
-  const { data: dba, error: dbaErr } = await sb
-    .from('sam_entities')
-    .select(LOCAL_ENTITY_COLUMNS)
-    .ilike('dba_name', pattern)
-    .limit(cap);
+  const { data: dba, error: dbaErr } = await byName('dba_name');
   if (dbaErr) {
     console.error('[sam-local-fallback] dba-name query failed:', dbaErr.message);
     return { status: 'unavailable', detail: dbaErr.message };
@@ -265,7 +282,36 @@ export async function lookupLocalEntitiesByName(name: string, limit = 10): Promi
   return { status: 'found', hits: [...byUei.values()] };
 }
 
-export async function localEntitiesByName(name: string, limit = 10): Promise<LocalEntityHit[]> {
-  const r = await lookupLocalEntitiesByName(name, limit);
+/**
+ * Registrations whose SAM entityURL is on `domain` (bare host, e.g. "efsdigital.com"). The ILIKE is a prefilter;
+ * the caller confirms the exact host. Most mirror rows hold no entityURL today: absence proves nothing.
+ */
+export async function lookupLocalEntitiesByWebsite(domain: string, limit = 10): Promise<
+  | { status: 'found'; hits: LocalEntityHit[] }
+  | { status: 'absent' }
+  | { status: 'unavailable'; detail: string }
+> {
+  const sb = db();
+  if (!sb) return { status: 'unavailable', detail: 'Supabase client unavailable' };
+  const d = domain.replace(/[%_]/g, '').trim();
+  if (!d) return { status: 'absent' };
+  const { data, error } = await sb
+    .from('sam_entities')
+    .select(LOCAL_ENTITY_COLUMNS)
+    .ilike('entity_url', `%${d}%`)
+    .limit(Math.min(Math.max(limit, 1), 25));
+  if (error) {
+    console.error('[sam-local-fallback] website query failed:', error.message);
+    return { status: 'unavailable', detail: error.message };
+  }
+  const hits = ((data || []) as unknown as Record<string, unknown>[]).map((row) => ({
+    entity: toSamEntity(row),
+    asOf: typeof row.synced_at === 'string' ? row.synced_at : null,
+  }));
+  return hits.length ? { status: 'found', hits } : { status: 'absent' };
+}
+
+export async function localEntitiesByName(name: string, limit = 10, state?: string): Promise<LocalEntityHit[]> {
+  const r = await lookupLocalEntitiesByName(name, limit, state);
   return r.status === 'found' ? r.hits : [];
 }

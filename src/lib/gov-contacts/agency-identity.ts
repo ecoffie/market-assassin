@@ -85,7 +85,18 @@ export function queryIdentifiesCandidate(query: string, candidate: string): bool
   const c = identityTokens(candidate);
   if (q.length === 0 || c.length === 0) return false;
   if (q.join(' ') === c.join(' ')) return true;
+  // A designator the query NAMES must be in the candidate too: FILLER strips "National" and "Bureau" for key
+  // equality, so "National Guard Bureau" reduced to "GUARD" and identified "U.S. Coast Guard" (Agent 4, from
+  // Eric's EFS Digital run, 2026-11-25). Articles and "Department of" stay ignorable (Navy ⊂ Department of the Navy).
+  const candidateWords = new Set(rawWords(candidate));
+  if (rawWords(query).some((w) => DESIGNATORS.has(w) && !candidateWords.has(w))) return false;
   return tokensContainPhrase(c, q);
+}
+
+/** Filler words that still DISTINGUISH an organisation when a query names them (National Guard ≠ Coast Guard). */
+const DESIGNATORS = new Set(['NATIONAL', 'BUREAU', 'AGENCY', 'OFFICE', 'FEDERAL', 'ADMINISTRATION']);
+function rawWords(s: string): string[] {
+  return (s || '').toUpperCase().split(/[^A-Z0-9]+/).filter(Boolean);
 }
 
 export interface DirectoryMatch<T extends DirectoryCommandLike> {

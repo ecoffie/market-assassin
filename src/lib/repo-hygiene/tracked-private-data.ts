@@ -59,7 +59,8 @@ export const KNOWN_EXCEPTIONS: Array<{ path: string; maxEmails: number }> = [
   { path: 'src/lib/mindy/campaign-exclusions.ts', maxEmails: 10 },
   { path: 'src/lib/mindy/advocate-accounts.ts', maxEmails: 6 },
   { path: 'src/lib/mindy/advocate-accounts.unit.test.ts', maxEmails: 8 },
-  { path: 'src/lib/api-auth.ts', maxEmails: 6 },
+  // The staff list moved here from src/lib/api-auth.ts (2026-11-24); same addresses, same cap.
+  { path: 'src/lib/access/staff-role.ts', maxEmails: 6 },
   { path: 'src/app/api/admin/member-lookup/route.ts', maxEmails: 6 },
 ];
 

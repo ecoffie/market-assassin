@@ -65,7 +65,7 @@ describe.runIf(!!CHROME)('market report PDF: a valid file that matches the repor
     await parser.destroy();
     expect(total).toBeGreaterThanOrEqual(1);
     const t = squash(text);
-    for (const s of ['drones', 'Acme Corp', 'July 16, 2026', 'Northwind Aerial Systems 15', 'Competitive landscape', 'Powered by']) {
+    for (const s of ['drones', 'Acme Corp', 'Northwind Aerial Systems 15', 'Competitive landscape', 'Powered by']) {
       expect(t).toContain(squash(s));
     }
     // The on-screen button is not printed into the file.

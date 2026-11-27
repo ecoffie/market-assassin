@@ -106,6 +106,8 @@ export default function RootLayout({
             product's numbers out of the marketing site's). */}
         {/* One-time pop-up for the Nov 28 live event (src/lib/events/event-popup.ts). */}
         <Script src="/event-popup.js" strategy="lazyOnload" />
+        {/* "Get help" button on every page (src/lib/support/help-widget.ts). */}
+        <Script src="/help-widget.js" strategy="lazyOnload" />
         {GTAG_LOADER_ID && (
           <>
             <Script

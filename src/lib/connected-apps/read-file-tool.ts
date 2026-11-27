@@ -42,16 +42,69 @@ export interface ReadFileDeps {
   accessTokenFor?: typeof accessTokenFor;
   fetch?: typeof fetch;
   now?: () => Date;
+  cache?: TextCache;
 }
+
+/**
+ * Extracted text, per (scope, connection, file, modified time). A file attached to a conversation goes with every
+ * question; without this, every turn re-downloaded and re-extracted up to 5 files of 15 MB. Authority is unchanged:
+ * the connection is re-checked and the file's metadata re-read on every turn, and a changed file (new modified
+ * time) is read again. In memory only (never persisted), bounded by entries, total characters and age.
+ */
+export class TextCache {
+  private m = new Map<string, { text: string; pages: number | null; at: number }>();
+  private chars = 0;
+  constructor(private maxEntries = 64, private maxChars = 8_000_000, private ttlMs = 60 * 60_000) {}
+  get(key: string, now = Date.now()): { text: string; pages: number | null } | null {
+    const e = this.m.get(key);
+    if (!e) return null;
+    if (now - e.at > this.ttlMs) { this.drop(key); return null; }
+    this.m.delete(key); this.m.set(key, e); // most recently used last
+    return { text: e.text, pages: e.pages };
+  }
+  set(key: string, text: string, pages: number | null, now = Date.now()) {
+    if (text.length > this.maxChars) return;
+    this.drop(key);
+    this.m.set(key, { text, pages, at: now });
+    this.chars += text.length;
+    while (this.m.size > this.maxEntries || this.chars > this.maxChars) {
+      const oldest = this.m.keys().next().value as string | undefined;
+      if (oldest === undefined) break;
+      this.drop(oldest);
+    }
+  }
+  private drop(key: string) {
+    const e = this.m.get(key);
+    if (e) { this.chars -= e.text.length; this.m.delete(key); }
+  }
+  get size() { return this.m.size; }
+}
+const SHARED_CACHE = new TextCache();
+const cacheKey = (scopeKey: string, h: FileHandle, modified: string | null) => (modified ? `${scopeKey}\u0001${h.connectionId}\u0001${h.provider}\u0001${h.fileId}\u0001${modified}` : null);
 
 type ReadOutcome =
   | { ok: true; name: string; provider: string; account: string; modified: string | null; text: string; pages: number | null }
   | { ok: false; name: string; provider: string; reason: string };
 
-/** Read ONE verified handle. Re-checks the connection, provider and file id; maps every failure to a reason. */
+const UNREACHABLE = 'this file could not be reached right now. This is not an empty file; say it could not be read right now.';
+
+/**
+ * Read ONE verified handle. Re-checks the connection, provider and file id; maps every failure to a reason. Never
+ * throws: a store or decryption error becomes a plain "could not be reached" line, so the chat turn continues.
+ */
 async function readVerified(scopeKey: string, scope: ChatActingScope, h: FileHandle, deps: ReadFileDeps): Promise<ReadOutcome> {
+  try {
+    return await readVerifiedInner(scopeKey, scope, h, deps);
+  } catch (err) {
+    console.error('[connected-files] read failed (non-fatal):', (err as Error)?.message);
+    return { ok: false, name: h.name, provider: providerLabel(h.provider), reason: UNREACHABLE };
+  }
+}
+
+async function readVerifiedInner(scopeKey: string, scope: ChatActingScope, h: FileHandle, deps: ReadFileDeps): Promise<ReadOutcome> {
   const getToken = deps.accessTokenFor ?? accessTokenFor;
   const f = deps.fetch ?? fetch;
+  const cache = deps.cache ?? SHARED_CACHE;
   const base = { name: h.name, provider: providerLabel(h.provider) };
   const tok = await getToken(scopeKey, scope.email, h.connectionId);
   if (!tok.ok) {
@@ -64,7 +117,11 @@ async function readVerified(scopeKey: string, scope: ChatActingScope, h: FileHan
   try {
     const meta = await fetchFileMeta(h.provider, tok.token, h.fileId, f);
     if (meta.id !== h.fileId) return { ok: false, ...base, reason: 'the provider returned a different file than the one selected.' };
+    const key = cacheKey(scopeKey, h, meta.modified);
+    const hit = key ? cache.get(key) : null;
+    if (hit) return { ok: true, ...base, name: meta.name, account: tok.connection.connected_email, modified: meta.modified, text: hit.text, pages: hit.pages };
     const { text, pageCount } = await readFileText(h.provider, tok.token, meta, f);
+    if (key && text.trim()) cache.set(key, text, pageCount ?? null);
     if (!text.trim()) return { ok: false, ...base, name: meta.name, reason: READ_FAIL.unreadable };
     return { ok: true, ...base, name: meta.name, account: tok.connection.connected_email, modified: meta.modified, text, pages: pageCount ?? null };
   } catch (err) {

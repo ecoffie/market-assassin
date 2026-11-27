@@ -3974,6 +3974,8 @@ const VIEWPORT_JS = `<script>
     }catch(e){}
     return st;
   }
+  // Ask Mindy actions (Undo): the current view in the exact {mode, filters, bbox} shape __applySavedSearch restores.
+  window.__mapSnapshot=function(){ var st=_mapState()||{}; var md=window.__mapMode==='recompete'?'recompete':'open'; return {mode:md,filters:st.filters||{},bbox:st.bbox}; };
 
   // ── RETURN CONTINUITY: remember the MARKET, not just the viewport ─────────
   // Measured 2026-09-21: 8,096 of 9,315 30-day users are one-day-only, and
@@ -10914,7 +10916,7 @@ const ASK_MINDY_CSS =
   + '.amk-msg.a .bub.md .md-table{margin:6px 0 10px;overflow-x:auto}.amk-msg.a .bub.md table{border-collapse:collapse;width:100%;font-size:12.5px}'
   + '.amk-msg.a .bub.md th{text-align:left;font-weight:700;border-bottom:1px solid #d7dee8;padding:5px 6px;white-space:nowrap}.amk-msg.a .bub.md td{border-bottom:1px solid #edf1f5;padding:5px 6px;vertical-align:top;overflow-wrap:normal;word-break:normal}'
   // Narrow drawer: holder links must not break mid-word; the value stays on one line; every column stays visible at drawer width. 2026-11-16.
-  + '.amk-msg.a .bub.md td a{overflow-wrap:normal;word-break:normal}.amk-msg.a .bub.md td:first-child{min-width:130px}.amk-msg.a .bub.md td:nth-child(2){white-space:nowrap}'
+  + '.amk-msg.a .bub.md td a{overflow-wrap:normal;word-break:normal}.amk-msg.a .bub.md td:first-child{min-width:130px}.amk-msg.a .bub.md td:nth-child(2){white-space:nowrap}.amk-msg.a .bub.md td.md-wrap{white-space:normal;min-width:150px}.amk-msg.a .bub.md table.md-cols3 td:first-child{min-width:0}.amk-msg.a .bub.md table.md-cols3 td.md-wrap{min-width:110px}'
   // Follow-up ACTION chips under an answer (the vision\'s "What agencies use Azure? / Add to pipeline").
   + '.amk-act{display:flex;flex-wrap:wrap;gap:7px;margin-top:9px}'
   + '.amk-act button{font:600 11.5px Inter;color:#2563eb;background:#eaf1fe;border:1px solid #d3e2fc;border-radius:8px;padding:6px 11px;cursor:pointer;text-align:left}'
@@ -10936,11 +10938,23 @@ const ASK_MINDY_CSS =
   + '.amk-in{display:flex;gap:8px;align-items:flex-end}'
   + '.amk-attach{margin-bottom:6px}.amk-attach-bar{display:flex;align-items:center;gap:8px}.amk-clip{flex:none;border:1px solid #dde3ec;background:#fff;color:#334155;cursor:pointer;font:600 11.5px Inter,system-ui,sans-serif;border-radius:7px;padding:4px 9px}.amk-clip:disabled{opacity:.5;cursor:default}'
   + '.amk-priv{font:500 11px Inter,system-ui,sans-serif;color:#6b7787}.amk-docs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:4px}.amk-doc{display:inline-flex;align-items:center;gap:6px;max-width:100%;border:1px solid #dde3ec;border-radius:7px;padding:2px 4px 2px 8px;font:500 11.5px Inter,system-ui,sans-serif;color:#334155}'
+  + '.amk-shots{margin-bottom:6px}.amk-shot-list{display:flex;flex-wrap:wrap;gap:6px}.amk-shot-list:empty{display:none}.amk-shot{position:relative;width:64px;height:44px;border:1px solid #dde3ec;border-radius:7px;overflow:hidden;background:#f5f8fb}.amk-shot img{width:100%;height:100%;object-fit:cover;display:block}'
+  + '.amk-shot button{position:absolute;top:2px;right:2px;border:0;border-radius:4px;background:rgba(0,0,0,.65);color:#fff;cursor:pointer;font:600 10px Inter,system-ui,sans-serif;line-height:1;padding:2px 4px}.amk-shot-note{font:500 11.5px Inter,system-ui,sans-serif;color:#b45309;margin-top:4px}.amk-shot-note:empty{display:none}'
   + '.amk-doc button{border:0;background:none;color:#6b7787;cursor:pointer;font:600 12px Inter;padding:0 4px}.amk-attach-err{font:500 11.5px Inter,system-ui,sans-serif;color:#b91c1c}.amk-attach-err:empty{display:none}'
   + '.amk-in textarea{flex:1;resize:none;border:1px solid #dde3ec;border-radius:12px;padding:10px 12px;font:400 13.5px Inter;color:#111c26;max-height:120px;outline:none}'
   + '.amk-in textarea:focus{border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.12)}'
   + '.amk-send{flex:none;width:40px;height:40px;border:0;border-radius:11px;background:#2563eb;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center}'
   + '.amk-send:disabled{opacity:.45;cursor:default}.amk-send svg{width:18px;height:18px}'
+  + '.amk-beta{display:inline-block;margin:0 0 6px;border:1px solid #c7d2fe;background:#eef2ff;color:#4338ca;border-radius:999px;padding:1px 8px;font:600 10.5px Inter,system-ui,sans-serif}.amk-rp-tag:empty{display:none}.amk-rp-tag{display:inline-block;margin:0 4px 0 2px;border:1px solid #c7d2fe;background:#eef2ff;color:#4338ca;border-radius:999px;padding:0 6px;font:600 10px Inter,system-ui,sans-serif;vertical-align:1px}'
+  + '@media(prefers-color-scheme:dark){.amk-beta,.amk-rp-tag{background:rgba(99,102,241,.15);border-color:rgba(129,140,248,.4);color:#c7d2fe}}'
+  + '.amk-rp{margin:0 0 8px;border:1px solid #e6ebf0;border-radius:10px;background:#f8fafc;padding:8px 10px;font:500 12.5px Inter,system-ui,sans-serif;color:#334155}.amk-rp-hd b{font-weight:600;color:#0f172a}.amk-rp-time,.amk-rp-n{color:#6b7787;font-variant-numeric:tabular-nums}'
+  + '.amk-rp-spin{display:inline-block;width:11px;height:11px;margin-right:6px;vertical-align:-1px;border:2px solid #c7d2fe;border-top-color:#6366f1;border-radius:50%;animation:amkspin .9s linear infinite}@keyframes amkspin{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){.amk-rp-spin{animation:none}}'
+  + '.amk-rp-cur{margin-top:3px;color:#475569}.amk-rp-still{margin-top:3px;font-size:11.5px;color:#6b7787}.amk-rp-still[hidden]{display:none}.amk-rp-tog{margin-top:4px;border:0;background:none;padding:0;cursor:pointer;font:600 11.5px Inter,system-ui,sans-serif;color:#6b7787}.amk-rp-tog:hover{color:#334155}'
+  + '.amk-rp-steps{margin:4px 0 0;padding:0 0 0 16px;font-size:12px;color:#64748b}.amk-rp-steps[hidden]{display:none}.amk-rp-sum{background:none;border:0;padding:0;color:#6b7787;font-size:12px}'
+  + '@media(prefers-color-scheme:dark){.amk-rp{background:#0d141d;border-color:#202b39;color:#cdd8e4}.amk-rp-hd b{color:#eaf1f8}.amk-rp-cur{color:#b6c3d1}.amk-rp-sum{background:none}}'
+  + '.amk-actnote{margin:0 0 6px;font:500 12px Inter,system-ui,sans-serif;color:#334155;background:#f1f5ff;border:1px solid #dbe4ff;border-radius:8px;padding:5px 9px}.amk-actbeta{font-weight:700;color:#4338ca}.amk-actundo{border:0;background:none;padding:0;cursor:pointer;font:600 12px Inter,system-ui,sans-serif;color:#2563eb;text-decoration:underline}.amk-actundo:disabled{color:#6b7787;text-decoration:none;cursor:default}'
+  + '.amk-actyes,.amk-actno{margin-left:6px;border-radius:6px;padding:2px 9px;cursor:pointer;font:600 11.5px Inter,system-ui,sans-serif}.amk-actyes{border:1px solid #2563eb;background:#2563eb;color:#fff}.amk-actno{border:1px solid #cbd5e1;background:#fff;color:#334155}.amk-actyes:disabled,.amk-actno:disabled{opacity:.55;cursor:default}.amk-actconfirm a{color:#2563eb;font-weight:600}'
+  + '@media(prefers-color-scheme:dark){.amk-actnote{background:#122033;border-color:#1f3a5c;color:#cdd8e4}.amk-actbeta{color:#c7d2fe}.amk-actundo{color:#7fb0ff}}'
   + '.amk-notices{margin-top:8px;display:flex;flex-direction:column;gap:4px}.amk-notice{font:500 12px Inter,system-ui,sans-serif;color:#92400e;background:#fffbeb;border:1px solid #fde68a;border-radius:7px;padding:4px 8px}'
   + '@media(prefers-color-scheme:dark){.amk-notice{color:#fcd34d;background:rgba(245,158,11,.1);border-color:rgba(245,158,11,.25)}}'
   + '.amk-hd-tools{display:flex;gap:6px;flex:none}.amk-card .amk-hd-tools{display:none}.amk-tool{border:1px solid #dde3ec;background:#fff;color:#334155;font:600 11.5px Inter,system-ui,sans-serif;border-radius:7px;padding:4px 9px;cursor:pointer}.amk-tool:hover{background:#f1f5f9}'
@@ -11009,8 +11023,12 @@ const ASK_MINDY_JS = `<script>(function(){
   // Answer text \\u2192 the bubble. window.__mindyMd (src/lib/chat/safe-markdown.ts) ESCAPES the model text first
   // and only then writes its own markup for a small markdown subset, so innerHTML never receives raw model
   // text. Without it (script missing) the text is shown as plain text, never as HTML.
+  // A long table cell (a research answer's status or source column) wraps; short ones (a dollar value, a code) stay
+  // on one line as before. Without this the second column's nowrap pushed prose tables off the drawer.
+  function mdWrapCells(root){ var tds=root.querySelectorAll('td'); for(var i=0;i<tds.length;i++){ if(String(tds[i].textContent||'').length>24) tds[i].className='md-wrap'; }
+    var tbs=root.querySelectorAll('table'); for(var j=0;j<tbs.length;j++){ var r=tbs[j].querySelector('tr'); if(r&&r.children.length>=3) tbs[j].className='md-cols3'; } }
   function paint(bub,text){
-    if(typeof window.__mindyMd==='function'){ try{ bub.innerHTML=window.__mindyMd(text); bub.classList.add('md'); return; }catch(e){} }
+    if(typeof window.__mindyMd==='function'){ try{ bub.innerHTML=window.__mindyMd(text); bub.classList.add('md'); mdWrapCells(bub); return; }catch(e){} }
     bub.classList.remove('md'); bub.textContent=text;
   }
   function tok(){ try{return localStorage.getItem('mi_beta_auth_token');}catch(e){return null;} }
@@ -11196,7 +11214,7 @@ const ASK_MINDY_JS = `<script>(function(){
   function readView(){ try{ var o=JSON.parse(sessionStorage.getItem(VIEW_KEY)||'null'); return (o&&o.email&&o.email===email()&&(o.ws||'')===wsKey()&&Array.isArray(o.history))?o:null; }catch(e){ return null; } }
   function renderConversation(msgs){
     body.innerHTML='';
-    msgs.forEach(function(m){ if(!m||typeof m.content!=='string') return; var d=addMsg(m.role==='user'?'user':'assistant', m.content); if(m.role!=='user'&&m.files&&m.files.length) repCard(cleanFiles(m.files),d); if(m.role!=='user'){ var r=savedReport(m.report); if(r) repSavedCard(r,d); } });
+    msgs.forEach(function(m){ if(!m||typeof m.content!=='string') return; var d=addMsg(m.role==='user'?'user':'assistant', m.content); if(m.role!=='user'&&m.files&&m.files.length) repCard(cleanFiles(m.files),d); if(m.role!=='user'){ var r=savedReport(m.report); if(r) repSavedCard(r,d); if(m.tag) betaTag(d,betaLabel(m.tag)); } });
     body.scrollTop=body.scrollHeight; // a reopened conversation shows its end (its report card) above the composer
   }
   function newChat(){
@@ -11254,7 +11272,7 @@ const ASK_MINDY_JS = `<script>(function(){
         sessionId=sid;
         history=d.messages.filter(function(m){ return m&&(m.role==='user'||m.role==='assistant')&&typeof m.content==='string'; }).map(function(m){
           var h={role:m.role,content:m.content}; var f=m.deliverables&&Array.isArray(m.deliverables.files)?m.deliverables.files:null; if(f&&f.length) h.files=f;
-          var r=m.market_report?savedReport({id:m.market_report.report_id,title:m.market_report.title}):null; if(r) h.report=r; return h; });
+          var r=m.market_report?savedReport({id:m.market_report.report_id,title:m.market_report.title}):null; if(r) h.report=r; if(m.role==='assistant'&&m.research_mode) h.tag=betaLabel(m.research_mode.label); return h; });
         clearFollowups(); hideHistory(); renderConversation(history); saveView();
         try{ if(window.__track) window.__track('tool_use','map_chat_reopen',{messages:history.length}); }catch(e){}
       })
@@ -11346,6 +11364,278 @@ const ASK_MINDY_JS = `<script>(function(){
         .then(function(r){ return r.ok?r.json():null; },function(){ return null; })
         .then(function(d){ if(d && d.uploads===true && !amkDocs) buildAttach(); },function(){});
     }catch(e){}
+  }
+  // Pasted screenshots (view mode only): shown only when the SERVER says it will read them for this account
+  // (/api/app/chat/capabilities). Each image is redrawn on a canvas (longest edge 1568 px) and re-encoded, so no
+  // EXIF/GPS metadata is sent. They ride on ONE question as images:[{media_type,data}] and are never kept: not in
+  // history, sessionStorage, localStorage, a retry or the Vault. The transcript keeps only "[screenshot attached]".
+  var amkShots=null, SHOT_MAX=3, SHOT_BYTES=3.5*1024*1024, SHOT_EDGE=1568, SHOT_TYPES={'image/png':1,'image/jpeg':1,'image/webp':1};
+  var SHOT_DEFAULT='Who or what is in this screenshot? Research it for me.';
+  var SHOT_MSG={type:'Mindy can read PNG, JPEG or WebP screenshots. That file is not one.',count:'You can attach up to 3 screenshots to one message.',size:'That screenshot is too large to send. Try a smaller capture.',unreadable:'Mindy could not open that image. Try taking the screenshot again.',server:'Mindy could not read that screenshot. Your message is still here. Remove the screenshot or try another one.',total:'These screenshots are too large to send together. Remove one, or try smaller captures.'};
+  function shotMarker(n){ return n===1?'[screenshot attached]':('['+n+' screenshots attached]'); }
+  function shotDecode(f){ return new Promise(function(res,rej){
+    if(typeof createImageBitmap==='function'){ createImageBitmap(f).then(function(b){ res({w:b.width,h:b.height,src:b,done:function(){ try{ b.close(); }catch(e){} }}); },rej); return; }
+    var u=URL.createObjectURL(f), im=new Image(); im.onload=function(){ res({w:im.naturalWidth,h:im.naturalHeight,src:im,done:function(){ URL.revokeObjectURL(u); }}); }; im.onerror=function(){ URL.revokeObjectURL(u); rej(new Error('decode')); }; im.src=u; }); }
+  function shotEncode(cv,type,q){ return new Promise(function(res){ try{ cv.toBlob(function(b){ res(b); },type,q); }catch(e){ res(null); } }); }
+  function shotB64(blob){ return new Promise(function(res,rej){ var fr=new FileReader(); fr.onload=function(){ var s=String(fr.result||''); res(s.slice(s.indexOf(',')+1)); }; fr.onerror=rej; fr.readAsDataURL(blob); }); }
+  // Each image aims for <= 900 KB so three stay well under the route's ~4 MB base64 total (Vercel body limit): PNG
+  // first for a PNG source, then JPEG 0.82 to 0.52, then a smaller edge (1280, 1024).
+  var SHOT_TARGET=900*1024, SHOT_TOTAL_B64=3800000, SHOT_EDGES=[SHOT_EDGE,1280,1024], SHOT_QS=[0.82,0.72,0.62,0.52];
+  function shotPrepare(f){
+    if(!SHOT_TYPES[f.type]) return Promise.resolve({err:'type'});
+    return shotDecode(f).then(function(img){
+      var L=Math.max(img.w,img.h); if(!L){ img.done(); return {err:'unreadable'}; }
+      var cv=document.createElement('canvas'), cx=cv.getContext('2d'); if(!cx){ img.done(); return {err:'unreadable'}; }
+      var plan=[];
+      SHOT_EDGES.forEach(function(edge,ei){ if(ei>0&&L<=SHOT_EDGES[ei-1]) return;
+        if(f.type==='image/png') plan.push({edge:edge,type:'image/png'});
+        SHOT_QS.forEach(function(q){ plan.push({edge:edge,type:'image/jpeg',q:q}); }); });
+      var drawnEdge=0, any=false;
+      function attempt(i){
+        if(i>=plan.length){ img.done(); return Promise.resolve({err:any?'size':'unreadable'}); }
+        var st=plan[i];
+        if(st.edge!==drawnEdge){ var w=img.w, h=img.h; if(L>st.edge){ var s=st.edge/L; w=Math.max(1,Math.round(w*s)); h=Math.max(1,Math.round(h*s)); }
+          cv.width=w; cv.height=h; cx.drawImage(img.src,0,0,w,h); drawnEdge=st.edge; }
+        return shotEncode(cv,st.type,st.q).then(function(b){
+          if(!b) return attempt(i+1); any=true;
+          if(b.size>SHOT_TARGET) return attempt(i+1);
+          img.done();
+          return shotB64(b).then(function(d){ return {shot:{media_type:st.type,data:d,url:URL.createObjectURL(b)}}; });
+        });
+      }
+      return attempt(0);
+    },function(){ return {err:'unreadable'}; });
+  }
+  function buildShots(){
+    var foot=drawer.querySelector('.amk-foot'); if(!foot||amkShots)return;
+    var row=document.createElement('div'); row.className='amk-shots'; row.setAttribute('data-testid','amk-shots');
+    row.innerHTML='<div class="amk-shot-list" aria-label="Attached screenshots"></div><div class="amk-shot-note" role="status"></div>';
+    var inRow=foot.querySelector('.amk-in'); foot.insertBefore(row,inRow||null);
+    var list=row.querySelector('.amk-shot-list'), note=row.querySelector('.amk-shot-note'), shots=[];
+    function paintShots(){ list.innerHTML=''; shots.forEach(function(s,i){ var c=document.createElement('span'); c.className='amk-shot';
+      var im=document.createElement('img'); im.src=s.url; im.alt='Screenshot '+(i+1); c.appendChild(im);
+      var x=document.createElement('button'); x.type='button'; x.setAttribute('data-testid','amk-shot-remove'); x.setAttribute('aria-label','Remove screenshot '+(i+1)); x.textContent='x';
+      x.onclick=function(){ if(busy){ note.textContent=''; return; } URL.revokeObjectURL(s.url); shots=shots.filter(function(o){ return o!==s; }); note.textContent=''; paintShots(); }; c.appendChild(x); list.appendChild(c); }); }
+    function add(dt){
+      var raw=[], items=dt&&dt.items?Array.prototype.slice.call(dt.items):[];
+      if(items.length){ items.forEach(function(it){ if(it.kind==='file'){ var f=it.getAsFile(); if(f) raw.push(f); } }); }
+      else if(dt&&dt.files){ raw=Array.prototype.slice.call(dt.files); }
+      if(!raw.length) return false;
+      var ok=raw.filter(function(f){ return !!SHOT_TYPES[f.type]; });
+      note.textContent=(ok.length<raw.length)?SHOT_MSG.type:'';
+      var room=SHOT_MAX-shots.length; if(room<=0){ note.textContent=SHOT_MSG.count; return true; }
+      if(ok.length>room) note.textContent=SHOT_MSG.count;
+      ok.slice(0,room).reduce(function(p,f){ return p.then(function(){ return shotPrepare(f).then(function(r){
+        if(r.err){ note.textContent=SHOT_MSG[r.err]; return; }
+        if(shots.length>=SHOT_MAX){ URL.revokeObjectURL(r.shot.url); return; }
+        shots.push(r.shot); paintShots(); }); }); },Promise.resolve());
+      return true;
+    }
+    if(input) input.addEventListener('paste',function(e){ if(busy||oppCtx)return; var cd=e.clipboardData; var has=cd&&cd.items&&Array.prototype.some.call(cd.items,function(i){ return i.kind==='file'; }); if(!has)return; e.preventDefault(); add(cd); });
+    foot.addEventListener('dragover',function(e){ if(oppCtx)return; var t=e.dataTransfer&&e.dataTransfer.types; if(t&&Array.prototype.indexOf.call(t,'Files')>=0) e.preventDefault(); });
+    foot.addEventListener('drop',function(e){ if(busy||oppCtx||!e.dataTransfer||!e.dataTransfer.files||!e.dataTransfer.files.length)return; e.preventDefault(); add(e.dataTransfer); });
+    if(input&&!oppCtx) input.placeholder='Ask Mindy, or paste a screenshot';
+    amkShots={
+      count:function(){ return oppCtx?0:shots.length; },
+      fits:function(){ var n=0; shots.forEach(function(x){ n+=x.data.length; }); return n<=SHOT_TOTAL_B64; },
+      tooBig:function(){ note.textContent=SHOT_MSG.total; },
+      // Hand the screenshots to one question: off the composer at once.
+      take:function(){ if(oppCtx) return []; var t=shots; shots=[]; note.textContent=''; paintShots(); return t; },
+      // The server's refusal message is customer-safe by contract (400/413/415 JSON {error, message}); ours if absent.
+      restore:function(t,msg){ shots=t.slice(0,SHOT_MAX); note.textContent=msg||SHOT_MSG.server; paintShots(); },
+      release:function(t){ t.forEach(function(s){ URL.revokeObjectURL(s.url); }); }
+    };
+  }
+  if(drawer && tok() && email()){
+    try{
+      fetch('/api/app/chat/capabilities?email='+encodeURIComponent(email()),{headers:{'x-mi-auth-token':tok()||'','x-user-email':email()}})
+        .then(function(r){ return r.ok?r.json():null; },function(){ return null; })
+        .then(function(d){ if(d && d.screenshots===true) buildShots(); if(d && d.actions===true) actionsOn=true; },function(){});
+    }catch(e){}
+  }
+  // ── ASK MINDY CONTROLS THE MAP (beta). The server proposes {type:'action', id, name, args} on the chat stream; this
+  // runs it through the function behind today's button and shows what changed with one-click Undo. Only when the
+  // SERVER says actions are on for this account (/api/app/chat/capabilities → actions). Unknown names, unknown arg
+  // keys or bad values are rejected whole. Mirrors src/lib/chat/app-actions/registry.ts (parity-tested).
+  var actionsOn=false, actUndo=null;
+  var MAP_FILTER_KEYS=['state','setAside','setAsideMulti','agency','subAgency','office','naics','psc','noticeType','noticeMulti','closingDays','postedDays','valueRange','vehicle','hasDocs','hasContact','likelihood'];
+  var MAP_ACTIONS={
+    'map.apply_view':['mode','q','filters','horizons','replace'],
+    'map.search':['q'],
+    'map.set_horizons':['open','recompete','forecast','isolate'],
+    'map.go_to':['state','national'],
+    'map.open_record':['notice_id'],
+    'map.save_search':['name','alert_frequency'],
+    'map.update_alert':['search_id','alert_frequency'],
+    'map.add_to_pursuits':['kind','notice_id','contract_id'],
+    'map.remove_from_pursuits':['pursuit_id','notice_id']
+  };
+  var ACT_PLAIN=/^[A-Za-z0-9 ,.&()'/:_-]+$/, ACT_HZ=['open','recompete','forecast'];
+  function actPlain(v,max){ if(typeof v!=='string') return null; var s=v.replace(/ +/g,' ').trim(); return (s&&s.length<=max&&ACT_PLAIN.test(s))?s:null; }
+  function actHas(arr,v){ for(var i=0;i<arr.length;i++){ if(arr[i]===v) return true; } return false; }
+  function actValidate(ev){
+    if(!ev||typeof ev.id!=='string'||!/^[A-Za-z0-9_-]{1,64}$/.test(ev.id)) return null;
+    var keys=MAP_ACTIONS[ev.name]; if(!keys) return null;
+    var raw=(ev.args&&typeof ev.args==='object'&&!Array.isArray(ev.args))?ev.args:{}, a={}, k;
+    for(k in raw){ if(!actHas(keys,k)) return null; }
+    if(ACT_WRITES[ev.name]){ var wa=actValidateWrite(ev.name,raw); return wa?{id:ev.id,name:ev.name,args:wa}:null; }
+    if(ev.name==='map.apply_view'||ev.name==='map.search'){
+      if(raw.q!=null){ var q=actPlain(raw.q,120); if(q==null||q.length<2) return null; a.q=q; }
+      if(ev.name==='map.search'&&a.q==null) return null;
+      if(raw.mode!=null){ if(raw.mode!=='open'&&raw.mode!=='recompete') return null; a.mode=raw.mode; }
+      if(raw.replace!=null){ if(typeof raw.replace!=='boolean') return null; a.replace=raw.replace; }
+      if(raw.filters!=null){ if(typeof raw.filters!=='object'||Array.isArray(raw.filters)) return null; a.filters={};
+        for(k in raw.filters){ if(!actHas(MAP_FILTER_KEYS,k)) return null; var s=actPlain(raw.filters[k],80); if(s==null) return null;
+          if(k==='state'){ s=s.toUpperCase().replace(/ /g,''); if(!/^[A-Z][A-Z](,[A-Z][A-Z])*$/.test(s)) return null; } a.filters[k]=s; } }
+      if(raw.horizons!=null){ if(typeof raw.horizons!=='object'||Array.isArray(raw.horizons)) return null; a.horizons={};
+        for(k in raw.horizons){ if(!actHas(ACT_HZ,k)||typeof raw.horizons[k]!=='boolean') return null; a.horizons[k]=raw.horizons[k]; } }
+      if(ev.name==='map.apply_view'&&a.q==null&&!a.filters&&!a.horizons&&!a.mode) return null;
+    } else if(ev.name==='map.set_horizons'){
+      if(raw.isolate!=null){ if(!actHas(ACT_HZ,raw.isolate)) return null; a.isolate=raw.isolate; }
+      for(var i=0;i<ACT_HZ.length;i++){ var h=ACT_HZ[i]; if(raw[h]!=null){ if(typeof raw[h]!=='boolean') return null; a[h]=raw[h]; } }
+      var any=false; for(k in a){ any=true; } if(!any) return null;
+    } else if(ev.name==='map.go_to'){
+      if(raw.national===true) a.national=true; else if(typeof raw.state==='string'&&/^[A-Za-z][A-Za-z]$/.test(raw.state)) a.state=raw.state.toUpperCase(); else return null;
+    } else if(ev.name==='map.open_record'){
+      if(typeof raw.notice_id!=='string'||!/^[A-Za-z0-9_-]{6,64}$/.test(raw.notice_id)) return null; a.notice_id=raw.notice_id;
+    }
+    return {id:ev.id,name:ev.name,args:a};
+  }
+  // Write actions (slice 2): never run without a click. One line: "<what> · Beta [Save] [Not now]". On Yes the drawer
+  // POSTs /api/app/mindy-actions (Agent 3; same session + workspace as the buttons; the route calls the existing lib).
+  // save_search saves EXACTLY the view on screen (filters/mode from the snapshot, never from the model).
+  var ACT_FREQ=['daily','weekly','off'], ACT_UUID=/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+  var ACT_WRITES={'map.save_search':'Save','map.update_alert':'Change','map.add_to_pursuits':'Add','map.remove_from_pursuits':'Remove'};
+  function actValidateWrite(name,raw){ var a={};
+    if(name==='map.save_search'){ var n=actPlain(raw.name,80); if(n==null||!actHas(ACT_FREQ,raw.alert_frequency)) return null; a.name=n; a.alert_frequency=raw.alert_frequency; return a; }
+    if(name==='map.update_alert'){ if(typeof raw.search_id!=='string'||!ACT_UUID.test(raw.search_id)||!actHas(ACT_FREQ,raw.alert_frequency)) return null; a.search_id=raw.search_id; a.alert_frequency=raw.alert_frequency; return a; }
+    if(name==='map.add_to_pursuits'){
+      if(raw.kind==='opportunity'&&typeof raw.notice_id==='string'&&/^[A-Za-z0-9_-]{6,64}$/.test(raw.notice_id)&&raw.contract_id==null){ a.kind='opportunity'; a.notice_id=raw.notice_id; return a; }
+      if(raw.kind==='recompete'&&raw.notice_id==null){ var c=actPlain(raw.contract_id,64); if(c==null) return null; a.kind='recompete'; a.contract_id=c; return a; }
+      return null; }
+    if(name==='map.remove_from_pursuits'){ var hp=raw.pursuit_id!=null, hn=raw.notice_id!=null; if(hp===hn) return null;
+      if(hp){ if(typeof raw.pursuit_id!=='string'||!ACT_UUID.test(raw.pursuit_id)) return null; a.pursuit_id=raw.pursuit_id; return a; }
+      if(typeof raw.notice_id!=='string'||!/^[A-Za-z0-9_-]{6,64}$/.test(raw.notice_id)) return null; a.notice_id=raw.notice_id; return a; }
+    return null;
+  }
+  function actFreqText(f){ return f==='off'?'no alerts':(f+' alerts'); }
+  function actConfirmText(act){ var a=act.args;
+    if(act.name==='map.save_search') return 'Save this view as "'+a.name+'" with '+actFreqText(a.alert_frequency)+'?';
+    if(act.name==='map.update_alert') return 'Change this saved search to '+actFreqText(a.alert_frequency)+'?';
+    if(act.name==='map.add_to_pursuits') return 'Add this '+(a.kind==='recompete'?'recompete':'opportunity')+' to My Pursuits?';
+    return 'Remove this from My Pursuits?';
+  }
+  function actPost(name,args,id){
+    return fetch('/api/app/mindy-actions',{method:'POST',headers:withWorkspace({'Content-Type':'application/json','x-mi-auth-token':tok()||'','x-user-email':email()}),
+      body:JSON.stringify({email:email(),action_id:id,name:name,args:args,confirmed:true})})
+      .then(function(r){ return r.json().then(function(d){ return {status:r.status,d:d||{}}; },function(){ return {status:r.status,d:{}}; }); },function(){ return {status:0,d:{}}; });
+  }
+  function actResultText(res){
+    if(res.status===401) return 'Please sign in again to let Mindy save this.';
+    var m=(res.d&&typeof res.d.message==='string')?res.d.message.replace(/ +/g,' ').trim():'';
+    if(m&&m.length<=300) return m;
+    return (res.d&&res.d.ok)?'Done.':'Mindy couldn’t save that right now. Nothing was changed.';
+  }
+  function actWrite(act,aEl){
+    if(!tok()||!email()){ actTrack(act,'rejected:signed_out'); if(window.openSignInModal) window.openSignInModal('let Mindy save this',function(){}); return; }
+    var box=document.createElement('div'); box.className='amk-actnote amk-actconfirm'; box.setAttribute('data-testid','amk-action-confirm'); box.setAttribute('role','group');
+    var t=document.createElement('span'); t.className='amk-acttext'; t.textContent=actConfirmText(act); box.appendChild(t);
+    box.appendChild(document.createTextNode(' · ')); var bt=document.createElement('span'); bt.className='amk-actbeta'; bt.textContent='Beta'; box.appendChild(bt); box.appendChild(document.createTextNode(' '));
+    var yes=document.createElement('button'); yes.type='button'; yes.className='amk-actyes'; yes.setAttribute('data-testid','amk-action-yes'); yes.textContent=ACT_WRITES[act.name];
+    var no=document.createElement('button'); no.type='button'; no.className='amk-actno'; no.setAttribute('data-testid','amk-action-no'); no.textContent='Not now';
+    box.appendChild(yes); box.appendChild(no);
+    var bub=aEl.querySelector('.bub'); aEl.insertBefore(box,bub||null); body.scrollTop=body.scrollHeight;
+    function settle(text){ yes.parentNode&&box.removeChild(yes); no.parentNode&&box.removeChild(no); t.textContent=text; }
+    no.onclick=function(){ actTrack(act,'declined'); settle('Not saved.'); };
+    yes.onclick=function(){
+      yes.disabled=true; no.disabled=true; actTrack(act,'confirmed');
+      var args={}, k; for(k in act.args){ args[k]=act.args[k]; }
+      if(act.name==='map.save_search'){ var snap=actSnapshot()||{mode:'open',filters:{}}; args.mode=snap.mode==='recompete'?'recompete':'open'; args.filters=snap.filters||{}; }
+      var route=act.name.replace(/^map[.]/,'');
+      actPost(route,args,act.id).then(function(res){
+        var ok=!!(res.d&&res.d.ok); actTrack(act,ok?'saved':'failed'); settle(actResultText(res));
+        var tg=res.d&&res.d.target;
+        if(ok&&tg&&typeof tg.href==='string'&&tg.href.charAt(0)==='/'&&tg.href.charAt(1)!=='/'){ box.appendChild(document.createTextNode(' · ')); var lk=document.createElement('a'); lk.href=tg.href; lk.textContent='Open'; lk.setAttribute('data-testid','amk-action-link'); box.appendChild(lk); }
+        // Undo (10 s) only where the route has an exact inverse: a NEW pursuit can be removed by its id.
+        if(ok&&!res.d.already&&act.name==='map.add_to_pursuits'&&tg&&typeof tg.id==='string'&&ACT_UUID.test(tg.id)){
+          box.appendChild(document.createTextNode(' · ')); var u=document.createElement('button'); u.type='button'; u.className='amk-actundo'; u.setAttribute('data-testid','amk-action-undo'); u.textContent='Undo'; box.appendChild(u);
+          var timer=setTimeout(function(){ if(u.parentNode) u.parentNode.removeChild(u); },10000);
+          u.onclick=function(){ clearTimeout(timer); u.disabled=true; actPost('remove_from_pursuits',{pursuit_id:tg.id},act.id+'-undo').then(function(r2){ actTrack(act,(r2.d&&r2.d.ok)?'undone':'undo_failed'); u.textContent=(r2.d&&r2.d.ok)?'Undone':'Couldn’t undo'; }); };
+        }
+      });
+    };
+  }
+  function actSnapshot(){ try{ if(typeof window.__mapSnapshot==='function') return window.__mapSnapshot(); }catch(e){} return null; }
+  function actStateName(st){ var n=window.__STATE_NAMES; return (n&&n[st])||st; }
+  function actDescribe(act){ var a=act.args, parts=[], k;
+    if(act.name==='map.go_to') return a.national?'Showing the whole country':('Zoomed to '+actStateName(a.state));
+    if(act.name==='map.open_record') return 'Opened the opportunity';
+    if(act.name==='map.set_horizons'){ if(a.isolate) return 'Showing '+({open:'Open now',recompete:'Coming back',forecast:'Coming soon'}[a.isolate]); return 'Changed what the map shows'; }
+    if(a.q) parts.push('"'+a.q+'"');
+    if(a.filters){ for(k in a.filters){ parts.push(k==='state'?a.filters[k].split(',').map(actStateName).join(', '):a.filters[k]); } }
+    if(a.mode==='recompete') parts.push('Coming back');
+    return parts.length?('Filtered to '+parts.join(' · ')):'Changed your view';
+  }
+  function actRun(act){
+    var a=act.args;
+    if(act.name==='map.apply_view'||act.name==='map.search'){
+      if(typeof window.__applySavedSearch!=='function') return false;
+      var snap=actSnapshot()||{mode:'open',filters:{}}, base=(a.replace?{}:(snap.filters||{})), f={}, k;
+      for(k in base){ f[k]=base[k]; }
+      if(a.filters){ for(k in a.filters){ f[k]=a.filters[k]; } }
+      if(a.q!=null) f.q=a.q;
+      if(a.horizons){ var h=f.horizons||{open:true,recompete:false,forecast:false}, nh={open:h.open,recompete:h.recompete,forecast:h.forecast}; for(k in a.horizons){ nh[k]=a.horizons[k]; } f.horizons=nh; }
+      window.__applySavedSearch({mode:a.mode||snap.mode||'open',filters:f}); return true;
+    }
+    if(act.name==='map.set_horizons'){
+      if(a.isolate){ if(typeof window.__isolateHorizon!=='function') return false; window.__isolateHorizon(a.isolate); return true; }
+      if(typeof window.toggleHorizon!=='function') return false; var cur=window.__horizons||{};
+      for(var i=0;i<ACT_HZ.length;i++){ var hz=ACT_HZ[i]; if(a[hz]==null) continue; var have=(hz==='open')?cur.open!==false:!!cur[hz]; if(have!==a[hz]) window.toggleHorizon(hz); }
+      return true;
+    }
+    if(act.name==='map.go_to'){
+      if(a.national){ if(typeof window.__mapNationalView!=='function') return false; window.__mapNationalView(); return true; }
+      var c=(window.__STATE_CENTROIDS||{})[a.state]; if(!c||typeof window.__applySavedSearch!=='function') return false;
+      var s2=actSnapshot()||{mode:'open',filters:{}}; var d=(a.state==='AK')?9:3.2;
+      window.__applySavedSearch({mode:s2.mode||'open',filters:s2.filters||{},bbox:{s:c[0]-d,n:c[0]+d,w:c[1]-d*1.4,e:c[1]+d*1.4}}); return true;
+    }
+    if(act.name==='map.open_record'){ if(typeof window.openOppDrawer!=='function') return false; window.openOppDrawer(a.notice_id); return true; }
+    return false;
+  }
+  function actTrack(act,outcome){ try{ if(window.__track) window.__track('tool_use','ask_mindy_action',{name:act?act.name:'unknown',outcome:outcome}); }catch(e){} }
+  function actNote(aEl,text,undoFn){
+    var n=document.createElement('div'); n.className='amk-actnote'; n.setAttribute('data-testid','amk-action-note'); n.setAttribute('role','status');
+    var t=document.createElement('span'); t.textContent=text; n.appendChild(t);
+    var b=document.createElement('span'); b.className='amk-actbeta'; b.textContent='Beta'; n.appendChild(document.createTextNode(' · ')); n.appendChild(b);
+    if(undoFn){ n.appendChild(document.createTextNode(' · ')); var u=document.createElement('button'); u.type='button'; u.className='amk-actundo'; u.setAttribute('data-testid','amk-action-undo'); u.textContent='Undo';
+      u.onclick=function(){ undoFn(); u.disabled=true; u.textContent='Undone'; actUndo=null; }; n.appendChild(u); }
+    var bub=aEl.querySelector('.bub'); aEl.insertBefore(n,bub||null); body.scrollTop=body.scrollHeight; return n;
+  }
+  function actFlush(aEl,turn,evidence){
+    var list=turn.pending||[]; turn.pending=[];
+    for(var i=0;i<list.length;i++){ var act=list[i];
+      if(String(evidence||'').indexOf(act.args.notice_id)<0){ actTrack(act,'rejected:unsourced'); continue; }
+      if(ACT_WRITES[act.name]){ actWrite(act,aEl); continue; }
+      if(!actRun(act)){ actTrack(act,'rejected:unavailable'); continue; }
+      actTrack(act,'ran'); actNote(aEl,actDescribe(act),null); }
+  }
+  function onAction(ev,aEl,turn){
+    if(!actionsOn||oppCtx) return;
+    if(turn.count>=3){ actTrack(null,'rejected:max'); return; }
+    var act=actValidate(ev);
+    if(!act){ actTrack(ev&&typeof ev.name==='string'?{name:String(ev.name).slice(0,60)}:null,'rejected:invalid'); if(!turn.noted){ turn.noted=true; actNote(aEl,'Mindy suggested a change this page can’t make',null); } return; }
+    turn.count++;
+    // Opening a record waits for the answer to finish: the id must appear in what this turn actually returned
+    // (the answer text or its sources), so an id from a prompt-injected page is never opened (Eric, 2026-11-27).
+    if(act.name==='map.open_record'||(act.name==='map.add_to_pursuits'&&act.args.notice_id)){ (turn.pending||(turn.pending=[])).push(act); return; }
+    if(ACT_WRITES[act.name]){ actWrite(act,aEl); return; }
+    // Undo for this action only: the previous action's Undo is withdrawn (one level).
+    if(actUndo&&actUndo.btn){ actUndo.btn.disabled=true; actUndo.btn.style.display='none'; }
+    var snap=(act.name==='map.open_record')?null:actSnapshot();
+    if(!actRun(act)){ actTrack(act,'rejected:unavailable'); actNote(aEl,'Mindy suggested a change this page can’t make',null); return; }
+    actTrack(act,'ran');
+    var note=actNote(aEl,actDescribe(act),snap?function(){ try{ window.__applySavedSearch(snap); actTrack(act,'undone'); }catch(e){} }:null);
+    actUndo={btn:note.querySelector('.amk-actundo')};
   }
   // ── REPORT PANE. A document Mindy just saved (create_document) opens HERE, in the chat, as a readable page:
   // no download needed. Reuses the Vault: GET /api/app/vault/documents/preview renders the stored DocModel with
@@ -11494,6 +11784,34 @@ const ASK_MINDY_JS = `<script>(function(){
       else if(/^mailto:/i.test(href)){ try{ window.location.href=href; }catch(e){} }
     },true);
   }
+  // Keyboard reading. A click inside the report moves focus INTO the frame, whose document is sized to its
+  // content and does not scroll, so Page Down / End / arrows did nothing (Claude Local, production retest
+  // 2026-11-25). The frame is same-origin, so the PARENT listens on its document and scrolls the pane body,
+  // the real scroller. No script runs in the frame; the sandbox is unchanged.
+  var REP_LINE_PX=40;
+  function repKeys(E,body){
+    var d=null; try{ d=E.f.contentDocument; }catch(e){ d=null; }
+    if(!d||d.__amkKeys) return; d.__amkKeys=1;
+    d.addEventListener('keydown',function(ev){
+      if(!E.f.classList.contains('fit')) return; // not fitted: the frame's own document scrolls natively
+      if(ev.defaultPrevented||ev.ctrlKey||ev.metaKey||ev.altKey) return;
+      var t=ev.target, tag=t&&t.tagName?String(t.tagName).toLowerCase():'';
+      if(tag==='input'||tag==='textarea'||tag==='select'||(t&&t.isContentEditable)) return;
+      var page=Math.max(REP_LINE_PX,Math.round(body.clientHeight*0.875)), max=body.scrollHeight-body.clientHeight, to=null;
+      switch(ev.key){
+        case 'ArrowDown': to=body.scrollTop+REP_LINE_PX; break;
+        case 'ArrowUp': to=body.scrollTop-REP_LINE_PX; break;
+        case 'PageDown': to=body.scrollTop+page; break;
+        case 'PageUp': to=body.scrollTop-page; break;
+        case ' ': case 'Spacebar': to=body.scrollTop+(ev.shiftKey?-page:page); break;
+        case 'Home': to=0; break;
+        case 'End': to=max; break;
+      }
+      if(to===null) return;
+      ev.preventDefault();
+      body.scrollTop=Math.max(0,Math.min(max,to));
+    },true);
+  }
   function repFit(E){
     var d=null; try{ d=E.f.contentDocument; }catch(e){ d=null; }
     if(!d||!d.documentElement||!d.body||!d.body.firstChild) return false;
@@ -11519,7 +11837,7 @@ const ASK_MINDY_JS = `<script>(function(){
     var body=el.querySelector('.amk-rep-body'); repEls.body=body;
     repEls.f.addEventListener('load',function(){
       if(repEls.f.style.visibility!=='visible') return;
-      var fitted=repFit(repEls); repLinks(repEls); body.scrollTop=0;
+      var fitted=repFit(repEls); repLinks(repEls); repKeys(repEls,body); body.scrollTop=0;
       if(repIsOpen()){ try{ (fitted?body:repEls.f).focus(); }catch(e){} }
     });
     // A width change reflows the report, so its height is measured again.
@@ -11656,23 +11974,37 @@ const ASK_MINDY_JS = `<script>(function(){
       },function(){ fail('Your report could not be loaded. Check your connection and try again.',true); });
     try{ if(window.__track) window.__track('tool_use','map_market_report_reopen',{}); }catch(e){}
   }
+  // "Research · Beta" tag (research mode for everyone, labelled beta): from the research mode event of this turn (type mode, mode research,
+  // beta true, with a label), or from the research_mode label History returns. Server text shown as plain text, bounded.
+  // (literal, not a var: renderConversation can run at boot before a var assignment below has executed)
+  function betaLabel(raw){ var BETA_DEFAULT='Research · Beta'; if(typeof raw!=='string') return BETA_DEFAULT; var o=''; for(var i=0;i<raw.length;i++){ var c=raw.charCodeAt(i); o+=(c<32||c===127)?' ':raw.charAt(i); }
+    o=o.replace(/ +/g,' ').trim(); return (o&&o.length<=40)?o:BETA_DEFAULT; }
+  function betaTag(el,label){ if(!el||!label||el.querySelector('.amk-beta')) return; var t=document.createElement('span'); t.className='amk-beta'; t.setAttribute('data-testid','amk-beta-tag'); t.textContent=label; el.insertBefore(t,el.firstChild); }
   function addMsg(role, text){ var d=document.createElement('div'); d.className='amk-msg '+(role==='user'?'u':'a'); d.innerHTML=(role==='user')?esc(text):('<div class="bub"></div>'); if(role!=='user'){ var bb=d.querySelector('.bub'); if(text) paint(bb,text); else bb.textContent=''; } body.appendChild(d); body.scrollTop=body.scrollHeight; return d; }
   function upsell(){ body.innerHTML='<div class="amk-up"><h4>\\ud83d\\udd12 Ask Mindy is a Pro feature</h4><p>Get grounded, real-data answers on set-asides, agencies, opportunities, teaming and proposals \\u2014 with sources.</p><a href="/market-intelligence">Upgrade to Pro</a></div>'; }
   // opts (card chat only): turnId = reuse this question's id (retry/reopen); replay = only fetch the saved answer.
   function ask(q,opts){
     opts=opts||{};
-    q=(q||'').trim(); if(!q||busy)return;
+    var typed=(q||'').trim(); q=typed;
+    // A pasted screenshot with nothing typed still asks a plain question about it.
+    if(!q&&!busy&&!opts.turnId&&!oppCtx&&amkShots&&amkShots.count()) q=SHOT_DEFAULT;
+    if(!q||busy)return;
     var t=tok(), em=email();
     // Card chat resumes the same question after sign-in (the card and its thread stay open); view mode keeps
     // its existing reload.
     if(!t||!em){ var _cq=q, _card=!!oppCtx; if(window.openSignInModal){window.openSignInModal(_card?'ask Mindy about this opportunity':'ask Mindy',function(){ if(_card&&oppCtx){ ask(_cq); } else location.reload(); });}else{location.href='/app?next='+encodeURIComponent(location.pathname);} return; }
     // clear the greeting on first ask
+    // The route caps the images' base64 in total: refuse plainly before anything is sent; text and screenshots stay.
+    if(!oppCtx&&!opts.turnId&&amkShots&&amkShots.count()&&!amkShots.fits()){ amkShots.tooBig(); return; }
     if(body.querySelector('.amk-empty'))body.innerHTML='';
+    // Screenshots go with THIS question only (never a retry or a card turn); the transcript keeps a marker.
+    var shotsAtSend=(!oppCtx&&!opts.turnId&&amkShots)?amkShots.take():[];
+    var shown=shotsAtSend.length?(q+' '+shotMarker(shotsAtSend.length)):q;
     if(input&&!opts.turnId){ input.value=''; input.style.height='auto'; }
     // A card question is recorded as pending (with its turn id) before it is sent.
     var turnId=null, polls=opts.polls||0;
     if(oppCtx){ turnId=opts.turnId||newTurnId(); pendingTurn={turnId:turnId,q:q}; saveCard(); }
-    addMsg('user', q);
+    addMsg('user', shown);
     var aEl=addMsg('assistant',''); var bub=aEl.querySelector('.bub');
     bub.innerHTML='<span class="amk-typing"><i></i><i></i><i></i></span>';
     busy=true; if(send)send.disabled=true; clearFollowups(); hideHistory();
@@ -11681,12 +12013,53 @@ const ASK_MINDY_JS = `<script>(function(){
     if(ctrl){ stopBtn=document.createElement('button'); stopBtn.type='button'; stopBtn.className='amk-stop'; stopBtn.setAttribute('data-testid','amk-stop'); stopBtn.textContent='Stop';
       stopBtn.onclick=function(){ stopped=true; try{ ctrl.abort(); }catch(e){} }; aEl.appendChild(stopBtn); }
     function stoppedEnd(){
-      if(acc){ paint(bub,acc); history.push({role:'user',content:q}); history.push(ledger?{role:'assistant',content:acc,sources:ledger}:{role:'assistant',content:acc}); }
+      if(acc){ paint(bub,acc); history.push({role:'user',content:shown}); history.push(ledger?{role:'assistant',content:acc,sources:ledger}:{role:'assistant',content:acc}); if(turnTag) history[history.length-1].tag=turnTag; }
       else bub.textContent='';
       var sn=document.createElement('div'); sn.className='amk-credits'; sn.setAttribute('data-testid','amk-stopped'); sn.textContent=acc?'You stopped this answer, so it may be incomplete.':'You stopped this answer.'; aEl.appendChild(sn);
       saveView(); release(); body.scrollTop=body.scrollHeight;
     }
     var acc='', started=false, gotDone=false, gotError=false, ledger=null, turnDoc=false, turnFiles=null, turnReport=null;
+    var actTurn={count:0,noted:false};
+    // Research steps ('progress' events): a calm panel, not warnings. Timer, current step, count, Show steps, and a
+    // "still working" line after 20 s of quiet. Collapses to "Researched · N steps · m:ss" once the answer starts
+    // (or the turn ends any other way). A phase ('writing'|'checking') is the headline, not a step.
+    var rp=null, turnTag=null;
+    function rpFmt(ms){ var s=Math.max(0,Math.floor(ms/1000)); var r=s%60; return Math.floor(s/60)+':'+(r<10?'0':'')+r; }
+    function rpCount(n){ return n===1?'1 step':(n+' steps'); }
+    function rpList(){ var ol=rp.el.querySelector('.amk-rp-steps'); if(!ol)return; ol.innerHTML='';
+      rp.steps.forEach(function(s){ var li=document.createElement('li'); li.textContent=s.text+(s.count>1?(' ×'+s.count):''); ol.appendChild(li); }); }
+    function rpPaint(){ if(!rp||rp.done)return; var now=Date.now();
+      rp.el.querySelector('.amk-rp-time').textContent=rpFmt(now-rp.start);
+      rp.el.querySelector('.amk-rp-n').textContent=rp.total?(' · '+rpCount(rp.total)):'';
+      rp.el.querySelector('.amk-rp-cur').textContent=rp.headline||(rp.steps.length?rp.steps[rp.steps.length-1].text:'Starting research.');
+      var still=rp.el.querySelector('.amk-rp-still'); still.hidden=(now-rp.last<20000); }
+    function rpStep(ev){
+      var text=String(ev.message||'').replace(/ +/g,' ').trim().slice(0,200); if(!text)return;
+      if(!rp){
+        var el=document.createElement('div'); el.className='amk-rp'; el.setAttribute('role','status'); el.setAttribute('aria-live','polite'); el.setAttribute('data-testid','amk-research');
+        el.innerHTML='<div class="amk-rp-hd"><span class="amk-rp-spin" aria-hidden="true"></span><b>Researching</b> <span class="amk-rp-tag"></span><span class="amk-rp-time">0:00</span><span class="amk-rp-n"></span></div><div class="amk-rp-cur"></div><div class="amk-rp-still" hidden>Still working. Research answers can take a few minutes.</div><button type="button" class="amk-rp-tog" aria-expanded="false" data-testid="amk-research-toggle">Show steps</button><ol class="amk-rp-steps" hidden></ol>';
+        aEl.insertBefore(el,bub); if(!started) bub.style.display='none';
+        rp={steps:[],total:0,headline:null,start:Date.now(),last:Date.now(),el:el,done:false,timer:null};
+        var tog=el.querySelector('.amk-rp-tog'), ol=el.querySelector('.amk-rp-steps');
+        tog.onclick=function(){ var open=ol.hidden; ol.hidden=!open; tog.textContent=open?'Hide steps':'Show steps'; tog.setAttribute('aria-expanded',open?'true':'false'); if(open) rpList(); };
+        rp.timer=setInterval(rpPaint,1000);
+        if(turnTag){ var rt=el.querySelector('.amk-rp-tag'); rt.textContent=turnTag; rt.setAttribute('data-testid','amk-research-tag'); }
+      }
+      if(rp.done)return;
+      rp.last=Date.now();
+      if(ev.phase==='writing'||ev.phase==='checking'){ rp.headline=text; }
+      else { rp.headline=null; rp.total++; var hit=null; for(var i=0;i<rp.steps.length;i++){ if(rp.steps[i].text===text){ hit=rp.steps[i]; break; } }
+        if(hit) hit.count++; else { rp.steps.push({text:text,count:1}); if(rp.steps.length>40) rp.steps.shift(); } }
+      if(!rp.el.querySelector('.amk-rp-steps').hidden) rpList();
+      rpPaint(); body.scrollTop=body.scrollHeight;
+    }
+    function rpDone(){ if(!rp||rp.done)return; rp.done=true; if(rp.timer) clearInterval(rp.timer); bub.style.display='';
+      var ol0=rp.el.querySelector('.amk-rp-steps'), tg0=rp.el.querySelector('.amk-rp-tog'); if(ol0) ol0.hidden=true; if(tg0){ tg0.textContent='Show steps'; tg0.setAttribute('aria-expanded','false'); }
+      rp.el.className='amk-rp amk-rp-sum'; rp.el.removeAttribute('aria-live'); rp.el.setAttribute('data-testid','amk-research-summary');
+      var hd=rp.el.querySelector('.amk-rp-hd'); hd.textContent='Researched · '+rpCount(rp.total)+' · '+rpFmt(Date.now()-rp.start);
+      var c=rp.el.querySelector('.amk-rp-cur'); if(c&&c.parentNode) c.parentNode.removeChild(c);
+      var st=rp.el.querySelector('.amk-rp-still'); if(st&&st.parentNode) st.parentNode.removeChild(st);
+      if(!rp.total&&rp.el.parentNode) rp.el.parentNode.removeChild(rp.el); }
     // Product decision 2026-11-19: Map and Ask Mindy are separate tools. Send the customer's words
     // only — never inject map viewport filters/geography into Ask. Card chat still sends notice
     // context (below); that is an opportunity record, not the map view.
@@ -11696,12 +12069,13 @@ const ASK_MINDY_JS = `<script>(function(){
     // source ledger saved with the report is what lets "revise it" resolve to THAT document. It rides along as
     // the oldest assistant turn (the server verifies the signature and the owner; a forged one is ignored).
     if(!oppCtx&&!history.length&&rep&&rep.ledger&&rep.email===em){ history.push({role:'assistant',content:'I saved your report'+(rep.title?' "'+rep.title+'"':'')+' to your Vault.',sources:rep.ledger}); }
-    var payload={email:em,message:sendMsg,sessionId:sessionId||undefined,history:history.slice(-8).map(function(h){ return h.sources?{role:h.role,content:h.content,sources:h.sources}:{role:h.role,content:h.content}; }),display:'narrow_panel'};
+    var payload={email:em,message:sendMsg,sessionId:sessionId||undefined,history:history.slice(-8).map(function(h){ return h.sources?{role:h.role,content:h.content,sources:h.sources}:{role:h.role,content:h.content}; }),display:'narrow_panel',surface:'map'};
+    if(shotsAtSend.length) payload.images=shotsAtSend.map(function(x){ return {media_type:x.media_type,data:x.data}; });
     if(attAtSend){ payload.context={kind:'opportunity',notice_id:attAtSend.id}; try{ if(window.__track) window.__track('tool_use','ask_mindy_with_notice',{}); }catch(e){} }
     if(oppCtx){ payload.context={kind:'opportunity',notice_id:oppCtx.id}; payload.turn_id=turnId; if(opts.replay)payload.replay_only=true;
       if(!opts.turnId){ try{ if(window.__track) window.__track('tool_use','card_chat_ask',{turn:Math.floor(history.length/2)+1}); }catch(e){} } }
     var cardAtSend=oppCtx;
-    function release(){ busy=false; if(send)send.disabled=false; if(stopBtn&&stopBtn.parentNode)stopBtn.parentNode.removeChild(stopBtn); stopBtn=null; }
+    function release(){ rpDone(); busy=false; if(send)send.disabled=false; if(stopBtn&&stopBtn.parentNode)stopBtn.parentNode.removeChild(stopBtn); stopBtn=null; }
     // Drop the question's two bubbles (it is about to be re-asked with the same turn id).
     function dropBubbles(){ var u=aEl.previousSibling; if(aEl.parentNode)aEl.parentNode.removeChild(aEl); if(u&&u.classList&&u.classList.contains('u')&&u.parentNode)u.parentNode.removeChild(u); }
     // The answer did not arrive: offer to get it. Same turn id, so an answer the server already finished
@@ -11710,6 +12084,11 @@ const ASK_MINDY_JS = `<script>(function(){
       b.onclick=function(){ if(busy||oppCtx!==cardAtSend)return; dropBubbles(); ask(q,{turnId:turnId}); }; w.appendChild(b); aEl.appendChild(w); }
     fetch('/api/app/chat',{method:'POST',headers:withWorkspace({'Content-Type':'application/json','x-mi-auth-token':t,'x-user-email':em}),body:JSON.stringify(payload),signal:ctrl?ctrl.signal:undefined})
       .then(function(r){
+        // The server would not read the screenshot(s): nothing was answered. Give back the typed text and the
+        // screenshots with a plain note.
+        if(shotsAtSend.length&&(r.status===400||r.status===413||r.status===415||r.status===422)){ var back=shotsAtSend; shotsAtSend=[]; dropBubbles(); if(input){ input.value=typed; } release();
+          return r.json().then(function(d){ return d; },function(){ return null; }).then(function(d){ var m=(d&&typeof d.message==='string')?d.message.replace(/ +/g,' ').trim():''; amkShots.restore(back,(m&&m.length<=300)?m:''); return null; }); }
+        if(shotsAtSend.length){ amkShots.release(shotsAtSend); shotsAtSend=[]; }
         if(r.status===403){ if(turnId){ pendingTurn=null; saveCard(); } upsell(); release(); return null; }
         if(r.status===402){ if(turnId){ pendingTurn=null; saveCard(); } r.json().then(function(d){ creditsWall(bub,d||{}); },function(){ creditsWall(bub,{}); }); release(); return null; }
         // Charge once per question: the same question is still being answered by another request (a second
@@ -11734,16 +12113,20 @@ const ASK_MINDY_JS = `<script>(function(){
           parts.forEach(function(p){ var line=p.split('\\n').filter(function(l){return l.indexOf('data:')===0;}).map(function(l){return l.slice(5).trim();}).join(''); if(!line)return;
             var ev; try{ ev=JSON.parse(line); }catch(e){ return; }
             if(ev.type==='session'){ sessionId=ev.sessionId||sessionId; }
+            else if(ev.type==='mode'&&ev.mode==='research'&&ev.beta===true){ turnTag=betaLabel(ev.label); betaTag(aEl,turnTag);
+              if(rp&&!rp.done){ var rt=rp.el.querySelector('.amk-rp-tag'); if(rt){ rt.textContent=turnTag; rt.setAttribute('data-testid','amk-research-tag'); } } }
+            else if(ev.type==='action'){ try{ onAction(ev,aEl,actTurn); }catch(e){} }
             else if(ev.type==='sources'){ ledger=(ev.ledger&&typeof ev.ledger==='object')?ev.ledger:null; if(turnDoc&&rep&&ledger){ rep.ledger=ledger; repWrite(); } }
             // create_document saved a document: a card under the answer and the report opens in the pane (view mode only).
             else if(ev.type==='deliverables'&&Array.isArray(ev.files)&&!oppCtx){ turnDoc=true; turnFiles=ev.files; try{ repOnDeliverables(ev.files,aEl); }catch(e){} }
             else if(ev.type==='market_report'&&ev.html&&!oppCtx){ turnDoc=true; turnReport=savedReport({id:ev.report_id,title:ev.title}); try{ repOnMarketReport(ev,aEl); }catch(e){} }
-            else if(ev.type==='token'){ if(!started){ bub.textContent=''; started=true; } acc+=(ev.content||''); paint(bub,acc); body.scrollTop=body.scrollHeight; }
+            else if(ev.type==='token'){ if(!started){ bub.textContent=''; started=true; rpDone(); } acc+=(ev.content||''); paint(bub,acc); body.scrollTop=body.scrollHeight; }
             // citations event is now always empty (RAG corpus removed 2026-08-02) \\u2014 ignored.
             else if(ev.type==='error'){ gotError=true; if(!started)bub.textContent=safeErr(ev.message); }
             // Server status lines (a data source unavailable, a lookup failed, a long step under way): shown under
             // the answer, as the old chat does, instead of only typing dots.
-            else if((ev.type==='notice'||ev.type==='progress')&&typeof ev.message==='string'&&ev.message.trim()){ addNotice(aEl,ev.message); }
+            else if(ev.type==='progress'&&typeof ev.message==='string'){ rpStep(ev); }
+            else if(ev.type==='notice'&&typeof ev.message==='string'&&ev.message.trim()){ addNotice(aEl,ev.message); }
             else if(ev.type==='done'){ gotDone=true; }
             else if(ev.type==='replayed'){ var rd=document.createElement('div'); rd.className='amk-credits'; rd.textContent='Saved answer \\u00b7 no extra credits'; aEl.appendChild(rd); }
             else if(ev.type==='citations'&&oppCtx&&Array.isArray(ev.sources)&&ev.sources.length){ var sd=document.createElement('div'); sd.className='amk-src'; var s0=ev.sources[0]; sd.innerHTML='Source: '+(s0.url?'<a href="'+esc(s0.url)+'" target="_blank" rel="noopener">'+esc(s0.title||'SAM.gov notice')+'</a>':esc(s0.title||'SAM.gov notice')); aEl.appendChild(sd); }
@@ -11752,14 +12135,16 @@ const ASK_MINDY_JS = `<script>(function(){
           return pump();
         }); }
         function finish(){
+          try{ if(actTurn.pending&&actTurn.pending.length) actFlush(aEl,actTurn,acc+' '+(ledger?JSON.stringify(ledger):'')+' '+(turnReport?JSON.stringify(turnReport):'')); }catch(e){}
           // Card chat: only a FULLY received answer clears the pending question. A stream that ended without
           // its done event lost the connection: keep the turn id so "Get the answer" (or reopening the card)
           // fetches it without a second charge.
           if(turnId&&!gotDone){ if(oppCtx===cardAtSend){ offerRetry(acc?'The connection dropped before the answer finished.':'The connection dropped before the answer arrived.'); } release(); body.scrollTop=body.scrollHeight; return; }
           if(turnId&&oppCtx===cardAtSend){ pendingTurn=null; }
           if(!started&&!acc&&!gotError)bub.textContent='Mindy had no answer for that \\u2014 try rephrasing.';
-          if(!(turnId&&gotError&&!acc)){ history.push({role:'user',content:q}); history.push(ledger?{role:'assistant',content:acc,sources:ledger}:{role:'assistant',content:acc}); }
+          if(!(turnId&&gotError&&!acc)){ history.push({role:'user',content:shown}); history.push(ledger?{role:'assistant',content:acc,sources:ledger}:{role:'assistant',content:acc}); }
           if(turnFiles&&history.length&&history[history.length-1].role==='assistant') history[history.length-1].files=turnFiles;
+          if(turnTag&&history.length&&history[history.length-1].role==='assistant') history[history.length-1].tag=turnTag;
           if(turnReport&&history.length&&history[history.length-1].role==='assistant') history[history.length-1].report=turnReport;
           saveCard(); saveView(); if(acc)paint(bub,acc);
           // Follow-ups only after a real outcome (report/files) or a finished Q&A answer — never mid-gather.

@@ -28,8 +28,16 @@ function builder(table: string) {
     select: () => b,
     eq: (col: string, v: unknown) => { preds.push((r) => readPath(r, col) === v); return b; },
     ilike: (col: string, pat: string) => {
-      const needle = pat.replace(/%/g, '').toLowerCase();
-      preds.push((r) => String(r[col] ?? '').toLowerCase().includes(needle));
+      const re = new RegExp(`^${pat.split('%').map((x) => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('.*')}$`, 'is');
+      preds.push((r) => re.test(String(r[col] ?? '')));
+      return b;
+    },
+    // PostgREST imatch with POSIX \m \M word boundaries (entity-local-fallback localNameFilters).
+    filter: (col: string, op: string, val: string) => {
+      if (op === 'imatch') {
+        const re = new RegExp(val.replace(/\\m/g, '\\b').replace(/\\M/g, '\\b').replace(/\[\^\[:alnum:\]\]\+/g, '[^A-Za-z0-9]+'), 'i');
+        preds.push((r) => re.test(String(r[col] ?? '')));
+      }
       return b;
     },
     order: (col: string, o?: { ascending?: boolean }) => { order = { col, asc: o?.ascending !== false }; return b; },

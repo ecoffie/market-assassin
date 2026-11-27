@@ -43,6 +43,7 @@ function boot(replies: Reply[]) {
   w.fetch = vi.fn((url: string, init: { body?: string; signal?: AbortSignal }) => {
     let p: Promise<unknown>;
     if (url.startsWith('/api/app/vault/doc-access')) p = Promise.resolve({ ok: true, status: 200, json: async () => ({ uploads: false, generate: false }) });
+    else if (url.startsWith('/api/app/chat/capabilities')) p = Promise.resolve({ ok: true, status: 200, json: async () => ({ screenshots: false }) });
     else if (url.startsWith('/api/app/chat/suggestions')) p = Promise.resolve({ ok: true, status: 200, json: async () => ({ suggestions: [] }) });
     else {
       chatBodies.push(JSON.parse(init.body || '{}'));

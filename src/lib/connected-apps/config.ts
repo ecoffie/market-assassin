@@ -120,13 +120,15 @@ export function redirectUri(env: Env = process.env): string {
  * rotating an unrelated secret must never invalidate every stored connection or let states signed under one
  * purpose verify under another. null = refuse to run (routes answer 503 not_configured).
  */
-export interface ConnectedAppsSecrets { stateSecret: string; tokenKey: { secret: string; salt: string } }
+export interface ConnectedAppsSecrets { stateSecret: string; tokenKey: { secret: string; salt: string; id: string } }
 const MIN_SECRET_LEN = 32;
 export function connectedAppsSecrets(env: Env = process.env): ConnectedAppsSecrets | null {
   const state = env.CONNECTED_APPS_STATE_SECRET || '';
   const enc = env.CONNECTED_APPS_TOKEN_ENC_KEY || '';
   if (state.length < MIN_SECRET_LEN || enc.length < MIN_SECRET_LEN || state === enc) return null;
-  return { stateSecret: state, tokenKey: { secret: enc, salt: 'mindy-connected-apps-v1' } };
+  // Key id travels in every stored ciphertext, so the key can be rotated later (decrypt refuses another id).
+  const id = /^[A-Za-z0-9_-]{1,32}$/.test(env.CONNECTED_APPS_TOKEN_KEY_ID || '') ? env.CONNECTED_APPS_TOKEN_KEY_ID! : 'k1';
+  return { stateSecret: state, tokenKey: { secret: enc, salt: 'mindy-connected-apps-v1', id } };
 }
 
 /** Off unless CONNECTED_APPS=true and the user is on CONNECTED_APPS_ALLOWLIST (comma-separated, or `*`). */
