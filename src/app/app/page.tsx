@@ -7,6 +7,7 @@ import { encodePendingNext, oauthOnboardingRedirect, onboardingRedirectPath, PEN
 import { useSearchParams } from 'next/navigation';
 import UnifiedSidebar, { type AppPanel, type AppTier } from '@/components/app/UnifiedSidebar';
 import AppNavTabs from '@/components/app/AppNavTabs';
+import AskMindyFab from '@/components/app/AskMindyFab';
 import GlobalLookup from '@/components/app/GlobalLookup';
 import ProductTour from '@/components/app/ProductTour';
 import PanelContainer from '@/components/app/panels';
@@ -1614,6 +1615,11 @@ function AppDashboard() {
           panelContext={panelContext}
         />
       </main>
+
+      {/* Floating Ask Mindy (owner, 2026-11-27): replaces the public Get help button inside /app. */}
+      {email && (
+        <AskMindyFab activePanel={activePanel} isMapShell={isMapShell} onOpen={() => handlePanelChange('chat')} />
+      )}
 
       {/* Mobile-first voice capture FAB. Visible on small screens
           only — desktop users use the in-panel "Add by voice" button
