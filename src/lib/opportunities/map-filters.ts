@@ -6,7 +6,7 @@
 import { SET_GROUPS } from './map-data';
 import { multiAgency, agencyIlikeConds, agencyOrExpr } from './agency-match';
 import { buildSearchOr } from '@/lib/mi-dashboard/search';
-import { resolveQueryIntent, setAsideOrExpr } from '@/lib/search/query-intent';
+import { resolveQueryIntent, setAsideOrExpr, SET_ASIDE_CODES } from '@/lib/search/query-intent';
 import { hierarchyPathConds, resolveHierarchySubAgency } from './hierarchy-sub-agency';
 import { normalizeStateCode } from '@/lib/utils/us-states';
 import { SAM_DEPARTMENT_TIERS, type SapBuyerTier } from './sap-friendly-agencies';
@@ -194,6 +194,44 @@ export function stateOrExpr(codes: string[]): string | null {
   return codes.flatMap((st) => [`pop_state.eq.${st}`, `office_address->>state.eq.${st}`]).join(',');
 }
 
+
+/**
+ * Stored map filters keep the set-aside choice in TWO fields: `setAside` (the top-bar control) and
+ * `setAsideMulti` (the Filters panel checkboxes). The live map MERGES them into one `setAside=` URL param
+ * (opportunity-map/route.ts `_merge(FILT.setAside, FILT.setAsideMulti)`), but every server path that
+ * evaluates a SAVED search — the alert cron, search-delivery-status, the saved-searches API, the watchlist
+ * snapshot and brief — read only `setAside`. So a search saved with "SDVOSB" chosen in the Filters panel
+ * got UNFILTERED alerts (2026-11-22). Wrap a stored-filter getter with this so `setAside` is the same
+ * merge the map applies. Values may be strings (comma lists) or arrays; the result is a deduped comma list.
+ */
+/**
+ * A stored set-aside token → what the map means by it. The map's plain-English search appends LOWERCASE
+ * intent keys ('sdvosb', 'vosb', 'hubzone', '8a', …) to setAsideMulti, and SET_GROUPS keys are uppercase,
+ * so a literal lowercase token would be applied as a raw code that matches nothing — once alerts honor
+ * setAsideMulti, that would silence a search instead of filtering it. Case-insensitive group key first
+ * ('sdvosb' → 'SDVOSB', exactly like the uppercase key); otherwise the intent key's official codes.
+ */
+export function canonicalSetAsideTokens(token: string): string[] {
+  const t = token.trim();
+  if (!t) return [];
+  const group = SET_GROUPS.find((g) => g.key.toUpperCase() === t.toUpperCase());
+  if (group) return [group.key];
+  const intent = (SET_ASIDE_CODES as Record<string, string[]>)[t.toLowerCase()];
+  if (intent && t === t.toLowerCase()) return intent;
+  return [t];
+}
+
+export function withMergedSetAside(get: (k: string) => unknown): (k: string) => string | null {
+  const parts = (v: unknown): string[] =>
+    v === null || v === undefined ? [] : (Array.isArray(v) ? v : [v]).flatMap((x) => (typeof x === 'string' || typeof x === 'number' ? String(x).split(',') : [])).map((x) => x.trim()).filter(Boolean);
+  return (k: string) => {
+    if (k !== 'setAside') return get(k) as string | null;
+    const out = [...new Set([...parts(get('setAside')), ...parts(get('setAsideMulti'))].flatMap(canonicalSetAsideTokens))];
+    return out.length ? out.join(',') : null;
+  };
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function applyMapFilters(query: any, f: MapFilters) {
   const nowIso = new Date().toISOString();
   if (f.status === 'inactive') query = query.or(`active.eq.false,response_deadline.lt.${nowIso}`);
