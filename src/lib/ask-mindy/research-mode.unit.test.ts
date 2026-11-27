@@ -280,6 +280,32 @@ describe('decision, not findings (Eric, 2026-11-25)', () => {
   });
 });
 
+describe('the writing budget is exact (acceptance: 25 and 28 calls)', () => {
+  it('a 6-call step at 22 calls runs only 2; the other 4 get "Not run"; the total is 24', async () => {
+    let step = 0;
+    const create = vi.fn(async (body: { tool_choice: { type: string } }) => {
+      if (body.tool_choice.type === 'none') return msg([text('Done.')], 'end_turn');
+      step++;
+      const n = step <= 11 ? 2 : 6; // 11 steps x 2 = 22, then one step asking for 6
+      return msg(Array.from({ length: n }, (_, i) => toolUse(`s${step}-${i}`, 'find_opportunities')), 'tool_use');
+    });
+    const batches: number[] = [];
+    const r = await runResearchLoop({ ...base, client: { messages: { create } } as never, execute: async (cs) => { batches.push(cs.length); return cs.map((c) => ({ id: c.id, content: 'ok' })); } });
+    expect(batches.at(-1)).toBe(2);
+    expect(r.calls).toBe(24);
+    const final = (create.mock.calls.at(-1) as never[])[0] as { messages: Array<{ role: string; content: Array<{ content?: string }> }> };
+    const results = final.messages.filter((m) => m.role === 'user').at(-1)!.content;
+    expect(results.filter((b) => String(b.content).startsWith('Not run'))).toHaveLength(4);
+  });
+});
+
+describe('a named company is researched even when the saved profile is a different company', () => {
+  it('the mismatch is one line in Sources & coverage, never the opening', () => {
+    expect(RESEARCH_INSTRUCTIONS).toMatch(/A company named in the question is the company to research, even when it differs from the saved company profile/);
+    expect(RESEARCH_INSTRUCTIONS).toMatch(/only as one line in "Sources & coverage", never at the start of the answer/);
+  });
+});
+
 describe('prompt caching (766K input tokens on one answer)', () => {
   it('system prompt and tool definitions are cache breakpoints; exactly one moving breakpoint on the newest message; history is never mutated', async () => {
     const { client, create } = scripted([
