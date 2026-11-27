@@ -98,11 +98,11 @@ describe('/pricing with the seat switch ON (server render)', () => {
     doc = parse(render());
   });
 
-  it('shows the mockup header and footer, monthly only', () => {
+  it('shows the header, footer and the Monthly/Annual toggle', () => {
     const h = doc.querySelector('[data-testid="seat-pricing-header"]')!;
     expect(h.querySelector('h1')?.textContent).toBe('Pricing');
-    expect(h.textContent).toContain('Monthly. Annual plans include training and onboarding.');
-    expect(doc.querySelector('[aria-label="Billing period"]')).toBeNull();
+    expect(h.textContent).toContain('Pay monthly, or pay yearly and save up to 33%.');
+    expect(doc.querySelector('[aria-label="Billing period"]')).not.toBeNull();
     const foot = doc.querySelector('.seat-foot')!;
     expect(foot.textContent).toBe('Questions about a rollout: hello@getmindy.ai');
     expect(foot.querySelector('a')?.getAttribute('href')).toBe('mailto:hello@getmindy.ai');
