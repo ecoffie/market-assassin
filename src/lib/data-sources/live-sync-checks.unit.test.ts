@@ -18,7 +18,6 @@ const daysAgo = (d: number) => new Date(NOW - d * 86_400_000).toISOString();
 describe('thresholds per dataset', () => {
   it.each([
     ['sam_entities_registrations', 'sam_entities', 'synced_at', 35],
-    ['sam_opportunities_new', 'sam_opportunities', 'created_at', 2],
     ['recompete_opportunities_sync', 'recompete_opportunities', 'last_synced_at', 2],
     ['agency_forecasts_sync', 'agency_forecasts', 'last_synced_at', 7],
     ['federal_contacts_sync', 'federal_contacts', 'updated_at', 3],
@@ -77,5 +76,20 @@ describe('unknown is never fresh', () => {
     expect(route).toMatch(/v\.status === 'unreadable'\) \{\s*\n\s*stale\.push/);
     expect(route).toMatch(/v\.status === 'no_timestamp'\) \{\s*\n\s*stale\.push/);
     expect(route).toMatch(/v\.status === 'stale'\) \{\s*\n\s*stale\.push/);
+  });
+});
+
+describe('hours thresholds (Agent 4 review of #2490)', () => {
+  const hoursAgo = (h: number) => new Date(NOW - h * 3_600_000).toISOString();
+  it('sam_opportunities_new fires after 12h without a new notice, not 2 days', () => {
+    const c = check('sam_opportunities_new');
+    expect(c.staleHours).toBe(12);
+    expect(classifyLiveSync(c, { timestamp: hoursAgo(11.9) }, NOW).status).toBe('fresh');
+    const v = classifyLiveSync(c, { timestamp: hoursAgo(12.1) }, NOW);
+    expect(v).toMatchObject({ status: 'stale', ageDays: 1, ageHours: 12.1 });
+  });
+  it('checks without staleHours keep their day rule', () => {
+    expect(check('sam_events_reread').staleHours).toBeUndefined();
+    expect(classifyLiveSync(check('sam_events_reread'), { timestamp: hoursAgo(40) }, NOW).status).toBe('fresh');
   });
 });

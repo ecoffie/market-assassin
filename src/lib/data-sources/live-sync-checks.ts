@@ -14,6 +14,12 @@ export interface LiveSyncCheck {
   table: string;
   column: string;
   staleDays: number;
+  /**
+   * Optional tighter threshold in HOURS for feeds that write many times a day. When set it replaces staleDays for the
+   * verdict (raw age, no day rounding). sam_opportunities went 2.5 days without a new notice on 2026-11-25..27 (two
+   * expired keys) and a 2-day threshold only fired on day 3 (Agent 4 review of #2490).
+   */
+  staleHours?: number;
   refreshWith: string;
   /**
    * Optional equality filter so the clock reads ONE producer's rows (fixed in code, never user input). Without it a
@@ -83,6 +89,8 @@ export const LIVE_SYNC_CHECKS: readonly LiveSyncCheck[] = [
     table: 'sam_opportunities',
     column: 'created_at',
     staleDays: 2,
+    // Syncs run several times a day and SAM posts on weekends too; 12h without ANY new notice = the sync is down.
+    staleHours: 12,
     refreshWith: 'live sync — verify /api/cron/sync-sam-opportunities-delta / -full in cron_job_runs; sam-sync-watchdog',
   },
   {
@@ -109,8 +117,8 @@ export const LIVE_SYNC_CHECKS: readonly LiveSyncCheck[] = [
 ];
 
 export type LiveSyncVerdict =
-  | { status: 'fresh'; ageDays: number }
-  | { status: 'stale'; ageDays: number }
+  | { status: 'fresh'; ageDays: number; ageHours: number }
+  | { status: 'stale'; ageDays: number; ageHours: number }
   | { status: 'no_timestamp' }
   | { status: 'unreadable'; error: string };
 
@@ -124,5 +132,7 @@ export function classifyLiveSync(
   const t = read.timestamp ? Date.parse(read.timestamp) : NaN;
   if (!Number.isFinite(t)) return { status: 'no_timestamp' };
   const ageDays = Math.round((nowMs - t) / 86_400_000);
-  return ageDays > check.staleDays ? { status: 'stale', ageDays } : { status: 'fresh', ageDays };
+  const ageHours = Math.round(((nowMs - t) / 3_600_000) * 10) / 10;
+  const isStale = check.staleHours != null ? nowMs - t > check.staleHours * 3_600_000 : ageDays > check.staleDays;
+  return isStale ? { status: 'stale', ageDays, ageHours } : { status: 'fresh', ageDays, ageHours };
 }
