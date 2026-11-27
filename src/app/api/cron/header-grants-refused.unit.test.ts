@@ -26,6 +26,11 @@ vi.mock('@/lib/supabase/server-clients', () => ({
   getWriteClient: vi.fn(() => fakeDb()), getReadClient: vi.fn(() => fakeDb()), getServiceClient: vi.fn(() => fakeDb()),
 }));
 vi.mock('@/lib/send-email', () => ({ sendEmail: vi.fn(async () => { calls.email++; return true; }) }));
+// The Lazy Contractor's Blueprint SMS cron only reaches GHL while a send window is open (event
+// week). Without these mocks this test failed on those dates ("GHL not configured") and could
+// try a real SMS if GHL env were present. Auth is all this file checks; GHL is never touched.
+vi.mock('@/lib/ghl/event-registration', () => ({ listContactsByTag: vi.fn(async () => []), changeContactTags: vi.fn(async () => ({ success: true })) }));
+vi.mock('@/lib/ghl/sms', () => ({ sendSmsToContact: vi.fn(async () => ({ success: true })) }));
 vi.mock('@/lib/admin-identity', () => ({ verifyAdminAuth: vi.fn(async () => ({ ok: false })) }));
 
 const ROUTES = [
