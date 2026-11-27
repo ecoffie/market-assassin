@@ -64,7 +64,7 @@ export const TAB_TIPS: TabTipsRegistry = {
   },
   research: {
     steps: [
-      'Auto uses your saved profile. Choose Sport to research any industry without changing your settings.',
+      'Sport (the default) lets you research any industry without changing your settings. Auto uses your saved profile instead.',
       'In Sport, describe the work and press "Suggest codes", or type a NAICS or PSC code.',
       'Press "Build Market Map", then pick Market Map, Agency Intel or Competitor Intel under "Choose What You Need".',
     ],

@@ -8,6 +8,7 @@ vi.mock('./ForecastsPanel', () => ({ default: () => <div data-testid="forecasts-
 vi.mock('./CatalogTeaserFree', () => ({ default: () => <div data-testid="catalog-teaser">Teaser</div> }));
 vi.mock('./TeamPanel', () => ({ default: () => <div data-testid="team-panel">Team</div> }));
 vi.mock('./OsbpSmbResearchPanel', () => ({ default: () => <div data-testid="osbp-panel">OSBP</div> }));
+vi.mock('./MindyChatPanel', () => ({ default: () => <div data-testid="chat-panel">Chat</div> }));
 
 import PanelContainer, { tabTipsPanelId } from './index';
 import { getTabTips } from '@/lib/app/tab-tips';
@@ -61,8 +62,8 @@ describe('PanelContainer tab tips', () => {
   it('ON but the tab has no entry: no box', async () => {
     vi.stubEnv('NEXT_PUBLIC_TAB_TIPS', 'on');
     // A panel id with no tips entry (precondition asserted so a future entry fails loudly here).
-    expect(getTabTips('osbp-smb')).toBeNull();
-    expect(await render({ activePanel: 'osbp-smb' })).toBe('<div data-testid="osbp-panel">OSBP</div>');
+    expect(getTabTips('chat')).toBeNull();
+    expect(await render({ activePanel: 'chat' })).toBe('<div data-testid="chat-panel">Chat</div>');
   });
 
   it('ON but a free user sees the teaser instead of the panel: no box (tips describe the full panel)', async () => {
