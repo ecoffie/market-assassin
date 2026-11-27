@@ -1,5 +1,6 @@
 'use client';
 
+import { FAR_THRESHOLDS_CITATION, microPurchaseLabel, satLabel } from '@/lib/far/thresholds';
 import { useState, useCallback, useEffect, useRef, useMemo, Fragment } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {
@@ -4046,7 +4047,7 @@ const SORT_LENSES: Array<{ id: SortLens; label: string; hint: string }> = [
   // crowded vendor density, more SAT contracts. Toggle when
   // you're looking for first-contract candidates.
   { id: 'civilian_first', label: 'Civilian First',  hint: 'Non-DOD agencies first — often easier for new entrants' },
-  { id: 'easy_entry',    label: 'Easy Entry (SAT)', hint: 'Highest share of contracts under the $250K Simplified Acquisition Threshold — the easiest entry points for new contractors (weighted by volume). Most useful for services/products; construction rarely has SAT-eligible spend.' },
+  { id: 'easy_entry',    label: 'Easy Entry (SAT)', hint: `Highest share of contracts under the ${satLabel} Simplified Acquisition Threshold (${FAR_THRESHOLDS_CITATION}) — the easiest entry points for new contractors (weighted by volume). Most useful for services/products; construction rarely has SAT-eligible spend.` },
   { id: 'contracts',     label: 'Contracts',        hint: 'Most contract awards in your NAICS — high-frequency buyers' },
 ];
 
@@ -4551,7 +4552,7 @@ function AgencyTable({
       case 'easy_entry':
         // SAT% sort (restored Jun 23, 2026 per Eric — "swap back, don't add
         // another column"). metric_easy_entry = satRatio × √satContractCount:
-        // the share of an office's contracts under the $250K Simplified
+        // the share of an office's contracts under the Simplified (FAR 2.101, src/lib/far/thresholds.ts)
         // Acquisition Threshold, weighted by how many such contracts exist so
         // high-volume easy-entry offices outrank a 1-contract 100% fluke.
         // Caveat: collapses to 0 for NAICS with no SAT-eligible spend (e.g.
@@ -5416,11 +5417,11 @@ function AgencyDrawer({
               tone="blue"
               hint={
                 row.satContractCount > 0
-                  ? `${row.satContractCount} of ${row.contractCount} contracts under $350K`
+                  ? `${row.satContractCount} of ${row.contractCount} contracts under ${satLabel} (${FAR_THRESHOLDS_CITATION} threshold)`
                   : row.id?.startsWith('cat:')
-                    ? 'Share of this buyer’s spend on awards under $350K (dollar-based, from aggregated totals)'
+                    ? `Share of this buyer’s spend on awards under ${satLabel} (${FAR_THRESHOLDS_CITATION}; dollar-based, from aggregated totals)`
                     : row.contractCount > 0
-                      ? 'No small-dollar awards (<$350K) in our USAspending sample. Pipeline skews to large contracts; true SAT count needs SAM Contract Data API.'
+                      ? `No small-dollar awards (under ${satLabel}) in our USAspending sample. Pipeline skews to large contracts; true SAT count needs SAM Contract Data API.`
                       : undefined
               }
             />

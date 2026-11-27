@@ -1,3 +1,4 @@
+import { SIMPLIFIED_ACQUISITION_THRESHOLD } from '@/lib/far/thresholds';
 import { NextRequest, NextResponse } from 'next/server';
 import { logEngagement, EventTypes } from '@/lib/engagement';
 import {
@@ -494,7 +495,7 @@ export async function POST(request: NextRequest) {
       officeSpending[officeKey].contractCount += 1;
 
       // Track Simplified Acquisition Threshold (SAT) and micro-purchase metrics
-      if (amount > 0 && amount <= 250000) {
+      if (amount > 0 && amount <= SIMPLIFIED_ACQUISITION_THRESHOLD) {
         officeSpending[officeKey].satSpending += amount;
         officeSpending[officeKey].satContractCount += 1;
       }

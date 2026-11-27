@@ -11,6 +11,7 @@
  * surface small contracts (e.g. construction NAICS that skew to mega
  * contracts via USAspending's FY-broken pagination — task #32).
  */
+import { FAR_THRESHOLDS_CITATION, microPurchaseLabel, satLabel } from '@/lib/far/thresholds';
 import { useState } from 'react';
 import type { SimplifiedAcquisitionReport } from '@/types/federal-market-assassin';
 
@@ -30,7 +31,7 @@ export function EntryAccessibilityCard({ data }: EntryAccessibilityCardProps) {
         <div className="mb-3 flex items-baseline justify-between">
           <h3 className="text-lg font-semibold text-amber-400">Entry Accessibility</h3>
           <span className="text-xs text-faint">
-            SAT = Simplified Acquisition Threshold ($350K)
+            SAT = Simplified Acquisition Threshold ({satLabel}, {FAR_THRESHOLDS_CITATION})
           </span>
         </div>
         <p className="text-sm text-muted">
@@ -89,7 +90,7 @@ export function EntryAccessibilityCard({ data }: EntryAccessibilityCardProps) {
       <div className="bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/20 rounded-xl p-5">
         <h3 className="text-xl font-bold text-amber-400 mb-2">Entry Accessibility — Where Small Biz Wins</h3>
         <p className="text-muted text-sm">
-          Contracts under $350K use simplified acquisition (faster, less paperwork). Micro-purchases under $15K use government purchase cards. These are the easiest first wins.
+          Contracts under {satLabel} use simplified acquisition (faster, less paperwork). Micro-purchases under {microPurchaseLabel} use government purchase cards ({FAR_THRESHOLDS_CITATION}). These are the easiest first wins.
         </p>
       </div>
 
@@ -216,7 +217,7 @@ export function EntryAccessibilityCard({ data }: EntryAccessibilityCardProps) {
             Low (&lt;25% SAT)
           </div>
           <div className="ml-auto">
-            SAT = Simplified Acquisition Threshold ($350K) | Micro = Government Purchase Card ($15K)
+            SAT = Simplified Acquisition Threshold ({satLabel}) | Micro = Government Purchase Card ({microPurchaseLabel}) ({FAR_THRESHOLDS_CITATION})
           </div>
         </div>
       </div>

@@ -31,14 +31,10 @@ export interface CoachAccessResult {
 }
 
 /** Client workspace caps by access path. */
-export const COACH_CLIENT_LIMITS = {
-  /** Teams seat — the serious consultant tier. */
-  team: 5,
-  /** Grandfathered Pro org members keep the historical cap (predate the add-on). */
-  grandfather: 10,
-  /** Pro + Coach Mode add-on ($99/mo) — a small book of clients; upgrade to Teams for more. */
-  coachAddon: 3,
-} as const;
+// The limits live in a client-safe module so customer copy (UpgradeModal, CoachPanel) shows the SAME numbers this
+// file enforces. Values unchanged.
+export { COACH_CLIENT_LIMITS } from './coach-limits';
+import { COACH_CLIENT_LIMITS } from './coach-limits';
 
 function getSupabase() {
   return createClient(

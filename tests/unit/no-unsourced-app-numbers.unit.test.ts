@@ -59,4 +59,40 @@ describe('no unsourced numbers on the swept App and Map surfaces', () => {
     const all = JSON.stringify(nav);
     expect(all).toContain(`${forecastsLabel} planned`);
   });
+
+  it('acquisition thresholds: one cited constant (FAR 2.101), shown with its citation, used by every panel and the backend', async () => {
+    const far = await import('@/lib/far/thresholds');
+    expect(far.SIMPLIFIED_ACQUISITION_THRESHOLD).toBe(350_000);
+    expect(far.MICRO_PURCHASE_THRESHOLD).toBe(15_000);
+    expect(far.FAR_THRESHOLDS_URL).toBe('https://www.acquisition.gov/far/2.101');
+    expect(far.satLabel).toBe('$350K');
+    const legacy = await import('@/lib/utils/agency-priority');
+    expect(legacy.SIMPLIFIED_ACQUISITION_THRESHOLD).toBe(far.SIMPLIFIED_ACQUISITION_THRESHOLD);
+    expect(legacy.MICRO_PURCHASE_THRESHOLD).toBe(far.MICRO_PURCHASE_THRESHOLD);
+    for (const file of [
+      'src/components/app/panels/EntryAccessibilityCard.tsx',
+      'src/components/app/panels/MarketResearchPanel.tsx',
+      'src/components/app/panels/MyTargetListPanel.tsx',
+    ]) {
+      const text = visible(file);
+      expect(text).not.toMatch(/\$250K|\$350K|\$15K/);
+      expect(read(file)).toMatch(/from '@\/lib\/far\/thresholds'/);
+      expect(text).toContain('FAR_THRESHOLDS_CITATION');
+    }
+    for (const file of ['src/app/api/government-contracts/search/route.ts', 'src/app/api/usaspending/find-hit-list/route.ts']) {
+      expect(visible(file)).not.toMatch(/\b250000\b|\b250_000\b/);
+      expect(read(file)).toContain('SIMPLIFIED_ACQUISITION_THRESHOLD');
+    }
+  });
+
+  it('client-workspace limits shown to customers are the limits coach-access enforces (Teams 5, add-on 3)', async () => {
+    const { COACH_CLIENT_LIMITS } = await import('@/lib/mindy/coach-limits');
+    expect(COACH_CLIENT_LIMITS).toEqual({ team: 5, grandfather: 10, coachAddon: 3 });
+    for (const file of ['src/components/app/UpgradeModal.tsx', 'src/components/app/panels/CoachPanel.tsx']) {
+      const text = visible(file);
+      expect(text).not.toMatch(/up to (10|5|3) client workspaces|more than 3 clients/);
+      expect(read(file)).toMatch(/from '@\/lib\/mindy\/coach-limits'/);
+    }
+    expect(read('src/lib/mindy/coach-access.ts')).toMatch(/from '\.\/coach-limits'/);
+  });
 });

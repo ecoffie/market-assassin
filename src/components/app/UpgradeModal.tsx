@@ -1,5 +1,6 @@
 'use client';
 
+import { COACH_CLIENT_LIMITS } from '@/lib/mindy/coach-limits';
 import { forecastsLabel, contractorsLabel } from '@/lib/marketing-stats';
 import NoRefundNote from '@/components/NoRefundNote';
 import { useEffect } from 'react';
@@ -49,7 +50,7 @@ const PRO_BENEFITS = [
 
 const TEAM_BENEFITS = [
   'Everything in Solopreneur — for your whole team',
-  'My Clients — up to 10 client workspaces per seat',
+  `My Clients — up to ${COACH_CLIENT_LIMITS.team} client workspaces`,
   '5 user seats (add more at $99/mo each)',
   'Shared pipeline + team briefings',
   'Monthly strategy call with a GovCon coach',
