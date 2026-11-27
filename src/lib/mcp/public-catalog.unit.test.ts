@@ -31,14 +31,16 @@ const APPROVED_HIDDEN = [
  * external MCP surface; publishing or pricing them for MCP needs a separate owner review.
  */
 const ASK_MINDY_ONLY = ['get_buying_offices', 'get_vehicle_spend_mix'];
-const ALL_HIDDEN = [...APPROVED_HIDDEN, ...ASK_MINDY_ONLY].sort();
+/** Eric, 2026-11-27: the podcast corpus is removed from every customer-facing surface. */
+const REMOVED_CONTENT = ['search_podcast_lessons'];
+const ALL_HIDDEN = [...APPROVED_HIDDEN, ...ASK_MINDY_ONLY, ...REMOVED_CONTENT].sort();
 
 describe('public MCP catalog', () => {
   it('every registered tool is classified exactly once', () => {
     expect(auditPublicCatalog()).toEqual({ unclassified: [], both: [], unknownPublic: [], unknownHidden: [] });
   });
 
-  it('hides exactly the 11 audit-approved tools plus the Ask-Mindy-only tools', () => {
+  it('hides exactly the 11 audit-approved tools, the Ask-Mindy-only tools and the removed podcast tool', () => {
     expect(Object.keys(HIDDEN_FROM_PUBLIC_MCP).sort()).toEqual(ALL_HIDDEN);
   });
 
@@ -84,5 +86,12 @@ describe('public MCP catalog', () => {
       expect(e.reason.length, tool).toBeGreaterThan(20);
     }
     expect(HIDDEN_FROM_PUBLIC_MCP.get_regulatory_demand.decision).toBe('hide_reconsider');
+  });
+
+  it('search_podcast_lessons is not listed and not registered on the external transport, so a host call never reaches a charge', () => {
+    expect(isPublicMcpTool('search_podcast_lessons')).toBe(false);
+    expect(listPublicMcpTools().map(name)).not.toContain('search_podcast_lessons');
+    expect(mcpRegistrationList().map((t) => t.name)).not.toContain('search_podcast_lessons');
+    expect(HIDDEN_FROM_PUBLIC_MCP.search_podcast_lessons.decision).toBe('hide');
   });
 });

@@ -153,7 +153,6 @@ export default function McpAboutPage() {
               ['The winning-playbook corpus', '8 years of course, proposal-template & podcast content that answers "how do I actually win this" — no public API has it.'],
               ['Office-level buying contacts', 'The named contracting officers & small-business POCs at a specific buying office — not the whole-department firehose.'],
               ['A curated SBLO teaming roster', 'The Small Business Liaison at 200 primes, re-researched and verified — so an agent knows who to call to team.'],
-              ['The podcast lesson corpus', 'Real lessons from real contractor & agency guests, matched by topic, agency, or set-aside.'],
             ].map(([t, d]) => (
               <li key={t} className="rounded-none border border-(--mp-line) bg-(--mp-wash) p-4">
                 <div className="text-[13.5px] font-semibold text-(--mp-navy)">{t}</div>
