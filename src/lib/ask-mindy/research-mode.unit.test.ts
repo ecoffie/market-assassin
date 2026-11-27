@@ -4,7 +4,7 @@
  */
 import { describe, it, expect, vi } from 'vitest';
 import {
-  researchModeEnabledFor, toAnthropicTools, runResearchLoop, billedInputTokens, RESEARCH_SYSTEM_STATIC, researchSystemDynamic, groundAnswer, fullResult, progressLine, researchSystemPrompt, wantsReport, RESEARCH_SYNTHESIS_AT_CALLS,
+  researchModeEnabledFor, toAnthropicTools, runResearchLoop, billedInputTokens, describeResearchError, groundAnswer, fullResult, progressLine, researchSystemPrompt, RESEARCH_SYSTEM_STATIC, researchSystemDynamic, wantsReport, RESEARCH_SYNTHESIS_AT_CALLS,
   RESEARCH_INSTRUCTIONS, RESEARCH_WITHHELD_TOOLS, RESEARCH_EXTRA_TOOLS, RESULT_CEILING_CHARS, FINAL_RESERVE_MS, researchToolDefs,
 } from './research-mode';
 import { MCP_CONNECTOR_INSTRUCTIONS } from '@/lib/mcp/schedule-discovery';
@@ -280,6 +280,32 @@ describe('decision, not findings (Eric, 2026-11-25)', () => {
   });
 });
 
+describe('the writing budget is exact (acceptance: 25 and 28 calls)', () => {
+  it('a 6-call step at 22 calls runs only 2; the other 4 get "Not run"; the total is 24', async () => {
+    let step = 0;
+    const create = vi.fn(async (body: { tool_choice: { type: string } }) => {
+      if (body.tool_choice.type === 'none') return msg([text('Done.')], 'end_turn');
+      step++;
+      const n = step <= 11 ? 2 : 6; // 11 steps x 2 = 22, then one step asking for 6
+      return msg(Array.from({ length: n }, (_, i) => toolUse(`s${step}-${i}`, 'find_opportunities')), 'tool_use');
+    });
+    const batches: number[] = [];
+    const r = await runResearchLoop({ ...base, client: { messages: { create } } as never, execute: async (cs) => { batches.push(cs.length); return cs.map((c) => ({ id: c.id, content: 'ok' })); } });
+    expect(batches.at(-1)).toBe(2);
+    expect(r.calls).toBe(24);
+    const final = (create.mock.calls.at(-1) as never[])[0] as { messages: Array<{ role: string; content: Array<{ content?: string }> }> };
+    const results = final.messages.filter((m) => m.role === 'user').at(-1)!.content;
+    expect(results.filter((b) => String(b.content).startsWith('Not run'))).toHaveLength(4);
+  });
+});
+
+describe('a named company is researched even when the saved profile is a different company', () => {
+  it('the mismatch is one line in Sources & coverage, never the opening', () => {
+    expect(RESEARCH_INSTRUCTIONS).toMatch(/A company named in the question is the company to research, even when it differs from the saved company profile/);
+    expect(RESEARCH_INSTRUCTIONS).toMatch(/only as one line in "Sources & coverage", never at the start of the answer/);
+  });
+});
+
 describe('prompt caching (766K input tokens on one answer)', () => {
   it('system prompt and tool definitions are cache breakpoints; exactly one moving breakpoint on the newest message; history is never mutated', async () => {
     const { client, create } = scripted([
@@ -315,6 +341,29 @@ describe('prompt caching (766K input tokens on one answer)', () => {
       prefix = prompt;
     }
     expect(after / before).toBeLessThan(0.25);
+  });
+});
+
+describe('a failed research turn keeps its cost and its cause', () => {
+  const creditError = () => Object.assign(new Error('400 {"type":"error","error":{"type":"invalid_request_error","message":"Your credit balance is too low to access the Anthropic API."}}'), {
+    status: 400, error: { type: 'error', error: { type: 'invalid_request_error', message: 'Your credit balance is too low to access the Anthropic API.' } },
+  });
+  it('the thrown error carries the usage, steps and calls accrued before it', async () => {
+    let n = 0;
+    const create = vi.fn(async () => {
+      if (++n === 1) return { content: [toolUse('t1', 'find_opportunities')], stop_reason: 'tool_use', usage: { input_tokens: 500, output_tokens: 40, cache_read_input_tokens: 2000, cache_creation_input_tokens: 100 } };
+      throw creditError();
+    });
+    const err = await runResearchLoop({ ...base, client: { messages: { create } } as never, execute: async (cs) => cs.map((c) => ({ id: c.id, content: 'ok' })) }).catch((e) => e);
+    const d = describeResearchError(err);
+    expect(d.class).toBe('credit_balance_too_low');
+    expect(d.status).toBe(400);
+    expect(d.message).toMatch(/credit balance is too low/);
+    expect(d.progress).toEqual({ usage: { input: 500, output: 40, cacheRead: 2000, cacheWrite: 100 }, steps: 1, calls: 1 });
+  });
+  it('other provider errors keep their own type; a plain error its name', () => {
+    expect(describeResearchError(Object.assign(new Error('529 overloaded'), { status: 529, error: { type: 'error', error: { type: 'overloaded_error', message: 'Overloaded' } } }))).toMatchObject({ class: 'overloaded_error', status: 529, message: 'Overloaded' });
+    expect(describeResearchError(new TypeError('boom'))).toMatchObject({ class: 'TypeError', status: null, message: 'boom', progress: null });
   });
 });
 

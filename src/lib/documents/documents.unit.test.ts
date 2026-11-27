@@ -18,7 +18,7 @@ vi.mock('@/lib/pdf/launch-browser', () => ({
 import { SAMPLE_REPORT } from './__fixtures__/sample-report';
 import { DOC_SCHEMA, type DocModel } from './model';
 import { validateDocModel, demoteUncitedFacts, repairDocModelStructure, hardenedAssumptions, DEFAULT_ASSUMPTION_ORIGIN, repeatedSentences, fixtureMarkers } from './validate';
-import { keepDash, citationIndex, citeMarker, formatCell, formatColumn, formatChartValue, chartDuplicatesTable, parseInline, NOT_AVAILABLE, fileBaseName } from './format';
+import { keepDash, noEmDash, clientCopy, claimLabel, DOC_STAGE_MARK, citationIndex, citeMarker, formatCell, formatColumn, formatChartValue, chartDuplicatesTable, parseInline, NOT_AVAILABLE, fileBaseName } from './format';
 import { renderHtml, DOC_HTML_CSP, TOC_MIN_SECTIONS } from './render-html';
 import { renderDocx } from './render-docx';
 import { renderPdf, pdfOptions } from './render-pdf';
@@ -805,20 +805,21 @@ describe('titles keep a dash with the word before it (A5, v5)', () => {
     expect(keepDash('Pre-award work-up')).toBe('Pre-award work-up');
   });
 
-  it('PDF/HTML and DOCX titles and headings carry the non-breaking space', async () => {
-    const m = { ...clone(), sections: [...clone().sections, { id: 'extra', heading: 'Next steps — 90 days', blocks: [{ type: 'paragraph' as const, id: 'x1', text: 'Act.', claim: 'recommendation' as const }] }] };
+  it('client copy has no em dash: a title or heading reads "A: B"; an en dash range still keeps its non-breaking space', async () => {
+    const m = { ...clone(), sections: [...clone().sections, { id: 'extra', heading: 'Next steps \u2014 90 days', blocks: [{ type: 'paragraph' as const, id: 'x1', text: 'Act.', claim: 'recommendation' as const }] }, { id: 'range', heading: 'Spend FY2024 \u2013 FY2026', blocks: [{ type: 'paragraph' as const, id: 'x2', text: 'Act.', claim: 'recommendation' as const }] }] };
     const html = renderHtml(m);
-    expect(html).toContain('<h1>Federal Janitorial Services Market — Research Report (Fixture)</h1>');
-    expect(html).toContain('Next steps — 90 days</h2>');
-    expect(html).not.toMatch(/Market — Research/);
-    expect(String(pdfOptions(m).headerTemplate)).toContain('Market — Research');
+    expect(html).toContain('<h1>Federal Janitorial Services Market: Research Report (Fixture)</h1>');
+    expect(html).toContain('Next steps: 90 days</h2>');
+    expect(html).toContain('Spend FY2024\u00a0\u2013 FY2026</h2>');
+    expect(html).not.toContain('\u2014');
+    expect(String(pdfOptions(m).headerTemplate)).toContain('Market: Research');
     const files = unzipSync(new Uint8Array(await renderDocx(m)));
     const doc = strFromU8(files['word/document.xml']);
     const header = Object.keys(files).filter((k) => /^word\/header\d*\.xml$/.test(k)).map((k) => strFromU8(files[k])).join('');
-    expect(doc).toContain('Market — Research Report (Fixture)');
-    expect(doc).toContain('Next steps — 90 days');
-    expect(doc).not.toContain('Market — Research');
-    expect(header).toContain('Market — Research');
+    expect(doc).toContain('Market: Research Report (Fixture)');
+    expect(doc).toContain('Next steps: 90 days');
+    expect(doc).not.toContain('\u2014');
+    expect(header).toContain('Market: Research');
   });
 });
 
@@ -988,7 +989,7 @@ describe('unverified statements', () => {
   ] }] });
   it('HTML: labeled inline and listed in an "Unverified statements" section before Sources', () => {
     const html = renderHtml(m());
-    expect(html).toContain('class="label unverified">Unverified — no source</span>');
+    expect(html).toContain('class="label unverified">Unverified: no source</span>');
     expect(html).toMatch(/<h2>Unverified statements<\/h2>[\s\S]*Buyers:<\/span> VA buys the most\.[\s\S]*<h2>Sources<\/h2>/);
   });
   it('HTML: no section when nothing is unverified', () => {
@@ -997,7 +998,7 @@ describe('unverified statements', () => {
   it('DOCX: labeled inline and listed', async () => {
     const files = unzipSync(new Uint8Array(await renderDocx(m())));
     const doc = strFromU8(files['word/document.xml']);
-    expect(doc).toContain('UNVERIFIED — NO SOURCE');
+    expect(doc).toContain('UNVERIFIED: NO SOURCE');
     expect(doc).toContain('Unverified statements');
     expect(doc).toContain('Buyers: ');
   });
@@ -1256,5 +1257,56 @@ describe('reference layout (Design & Output, 2026-11-25)', () => {
     expect(html).toContain("font-family:'Mindy Report Inter'");
     expect(html).toContain("font-family: 'Mindy Report Inter', ");
     expect(DOC_HTML_CSP).toContain('font-src data:');
+  });
+});
+
+describe('research report launch (Design & Output, 2026-11-27)', () => {
+  it('noEmDash: running text gets a comma, headings a colon; a dash-only cell reads Not available; en dash ranges untouched', () => {
+    expect(noEmDash('The buyer is behind \u2014 two years running.')).toBe('The buyer is behind, two years running.');
+    expect(noEmDash('decision\u2014not findings')).toBe('decision, not findings');
+    expect(noEmDash('Pathways \u2014 where to focus', 'heading')).toBe('Pathways: where to focus');
+    expect(noEmDash('\u2014')).toBe(NOT_AVAILABLE);
+    expect(noEmDash('\u2014 leading and trailing \u2014')).toBe('leading and trailing');
+    expect(noEmDash('FY2024\u2013FY2026')).toBe('FY2024\u2013FY2026');
+  });
+  it('noEmDash: an em dash between numbers or amounts is a range and becomes an en dash, never a comma', () => {
+    expect(noEmDash('$10M\u2014$19M')).toBe('$10M\u2013$19M');
+    expect(noEmDash('the FHWA $10M \u2014 $19M program')).toBe('the FHWA $10M\u2013$19M program');
+    expect(noEmDash('2024\u20142026')).toBe('2024\u20132026');
+    expect(noEmDash('FY2024\u2014FY2026')).toBe('FY2024\u2013FY2026');
+    expect(noEmDash('10%\u201415% of awards')).toBe('10%\u201315% of awards');
+    expect(noEmDash('Won 3 awards \u2014 all small')).toBe('Won 3 awards, all small');
+  });
+  it('source titles and URLs are quoted verbatim (exempt from client-copy rewriting)', () => {
+    const m = clone();
+    m.sources[0] = { ...m.sources[0], label: 'GAO-26-1 \u2014 Federal Facilities: Backlog', url: 'https://example.com/a\u2014b' };
+    const out = clientCopy(m);
+    expect(out.sources[0].label).toBe('GAO-26-1 \u2014 Federal Facilities: Backlog');
+    expect(out.sources[0].url).toBe('https://example.com/a\u2014b');
+  });
+  it('no em dash reaches the reader anywhere in the PDF/HTML or Word output, and the stored model is unchanged', async () => {
+    const m = clone();
+    m.title = 'Acme \u2014 Plan';
+    m.sections[0].blocks.unshift({ type: 'paragraph', id: 'em1', text: 'One move \u2014 the best one.', claim: 'recommendation' });
+    const html = renderHtml(m);
+    const doc = strFromU8(unzipSync(new Uint8Array(await renderDocx(m)))['word/document.xml']);
+    expect(html.replace(/<style>[\s\S]*?<\/style>/, '')).not.toContain('\u2014');
+    expect(doc).not.toContain('\u2014');
+    expect(m.title).toBe('Acme \u2014 Plan');
+    expect(claimLabel('unverified')).toBe('Unverified: no source');
+  });
+  it('every page footer carries the Beta mark (PDF and Word)', async () => {
+    expect(DOC_STAGE_MARK).toBe('Beta');
+    expect(String(pdfOptions(clone()).footerTemplate)).toContain('Beta');
+    const files = unzipSync(new Uint8Array(await renderDocx(clone())));
+    const footer = Object.keys(files).filter((k) => /^word\/footer\d*\.xml$/.test(k)).map((k) => strFromU8(files[k])).join('');
+    expect(footer).toContain('Beta');
+  });
+  it('Word: the cover flows into the first section and short documents get no contents page', async () => {
+    const doc = strFromU8(unzipSync(new Uint8Array(await renderDocx(clone())))['word/document.xml']);
+    expect(doc).not.toContain('>Contents<');
+    const firstHeading = doc.indexOf('Executive summary');
+    expect(firstHeading).toBeGreaterThan(0);
+    expect(doc.slice(0, firstHeading)).not.toContain('w:type="page"');
   });
 });

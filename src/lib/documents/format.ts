@@ -9,6 +9,12 @@ import { labeledUnits } from './model';
 /** A missing value is "Not available", never 0 (CLAUDE.md: unknown ≠ zero). */
 export const NOT_AVAILABLE = 'Not available';
 
+/**
+ * Release-stage mark printed in every document's footer (PDF and Word): research documents launch to every
+ * customer as a beta (Eric, 2026-11-27). Change or empty this one constant when the stage changes.
+ */
+export const DOC_STAGE_MARK = 'Beta';
+
 export function formatCell(v: CellValue, format: ColumnFormat = 'text'): string {
   if (v === null || v === undefined || (typeof v === 'string' && v.trim() === '')) return NOT_AVAILABLE;
   if (typeof v === 'string') return v;
@@ -174,8 +180,60 @@ export function citeMarker(cites: string[] | undefined, numberOf: (id: string) =
 export function claimLabel(claim: Claim | undefined): string | null {
   if (claim === 'assumption') return 'Planning assumption';
   if (claim === 'recommendation') return 'Recommendation';
-  if (claim === 'unverified') return 'Unverified — no source';
+  if (claim === 'unverified') return 'Unverified: no source';
   return null;
+}
+
+/**
+ * Client copy carries no em dashes (Eric, 2026-11-27). Applied at RENDER time to a copy of the model, after
+ * validation, so grounding, citations and the stored model are untouched. A spaced or unspaced em dash between
+ * words becomes ", " in running text and ": " in a heading or title; a leading or trailing one is dropped; a
+ * cell that is only a dash means "no value" and reads Not available. An em dash between two numbers or amounts is a
+ * RANGE ("$10M—$19M", "FY2024—FY2026") and becomes an en dash, never a comma. En dashes are kept.
+ */
+export function noEmDash(text: string, mode: 'text' | 'heading' = 'text'): string {
+  if (!text.includes('\u2014')) return text;
+  if (/^\s*\u2014\s*$/.test(text)) return NOT_AVAILABLE;
+  return text
+    // A range: digit (optionally a unit: K, M, B, T, bn, %) on the left; a number, amount or fiscal year on the right.
+    .replace(/(\d(?:[KMBT]|bn|k|%)?)\s*\u2014\s*(?=(?:\$|US\$|FY|Q)?\s?\d)/g, '$1\u2013')
+    .replace(/^\s*\u2014\s*|\s*\u2014\s*$/g, '')
+    .replace(/\s*\u2014\s*/g, mode === 'heading' ? ': ' : ', ')
+    .replace(/([,:])\s*([,:.;])/g, '$2');
+}
+
+/**
+ * The model with noEmDash applied to the copy Mindy writes (renderers call this; the stored model is unchanged).
+ * Source titles and URLs are exempt: a cited document's title is quoted verbatim.
+ */
+export function clientCopy(model: DocModel): DocModel {
+  const t = (s: string | undefined) => (typeof s === 'string' ? noEmDash(s) : s);
+  const h = (s: string | undefined) => (typeof s === 'string' ? noEmDash(s, 'heading') : s);
+  const cell = (v: CellValue) => (typeof v === 'string' ? noEmDash(v) : v);
+  const block = (b: Block): Block => {
+    switch (b.type) {
+      case 'paragraph':
+      case 'callout':
+        return { ...b, text: noEmDash(b.text), origin: t(b.origin) };
+      case 'bullets':
+        return { ...b, items: b.items.map((it) => ({ ...it, text: noEmDash(it.text), origin: t(it.origin) })) };
+      case 'table':
+        return { ...b, caption: t(b.caption), origin: t(b.origin), columns: b.columns.map((c) => ({ ...c, label: noEmDash(c.label, 'heading') })), rows: b.rows.map((r) => Object.fromEntries(Object.entries(r).map(([k, v]) => [k, cell(v)]))) };
+      case 'chart':
+        return { ...b, caption: t(b.caption), origin: t(b.origin), xLabel: t(b.xLabel), yLabel: t(b.yLabel), series: b.series.map((se) => ({ ...se, name: noEmDash(se.name), points: se.points.map((pt) => ({ ...pt, x: noEmDash(pt.x) })) })) };
+      default:
+        return b;
+    }
+  };
+  return {
+    ...model,
+    title: noEmDash(model.title, 'heading'),
+    subtitle: t(model.subtitle),
+    preparedFor: t(model.preparedFor),
+    meta: model.meta ? { ...model.meta, attention: t(model.meta.attention) } : model.meta,
+    // Sources are cited documents: their titles and URLs stay verbatim (never rewritten).
+    sections: model.sections.map((s) => ({ ...s, heading: h(s.heading)!, blocks: s.blocks.map(block) })),
+  };
 }
 
 /** The origin sentence an assumption renders after its text (null for every other claim). */
