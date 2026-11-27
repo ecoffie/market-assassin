@@ -31,3 +31,56 @@ describe('app action registry', () => {
     expect(validateAction(ev('map.open_record', { notice_id: '../admin' }), 'map')).toMatchObject({ ok: false });
   });
 });
+
+import { ACTIONS, MAP_FILTER_KEYS, toolInputSchema } from './registry';
+
+describe('registry metadata for the server tool (Agent 1)', () => {
+  it('every action: argsSchema lists exactly its args, forbids extras; needsConfirm iff write; has a description and gate', () => {
+    for (const [name, d] of Object.entries(ACTIONS)) {
+      const props = Object.keys((d.argsSchema as { properties: Record<string, unknown> }).properties).sort();
+      expect(props, name).toEqual([...d.args].sort());
+      expect((d.argsSchema as { additionalProperties: unknown }).additionalProperties, name).toBe(false);
+      expect(d.needsConfirm, name).toBe(d.kind === 'write');
+      expect(d.description.length, name).toBeGreaterThan(10);
+      expect(['none', 'signed_in', 'pro']).toContain(d.gate);
+    }
+  });
+  it('the apply_view filters schema covers exactly MAP_FILTER_KEYS', () => {
+    const f = (ACTIONS['map.apply_view'].argsSchema as { properties: { filters: { properties: Record<string, unknown> } } }).properties.filters.properties;
+    expect(Object.keys(f)).toEqual([...MAP_FILTER_KEYS]);
+  });
+  it('toolInputSchema offers one branch per registered action for the surface', () => {
+    const s = toolInputSchema(['map']) as { oneOf: Array<{ properties: { name: { const: string } } }> };
+    expect(s.oneOf.map((b) => b.properties.name.const).sort()).toEqual(Object.keys(ACTIONS).filter((n) => ACTIONS[n].surfaces.includes('map')).sort());
+    expect((toolInputSchema(['app']) as { oneOf: unknown[] }).oneOf).toEqual([]);
+  });
+});
+
+import Ajv from 'ajv';
+
+describe('argsSchema agrees with validateAction (compiled with ajv)', () => {
+  const ajv = new Ajv({ strict: false });
+  const samples: Array<[string, Record<string, unknown>]> = [
+    ['map.apply_view', { q: 'construction', filters: { state: 'FL', agency: 'Department of Veterans Affairs' }, horizons: { recompete: true } }],
+    ['map.apply_view', { filters: { onclick: 'x' } }],
+    ['map.apply_view', { mode: 'companies' }],
+    ['map.apply_view', {}],
+    ['map.search', { q: 'cybersecurity' }],
+    ['map.search', { q: 'x' }],
+    ['map.search', { q: 'cyber', css: 'body' }],
+    ['map.set_horizons', { isolate: 'forecast' }],
+    ['map.set_horizons', { isolate: 'dla' }],
+    ['map.go_to', { state: 'FL' }],
+    ['map.go_to', { national: true }],
+    ['map.go_to', { lat: 1 }],
+    ['map.open_record', { notice_id: '0009f2dae25541e4a2782d4807461bd0' }],
+    ['map.open_record', { notice_id: '../admin' }],
+  ];
+  for (const [name, args] of samples) {
+    it(`${name} ${JSON.stringify(args)}`, () => {
+      const schemaOk = ajv.compile(ACTIONS[name].argsSchema)(args);
+      const clientOk = validateAction({ type: 'action', id: 'a1', name, args }, 'map').ok;
+      expect(schemaOk).toBe(clientOk);
+    });
+  }
+});
