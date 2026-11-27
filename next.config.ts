@@ -107,7 +107,11 @@ const nextConfig: NextConfig = {
     // Third browser route: the document engine renders DocModel -> PDF (src/lib/documents/render-pdf.ts).
     '/api/app/documents/render': ['./node_modules/@sparticuz/chromium/bin/**/*'],
     '/api/app/documents/render/**/*': ['./node_modules/@sparticuz/chromium/bin/**/*'],
-    // Fourth: the hosted market report's PDF download (src/app/reports/[id]/pdf/route.ts). '*' stands in for
+    // Fourth browser route: Ask Mindy chat. Research mode calls create_document INSIDE the chat function, so the
+    // document's PDF is rendered there (prod 2026-11-27: Word/Excel/CSV saved, "the PDF could not be produced right
+    // now"; last Vault PDF Nov 22). Exact key only: the chat sub-routes (documents, uploads...) do not render PDFs.
+    '/api/app/chat': ['./node_modules/@sparticuz/chromium/bin/**/*'],
+    // Fifth: the hosted market report's PDF download (src/app/reports/[id]/pdf/route.ts). '*' stands in for
     // the [id] segment (Next matches these keys with picomatch, where brackets are a character class).
     '/reports/*/pdf': ['./node_modules/@sparticuz/chromium/bin/**/*'],
     // Ralph Phase 1 MRR assembler reads a vendored .docx by absolute cwd path.

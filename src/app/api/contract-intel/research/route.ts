@@ -32,11 +32,12 @@ export async function GET(request: NextRequest) {
     }
 
     // Analyze the contract
+    const offers = family.baseAward.numberOfOffersReceived;
     const analysis = {
       troubleIndicator: family.totalModifications >= 4 ? 'HIGH' :
                        family.totalModifications >= 2 ? 'MEDIUM' : 'LOW',
-      incumbentStrength: family.baseAward.numberOfOffersReceived <= 2 ? 'VULNERABLE' :
-                        family.baseAward.numberOfOffersReceived <= 4 ? 'MODERATE' : 'STRONG',
+      // Not reported → UNKNOWN (it used to read a missing count as 0 → VULNERABLE).
+      incumbentStrength: offers === null ? 'UNKNOWN' : offers <= 2 ? 'VULNERABLE' : offers <= 4 ? 'MODERATE' : 'STRONG',
       valueGrowth: family.totalObligated > family.baseAward.currentTotalValueOfAward * 1.5 ?
                    'SIGNIFICANT_GROWTH' : 'NORMAL',
       insights: [] as string[]
@@ -51,8 +52,8 @@ export async function GET(request: NextRequest) {
       analysis.insights.push('Original award was sole source - incumbent may be vulnerable on recompete');
     }
 
-    if (family.baseAward.numberOfOffersReceived <= 2) {
-      analysis.insights.push(`Only ${family.baseAward.numberOfOffersReceived} bidder(s) on original award - low competition market`);
+    if (offers !== null && offers <= 2) {
+      analysis.insights.push(`Only ${offers} bidder(s) on original award - low competition market`);
     }
 
     const valueIncrease = family.totalObligated - family.baseAward.currentTotalValueOfAward;

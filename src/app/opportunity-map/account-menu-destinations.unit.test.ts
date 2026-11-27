@@ -52,8 +52,10 @@ describe('account menu destinations', () => {
     //   • /app?next= — the sign-in button's FALLBACK, used only if openSignInModal is absent.
     //     The modal is the primary path; this is the defensive branch, not a destination.
     // Unique destinations: the header Pro badge (2026-11-15) reuses the credits chip's billing bridge.
+    //   • /app?panel=settings&section=billing — "Manage or cancel subscription" (Eric, 2026-11-27): the same
+    //     Settings bridge, opened at the Billing card, so cancelling is one click from every page.
     const appLinks = Array.from(new Set(menu().match(/href="\/app[^"]*"/g) || [])).sort();
-    expect(appLinks).toEqual(['href="/app?next="', 'href="/app?panel=settings"', 'href="/app?panel=settings&section=credits"', 'href="/app?panel=settings&section=credits&tab=billing"']);
+    expect(appLinks).toEqual(['href="/app?next="', 'href="/app?panel=settings"', 'href="/app?panel=settings&section=billing"', 'href="/app?panel=settings&section=credits"', 'href="/app?panel=settings&section=credits&tab=billing"']);
   });
 
   it('no menu item points at the legacy pipeline or proposals panels', () => {

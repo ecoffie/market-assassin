@@ -17,6 +17,7 @@ import { lookupSamOpportunityForPipeline } from '@/lib/pipeline/sam-opportunity-
 import { indexFamiliesByNoticeId, type FamilyNoticeRow } from '@/lib/sam/solicitation-family';
 import { createCanonicalPursuit, type PursuitDraft } from '@/lib/pipeline/create-pursuit';
 import { normalizePursuitDates } from '@/lib/pipeline/pursuit-dates';
+import { removeOwnedPursuit } from '@/lib/pipeline/remove-pursuit';
 import { shadowEntitlement } from '@/lib/entitlements/shadow';
 
 export const runtime = 'nodejs';
@@ -525,28 +526,15 @@ export async function DELETE(request: NextRequest) {
     // ownership check below would 404 the client's row).
     const { workspaceId } = await resolveActiveWorkspace(user_email, request);
 
-    const { data: existing, error: existingErr } = await getSupabase()
-      .from('user_pipeline')
-      .select('id,title,stage')
-      .eq('id', id)
-      .or(`workspace_id.eq.${workspaceId},user_email.eq.${user_email.toLowerCase()}`)
-      .maybeSingle();
-    if (existingErr) console.error('[pipeline] ownership query error:', existingErr.message);
-
-    if (!existing) {
+    const removed = await removeOwnedPursuit(getSupabase(), { workspaceId, email: user_email }, { id });
+    if (removed.kind === 'error') throw new Error(removed.message);
+    if (removed.kind === 'not_found') {
       return NextResponse.json(
         { error: 'Opportunity not found or access denied' },
         { status: 404 }
       );
     }
-
-    const { error } = await getSupabase()
-      .from('user_pipeline')
-      .delete()
-      .eq('id', id)
-      .or(`workspace_id.eq.${workspaceId},user_email.eq.${user_email.toLowerCase()}`);
-
-    if (error) throw error;
+    const existing = removed.row;
 
     await recordAppActivity({
       workspaceId,

@@ -23,8 +23,17 @@ import { authedFetch } from '../authHeaders';
 import { ChatAttachments } from '../chat/ChatAttachments';
 import { ConnectedFiles, type ConnectedFile } from '../chat/ConnectedFiles';
 import type { GeneratedDownloadFile } from '../chat/GeneratedDownloadChips';
-import { ChatReportPreview, type ChatInlineReport } from '../chat/ChatReportPreview';
+import { ChatReportPreview, validReportId, type ChatInlineReport, type ChatSavedReport } from '../chat/ChatReportPreview';
 import { useVaultCapabilities } from '../chat/useVaultCapabilities';
+import { useChatCapabilities } from '../chat/useChatCapabilities';
+import { ChatScreenshots } from '../chat/ChatScreenshots';
+import {
+  prepareScreenshot, imageFilesFrom, screenshotsField, screenshotMarker,
+  SCREENSHOT_MAX_COUNT, SCREENSHOT_MESSAGES, SCREENSHOT_DEFAULT_PROMPT, screenshotRefusalNote, screenshotsFit, type PreparedScreenshot,
+} from '@/lib/chat/screenshot-client';
+import { ResearchProgressView } from '../chat/ResearchProgressView';
+import { researchTagFromEvent, cleanResearchLabel } from '@/lib/chat/research-mode-tag';
+import { addProgress, startProgress, type ResearchProgress } from '@/lib/chat/research-progress';
 import { UpgradeModal } from '../UpgradeModal';
 import { renderSafeMarkdown } from '@/lib/chat/safe-markdown';
 import { startProposalFromNotice } from '@/lib/chat/start-proposal';
@@ -84,6 +93,14 @@ interface ChatMessage {
   deliverablePdfNote?: string | null;
   /** Packaged generate_market_report: the rendered report HTML, read in the chat (not persisted in History). */
   report?: ChatInlineReport;
+  /** A packaged market report in a reopened conversation: History keeps its id and title; the pane reloads it. */
+  savedReport?: ChatSavedReport;
+  /** "Research · Beta": set by the turn's mode event, or by History for a saved research answer. */
+  modeLabel?: string;
+  /** Live research steps for this turn ('progress' events). Not persisted; the answer is what History keeps. */
+  progress?: ResearchProgress;
+  /** When the answer started arriving: the research summary's elapsed time stops here. */
+  progressDoneAt?: number;
 }
 
 
@@ -148,6 +165,43 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
   const isFree = tier === 'free';
   // Attach button: on only when the SERVER says this account may upload (global flag or allowlist).
   const vaultCaps = useVaultCapabilities(email);
+  // Pasted screenshots: on only when the SERVER says it will read them for this account. They live here until
+  // Send, go with exactly one turn, and are never put in history, retries, storage or the Vault.
+  const chatCaps = useChatCapabilities(email);
+  const canPasteShots = chatCaps.screenshots && !isFree;
+  const [shots, setShots] = useState<PreparedScreenshot[]>([]);
+  const [shotNote, setShotNote] = useState<string | null>(null);
+  const shotsRef = useRef<PreparedScreenshot[]>([]);
+  shotsRef.current = shots;
+  useEffect(() => () => { shotsRef.current.forEach((x) => URL.revokeObjectURL(x.previewUrl)); }, []);
+  const addScreenshots = useCallback(async (dt: DataTransfer | null): Promise<boolean> => {
+    const { files, rejectedType } = imageFilesFrom(dt);
+    if (!files.length) {
+      if (rejectedType) setShotNote(SCREENSHOT_MESSAGES.type);
+      return false;
+    }
+    setShotNote(rejectedType ? SCREENSHOT_MESSAGES.type : null);
+    const room = SCREENSHOT_MAX_COUNT - shotsRef.current.length;
+    if (room <= 0) { setShotNote(SCREENSHOT_MESSAGES.count); return true; }
+    if (files.length > room) setShotNote(SCREENSHOT_MESSAGES.count);
+    for (const f of files.slice(0, room)) {
+      const r = await prepareScreenshot(f);
+      if (!r.ok) { setShotNote(SCREENSHOT_MESSAGES[r.reason]); continue; }
+      setShots((prev) => {
+        if (prev.length >= SCREENSHOT_MAX_COUNT) { URL.revokeObjectURL(r.shot.previewUrl); return prev; }
+        return [...prev, r.shot];
+      });
+    }
+    return true;
+  }, []);
+  const removeScreenshot = useCallback((id: string) => {
+    setShots((prev) => {
+      const gone = prev.find((x) => x.id === id);
+      if (gone) URL.revokeObjectURL(gone.previewUrl);
+      return prev.filter((x) => x.id !== id);
+    });
+    setShotNote(null);
+  }, []);
   const [sessionId, setSessionId] = useState<string | null>(null);
   // Attaching a file before the first question needs a conversation id: mint one here; the upload route
   // creates the conversation row only when the file is actually saved.
@@ -196,8 +250,11 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
   // mount so React StrictMode's double-invoke can't fire it twice.
   const seedHandledRef = useRef(false);
 
-  const sendMessage = useCallback(async (rawText: string) => {
-    const text = rawText.trim();
+  const sendMessage = useCallback(async (rawText: string, opts?: { withScreenshots?: boolean }) => {
+    // Only the composer's own Send attaches screenshots; a follow-up chip or a seeded question never does.
+    const turnShots = opts?.withScreenshots && canPasteShots ? shots : [];
+    const typed = rawText.trim();
+    const text = typed || (turnShots.length ? SCREENSHOT_DEFAULT_PROMPT : '');
     if (!text || isStreaming || !email) return;
 
     // Pro gate: don't even send for free users — show the upgrade modal.
@@ -205,6 +262,9 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
       setShowUpgrade(true);
       return;
     }
+
+    // The route caps the images' base64 in total (Vercel body limit): refuse plainly before sending, keep everything.
+    if (turnShots.length && !screenshotsFit(turnShots)) { setShotNote(SCREENSHOT_MESSAGES.total); return; }
 
     // Build the history payload from existing messages BEFORE we mutate state
     const historyForServer = messages
@@ -215,7 +275,8 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
     const userMsg: ChatMessage = {
       id: `u-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       role: 'user',
-      content: text,
+      // The transcript carries a marker, never the image (the server stores the same marker).
+      content: turnShots.length ? `${text}\n\n${screenshotMarker(turnShots.length)}` : text,
     };
     const assistantMsg: ChatMessage = {
       id: `a-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
@@ -227,6 +288,9 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
     setMessages(prev => [...prev, userMsg, assistantMsg]);
     setInput('');
     setIsStreaming(true);
+    // Hand the screenshots to this turn: off the composer now; restored only if the server refuses them.
+    let shotsRestored = false;
+    if (turnShots.length) { setShots([]); setShotNote(null); }
 
     const controller = new AbortController();
     abortRef.current = controller;
@@ -244,9 +308,21 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
           history: historyForServer,
           ...opportunityContextField(attachedOpp),
           ...(connectedFiles.length ? { connectedFiles: connectedFiles.map((f) => f.handle) } : {}),
+          ...screenshotsField(turnShots),
         }),
         signal: controller.signal,
       });
+
+      if (turnShots.length && (res.status === 400 || res.status === 413 || res.status === 415 || res.status === 422)) {
+        // The server would not read the screenshot(s). Nothing was answered: drop the optimistic bubbles and give
+        // the customer back exactly what they typed and attached, with a plain note.
+        setMessages(prev => prev.filter(m => m.id !== userMsg.id && m.id !== assistantMsg.id));
+        setInput(rawText);
+        setShots(turnShots);
+        shotsRestored = true;
+        setShotNote(screenshotRefusalNote(await res.json().catch(() => null)));
+        return;
+      }
 
       if (res.status === 403) {
         // Server says Pro-required (e.g. tier prop stale after a downgrade).
@@ -289,12 +365,17 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
           if (!payload) continue;
           try {
             const evt = JSON.parse(payload);
-            if (evt.type === 'session' && evt.sessionId) {
+            if (evt.type === 'mode') {
+              const label = researchTagFromEvent(evt);
+              if (label) setMessages(prev => prev.map(m => m.id === assistantMsg.id ? { ...m, modeLabel: label } : m));
+            } else if (evt.type === 'session' && evt.sessionId) {
               setSessionId(evt.sessionId);
             } else if (evt.type === 'token' && typeof evt.content === 'string') {
               finalContent += evt.content;
               setMessages(prev => prev.map(m =>
-                m.id === assistantMsg.id ? { ...m, content: m.content + evt.content } : m
+                m.id === assistantMsg.id
+                  ? { ...m, content: m.content + evt.content, ...(m.progress && !m.progressDoneAt ? { progressDoneAt: Date.now() } : {}) }
+                  : m
               ));
             } else if (evt.type === 'deliverables' && Array.isArray(evt.files)) {
               const files = (evt.files as GeneratedDownloadFile[]).filter(
@@ -318,6 +399,7 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
                 html: evt.html,
                 title: typeof evt.title === 'string' && evt.title ? evt.title : 'Market report',
                 url: typeof evt.url === 'string' ? evt.url : null,
+                reportId: validReportId(evt.report_id) ? evt.report_id : null,
               };
               setMessages(prev => prev.map(m => m.id === assistantMsg.id ? { ...m, report } : m));
             } else if (evt.type === 'sources' && evt.ledger && typeof evt.ledger === 'object') {
@@ -329,7 +411,13 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
               setMessages(prev => prev.map(m =>
                 m.id === assistantMsg.id ? { ...m, citations: evt.sources } : m
               ));
-            } else if ((evt.type === 'notice' || evt.type === 'progress') && typeof evt.message === 'string') {
+            } else if (evt.type === 'progress' && typeof evt.message === 'string') {
+              // A research step, not a warning: it goes in the progress panel (timer, current step, Show steps).
+              const at = Date.now();
+              setMessages(prev => prev.map(m =>
+                m.id === assistantMsg.id ? { ...m, progress: addProgress(m.progress ?? startProgress(at), evt, at) } : m
+              ));
+            } else if (evt.type === 'notice' && typeof evt.message === 'string') {
               setMessages(prev => prev.map(m =>
                 m.id === assistantMsg.id ? { ...m, notices: [...(m.notices || []), evt.message] } : m
               ));
@@ -377,11 +465,12 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
           : m
       ));
     } finally {
+      if (!shotsRestored) turnShots.forEach((x) => URL.revokeObjectURL(x.previewUrl));
       setIsStreaming(false);
       abortRef.current = null;
       inputRef.current?.focus();
     }
-  }, [email, isStreaming, messages, sessionId, isFree, attachedOpp, connectedFiles]);
+  }, [email, isStreaming, messages, sessionId, isFree, attachedOpp, connectedFiles, canPasteShots, shots]);
 
   // --- Conversation history ----------------------------------------
   const loadSessions = useCallback(async () => {
@@ -416,6 +505,8 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
           content: string;
           cited_sources?: CitedSource[];
           deliverables?: { files?: GeneratedDownloadFile[]; pdf_note?: string };
+          market_report?: { report_id?: unknown; title?: unknown };
+          research_mode?: { label?: unknown };
         }) => {
           const files = Array.isArray(m.deliverables?.files)
             ? m.deliverables!.files!.filter((f) => f && typeof f.document_id === 'string' && typeof f.format === 'string')
@@ -427,6 +518,10 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
             citations: Array.isArray(m.cited_sources) ? m.cited_sources : undefined,
             ...(files?.length ? { deliverables: files } : {}),
             ...(typeof m.deliverables?.pdf_note === 'string' ? { deliverablePdfNote: m.deliverables.pdf_note } : {}),
+            ...(m.role === 'assistant' && validReportId(m.market_report?.report_id)
+              ? { savedReport: { id: m.market_report!.report_id as string, title: typeof m.market_report?.title === 'string' && m.market_report.title ? m.market_report.title.slice(0, 160) : 'Market report' } }
+              : {}),
+            ...(m.role === 'assistant' && m.research_mode ? { modeLabel: cleanResearchLabel(m.research_mode.label) } : {}),
           };
         }));
         setSessionId(sid);
@@ -550,7 +645,23 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
     if (e.key !== 'Enter' || e.nativeEvent.isComposing) return;
     if (e.shiftKey) return;
     e.preventDefault();
-    if (!isStreaming) sendMessage(input);
+    if (!isStreaming) sendMessage(input, { withScreenshots: true });
+  };
+
+  const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    if (!canPasteShots || isStreaming) return;
+    const hasFile = Array.from(e.clipboardData?.items || []).some((i) => i.kind === 'file');
+    if (!hasFile) return; // ordinary text paste
+    e.preventDefault();
+    void addScreenshots(e.clipboardData);
+  };
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    if (!canPasteShots || isStreaming || !e.dataTransfer?.files?.length) return;
+    e.preventDefault();
+    void addScreenshots(e.dataTransfer);
+  };
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    if (canPasteShots && Array.from(e.dataTransfer?.types || []).includes('Files')) e.preventDefault();
   };
 
   const handleStop = () => {
@@ -631,7 +742,7 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
                 <span className="text-[10px] font-semibold tracking-wider px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">BETA</span>
               </div>
               <p className="text-xs text-faint mt-0.5 [@media(max-height:500px)]:hidden">
-                Ask anything about federal contracting. Mindy cites her sources from your 8-year knowledge base.
+                Ask anything about federal contracting. Mindy cites her sources from live federal data.
               </p>
             </div>
           </div>
@@ -684,8 +795,8 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
               <h2 className="text-xl font-semibold text-white mb-1">Mindy Chat is a Pro feature</h2>
               <p className="text-sm text-muted max-w-lg mx-auto">
                 Ask Mindy anything about federal contracting and get a straight answer,
-                grounded in 743 podcast interviews, real proposal templates, and 8 years
-                of teaching — with her sources cited.
+                grounded in live federal data (open opportunities, award history, recompetes
+                and forecasts), with her sources cited.
               </p>
             </div>
             <div className="text-center">
@@ -711,16 +822,27 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
                   {msg.role === 'assistant' && (
                     <div className="flex items-center gap-2 mb-1.5">
                       <span className="text-xs font-semibold text-purple-300">Mindy</span>
+                      {msg.modeLabel && (
+                        <span data-testid="research-beta-tag" className="rounded-full border border-purple-400/40 bg-purple-500/10 px-2 py-0.5 text-[10.5px] font-medium text-purple-200">
+                          {msg.modeLabel}
+                        </span>
+                      )}
                       {msg.isStreaming && (
                         <span className="inline-block w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse" />
                       )}
                     </div>
                   )}
                   {/* Report first; Export lives in the open pane header (Claude/ChatGPT), not under the answer. */}
+                  {msg.role === 'assistant' && msg.progress && (
+                    <ResearchProgressView progress={msg.progress} running={!!msg.isStreaming && !msg.content && !msg.errored} finishedAt={msg.progressDoneAt} tag={msg.modeLabel} />
+                  )}
                   {msg.role === 'assistant' && !msg.isStreaming && !msg.errored && email && msg.report && (
                     <ChatReportPreview email={email} inline={msg.report} files={msg.deliverables} pdfNote={msg.deliverablePdfNote} />
                   )}
-                  {msg.role === 'assistant' && !msg.isStreaming && !msg.errored && email && !msg.report && !!msg.deliverables?.length && (
+                  {msg.role === 'assistant' && !msg.isStreaming && !msg.errored && email && !msg.report && msg.savedReport && (
+                    <ChatReportPreview email={email} savedReport={msg.savedReport} files={msg.deliverables} pdfNote={msg.deliverablePdfNote} />
+                  )}
+                  {msg.role === 'assistant' && !msg.isStreaming && !msg.errored && email && !msg.report && !msg.savedReport && !!msg.deliverables?.length && (
                     <ChatReportPreview email={email} files={msg.deliverables} pdfNote={msg.deliverablePdfNote} />
                   )}
                   <div className={`text-[14.5px] leading-relaxed ${msg.errored ? 'text-red-300' : msg.role === 'user' ? 'text-slate-100' : 'text-slate-200'}`}>
@@ -728,7 +850,7 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
                       // A Map conversation's user turn carries the Map view preamble for the model; the
                       // bubble shows only what the customer typed (history still sends msg.content as stored).
                       ? renderMessageContent(msg.role === 'user' ? customerText(msg.content) : msg.content, msg.role === 'assistant' && !msg.errored)
-                      : msg.isStreaming
+                      : msg.isStreaming && !msg.progress
                         ? <span className="text-faint italic">Thinking…</span>
                         : null}
                   </div>
@@ -854,13 +976,17 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
           {email && !isFree && (
             <ConnectedFiles email={email} files={connectedFiles} onChange={setConnectedFiles} disabled={isStreaming} />
           )}
-          <div className="relative">
+          {canPasteShots && (
+            <ChatScreenshots shots={shots} note={shotNote} onRemove={removeScreenshot} disabled={isStreaming} />
+          )}
+          <div className="relative" onDrop={handleDrop} onDragOver={handleDragOver}>
             <textarea
               ref={inputRef}
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder={isStreaming ? 'Mindy is thinking…' : 'Ask Mindy anything about federal contracting…'}
+              onPaste={handlePaste}
+              placeholder={isStreaming ? 'Mindy is thinking…' : canPasteShots ? 'Ask Mindy anything — type a company or person, or paste a screenshot…' : 'Ask Mindy anything about federal contracting…'}
               disabled={isStreaming}
               rows={2}
               maxLength={2000}
@@ -876,8 +1002,8 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
                 </button>
               ) : (
                 <button
-                  onClick={() => sendMessage(input)}
-                  disabled={!input.trim()}
+                  onClick={() => sendMessage(input, { withScreenshots: true })}
+                  disabled={!input.trim() && !(canPasteShots && shots.length)}
                   className="px-3 py-1.5 text-xs rounded-md bg-purple-600 hover:bg-purple-500 disabled:bg-surface disabled:text-slate-600 text-white font-medium transition-colors"
                 >
                   Send <span className="text-[10px] text-purple-200">↵</span>

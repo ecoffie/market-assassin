@@ -8,6 +8,14 @@ const resolvePiidToId = vi.fn();
 vi.mock('@/lib/usaspending/award-detail', () => ({
   fetchAwardDetail: (...a: unknown[]) => fetchAwardDetail(...a),
   resolvePiidToId: (...a: unknown[]) => resolvePiidToId(...a),
+  fetchAwardDetailChecked: async (...a: unknown[]) => {
+    const v = await fetchAwardDetail(...a);
+    return v ? { state: 'found', value: v } : { state: 'not_found' };
+  },
+  resolvePiidToIdChecked: async (...a: unknown[]) => {
+    const v = await resolvePiidToId(...a);
+    return v ? { state: 'found', value: v } : { state: 'not_found' };
+  },
 }));
 vi.mock('@/lib/mcp/flags', () => ({ mcpFlags: { aiHint: false } }));
 

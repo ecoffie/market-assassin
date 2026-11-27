@@ -1,4 +1,5 @@
 import { hasProAccess } from '@/lib/access/resolve-access';
+import { unsubscribeUrl as signedUnsubscribeUrl } from '@/lib/email/unsubscribe';
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchAllPaged } from '@/lib/supabase/paged-read';
 import { eligibleSetAsides, eligibleSetAsidesCombined } from '@/lib/market/set-aside-eligibility';
@@ -879,7 +880,7 @@ async function sendAlertEmail(
     return trackingToken ? generateTrackedLink(trackingToken, urlWithUtm, label) : urlWithUtm;
   };
 
-  const unsubscribeUrl = `${MINDY_SITE_URL}/api/alerts/unsubscribe?email=${encodeURIComponent(email)}`;
+  const unsubscribeUrl = signedUnsubscribeUrl(email, 'weekly_alert');
   const preferencesUrl = await createSecureAccessUrl(email, 'preferences');
   const mindyDashboardUrl = mindyDashboardUrlFor(email);
   const alertCta = getAlertEmailCta(preferencesUrl, mindyDashboardUrl, user);

@@ -127,7 +127,7 @@ describe('POST /api/app/documents/render', () => {
     state.pdf = { pdf: null, error: 'no browser' };
     const res = await POST(ok('pdf'));
     expect(res.headers.get('x-export-degraded')).toBe('pdf-unavailable');
-    expect(res.headers.get('content-security-policy')).toBe("default-src 'none'; style-src 'unsafe-inline'; img-src data:");
+    expect(res.headers.get('content-security-policy')).toBe("default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:");
     expect(res.headers.get('x-content-type-options')).toBe('nosniff');
   });
 
