@@ -173,6 +173,7 @@ export default function PartnerFinderPanel({ email, tier }: PartnerFinderPanelPr
           Describe the work
         </button>
         <button
+          data-tip="partner-finder-complement"
           onClick={() => { setMode('complement'); setMatches([]); setSearched(false); }}
           className={`rounded px-3 py-1.5 text-sm font-medium ${mode === 'complement' ? 'bg-accent text-white' : 'text-ink-soft hover:text-ink'}`}
         >
@@ -184,7 +185,7 @@ export default function PartnerFinderPanel({ email, tier }: PartnerFinderPanelPr
       <div className="mb-4 space-y-3">
         {mode === 'describe' ? (
           <>
-            <div className="flex gap-2">
+            <div data-tip="partner-finder-describe" className="flex gap-2">
               <div className="relative flex-1">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-faint" />
                 <input
@@ -318,7 +319,7 @@ export default function PartnerFinderPanel({ email, tier }: PartnerFinderPanelPr
                       </span>
                     </div>
                   </div>
-                  <div className="flex shrink-0 flex-col gap-1.5">
+                  <div data-tip="partner-finder-save" className="flex shrink-0 flex-col gap-1.5">
                     <button
                       onClick={() => savePartner(m)}
                       disabled={!email || saved[m.rollup_uei]}

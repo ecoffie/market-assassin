@@ -98,7 +98,7 @@ export default function OsbpSmbResearchPanel({ email }: Props) {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
             <label className="block text-xs text-faint mb-1">PSC Code <span className="text-emerald-400/70">(what you\'re buying — best match)</span></label>
-            <input value={psc} onChange={e => setPsc(e.target.value)} placeholder="J998 (ship repair)"
+            <input data-tip="osbp-smb-psc" value={psc} onChange={e => setPsc(e.target.value)} placeholder="J998 (ship repair)"
               className="w-full px-3 py-2 bg-surface border border-hairline rounded-lg text-white text-sm placeholder-faint focus:border-emerald-500 focus:outline-none uppercase" />
           </div>
           <div>
@@ -108,7 +108,7 @@ export default function OsbpSmbResearchPanel({ email }: Props) {
           </div>
           <div>
             <label className="block text-xs text-faint mb-1">Max federal $ <span className="text-slate-600">(smaller = smaller firms)</span></label>
-            <select value={maxM} onChange={e => setMaxM(e.target.value)}
+            <select data-tip="osbp-smb-max" value={maxM} onChange={e => setMaxM(e.target.value)}
               className="w-full px-3 py-2 bg-surface border border-hairline rounded-lg text-white text-sm focus:border-blue-500 focus:outline-none">
               <option value="5">≤ $5M</option>
               <option value="25">≤ $25M</option>
@@ -123,7 +123,7 @@ export default function OsbpSmbResearchPanel({ email }: Props) {
             </button>
           </div>
         </div>
-        <label className="inline-flex items-center gap-2 text-sm text-ink-soft cursor-pointer">
+        <label data-tip="osbp-smb-set-aside" className="inline-flex items-center gap-2 text-sm text-ink-soft cursor-pointer">
           <input type="checkbox" checked={setAsideOnly} onChange={e => setSetAsideOnly(e.target.checked)}
             className="rounded border-slate-600 bg-surface" />
           Only firms that have won small-business set-aside work

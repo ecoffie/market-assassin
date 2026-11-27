@@ -352,7 +352,7 @@ export default function ContractorsPanel({ email, tier }: ContractorsPanelProps)
       <div className="bg-ground border border-surface rounded-xl p-5">
         {/* items-end so every field bottom-aligns regardless of label height —
             fixes the misaligned row Eric flagged. 12-col grid for clean spans. */}
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
+        <div data-tip="contractors-filters" className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
           {/* Search — widest */}
           <div className="md:col-span-4">
             <label className="block text-xs font-medium text-muted mb-1.5">Company name</label>
@@ -405,7 +405,7 @@ export default function ContractorsPanel({ email, tier }: ContractorsPanelProps)
         </div>
 
         {/* Sort Options */}
-        <div className="flex flex-wrap items-center gap-2 mt-4 pt-4 border-t border-surface">
+        <div data-tip="contractors-sort" className="flex flex-wrap items-center gap-2 mt-4 pt-4 border-t border-surface">
           <span className="text-xs text-faint mr-1">Sort by:</span>
           {[
             { key: 'contract_value', label: 'Contract Value' },
@@ -504,6 +504,7 @@ export default function ContractorsPanel({ email, tier }: ContractorsPanelProps)
                       to the proper full profile. */}
                   <button
                     type="button"
+                    data-tip="contractors-result"
                     onClick={(event) => {
                       event.stopPropagation();
                       openProfile(contractor);

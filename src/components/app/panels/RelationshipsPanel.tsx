@@ -475,6 +475,7 @@ export default function RelationshipsPanel({ email, tier, panelContext }: Relati
         <div className="flex items-center gap-2">
           <span className="text-[11px] font-semibold uppercase tracking-wider text-faint w-20 shrink-0">Your network</span>
           <button
+            data-tip="contacts-saved"
             onClick={() => { setActiveTab('network'); setNotice(null); setError(null); }}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               activeTab === 'network'
@@ -488,7 +489,7 @@ export default function RelationshipsPanel({ email, tier, panelContext }: Relati
         </div>
 
         {/* Row 2 — FIND NEW (discovery search) */}
-        <div className="flex flex-wrap items-center gap-2">
+        <div data-tip="contacts-find-new" className="flex flex-wrap items-center gap-2">
           <span className="text-[11px] font-semibold uppercase tracking-wider text-faint w-20 shrink-0">Find new</span>
           {TABS.filter(tab => tab.isDiscovery).map(tab => (
             <button
@@ -513,7 +514,7 @@ export default function RelationshipsPanel({ email, tier, panelContext }: Relati
       )}
 
       <div className="rounded-xl border border-surface bg-ground p-5 space-y-4">
-        <div className="flex flex-wrap items-end gap-3">
+        <div data-tip="contacts-search" className="flex flex-wrap items-end gap-3">
           <div className="flex-1 min-w-[220px]">
             <label className="block text-sm text-muted mb-2">
               {activeTab === 'network' ? 'Search My Network' : `Search ${activeTabConfig.label}`}
