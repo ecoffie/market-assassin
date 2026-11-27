@@ -43,13 +43,16 @@ describe('outreach rules (Eric\'s method, 2026-11-27)', () => {
 
 describe('action plan structure (the Claude + Mindy MCP reference plan)', () => {
   it('has the eight sections in order', () => {
-    const order = ['Dates that matter', 'The pitch in three lines', 'Who buys this work here', 'Who to talk to and what to say', 'The plan, week by week', 'What to say on every call', 'Emails to send', 'Sources'];
+    const order = ['Dates that matter', 'The pitch in three lines', 'Who buys this work here', 'Who to talk to and what to say', 'The plan, week by week', 'What to say on every call', 'Emails to send', '8. Sources'];
     let at = -1;
     for (const h of order) { const i = ACTION_PLAN_STRUCTURE.indexOf(h); expect(i, h).toBeGreaterThan(at); at = i; }
   });
   it('no certification in the pitch; contacts are sourced, never inferred; only confirmed events', () => {
     expect(ACTION_PLAN_STRUCTURE).toMatch(/No certification in the pitch/);
-    expect(ACTION_PLAN_STRUCTURE).toMatch(/Every named contact says where it came from/);
+    expect(ACTION_PLAN_STRUCTURE).toMatch(/Every named contact carries a citation marker \[n\] pointing to its source \(the notice number or official page\) in Sources/);
+    expect(ACTION_PLAN_STRUCTURE).toMatch(/write no 'from the notice\.\.\.' prose in the table or body/);
+    expect(ACTION_PLAN_STRUCTURE).toMatch(/"confirm this contact before reaching out", with no date shown/);
+    expect(ACTION_PLAN_STRUCTURE).not.toMatch(/says where it came from/);
     expect(ACTION_PLAN_STRUCTURE).toMatch(/Never infer an email from a name pattern/);
     expect(ACTION_PLAN_STRUCTURE).toMatch(/name only events confirmed by a source, and say plainly when none are confirmed/);
     expect(ACTION_PLAN_STRUCTURE).toMatch(/search_federal_events \/ get_federal_event_series/);
@@ -87,5 +90,7 @@ describe('every surface carries the rules', () => {
     expect(d).toMatch(/credentials \(UEI, CAGE, certifications, NAICS\) last, under the signature/);
     expect(d).toMatch(/Dates that matter \(opportunity dates only\), The pitch in three lines/);
     expect(d).toMatch(/DATES: no data-freshness dates/);
+    expect(d).toMatch(/every named contact cites its source with the citation marker/);
+    expect(d).toMatch(/no 'from the notice\.\.\.' prose in the table or body/);
   });
 });

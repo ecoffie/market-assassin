@@ -161,10 +161,12 @@ and recompetes as supporting examples) · 7 Readiness checklist (always includin
   never mark a door not applicable because prime history is thin (check subcontracts, JVs, mentor-protege, commercial and
   state work first). When length is a problem, cut from the top: Blocks 1 and 4 (briefing) go before Blocks 3 and 5
   (decisions).
-- Fix 3, contacts: every named contact carries its source (which SAM notice or official page) and when it was retrieved.
-  A contact only on a notice older than 180 days is marked "last seen on [notice] dated [date], confirm before use". No
-  contact is reused from an earlier report without a re-check. No named contact: say so and give the office's published
-  inbox. Never infer an email from a name pattern.
+- Fix 3, contacts (Eric: no dates for contacts either; no provenance clutter): every named contact carries a citation
+  marker [n] pointing to its source (the SAM notice number and office, or the official page) in Sources. No "from the
+  notice..." prose and no dates in the table or body. Staleness is checked internally: a contact whose newest source is
+  older than 180 days is dropped or marked "confirm this contact before reaching out". No contact is reused from an
+  earlier report without a re-check. Fewer verified contacts beat a long list. No named contact: say so and give the
+  office's published inbox. Never infer an email from a name pattern.
 - Fix 1 (Data Core): the source register and a stale-claim check called before a report ships.
 - Fix 4: a decision log at ship time (design: `tasks/report-decision-log-design-2026-11-27.md`; no migration until Eric
   approves).

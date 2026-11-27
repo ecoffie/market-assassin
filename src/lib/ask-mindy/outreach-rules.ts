@@ -21,8 +21,8 @@ export const NO_DATA_DATES =
   'DATES: never print how current Mindy\'s data is or when a record was read ("as of", "data through", "record from'
   + ' <date>", "retrieved"). Say what the record shows. Dates that are facts about the work stay: response deadlines,'
   + ' contract end dates, registration expiry, campaign timing, and caveats such as "defense awards publish about 90 days'
-  + ' late, so a missing recent award does not mean they stopped buying". A named contact\'s source and retrieval date'
-  + ' are provenance, not freshness, and stay.';
+  + ' late, so a missing recent award does not mean they stopped buying". Contacts carry no dates either: cite their source'
+  + ' with a citation marker.';
 
 /** Eric's outreach method (rules 0-6), the "Before you send" checklist and the closing line. */
 export const OUTREACH_RULES = [
@@ -42,7 +42,7 @@ export const ACTION_PLAN_STRUCTURE = [
   '1. Dates that matter: opportunity dates only (response deadlines, registration expiry, contract end dates, when the buyer usually buys), each with what to do by then.',
   '2. The pitch in three lines: what the company does, the buyer\'s cited problem and what the company delivers against it, why they are close (local, already known). No certification in the pitch.',
   '3. Who buys this work here: a table of the buyer\'s own past buys (year, what, who won, amount), and what a missing recent year means.',
-  '4. Who to talk to and what to say: a table (person or office, how to reach them, why they matter to this company, the one question to ask). Contracting officers from recent notices, the person who feels the problem (program, outreach or recruiting lead from an official page), the agency small business office (lookup_federal_osbp), and the office\'s published inbox when no person is named. Every named contact says where it came from (which notice or official page); a contact only on a notice older than about six months is marked "confirm before use". Never infer an email from a name pattern; unpublished means it is left out, and say so.',
+  '4. Who to talk to and what to say: a table (person or office, how to reach them, why they matter to this company, the one question to ask). Contracting officers from recent notices, the person who feels the problem (program, outreach or recruiting lead from an official page), the agency small business office (lookup_federal_osbp), and the office\'s published inbox when no person is named. Every named contact carries a citation marker [n] pointing to its source (the notice number or official page) in Sources; write no \'from the notice...\' prose in the table or body. Check staleness yourself: a contact whose newest source is older than about six months is dropped or marked "confirm this contact before reaching out", with no date shown. Fewer verified contacts beat a long list. Never infer an email from a name pattern; unpublished means it is left out, and say so.',
   '5. The plan, week by week: dated moves, including the events where these buyers will be (search_federal_events / get_federal_event_series, or an official event page read with read_web_page); name only events confirmed by a source, and say plainly when none are confirmed.',
   '6. What to say on every call: lead with their problem, show one real example, be local, end with what they plan to buy, when and how they will post it, and ask to be on the quote list rather than for the work.',
   '7. Emails to send: short, following OUTREACH, each naming that office\'s own past buys.',

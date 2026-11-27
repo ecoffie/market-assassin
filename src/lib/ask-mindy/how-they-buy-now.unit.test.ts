@@ -56,14 +56,16 @@ describe('report ship checks (Fixes 2 and 3)', () => {
   it('cut from the top when long', () => {
     expect(REPORT_SHIP_CHECKS).toMatch(/cut from the top: Blocks 1 and 4 \(briefing\) go before Blocks 3 and 5 \(decisions\)/);
   });
-  it('contact rules: source and date, 180-day re-check, no reuse, published inbox, never an inferred email', () => {
-    expect(REPORT_SHIP_CHECKS).toMatch(/every named contact carries its source \(which SAM notice or official page\) and when it was retrieved/);
-    expect(REPORT_SHIP_CHECKS).toMatch(/older than 180 days is marked "last seen on <notice> dated <date>, confirm before use"/);
-    expect(REPORT_SHIP_CHECKS).toMatch(/no contact is reused from an earlier report without a re-check/);
+  it('contact rules: a citation marker, no prose or dates, internal 180-day check, no reuse, published inbox, never an inferred email', () => {
+    expect(REPORT_SHIP_CHECKS).toMatch(/every named contact carries a citation marker \[n\] pointing to its source/);
+    expect(REPORT_SHIP_CHECKS).toMatch(/no "from the notice\.\.\." prose and no dates in the table or body/);
+    expect(REPORT_SHIP_CHECKS).toMatch(/older than 180 days is dropped or marked "confirm this contact before reaching out"/);
+    expect(REPORT_SHIP_CHECKS).not.toMatch(/retrieved|dated <date>|last seen/);
+    expect(REPORT_SHIP_CHECKS).toMatch(/No contact is reused from an earlier report without a re-check/);
     expect(REPORT_SHIP_CHECKS).toMatch(/give the office's published inbox/);
-    expect(REPORT_SHIP_CHECKS).toMatch(/never infer an email from a name pattern/);
-    // Contact provenance dates are not data-freshness dates.
-    expect(NO_DATA_DATES).toMatch(/A named contact's source and retrieval date are provenance, not freshness, and stay/);
+    expect(REPORT_SHIP_CHECKS).toMatch(/Never infer an email from a name pattern/);
+    // Eric, 2026-11-27: no dates for contacts either.
+    expect(NO_DATA_DATES).toMatch(/Contacts carry no dates either: cite their source with a citation marker/);
   });
 });
 
