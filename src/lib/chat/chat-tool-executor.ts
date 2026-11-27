@@ -124,7 +124,7 @@ function refusal(category: string, message: string): Record<string, unknown> {
  * carry billing_outcome 'nonbillable_free_tool', so they stay free if per-answer billing (#2110) is ever
  * enabled, whatever their result looks like. The success/failure outcome is still classified normally.
  */
-export const CHAT_FREE_TOOLS: ReadonlySet<string> = new Set(['create_document', 'find_my_documents']);
+export const CHAT_FREE_TOOLS: ReadonlySet<string> = new Set(['create_document', 'find_my_documents', 'create_email_draft']);
 
 /** Outcome telemetry is best-effort: a classifier error must not cost the log row. */
 function safeOutcome(name: string, result: unknown): { outcome?: ReturnType<typeof classifyCallOutcome> } {

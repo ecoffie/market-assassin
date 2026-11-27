@@ -52,6 +52,10 @@ const CHAT_OVERRIDES: Readonly<Record<string, ChatToolPolicy>> = {
     decision: 'allowed_write',
     reason: "Saves a NEW generated document (PDF + Word) to the acting scope's own Vault; never overwrites (a revision is a new version row). Non-billable. Offered only when VAULT_GENERATED_FILES is on for the verified caller.",
   },
+  create_email_draft: {
+    decision: 'allowed_write',
+    reason: "Saves an email DRAFT in the caller's own connected Gmail/Outlook (connected apps Slice B). Never sends: the customer reviews and sends it. Offered only when CONNECTED_APPS is on for the verified caller; scope re-resolved per call.",
+  },
   update_market_schedule: {
     decision: 'allowed_write',
     reason: 'Renames or changes the cadence/enabled state of the session user\'s own alert; reversible.',

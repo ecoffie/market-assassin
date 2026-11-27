@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { authorizeUrl, exchangeCode, fetchIdentity, newBrowserBinding, OAuthError, pkcePair, safeReturnTo, signState, verifyState, STATE_TTL_SEC } from './oauth';
-import { ACCESS_DISCLOSURE, connectedAppsEnabledFor, connectedAppsSecrets, SCOPES, scopesFor } from './config';
+import { ACCESS_DISCLOSURE, connectedAppsEnabledFor, connectedAppsSecrets, FORBIDDEN_SCOPES, hasCapability, SCOPES, scopesFor } from './config';
 import crypto from 'node:crypto';
 
 const ENV = ['CONNECTED_APPS_STATE_SECRET', 'CONNECTED_APPS_TOKEN_ENC_KEY', 'CRM_TOKEN_ENC_KEY', 'MCP_OAUTH_SIGNING_SECRET', 'ADMIN_PASSWORD', 'CONNECTED_APPS_GOOGLE_CLIENT_ID', 'CONNECTED_APPS_GOOGLE_CLIENT_SECRET', 'CONNECTED_APPS_MICROSOFT_CLIENT_ID', 'CONNECTED_APPS_MICROSOFT_CLIENT_SECRET', 'CONNECTED_APPS_REDIRECT_BASE'] as const;
@@ -104,11 +104,40 @@ describe('authorizeUrl: PKCE, account chooser, least privilege', () => {
     expect(u.searchParams.get('prompt')).toContain('select_account');
     expect(u.searchParams.get('redirect_uri')).toBe('https://getmindy.ai/api/app/connected-apps/callback');
   });
-  it('this slice defines file access only: no mail or calendar scopes are requestable yet', () => {
-    expect(Object.keys(SCOPES.google).sort()).toEqual(['file', 'identity']);
-    expect(Object.keys(SCOPES.microsoft).sort()).toEqual(['file', 'identity']);
-    const all = [...scopesFor('google', ['file']), ...scopesFor('microsoft', ['file'])].join(' ');
-    expect(all).not.toMatch(/gmail|calendar|Mail\.|Calendars\./i);
+  it('capabilities: file and email drafts only; no calendar yet; the file step asks for no mail scope', () => {
+    expect(Object.keys(SCOPES.google).sort()).toEqual(['draft', 'file', 'identity']);
+    expect(Object.keys(SCOPES.microsoft).sort()).toEqual(['draft', 'file', 'identity']);
+    const fileOnly = [...scopesFor('google', ['file']), ...scopesFor('microsoft', ['file'])].join(' ');
+    expect(fileOnly).not.toMatch(/gmail|calendar|Mail\.|Calendars\./i);
+    const all = [...scopesFor('google', ['file', 'draft']), ...scopesFor('microsoft', ['file', 'draft'])].join(' ');
+    expect(all).not.toMatch(/calendar|Calendars\./i);
+  });
+  it('email drafts: exactly gmail.compose (Google) and Mail.ReadWrite (Microsoft), requested only with the draft capability', () => {
+    expect(SCOPES.google.draft).toEqual(['https://www.googleapis.com/auth/gmail.compose']);
+    expect(SCOPES.microsoft.draft).toEqual(['Mail.ReadWrite']);
+    const g = new URL(authorizeUrl('google', 'st', 'ch', ['file', 'draft'])).searchParams.get('scope')!.split(' ');
+    expect(g).toContain('https://www.googleapis.com/auth/gmail.compose');
+    const m = new URL(authorizeUrl('microsoft', 'st', 'ch', ['file', 'draft'])).searchParams.get('scope')!.split(' ');
+    expect(m).toContain('Mail.ReadWrite');
+  });
+  it('never requests a send or full-mailbox scope, for any capability (gmail.send, Mail.Send, https://mail.google.com/)', () => {
+    const caps = ['file', 'draft'] as const;
+    const all = [...scopesFor('google', [...caps]), ...scopesFor('microsoft', [...caps])];
+    for (const f of FORBIDDEN_SCOPES) expect(all).not.toContain(f);
+    expect(FORBIDDEN_SCOPES).toEqual(expect.arrayContaining(['https://www.googleapis.com/auth/gmail.send', 'Mail.Send', 'https://mail.google.com/']));
+    expect(all.some((s) => /send/i.test(s))).toBe(false);
+  });
+  it('the draft access note is honest about each grant', () => {
+    expect(ACCESS_DISCLOSURE.google.draft).toMatch(/also covers sending/);
+    expect(ACCESS_DISCLOSURE.google.draft).toMatch(/Mindy never sends/);
+    expect(ACCESS_DISCLOSURE.microsoft.draft).toMatch(/also lets an app read your mail/);
+    expect(ACCESS_DISCLOSURE.microsoft.draft).toMatch(/cannot send/);
+  });
+  it('hasCapability reads granted scopes, including Graph-prefixed ones', () => {
+    expect(hasCapability('google', ['openid', 'https://www.googleapis.com/auth/gmail.compose'], 'draft')).toBe(true);
+    expect(hasCapability('google', ['https://www.googleapis.com/auth/drive.file'], 'draft')).toBe(false);
+    expect(hasCapability('microsoft', ['https://graph.microsoft.com/Mail.ReadWrite', 'User.Read'], 'draft')).toBe(true);
+    expect(hasCapability('microsoft', ['Files.Read'], 'draft')).toBe(false);
   });
   it('the access note describes the grant honestly: Microsoft Files.Read covers all OneDrive files', () => {
     expect(ACCESS_DISCLOSURE.microsoft.file).toMatch(/all of the files in your OneDrive/);

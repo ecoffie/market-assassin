@@ -10,8 +10,9 @@ import { ACCESS_DISCLOSURE, clientCreds, connectedAppsEnabledFor, connectedAppsS
 import { authorizeUrl, BINDING_COOKIE, BINDING_COOKIE_PATH, newBrowserBinding, pkcePair, safeReturnTo, signState, STATE_TTL_SEC } from '@/lib/connected-apps/oauth';
 import { scopeKeyFor } from '@/lib/connected-apps/store';
 
-// This slice requests only file access. Draft and calendar are added with the tools that use them.
-const CAPS: readonly Capability[] = ['file'];
+// File access, and email drafts (Slice B: requested only when the customer first asks Mindy to save a draft).
+// Calendar is added with the tool that uses it.
+const CAPS: readonly Capability[] = ['file', 'draft'];
 
 export async function POST(request: NextRequest) {
   const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;

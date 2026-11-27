@@ -106,7 +106,7 @@ export const LEDGER_MAX_ITEMS = 50;
 const KEY_RE = /^[A-Za-z0-9][A-Za-z0-9._:\-/]{2,63}$/;
 
 /** Tools whose results are the caller's own (or an authorized client's) account data. */
-export const PRIVATE_SOURCE_TOOLS: ReadonlySet<string> = new Set(['get_my_pipeline', 'search_my_vault', 'draft_proposal', 'draft_proposal_section', 'find_my_documents', 'create_document']);
+export const PRIVATE_SOURCE_TOOLS: ReadonlySet<string> = new Set(['get_my_pipeline', 'search_my_vault', 'draft_proposal', 'draft_proposal_section', 'find_my_documents', 'create_document', 'create_email_draft']);
 
 const TOOL_LABELS: Record<string, string> = {
   get_expiring_contracts: 'Expiring contracts (USASpending via Mindy recompete data)',

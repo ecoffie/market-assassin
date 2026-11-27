@@ -76,9 +76,23 @@ describe('POST /start', () => {
     expect(c).toMatch(/SameSite=lax/i);
     expect(c).toMatch(/Path=\/api\/app\/connected-apps\/callback/);
   });
-  it('mail and calendar capabilities are not grantable in this slice', async () => {
+  it('calendar is not grantable yet: alone it is refused, next to draft it is filtered out', async () => {
     const { POST } = await import('./start/route');
-    expect((await POST(post({ ...startBody, capabilities: ['draft', 'calendar'] }))).status).toBe(400);
+    expect((await POST(post({ ...startBody, capabilities: ['calendar'] }))).status).toBe(400);
+    const r = await POST(post({ ...startBody, capabilities: ['draft', 'calendar'] }));
+    expect(r.status).toBe(200);
+    const scope = new URL((await r.json()).authorize_url).searchParams.get('scope')!;
+    expect(scope).toContain('gmail.compose');
+    expect(scope).not.toMatch(/calendar/i);
+  });
+  it('email drafts: asked for only when requested, with the honest note for both grants', async () => {
+    const { POST } = await import('./start/route');
+    const fileOnly = await (await POST(post({ ...startBody }))).json();
+    expect(new URL(fileOnly.authorize_url).searchParams.get('scope')).not.toMatch(/gmail/);
+    const withDraft = await (await POST(post({ ...startBody, capabilities: ['file', 'draft'] }))).json();
+    expect(new URL(withDraft.authorize_url).searchParams.get('scope')).toContain('https://www.googleapis.com/auth/gmail.compose');
+    expect(withDraft.access_note).toMatch(/only the files you pick/);
+    expect(withDraft.access_note).toMatch(/Mindy never sends/);
   });
   it('returns the access note for the provider', async () => {
     const { POST } = await import('./start/route');

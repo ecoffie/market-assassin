@@ -44,6 +44,7 @@ import { makeTier0Tools, TIER0_TOOL_DEFS, TIER0_TOOL_NAMES } from '@/lib/chat/ti
 import { makeMyDocumentsTool, MY_DOCUMENTS_TOOL_DEF, FIND_MY_DOCUMENTS } from '@/lib/chat/my-documents-tool';
 import { connectedAppsEnabledFor } from '@/lib/connected-apps/config';
 import { loadConnectedFilesContext } from '@/lib/connected-apps/read-file-tool';
+import { makeEmailDraftTool, EMAIL_DRAFT_TOOL_DEF, CREATE_EMAIL_DRAFT, type VerifiedSource } from '@/lib/connected-apps/email-draft';
 import { makeSearchWebTool, SEARCH_WEB_TOOL_DEF, SEARCH_WEB, callerKeyFor } from '@/lib/chat/search-web-tool';
 import { makeGenerateDocumentTool, CREATE_DOCUMENT_TOOL_DEF, CREATE_DOCUMENT, isDocumentCreationRequest, parseCreateDocumentDeliverables, type CreateDocumentDeliverable } from '@/lib/chat/generate-document-tool';
 import { vaultDocEnabledFor } from '@/lib/vault/flags';
@@ -1176,6 +1177,21 @@ export async function POST(request: NextRequest) {
                 : {}),
             })
             : null;
+          // Connected apps Slice B: save an email DRAFT in the customer's own Gmail / Outlook (never sends). Flag
+          // CONNECTED_APPS + allowlist; never in card chat. The acting scope is re-resolved on every call, and the
+          // recipient is kept only when this turn's public records (or the attached notice's contacts) cite it.
+          const emailDraft = !cardCtx && connectedAppsEnabledFor(auth.email)
+            ? makeEmailDraftTool({
+              resolveScope: () => resolveChatActingScope(auth.email!, request),
+              callerEmail: auth.email!,
+              verifiedSources: (): VerifiedSource[] => [
+                ...turnSources
+                  .filter((x) => x.owner === null && (x.status === 'ok' || x.status === 'truncated'))
+                  .map((x) => ({ text: x.content, officialOnly: x.tool === 'search_web' || x.tool === 'read_web_page' })),
+                ...(noticeRecord ? [{ text: JSON.stringify((noticeRecord as { points_of_contact?: unknown }).points_of_contact ?? '') }] : []),
+              ],
+            })
+            : null;
           // Server-side web-search controls (per-turn cap, privacy guard, usage log): search-web-tool.ts.
           // Every document excerpt this turn has seen: the attached block plus each find_my_documents result.
           const turnDocumentTexts: string[] = [documentContext?.block, connectedFiles?.block].filter((t): t is string => !!t);
@@ -1184,8 +1200,8 @@ export async function POST(request: NextRequest) {
             documentText: () => turnDocumentTexts.join('\n'),
             attribution: { callerKey: callerKeyFor(auth.email), sessionId: turnSessionId },
           });
-          const privateDefs = [...TIER0_TOOL_DEFS, SEARCH_WEB_TOOL_DEF, ...(myDocs ? [MY_DOCUMENTS_TOOL_DEF] : []), ...(genDoc ? [CREATE_DOCUMENT_TOOL_DEF] : [])];
-          const privateNames = new Set([...TIER0_TOOL_NAMES, SEARCH_WEB, ...(myDocs ? [FIND_MY_DOCUMENTS] : []), ...(genDoc ? [CREATE_DOCUMENT] : [])]);
+          const privateDefs = [...TIER0_TOOL_DEFS, SEARCH_WEB_TOOL_DEF, ...(myDocs ? [MY_DOCUMENTS_TOOL_DEF] : []), ...(genDoc ? [CREATE_DOCUMENT_TOOL_DEF] : []), ...(emailDraft ? [EMAIL_DRAFT_TOOL_DEF] : [])];
+          const privateNames = new Set([...TIER0_TOOL_NAMES, SEARCH_WEB, ...(myDocs ? [FIND_MY_DOCUMENTS] : []), ...(genDoc ? [CREATE_DOCUMENT] : []), ...(emailDraft ? [CREATE_EMAIL_DRAFT] : [])]);
           const executor = createChatToolExecutor({
             userEmail: auth.email!,
             ...(actingScope.kind === 'client' ? { vaultEmail: actingScope.vaultEmail } : {}),
@@ -1196,6 +1212,7 @@ export async function POST(request: NextRequest) {
               names: privateNames,
               execute: (n, a) => {
                 if (n === SEARCH_WEB) return searchWeb.execute(a);
+                if (emailDraft && n === CREATE_EMAIL_DRAFT) return emailDraft.execute(a);
                 if (myDocs && n === FIND_MY_DOCUMENTS) {
                   return myDocs.execute(a).then((r) => {
                     try { turnDocumentTexts.push(JSON.stringify(r)); } catch { /* unserializable result: nothing to guard */ }
