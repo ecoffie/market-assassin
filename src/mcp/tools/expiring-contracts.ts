@@ -16,9 +16,29 @@ import {
 import { mcpFlags } from '@/lib/mcp/flags';
 import { normalizeStateCode } from '@/lib/utils/us-states';
 import type { IgnoredArg } from '@/lib/mcp/result-contract';
+import {
+  competitionFactsFor,
+  competitionCounts,
+  usaspendingCompetitionLookup,
+  type CompetitionFacts,
+  type CompetitionLookup,
+} from '@/lib/opportunities/competition-facts';
+
+/**
+ * At most this many rows get a competition lookup per call (USASpending award record, cached 7 days). The rest read
+ * `competition: null` + `_meta.competition.not_checked` — not looked up, never "unknown" or zero.
+ */
+export const COMPETITION_LOOKUP_CAP = 25;
 
 /** An order under a vehicle, listed at top level so an in-window order is never only nested. */
-export type ExpiringOrderInWindow = ExpiringContract & {
+/**
+ * How the CURRENT award was competed, from that award's own USASpending record (competition-facts.ts).
+ * `recompete_opportunities.competition_type` / `number_of_offers` are never written by the live sync (0% filled,
+ * Agent 4 / Eric 2026-11-27: 15 of 15 VA HVAC rows empty), so these come from the award record instead.
+ */
+export type WithCompetition = { competition?: CompetitionFacts | null };
+
+export type ExpiringOrderInWindow = ExpiringContract & WithCompetition & {
   parent_vehicle_piid: string | null;
   vehicle_ordering_end_date: string | null;
   vehicle_ordering_period_status: VehicleRollup['ordering_period_status'];
@@ -86,7 +106,7 @@ export interface ExpiringContractsToolInput {
 export interface ExpiringContractsToolResult {
   queried: Record<string, string | number>;
   /** Standalone contracts (and rows whose kind is unknown) — the recompete candidates. */
-  contracts: ExpiringContract[];
+  contracts: Array<ExpiringContract & WithCompetition>;
   /**
    * Task/delivery orders rolled up to their parent vehicle. An order is not re-competed on its
    * own; the vehicle's ordering end is the recompete signal (UNKNOWN when not established).
@@ -129,12 +149,22 @@ export interface ExpiringContractsToolResult {
     /** Set when more rows matched than were returned. */
     incomplete_reason?: string;
     result_state?: 'filter_not_applied';
+    /**
+     * Competition lookup coverage (only when the caller asked for it). checked = rows looked up; not_checked = rows
+     * past COMPETITION_LOOKUP_CAP (competition: null). unknown = looked up but not established. Offers received is
+     * reported only where the award record carries it: null means NOT REPORTED, never one bidder and never zero.
+     */
+    competition?: { source: 'usaspending_award'; checked: number; not_checked: number; competed: number; not_competed: number; unknown: number; offers_reported: number };
   };
 }
 
 export async function expiringContracts(
   input: ExpiringContractsToolInput,
-  deps: { vehicleLookup?: VehicleLookup } = {},
+  deps: {
+    vehicleLookup?: VehicleLookup;
+    /** Attach how each returned award was competed. Off by default (report/match callers keep their latency). */
+    competition?: boolean | { lookup?: CompetitionLookup; budgetMs?: number };
+  } = {},
 ): Promise<ExpiringContractsToolResult> {
   const naicsGiven = input.naicsCodes?.length ? input.naicsCodes : input.naics;
   const naicsArg = resolveNaicsArg(naicsGiven);
@@ -205,6 +235,28 @@ export async function expiringContracts(
         vehicle_ordering_period_status: v.ordering_period_status,
       };
     });
+  // Competition: the returned standalone contracts first, then in-window orders, capped.
+  let competitionMeta: ExpiringContractsToolResult['_meta']['competition'];
+  let withCompetition: Array<ExpiringContract & WithCompetition> = standalone;
+  let ordersOut: ExpiringOrderInWindow[] = expiringOrders;
+  if (deps.competition) {
+    const opt = typeof deps.competition === 'object' ? deps.competition : {};
+    const candidates = [...standalone, ...expiringOrders].map((c) => c.contract_id).filter(Boolean) as string[];
+    const toCheck = [...new Set(candidates)].slice(0, COMPETITION_LOOKUP_CAP);
+    const facts = await competitionFactsFor(toCheck, opt.lookup ?? usaspendingCompetitionLookup, { budgetMs: opt.budgetMs ?? 5000 });
+    const attach = <T extends ExpiringContract>(c: T): T & WithCompetition => ({ ...c, competition: facts.get(c.contract_id) ?? null });
+    withCompetition = standalone.map(attach);
+    ordersOut = expiringOrders.map(attach);
+    const counts = competitionCounts(facts.values());
+    const allIds = new Set(candidates);
+    competitionMeta = {
+      source: 'usaspending_award',
+      checked: facts.size,
+      not_checked: allIds.size - facts.size,
+      ...counts,
+      offers_reported: [...facts.values()].filter((f) => f.offers_received != null).length,
+    };
+  }
   const applied: Record<string, unknown> = {};
   if (naicsArg.codes.length) applied.naics = naicsArg.codes;
   if (stateArg.codes.length) applied.state = stateArg.codes;
@@ -221,9 +273,9 @@ export async function expiringContracts(
     : undefined;
   const result: ExpiringContractsToolResult = {
     queried,
-    contracts: standalone,
+    contracts: withCompetition,
     // Listed before vehicles[] (a large nested block) so a reader does not skim past in-window orders.
-    expiring_orders_in_window: expiringOrders,
+    expiring_orders_in_window: ordersOut,
     unresolved_orders: unresolved,
     vehicles,
     _meta: {
@@ -241,6 +293,7 @@ export async function expiringContracts(
       ignored_args: ignored,
       ...(res.window ? { window: res.window } : {}),
       ...(incomplete ? { incomplete_reason: incomplete } : {}),
+      ...(competitionMeta ? { competition: competitionMeta } : {}),
     },
   };
   if (mcpFlags.aiHint) {
@@ -263,6 +316,7 @@ export async function expiringContracts(
         'vehicles[] groups orders by the parent IDV recorded on each order. Holders of a multiple-award vehicle each hold their own IDV number, so sibling IDVs from one solicitation appear as separate vehicles; holders_in_result lists only holders seen in these rows.',
         'place_of_performance_state is the place of performance as reported by USASpending, shown as reported; null means USASpending reported none.',
         'recompete_likelihood is an inference; some contracts get extended or not recompeted.',
+        'competition (when present) is read from each award\'s own USASpending record: class competed | not_competed | unknown. competition.offers_received null = NOT REPORTED on the award, never "1 bidder" or zero. competition: null = not looked up (row past the lookup cap). The row columns competition_type / number_of_offers are not populated by the sync; use competition instead.',
         // set_aside_type is NULL on ~65% of rows (only PIIDs matched in the BQ awards
         // backfill carry it). NULL means UNKNOWN, never "Full & Open" — do not tell a
         // user a contract is open to them because the field is empty.
