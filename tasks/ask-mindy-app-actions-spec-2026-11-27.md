@@ -66,10 +66,10 @@ names, kinds or arg keys, so the two surfaces cannot drift.
 | `map.clear_filters` | view | the bar's own reset (`__saselReset`, `__naicsReset`, `__agencyReset` + FILT reset) | none |
 | `map.set_sort` | view | `window.__setSortScope` / existing sort control | `sort` ∈ the control's options |
 | `map.show_companies` | view (gated) | `setMapMode('companies')` via `__playersGate` | none; the gate behaves exactly as the button does |
-| `map.save_search` | **write** | the existing Save-search handler | `name` ≤80 chars; current view only |
-| `map.watch` (alerts) | **write** | the existing watch / alert toggle on a saved search | `frequency` ∈ the control's options |
+| `map.save_search` | **write** | `/api/app/mindy-actions` `save_search` → `createSavedSearch` (see below) | `name` ≤80 chars, `alert_frequency`; filters = current view |
+| `map.update_alert` | **write** | `/api/app/mindy-actions` `update_alert` → `updateSavedSearch` | `search_id` (uuid), `alert_frequency` ∈ daily/weekly/off |
 | `map.save_opportunity` (heart) | **write** | the existing heart handler | `notice_id` (as above) |
-| `map.add_to_pipeline` | **write** | `POST /api/pipeline` via the existing add-to-pipeline action | `notice_id` |
+| `map.add_to_pursuits` / `map.remove_from_pursuits` | **write** | `/api/app/mindy-actions` → `createCanonicalPursuit` / pipeline DELETE check | `{kind, notice_id \| contract_id}` / `{pursuit_id \| notice_id}` |
 | `map.export` | **write** | the existing list export | `format` ∈ the control's options |
 
 ### /app (standalone Ask Mindy and the shell)
@@ -157,6 +157,17 @@ with the confirm UI.
   Example: "show VA construction in Florida" → the filter chips show VA · construction · FL and the list count changes → Undo →
   the original chips come back. Run with `verify-ask-mindy` alongside the answer checks.
 - **Regression:** the same prompts with the flag off produce no UI change and identical answers.
+
+## Write actions backend (Agent 3, Data Core)
+
+- **Execution.** On Yes, the client POSTs `/api/app/mindy-actions` with `{email, action_id, name, args, confirmed: true}`. `name` is BARE (`save_search`, `update_alert`, `add_to_pursuits`, `remove_from_pursuits`); the client strips the surface prefix (`map.`/`app.`). The route checks the same MI session as the buttons, returns 400 `confirmation_required` unless `confirmed === true`, and calls the EXISTING lib.
+- **`save_search` {name, alert_frequency: daily|weekly|off}:** the model supplies only these. The client adds `mode` and `filters` from the CURRENT view: the same object the Map's Save button posts (`_mapState().filters`). That way a saved search reopens exactly what the customer saw, and an injected filter can't be saved. The route calls `createSavedSearch`, idempotent by fingerprint.
+- **`update_alert` {search_id, alert_frequency}:** calls `updateSavedSearch`, owner-scoped.
+- **`add_to_pursuits` {kind:'opportunity', notice_id} | {kind:'recompete', contract_id}:** calls `createCanonicalPursuit`. The title and fields come from our DB, never from args. A duplicate returns `already: true`.
+- **`remove_from_pursuits` {pursuit_id} | {notice_id}:** the same ownership check as the pipeline DELETE.
+- **Response:** `{ok, action_id, name, message, already?, target?: {kind, id, href}, error_code?}`. The client shows `message` as plain text (≤300 characters), plus a link when `target.href` exists.
+- **Undo after a confirmed write (10 s):** `add_to_pursuits` → `remove_from_pursuits` with the returned target id; `update_alert` → the previous frequency. `save_search` has no Undo in v1 ("You can remove it from Watchlist").
+- Both sides validate the args (plain name ≤80, enum frequency, id patterns, uuids).
 
 ## Server half (Agent 1)
 
