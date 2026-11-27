@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { clearUnsubscribeSuppression } from '@/lib/email/unsubscribe-apply';
 import { naicsSourceForUserWrite } from '@/lib/profile/naics-provenance';
 import { KEYWORD_MAX_COUNT, validateKeywordSave } from '@/lib/keywords/sanitize';
 import { createClient } from '@supabase/supabase-js';
@@ -567,6 +568,13 @@ export async function POST(request: NextRequest) {
       } catch (businessProfileError) {
         console.warn('[Notification Preferences] Could not mirror business description:', businessProfileError);
       }
+    }
+
+    // Re-subscribe (one-click unsubscribe wrote an 'unsubscribe' suppression, which blocks all non-transactional
+    // mail): the verified owner turning alerts or briefings back on clears it. Bounce/complaint rows are untouched.
+    if (data.alerts_enabled || data.briefings_enabled) {
+      const cleared = await clearUnsubscribeSuppression(getSupabase(), String(data.user_email));
+      if (!cleared.ok) console.error('[Notification Preferences] could not clear unsubscribe suppression:', cleared.error);
     }
 
     return NextResponse.json({

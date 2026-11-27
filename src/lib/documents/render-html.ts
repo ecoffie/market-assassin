@@ -68,7 +68,7 @@ body { margin: 0; color: ${c('ink')}; background: ${c('pageBg')}; font-family: '
 .cover dt { color: ${c('meta')}; } .cover dd { margin: 0; color: ${c('meta')}; }
 .cover .card { background: ${c('panelBg')}; border: 1px solid ${c('rule')}; border-radius: 10px; padding: 14px 18px; }
 .cover .card dt { color: ${c('accent')}; font-weight: 700; } .cover .card dd { color: ${c('ink')}; }
-.reading { margin-top: 0.22in; padding: 12px 14px; border: 1px solid ${c('rule')}; border-radius: 6px; font-size: 9pt; color: ${c('meta')}; background: ${c('panelBg')}; }
+.reading { break-inside: avoid; margin-top: 0.22in; padding: 12px 14px; border: 1px solid ${c('rule')}; border-radius: 6px; font-size: 9pt; color: ${c('meta')}; background: ${c('panelBg')}; }
 .reading b { color: ${c('ink')}; }
 .letterhead .lh { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding-bottom: 12px; margin-bottom: 0.3in; border-bottom: 2px solid ${c('accent2')}; }
 .letterhead .who { display: flex; align-items: center; }
@@ -223,7 +223,7 @@ export function renderHtml(stored: DocModel, opts: RenderHtmlOptions = {}): stri
 
   const meta: string[] = [];
   if (model.preparedFor) meta.push(`<dt>Prepared for</dt><dd>${escapeHtml(model.preparedFor)}</dd>`);
-  meta.push(`<dt>Date</dt><dd>${escapeHtml(formatDocDate(model.date))}</dd>`);
+  // No document date on the cover (Eric, 2026-11-27): a saved report with a date reads as out of date later.
   meta.push(`<dt>Prepared with</dt><dd>Mindy</dd>`);
   if (ordered.length) meta.push(`<dt>Sources</dt><dd>${ordered.length} cited source${ordered.length === 1 ? '' : 's'}</dd>`);
 
@@ -241,11 +241,10 @@ export function renderHtml(stored: DocModel, opts: RenderHtmlOptions = {}): stri
   if (typeof model.meta?.attention === 'string' && model.meta.attention.trim()) card.push(`<dt>Attention</dt><dd>${escapeHtml(model.meta.attention)}</dd>`);
   card.push(`<dt>Prepared by</dt><dd>${escapeHtml(brand.name)}</dd>`);
   if (model.subtitle) card.push(`<dt>What this is</dt><dd>${escapeHtml(model.subtitle)}</dd>`);
-  card.push(`<dt>Date</dt><dd>${escapeHtml(formatDocDate(model.date))}</dd>`);
   if (ordered.length) card.push(`<dt>Sources</dt><dd>${ordered.length} cited source${ordered.length === 1 ? '' : 's'}</dd>`);
-  const byline = [model.preparedFor ? `Prepared for ${escapeHtml(model.preparedFor)}` : '', escapeHtml(formatDocDate(model.date))].filter(Boolean).join(' · ');
+  const byline = model.preparedFor ? `Prepared for ${escapeHtml(model.preparedFor)}` : '';
   const cover = theme.cover === 'letterhead'
-    ? `<section class="cover letterhead"><div class="lh"><div class="who"><span class="mark">${escapeHtml(brand.mark)}</span><div><div class="name">${escapeHtml(brand.name)}</div><div class="tag">${escapeHtml(brand.tagline)}</div></div></div><div class="contact">${brand.contactLines.map(escapeHtml).join('<br>')}</div></div><h1>${escapeHtml(keepDash(model.title))}</h1><p class="byline">${byline}</p><dl class="card">${card.join('')}</dl><div class="reading">${reading}</div></section>`
+    ? `<section class="cover letterhead"><div class="lh"><div class="who"><span class="mark">${escapeHtml(brand.mark)}</span><div><div class="name">${escapeHtml(brand.name)}</div><div class="tag">${escapeHtml(brand.tagline)}</div></div></div><div class="contact">${brand.contactLines.map(escapeHtml).join('<br>')}</div></div><h1>${escapeHtml(keepDash(model.title))}</h1>${byline ? `<p class="byline">${byline}</p>` : ''}<dl class="card">${card.join('')}</dl><div class="reading">${reading}</div></section>`
     : theme.cover === 'brand-band'
     ? `<section class="cover brand"><div class="brandband"><div class="who"><span class="mark">${escapeHtml(brand.mark)}</span><div><div class="name">${escapeHtml(brand.name)}</div><div class="tag">${escapeHtml(brand.tagline)}</div></div></div><div class="contact">${brand.contactLines.map(escapeHtml).join('<br>')}</div></div><h1>${escapeHtml(keepDash(model.title))}</h1>${model.subtitle ? `<p class="subtitle">${escapeHtml(model.subtitle)}</p>` : ''}<dl class="card">${card.join('')}</dl><div class="reading">${reading}</div></section>`
     : `<section class="cover rule"><div class="titleblock"><div class="kicker">Report</div><h1>${escapeHtml(keepDash(model.title))}</h1>${model.subtitle ? `<p class="subtitle">${escapeHtml(model.subtitle)}</p>` : ''}<dl>${meta.join('')}</dl></div><div class="reading">${reading}</div></section>`;

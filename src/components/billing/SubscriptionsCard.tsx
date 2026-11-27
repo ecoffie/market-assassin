@@ -152,6 +152,8 @@ export default function SubscriptionsCard({ email, upgradeHref = '/pricing' }: {
 
           {subs === null ? (
             <p className="text-[12px] text-amber-300">We couldn&apos;t check your paid subscriptions right now. Refresh to try again.</p>
+          ) : subs.length === 0 && data?.plan === 'free' ? (
+            <p className="text-[12px] text-slate-400" data-testid="nothing-to-cancel">You&apos;re on the free plan, so there&apos;s nothing to cancel. Credit top-ups are one-time and don&apos;t renew.</p>
           ) : subs.length === 0 ? (
             <p className="text-[12px] text-slate-500">No paid subscriptions. Credit top-ups are one-time and don&apos;t renew.</p>
           ) : (
@@ -228,8 +230,8 @@ export default function SubscriptionsCard({ email, upgradeHref = '/pricing' }: {
           )}
 
           {hasPaidPlanWithoutSub && (
-            <p className="text-[12px] text-slate-500">
-              Your {data?.planLabel} access isn&apos;t a personal subscription here (it comes from a team, bundle or grant), so there&apos;s nothing to cancel.{' '}
+            <p className="text-[12px] text-slate-400" data-testid="nothing-to-cancel">
+              Your {data?.planLabel} access isn&apos;t a subscription you pay for here (it&apos;s lifetime access, or it comes from a team, bundle or grant), so there&apos;s nothing to cancel.{' '}
               <a href="mailto:admin@getmindy.ai" className="text-emerald-300 underline underline-offset-2">Questions? Contact support</a>
             </p>
           )}
