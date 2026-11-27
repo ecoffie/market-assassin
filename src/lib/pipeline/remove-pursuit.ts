@@ -5,6 +5,11 @@
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
 
+/** PostgREST filter-value quoting: wrap in double quotes, escape backslash and double quote. */
+export function pgrstQuote(v: string): string {
+  return `"${String(v).replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+}
+
 export type RemovePursuitResult =
   | { kind: 'removed'; row: { id: string; title: string; stage: string | null } }
   | { kind: 'not_found' }
@@ -16,7 +21,9 @@ export async function removeOwnedPursuit(
   target: { id?: string | null; noticeId?: string | null },
 ): Promise<RemovePursuitResult> {
   const email = owner.email.toLowerCase();
-  const ownership = `workspace_id.eq.${owner.workspaceId},user_email.eq.${email}`;
+  // Values are double-quoted (PostgREST reserved-character quoting) so an email containing ',', '.', '(' or ')'
+  // cannot alter the filter (Agent 4 review of #2504).
+  const ownership = `workspace_id.eq.${pgrstQuote(owner.workspaceId)},user_email.eq.${pgrstQuote(email)}`;
   if (!target.id && !target.noticeId) return { kind: 'not_found' };
 
   let find = db.from('user_pipeline').select('id,title,stage');

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { removeOwnedPursuit } from './remove-pursuit';
+import { removeOwnedPursuit, pgrstQuote } from './remove-pursuit';
 
 function db(rows: Array<{ id: string; title: string; stage: string | null }>, opts: { findErr?: string } = {}) {
   const calls: Array<{ op: string; col?: string; val?: unknown }> = [];
@@ -23,7 +23,7 @@ describe('removeOwnedPursuit', () => {
     const r = await removeOwnedPursuit(d.client, OWNER, { noticeId: 'abc' });
     expect(r).toEqual({ kind: 'removed', row: { id: 'p1', title: 'Roofing', stage: 'tracking' } });
     const ors = d.calls.filter((c) => c.op.endsWith('.or')).map((c) => c.val);
-    expect(ors).toEqual(['workspace_id.eq.ws-1,user_email.eq.pat@example.com', 'workspace_id.eq.ws-1,user_email.eq.pat@example.com']);
+    expect(ors).toEqual(['workspace_id.eq."ws-1",user_email.eq."pat@example.com"', 'workspace_id.eq."ws-1",user_email.eq."pat@example.com"']);
     expect(d.calls).toContainEqual({ op: 'find.eq', col: 'notice_id', val: 'abc' });
     expect(d.calls).toContainEqual({ op: 'delete.eq', col: 'id', val: 'p1' });
   });
@@ -40,5 +40,12 @@ describe('removeOwnedPursuit', () => {
   it('a read error is an error, never not_found', async () => {
     const d = db([], { findErr: 'boom' });
     expect(await removeOwnedPursuit(d.client, OWNER, { id: 'x' })).toEqual({ kind: 'error', message: 'boom' });
+  });
+});
+
+describe('pgrstQuote', () => {
+  it('an email with reserved characters stays one quoted value', () => {
+    expect(pgrstQuote('a,b)or(x.eq.1@y.com')).toBe('"a,b)or(x.eq.1@y.com"');
+    expect(pgrstQuote('q"uote\\x')).toBe('"q\\"uote\\\\x"');
   });
 });
