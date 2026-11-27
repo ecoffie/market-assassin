@@ -124,7 +124,7 @@ import { intelligenceGateEnabledFor, runIntelligenceGate, type GateResult } from
 import Anthropic from '@anthropic-ai/sdk';
 import {
   researchModeEnabledFor, researchModel, researchSystemPrompt, toAnthropicTools, runResearchLoop, groundAnswer, progressLine,
-  RESEARCH_TURN_MS, RESEARCH_DEADLINE_MS, RESEARCH_NO_ANSWER, researchToolDefs, wantsReport, type ResearchCall,
+  RESEARCH_TURN_MS, RESEARCH_DEADLINE_MS, RESEARCH_NO_ANSWER, researchToolDefs, billedInputTokens, describeResearchError, RESEARCH_SYSTEM_STATIC, researchSystemDynamic, type ResearchCall, wantsReport,
 } from '@/lib/ask-mindy/research-mode';
 import { toolLabel } from '@/lib/chat/context-sources';
 import { researchCapDecision } from '@/lib/ask-mindy/research-caps';
@@ -1284,11 +1284,8 @@ export async function POST(request: NextRequest) {
                 latencyMs: Date.now() - startedAt, trace: { ...rmTrace, ...extra, total_ms: Date.now() - rmStarted },
               }).catch((err) => console.error('[chat] persist failed:', err));
             };
-            // Never a silent model swap: if a budget limit applies, say so plainly and stop.
-            if (await isUserOverBudget(email).catch(() => false)) {
-              await finish('You have reached this month\'s research limit, so I can\'t run a full research answer right now. Your saved conversations and reports are unaffected.', { stop: 'over_budget' });
-              return;
-            }
+            // Research mode is governed ONLY by the plan-based daily caps (ASK_MINDY_RESEARCH_CAPS, checked before this
+            // turn started); the monthly dollar limit does not apply (Eric, 2026-11-25). The model is never swapped.
             const rmTools = toAnthropicTools(researchToolDefs(executor.offeredToolDefs(), privateNames));
             const conversation = [
               ...history.filter((h) => h.role === 'user' || h.role === 'assistant').slice(-12).map((h) => ({ role: h.role as 'user' | 'assistant', content: String(h.content || '').slice(0, 12_000) || '(empty)' })),
@@ -1330,7 +1327,9 @@ export async function POST(request: NextRequest) {
             try {
               const loop = await runResearchLoop({
                 client, model,
-                system: researchSystemPrompt({ today, profileBlock: userProfileBlock }),
+                // Fixed prompt first (cached across steps and turns), then today's date and the profile after the breakpoint.
+                system: RESEARCH_SYSTEM_STATIC,
+                systemDynamic: researchSystemDynamic({ today, profileBlock: userProfileBlock }),
                 conversation,
                 tools: rmTools,
                 effort: process.env.ASK_MINDY_RESEARCH_EFFORT || 'high',
@@ -1347,7 +1346,9 @@ export async function POST(request: NextRequest) {
                   return out;
                 },
               });
-              void recordLlmUsage({ userEmail: auth.email, tool: 'chat', job: 'research_mode', provider: 'anthropic', model, usage: { prompt_tokens: loop.usage.input, completion_tokens: loop.usage.output } });
+              // Cost: cached input priced as billed (reads 0.1x, writes 1.25x); the raw counts go to the trace.
+              void recordLlmUsage({ userEmail: auth.email, tool: 'chat', job: 'research_mode', provider: 'anthropic', model, usage: { prompt_tokens: billedInputTokens(loop.usage), completion_tokens: loop.usage.output } });
+              rmTrace.usage = { input: loop.usage.input, cache_read: loop.usage.cacheRead, cache_write: loop.usage.cacheWrite, output: loop.usage.output };
               Object.assign(rmTrace, { stop: loop.stop, steps: loop.steps, call_count: loop.calls, calls: callLog, results_cut: loop.resultsCut, sam_cache_only: true });
               if (!loop.text) { await finish(RESEARCH_NO_ANSWER, {}, rmSources); return; }
               send({ type: 'progress', message: 'Checking every figure against the sources.', phase: 'checking' });
@@ -1371,8 +1372,19 @@ export async function POST(request: NextRequest) {
               }
               await finish(grounded.text, {}, rmSources);
             } catch (err) {
-              console.error('[chat] research mode failed:', (err as Error)?.message);
-              Object.assign(rmTrace, { stop: 'error', calls: callLog });
+              // The failure keeps its cost and its cause: usage accrued before the error is logged, and the trace records
+              // the error class (e.g. credit_balance_too_low), status and message, not just "error".
+              const failure = describeResearchError(err);
+              console.error('[chat] research mode failed:', failure.class, failure.status ?? '', failure.message);
+              if (failure.progress) {
+                const u = failure.progress.usage;
+                void recordLlmUsage({ userEmail: auth.email, tool: 'chat', job: 'research_mode_failed', provider: 'anthropic', model, usage: { prompt_tokens: billedInputTokens(u), completion_tokens: u.output } });
+                rmTrace.usage = { input: u.input, cache_read: u.cacheRead, cache_write: u.cacheWrite, output: u.output };
+              }
+              Object.assign(rmTrace, {
+                stop: 'error', calls: callLog,
+                error: { class: failure.class, status: failure.status, message: failure.message, ...(failure.progress ? { steps: failure.progress.steps, call_count: failure.progress.calls } : {}) },
+              });
               await finish('I could not finish this research because a service did not respond. Please try again in a moment.', {}, rmSources);
             }
             return;

@@ -4,7 +4,7 @@
  */
 import { describe, it, expect, vi } from 'vitest';
 import {
-  researchModeEnabledFor, toAnthropicTools, runResearchLoop, wantsReport, RESEARCH_SYNTHESIS_AT_CALLS, groundAnswer, fullResult, progressLine, researchSystemPrompt,
+  researchModeEnabledFor, toAnthropicTools, runResearchLoop, billedInputTokens, describeResearchError, groundAnswer, fullResult, progressLine, researchSystemPrompt, RESEARCH_SYSTEM_STATIC, researchSystemDynamic, wantsReport, RESEARCH_SYNTHESIS_AT_CALLS,
   RESEARCH_INSTRUCTIONS, RESEARCH_WITHHELD_TOOLS, RESEARCH_EXTRA_TOOLS, RESULT_CEILING_CHARS, FINAL_RESERVE_MS, researchToolDefs,
 } from './research-mode';
 import { MCP_CONNECTOR_INSTRUCTIONS } from '@/lib/mcp/schedule-discovery';
@@ -136,6 +136,10 @@ describe('instructions', () => {
     expect(RESEARCH_INSTRUCTIONS).toMatch(/strategic plans and budget justifications on the agency's own site/);
     expect(RESEARCH_INSTRUCTIONS).toMatch(/officers as reported to USASpending/);
     expect(RESEARCH_INSTRUCTIONS).toMatch(/none_reported does not mean the company has no leaders/);
+  });
+  it('registration facts carry the SAM record date in plain words; never "go check SAM.gov"', () => {
+    expect(RESEARCH_INSTRUCTIONS).toMatch(/say the date of Mindy's SAM registration record in plain words/);
+    expect(RESEARCH_INSTRUCTIONS).toMatch(/never tell the customer to go check SAM\.gov/);
   });
   it('the spec is generic: no reference-case company, person or identifier', () => {
     expect(RESEARCH_INSTRUCTIONS).not.toMatch(/\bEFS\b|Norwich|Colon|X6PKH4P1T124|UConn/i);
@@ -299,5 +303,81 @@ describe('a named company is researched even when the saved profile is a differe
   it('the mismatch is one line in Sources & coverage, never the opening', () => {
     expect(RESEARCH_INSTRUCTIONS).toMatch(/A company named in the question is the company to research, even when it differs from the saved company profile/);
     expect(RESEARCH_INSTRUCTIONS).toMatch(/only as one line in "Sources & coverage", never at the start of the answer/);
+  });
+});
+
+describe('prompt caching (766K input tokens on one answer)', () => {
+  it('system prompt and tool definitions are cache breakpoints; exactly one moving breakpoint on the newest message; history is never mutated', async () => {
+    const { client, create } = scripted([
+      msg([toolUse('t1', 'find_opportunities')], 'tool_use'),
+      msg([toolUse('t2', 'find_opportunities')], 'tool_use'),
+      msg([text('Done.')], 'end_turn'),
+    ]);
+    const tools = [{ name: 'a', description: 'd', input_schema: { type: 'object' } }, { name: 'find_opportunities', description: 'd', input_schema: { type: 'object' } }];
+    await runResearchLoop({ ...base, tools, client, execute: async (cs) => cs.map((c) => ({ id: c.id, content: 'r' })) });
+    for (const call of create.mock.calls) {
+      const body = (call as never[])[0] as { system: Array<{ cache_control?: unknown }>; tools: Array<{ cache_control?: unknown }>; messages: Array<{ content: unknown }> };
+      expect(body.system[0].cache_control).toEqual({ type: 'ephemeral' });
+      expect(body.tools.map((t) => !!t.cache_control)).toEqual([false, true]);
+      const marks = JSON.stringify(body.messages).match(/"cache_control"/g) ?? [];
+      expect(marks).toHaveLength(1);
+      const last = body.messages[body.messages.length - 1].content as Array<{ cache_control?: unknown }>;
+      expect(last[last.length - 1].cache_control).toEqual({ type: 'ephemeral' });
+    }
+  });
+  it('cache reads and writes are counted and priced (reads 0.1x, writes 1.25x)', async () => {
+    const create = vi.fn(async () => ({ content: [{ type: 'text', text: 'ok' }], stop_reason: 'end_turn', usage: { input_tokens: 100, output_tokens: 10, cache_read_input_tokens: 9000, cache_creation_input_tokens: 400 } }));
+    const r = await runResearchLoop({ ...base, client: { messages: { create } } as never, execute: async () => [] });
+    expect(r.usage).toEqual({ input: 100, output: 10, cacheRead: 9000, cacheWrite: 400 });
+    expect(billedInputTokens(r.usage)).toBe(100 + 900 + 500);
+  });
+  it('modelled on an EFS-sized run (24 steps, 30k system+tools, ~8k new per step): billed input falls by over 75%', () => {
+    const steps = 24, fixed = 30_000, perStep = 8_000;
+    let before = 0, after = 0, prefix = fixed;
+    for (let i = 0; i < steps; i++) {
+      const prompt = prefix + (i === 0 ? 0 : perStep);
+      before += prompt;
+      after += i === 0 ? fixed * 1.25 : prefix * 0.1 + perStep * 1.25;
+      prefix = prompt;
+    }
+    expect(after / before).toBeLessThan(0.25);
+  });
+});
+
+describe('a failed research turn keeps its cost and its cause', () => {
+  const creditError = () => Object.assign(new Error('400 {"type":"error","error":{"type":"invalid_request_error","message":"Your credit balance is too low to access the Anthropic API."}}'), {
+    status: 400, error: { type: 'error', error: { type: 'invalid_request_error', message: 'Your credit balance is too low to access the Anthropic API.' } },
+  });
+  it('the thrown error carries the usage, steps and calls accrued before it', async () => {
+    let n = 0;
+    const create = vi.fn(async () => {
+      if (++n === 1) return { content: [toolUse('t1', 'find_opportunities')], stop_reason: 'tool_use', usage: { input_tokens: 500, output_tokens: 40, cache_read_input_tokens: 2000, cache_creation_input_tokens: 100 } };
+      throw creditError();
+    });
+    const err = await runResearchLoop({ ...base, client: { messages: { create } } as never, execute: async (cs) => cs.map((c) => ({ id: c.id, content: 'ok' })) }).catch((e) => e);
+    const d = describeResearchError(err);
+    expect(d.class).toBe('credit_balance_too_low');
+    expect(d.status).toBe(400);
+    expect(d.message).toMatch(/credit balance is too low/);
+    expect(d.progress).toEqual({ usage: { input: 500, output: 40, cacheRead: 2000, cacheWrite: 100 }, steps: 1, calls: 1 });
+  });
+  it('other provider errors keep their own type; a plain error its name', () => {
+    expect(describeResearchError(Object.assign(new Error('529 overloaded'), { status: 529, error: { type: 'error', error: { type: 'overloaded_error', message: 'Overloaded' } } }))).toMatchObject({ class: 'overloaded_error', status: 529, message: 'Overloaded' });
+    expect(describeResearchError(new TypeError('boom'))).toMatchObject({ class: 'TypeError', status: null, message: 'boom', progress: null });
+  });
+});
+
+describe('the cached prefix is stable (any byte change invalidates it)', () => {
+  it('the fixed system prompt is cached; today and the profile come after the breakpoint; the prefix is byte-identical every step', async () => {
+    const { client, create } = scripted([msg([toolUse('t1', 'find_opportunities')], 'tool_use'), msg([text('Done.')], 'end_turn')]);
+    await runResearchLoop({ ...base, system: RESEARCH_SYSTEM_STATIC, systemDynamic: researchSystemDynamic({ today: '2026-11-25', profileBlock: 'Company: Ridgeline Digital' }), client, execute: async (cs) => cs.map((c) => ({ id: c.id, content: 'r' })) });
+    const bodies = create.mock.calls.map((c) => (c as never[])[0] as { system: Array<{ text: string; cache_control?: unknown }>; tools: unknown[] });
+    for (const b of bodies) {
+      expect(b.system[0]).toMatchObject({ text: RESEARCH_SYSTEM_STATIC, cache_control: { type: 'ephemeral' } });
+      expect(b.system[1].cache_control).toBeUndefined();
+      expect(b.system[1].text).toContain('Today is 2026-11-25.');
+    }
+    expect(JSON.stringify([bodies[0].tools, bodies[0].system[0]])).toBe(JSON.stringify([bodies[1].tools, bodies[1].system[0]]));
+    expect(RESEARCH_SYSTEM_STATIC).not.toMatch(/Today is|SAVED COMPANY PROFILE/);
   });
 });

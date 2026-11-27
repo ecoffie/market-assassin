@@ -9,6 +9,7 @@
  * - Points of contact
  */
 
+import { markSamKeyRejected } from '@/lib/sam/key-health';
 import {
   getSAMAPIConfig,
   makeSAMRequest, getAllDistinctSAMKeys} from './utils';
@@ -453,6 +454,8 @@ export async function searchEntities(
   const keyUnusable = (st?: number) => st === 429 || st === 401 || st === 403;
 
   if (keyUnusable(result.error?.status)) {
+    // Remember a REJECTED key (401/403) for the process so no path re-tries it (key-health.ts, 2026-11-25).
+    if (result.error?.status) markSamKeyRejected(config.apiKey, result.error.status, result.error.message);
     const pool = getAllDistinctSAMKeys().filter((k) => k !== config.apiKey);
     for (const key of pool) {
       console.warn(`[SAM Entity] key unusable (${result.error?.status}) — failing over (${pool.indexOf(key) + 1}/${pool.length})`);
@@ -460,6 +463,7 @@ export async function searchEntities(
         entityData: Record<string, unknown>[];
         totalRecords: number;
       }>({ ...config, apiKey: key }, '/entities', queryParams);
+      if (result.error?.status) markSamKeyRejected(key, result.error.status, result.error.message);
       if (!keyUnusable(result.error?.status)) break;
     }
   }

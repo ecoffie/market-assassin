@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { ungroundedFigures } from './figure-grounding';
+import { ungroundedFigures, plainNumbersIn } from './figure-grounding';
 import { evaluateDecision } from './evaluator';
 import type { AnalystDecision } from './analyst';
 
@@ -78,5 +78,25 @@ describe('the review returns the untraceable figures (figure text only)', () => 
   it('an answer with only traceable figures returns none', async () => {
     const e = await evaluateDecision({ question: 'q', evidence: EVIDENCE, decision: dec('Go after the $1.2M contract'), checks }, { client: client() });
     expect(e.untraceableFigures).toEqual([]);
+  });
+});
+
+describe('Mindy\'s own contract values (plain JSON numbers in tool results) are evidence', () => {
+  const TOOL = JSON.stringify({ awards: [{ piid: 'W912PL26C4200', total_obligation: 1234567.89, potential_total_value: 18500000, naics_code: '541810', action_date: '2026-11-20', notice_id: '6ba812a7e0284f79bc44c4932777c340', uei: 'ABC123DEF456' }] });
+  it('a real value is kept however the answer rounds it', () => {
+    expect(ungroundedFigures(dec('The award is worth $1.2M.'), TOOL)).toEqual([]);
+    expect(ungroundedFigures(dec('The award is worth $1.23M.'), TOOL)).toEqual([]);
+    expect(ungroundedFigures(dec('The award is worth $1,234,567.'), TOOL)).toEqual([]);
+    expect(ungroundedFigures(dec('Ceiling of $18.5M.'), TOOL)).toEqual([]);
+    expect(ungroundedFigures(dec('Ceiling of $19M.'), TOOL)).toEqual([]);
+  });
+  it('an invented value is still stripped, even when identifiers and dates contain similar digits', () => {
+    expect(ungroundedFigures(dec('The award is worth $4.2M.'), TOOL)).toEqual(['$4.2M']);
+    expect(ungroundedFigures(dec('Worth $541,810.'), TOOL)).toEqual(['$541,810']);
+    expect(ungroundedFigures(dec('Worth $2.6M.'), TOOL)).toEqual(['$2.6M']);
+  });
+  it('plain numbers inside identifiers and dates are not values', () => {
+    expect(plainNumbersIn('piid W912PL26C4200 date 2026-11-20 uei ABC123DEF456 value 25000')).toEqual([25000]);
+    expect(plainNumbersIn('{"naics_code":"541810","zip":"20001","amount":"1,234,567","obligated":"98765.5"}')).toEqual([1234567, 98765.5]);
   });
 });

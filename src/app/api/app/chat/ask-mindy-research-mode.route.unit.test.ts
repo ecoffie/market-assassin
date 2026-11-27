@@ -116,7 +116,11 @@ describe('research mode in the chat route', () => {
     expect(h.create).toHaveBeenCalledTimes(2);
     const first = h.create.mock.calls[0][0] as { model: string; system: string; tools: Array<{ name: string }> };
     expect(first.model).toBe('claude-opus-5-5');
-    expect(first.system).toContain('IDENTITY FIRST');
+    expect(JSON.stringify(first.system)).toContain('IDENTITY FIRST');
+    const sys = first.system as unknown as Array<{ text: string; cache_control?: unknown }>;
+    expect(sys[0].cache_control).toEqual({ type: 'ephemeral' });
+    expect(sys[0].text).not.toMatch(/Today is/);
+    expect(sys[1].text).toMatch(/Today is/);
     const names = first.tools.map((t) => t.name);
     expect(names).toEqual(expect.arrayContaining(['find_opportunities', 'search_contractors', 'search_web', 'read_web_page']));
     for (const t of ['lookup_sam_entity', 'get_contractor_award_history', 'get_solicitation_incumbent', 'get_solicitation_documents', 'get_buying_offices']) expect(names).toContain(t);
@@ -132,16 +136,17 @@ describe('research mode in the chat route', () => {
     expect(JSON.stringify(trace)).not.toContain('obligated $1.2M');
   });
 
-  it('the model is set by env and never swapped; over budget says so plainly and runs no model', async () => {
+  it('the model is set by env and never swapped; the monthly dollar limit does NOT govern research mode (daily caps only)', async () => {
     flagOn();
     process.env.ASK_MINDY_RESEARCH_MODEL = 'claude-sonnet-5-5';
     await ask(Q);
     expect((h.create.mock.calls[0][0] as { model: string }).model).toBe('claude-sonnet-5-5');
     h.create.mockClear(); h.inserts.length = 0; h.overBudget = true;
     const ev = await ask(Q);
-    expect(h.create).not.toHaveBeenCalled();
+    expect(h.create).toHaveBeenCalled();
+    expect((h.create.mock.calls[0][0] as { model: string }).model).toBe('claude-sonnet-5-5');
     expect(openaiCalls).toHaveLength(0);
-    expect(text(ev)).toMatch(/reached this month's research limit/);
+    expect(text(ev)).not.toMatch(/research limit/);
   });
 
   it('an untraceable figure is fixed by one revision, or disclosed first', async () => {
@@ -321,5 +326,21 @@ describe('research mode in the chat route', () => {
   it('ordinary turns register no keep-alive', async () => {
     await ask(Q);
     expect(h.afterFns).toHaveLength(0);
+  });
+
+  it('a provider failure mid-run is traced with its class and the usage it had already cost', async () => {
+    flagOn();
+    let step = 0;
+    h.create.mockImplementation(async () => {
+      if (++step === 1) return { content: [{ type: 'tool_use', id: 'tu1', name: 'find_opportunities', input: { query: 'x' } }], stop_reason: 'tool_use', usage: { input_tokens: 700, output_tokens: 30, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 } };
+      throw Object.assign(new Error('credit'), { status: 400, error: { type: 'error', error: { type: 'invalid_request_error', message: 'Your credit balance is too low to access the Anthropic API.' } } });
+    });
+    const ev = await ask(Q);
+    expect(text(ev)).toMatch(/could not finish this research/);
+    expect(await savedTrace()).toMatchObject({
+      stop: 'error',
+      usage: { input: 700, output: 30 },
+      error: { class: 'credit_balance_too_low', status: 400, steps: 1, call_count: 1 },
+    });
   });
 });
