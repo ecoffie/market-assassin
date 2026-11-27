@@ -140,3 +140,21 @@ describe('capability statement as the model actually writes it (Eric’s screens
     expect(doc).toContain('Registration expires'.toUpperCase());
   });
 });
+
+describe('capability statement palette (Eric, 2026-11-27: "I like the other color, not the Mindy colors")', () => {
+  it('the default (mindy) theme prints in the navy and gold briefing palette: solid navy band, no purple gradient', () => {
+    expect(CAPABILITY_STATEMENT.theme ?? 'mindy').toBe('mindy');
+    const html = renderHtml(CAPABILITY_STATEMENT);
+    expect(html).toContain('linear-gradient(90deg, #0b2545, #0b2545)');
+    expect(html).not.toMatch(/#7c3aed|#1e3a8a/i);
+    expect(html).toContain('#b8892a'); // gold accent on the section rules
+  });
+  it('Word uses the same navy for the header band and the data box rule', async () => {
+    const doc = strFromU8(unzipSync(new Uint8Array(await renderDocx(CAPABILITY_STATEMENT)))['word/document.xml']);
+    expect(doc).toContain('w:fill="0B2545"');
+    expect(doc).not.toMatch(/7C3AED|1E3A8A/i);
+  });
+  it('a report keeps the Mindy theme (only the capability statement layout changes palette)', () => {
+    expect(renderHtml(SAMPLE_REPORT)).toMatch(/#1e3a8a/i);
+  });
+});

@@ -34,7 +34,7 @@ import {
 import type { Block, ChartBlock, DocModel, TableBlock, TableColumn } from './model';
 import { resolveTheme, type Theme } from './theme';
 import { assumptionOrigin, clientCopy, publicRecordId, DOC_STAGE_MARK, keepDash, stripHeadingNumber, chartShownByAdjacentTable, citationIndex, citeMarker, claimLabel, claimsPresent, formatColumn, formatChartValue, formatDocDate, usdColumnDecimals, parseInline, unverifiedStatements } from './format';
-import { extractCapability, isCapabilityStatement, type CapEntry, type CapField } from './capability-statement';
+import { capabilityThemeName, extractCapability, isCapabilityStatement, type CapEntry, type CapField } from './capability-statement';
 import { TOC_MIN_SECTIONS } from './render-html';
 
 // The document's theme (theme.ts), resolved once per buildDocx call (which is synchronous). Every
@@ -234,8 +234,8 @@ function blockToDocx(b: Block, numberOf: Numberer, shownByAdjacentTable = false)
 
 export function buildDocx(stored: DocModel): Document {
   const model = clientCopy(stored);
+  if (isCapabilityStatement(model)) { useTheme(resolveTheme(capabilityThemeName(model.theme))); return buildCapabilityDocx(model); }
   useTheme(resolveTheme(model.theme));
-  if (isCapabilityStatement(model)) return buildCapabilityDocx(model);
   const { ordered, numberOf } = citationIndex(model);
   // Same rule as the PDF (render-html.ts): a contents list only for long documents, and never a page of its own.
   const showToc = model.sections.filter((s) => (s.level ?? 1) === 1).length >= TOC_MIN_SECTIONS;
