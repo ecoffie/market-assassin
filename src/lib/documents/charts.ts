@@ -189,7 +189,7 @@ function pieSvg(chart: ChartBlock, width: number): string {
   const r = 90;
   const cx = 120;
   const cy = 110;
-  const legend = pts.map((p) => wrapWords(`${p.x} — ${total > 0 ? ((Math.max(0, p.y) / total) * 100).toFixed(1) : '0.0'}%`, 44));
+  const legend = pts.map((p) => wrapWords(`${p.x}: ${total > 0 ? ((Math.max(0, p.y) / total) * 100).toFixed(1) : '0.0'}%`, 44));
   const legendTop: number[] = [];
   const legendEnd = legend.reduce((y, ls, i) => { legendTop[i] = y; return y + 8 + ls.length * 14; }, 14);
   const height = Math.max(230, legendEnd + 10);
