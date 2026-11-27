@@ -1310,3 +1310,33 @@ describe('research report launch (Design & Output, 2026-11-27)', () => {
     expect(doc.slice(0, firstHeading)).not.toContain('w:type="page"');
   });
 });
+
+describe('sources list carries no retrieval date (Eric, 2026-11-27)', () => {
+  const m = () => {
+    const x = clone();
+    x.sources = [
+      { id: 's1', kind: 'web', label: 'GAO-25-106719, Nov 20 2024: Federal Real Property', url: 'https://www.gao.gov/products/gao-25-106719', retrievedAt: '2026-11-27' },
+      { id: 's2', kind: 'usaspending', label: 'Award record', recordId: 'HE125425CE002', retrievedAt: '2026-11-26' },
+    ];
+    for (const sec of x.sections) for (const b of sec.blocks) if ('cites' in b && Array.isArray(b.cites)) b.cites = b.cites.filter((c) => c === 's1' || c === 's2').length ? b.cites.filter((c) => c === 's1' || c === 's2') : ['s1'];
+    x.sections[0].blocks.unshift({ type: 'paragraph', id: 'cite2', text: 'Cited award.', claim: 'fact', cites: ['s2'] });
+    return x;
+  };
+  it('HTML/PDF: title, link and record id are kept; no "Retrieved" date; a date in the title is kept', () => {
+    const html = renderHtml(m());
+    const sources = html.slice(html.indexOf('<h2>Sources</h2>'));
+    expect(sources).not.toMatch(/Retrieved/i);
+    expect(sources).not.toContain('2026-11-27');
+    expect(sources).not.toContain('2026-11-26');
+    expect(sources).toContain('GAO-25-106719, Nov 20 2024: Federal Real Property');
+    expect(sources).toContain('https://www.gao.gov/products/gao-25-106719');
+    expect(sources).toContain('(HE125425CE002)');
+  });
+  it('Word: same', async () => {
+    const doc = strFromU8(unzipSync(new Uint8Array(await renderDocx(m())))['word/document.xml']);
+    expect(doc).not.toMatch(/Retrieved/i);
+    expect(doc).not.toContain('2026-11-27');
+    expect(doc).toContain('GAO-25-106719, Nov 20 2024: Federal Real Property');
+    expect(doc).toContain('HE125425CE002');
+  });
+});

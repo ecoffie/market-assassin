@@ -281,7 +281,8 @@ export function renderHtml(stored: DocModel, opts: RenderHtmlOptions = {}): stri
       .map((s) => {
         const bits = [escapeHtml(s.label)];
         if (s.recordId) bits.push(`<span class="meta">(${escapeHtml(s.recordId)})</span>`);
-        if (s.retrievedAt) bits.push(`<span class="meta">Retrieved ${escapeHtml(s.retrievedAt)}.</span>`);
+        // No retrieval (data-freshness) date in client copy (Eric, 2026-11-27). retrievedAt stays in the stored model
+        // for provenance; a date inside the cited document's own title is part of the label and is kept.
         if (s.url) bits.push(`<span class="meta">${escapeHtml(s.url)}</span>`);
         return `<li>${bits.join(' ')}</li>`;
       })
