@@ -24,6 +24,12 @@ export function researchModeEnabledFor(email: string | null | undefined, env: En
 }
 
 export const RESEARCH_MODEL_DEFAULT = 'claude-opus-5-5';
+/**
+ * Research mode is labelled BETA for customers (Eric's rollout, 2026-11-27). The route sends this once at the start
+ * of a research turn ({ type: 'mode', mode: 'research', beta: true, label }) and saves it in the trace, so the chat can
+ * tag the answer and its progress line, live and when the conversation is reopened. Only research turns carry it.
+ */
+export const RESEARCH_BETA_LABEL = 'Research · Beta';
 export const researchModel = (env: Env = process.env) => env.ASK_MINDY_RESEARCH_MODEL || RESEARCH_MODEL_DEFAULT;
 /** The whole research turn (inside the route's maxDuration). Past it: a disclosed answer from what was gathered. */
 export const RESEARCH_DEADLINE_MS = 720_000;

@@ -10,6 +10,7 @@
  * Returns: number_of_offers_received, extent_competed, extent_competed_description
  */
 
+import { reportedOffers } from '@/lib/opportunities/offers';
 import type { ContractAward, ContractAwardSearchParams, ContractAwardSearchResult } from './contract-awards';
 
 const USASPENDING_BASE_URL = 'https://api.usaspending.gov/api/v2';
@@ -30,10 +31,11 @@ const EXTENT_COMPETED_MAP: Record<string, string> = {
 /**
  * Get competition level from bid count
  */
-function getCompetitionLevel(numberOfOffers: number, extentCompeted: string): ContractAward['competitionLevel'] {
+function getCompetitionLevel(numberOfOffers: number | null, extentCompeted: string): ContractAward['competitionLevel'] {
   if (extentCompeted === 'C' || extentCompeted === 'B') {
     return 'sole_source';
   }
+  if (numberOfOffers === null) return 'unknown';
   if (numberOfOffers <= 2) return 'low';
   if (numberOfOffers <= 5) return 'medium';
   return 'high';
@@ -76,8 +78,8 @@ function transformUSASpendingAward(raw: Record<string, unknown>): ContractAward 
     (raw.recipient_uei as string) || '';
 
   // Competition data - the key fields we need
-  const numberOfOffersStr = (contractData.number_of_offers_received as string) || '0';
-  const numberOfOffers = parseInt(numberOfOffersStr, 10) || 0;
+  // Not reported → null (offers.ts). It used to default to 0, which read as "0 bidders" and classified as 'low'.
+  const numberOfOffers = reportedOffers(contractData.number_of_offers_received);
   const extentCompeted = (contractData.extent_competed as string) || '';
   const extentCompetedDesc = (contractData.extent_competed_description as string) ||
     EXTENT_COMPETED_MAP[extentCompeted] || extentCompeted;

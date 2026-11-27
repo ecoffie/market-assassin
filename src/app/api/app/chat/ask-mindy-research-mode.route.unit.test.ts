@@ -222,7 +222,8 @@ describe('research mode in the chat route', () => {
     expect(h.create).not.toHaveBeenCalled();
     expect(openaiCalls.length).toBeGreaterThan(0);
     const t = text(ev);
-    expect(t.startsWith("You've used today's 10 in-depth research answers, so this one is a standard answer. In-depth research resets tomorrow.")).toBe(true);
+    expect(t.startsWith("You've used today's 10 research answers on the beta. Standard answers are unlimited; research answers reset tomorrow.")).toBe(true);
+    expect(ev.some((e) => e.type === 'mode')).toBe(false);
     expect(t).toContain('Existing path answer.');
     const trace = await savedTrace();
     expect(JSON.stringify(trace)).toContain('research_cap:reached:10/10:pro_monthly');
@@ -343,6 +344,19 @@ describe('research mode in the chat route', () => {
     const recs = h.genOpts!.provenance!() as Array<{ retrievedAt: string }>;
     expect(recs).toHaveLength(2);
     for (const r of recs) expect(r.retrievedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+  });
+
+  it('a research turn is labelled beta: a mode event before the answer, and the label in the saved trace; standard turns carry none', async () => {
+    flagOn();
+    const ev = await ask(Q);
+    const mode = ev.find((e) => e.type === 'mode') as Record<string, unknown> | undefined;
+    expect(mode).toEqual({ type: 'mode', mode: 'research', beta: true, label: 'Research · Beta' });
+    expect(ev.findIndex((e) => e.type === 'mode')).toBeLessThan(ev.findIndex((e) => e.type === 'token'));
+    expect(await savedTrace()).toMatchObject({ engine: 'research_mode', beta: true, label: 'Research · Beta' });
+    h.inserts.length = 0;
+    delete process.env.ASK_MINDY_RESEARCH_MODE;
+    const std = await ask(Q);
+    expect(std.some((e) => e.type === 'mode')).toBe(false);
   });
 
   it('a provider failure mid-run is traced with its class and the usage it had already cost', async () => {

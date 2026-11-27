@@ -11,6 +11,7 @@
  *
  * Auth: MI session via verifyUserOwnsEmail (same as the chat + rag-doc).
  */
+import { researchTagFromTrace } from '@/lib/chat/research-mode-tag';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verifyUserOwnsEmail } from '@/lib/api-auth';
@@ -105,6 +106,8 @@ export async function GET(request: NextRequest) {
             && typeof (f as { format?: unknown }).format === 'string')
         : null;
       const ledger = withLedger && m.role === 'assistant' ? ledgerFromTrace(m.trace) : null;
+      // A research-mode answer (beta): its tag label only, so a reopened answer keeps "Research · Beta".
+      const researchMode = m.role === 'assistant' ? researchTagFromTrace(m.trace) : null;
       const { trace: _omit, ...rest } = m;
       return {
         ...rest,
@@ -113,6 +116,7 @@ export async function GET(request: NextRequest) {
           ? { deliverables: { files, ...(typeof raw?.pdf_note === 'string' ? { pdf_note: raw.pdf_note } : {}) } }
           : {}),
         ...(marketReport ? { market_report: marketReport } : {}),
+        ...(researchMode ? { research_mode: researchMode } : {}),
       };
     });
     return NextResponse.json({
