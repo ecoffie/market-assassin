@@ -5,6 +5,9 @@ import { useState, useEffect, useCallback } from 'react';
 import { Star, Flame, Zap, Search, FlaskConical, ShieldCheck, BarChart3, Medal, HeartPulse } from 'lucide-react';
 import type { AppTier } from '../UnifiedSidebar';
 import { useAppTracker } from '../track';
+import TabAskBox from '@/components/app/TabAskBox';
+import { isTabAskEnabled, type TabAskCount } from '@/lib/app/tab-ask';
+import { grantsAskAdapter, type GrantsAskParams } from '@/lib/app/tab-ask-adapters/grants';
 
 interface GrantsPanelProps {
   email: string | null;
@@ -83,7 +86,8 @@ export default function GrantsPanel({ email, tier }: GrantsPanelProps) {
     status: string,
     sortMode: 'relevance' | 'newest',
     offset = 0,
-  ) => {
+  ): Promise<TabAskCount> => {
+    // Resolves to the rows this page load showed, or null when it failed (unknown — never 0).
     if (offset > 0) setLoadingMore(true); else setIsLoading(true);
     setError(null);
     try {
@@ -109,6 +113,7 @@ export default function GrantsPanel({ email, tier }: GrantsPanelProps) {
         setHasMore(!!data.hasMore);
         setHasProfile(!!data.hasProfile);
         setSortedByRelevance(!!data.sortedByRelevance);
+        return { shown: (data.grants || []).length, more: !!data.hasMore };
       } else {
         setError(data.error || 'Failed to search grants');
         if (offset === 0) setGrants([]);
@@ -121,6 +126,7 @@ export default function GrantsPanel({ email, tier }: GrantsPanelProps) {
       setIsLoading(false);
       setLoadingMore(false);
     }
+    return null;
   }, [email]);
 
   const handleSearch = () => {
@@ -134,6 +140,50 @@ export default function GrantsPanel({ email, tier }: GrantsPanelProps) {
       has_category: !!selectedCategory,
       status: selectedStatus,
     });
+  };
+
+  // ── Ask Mindy on this tab (OFF unless NEXT_PUBLIC_TAB_ASK=on) ────────────────────────────────
+  // The question becomes THIS tab's filters and reloads THIS tab's list through /api/grants; Clear puts
+  // back exactly what was on screen before the first question (filters + rows), without another request.
+  const tabAskOn = isTabAskEnabled();
+  const [askSnapshot, setAskSnapshot] = useState<null | {
+    keyword: string; agency: string; category: string; status: string;
+    rows: Grant[]; totalHits: number; hasMore: boolean; hasProfile: boolean; sortedByRelevance: boolean;
+  }>(null);
+
+  const handleTabAsk = async (p: GrantsAskParams): Promise<TabAskCount> => {
+    if (!askSnapshot) {
+      setAskSnapshot({
+        keyword: searchKeyword, agency: selectedAgency, category: selectedCategory, status: selectedStatus,
+        rows: grants, totalHits, hasMore, hasProfile, sortedByRelevance,
+      });
+    }
+    setSearchKeyword(p.keyword);
+    setSelectedAgency(p.agency);
+    setSelectedCategory(p.category);
+    setSelectedStatus(p.status);
+    track('tool_use', 'grants', {
+      action: 'tab_ask',
+      has_keyword: !!p.keyword,
+      has_agency: !!p.agency,
+      status: p.status,
+    });
+    return searchGrants(p.keyword, p.agency, p.category, p.status, sort, 0);
+  };
+
+  const clearTabAsk = () => {
+    if (!askSnapshot) return;
+    setSearchKeyword(askSnapshot.keyword);
+    setSelectedAgency(askSnapshot.agency);
+    setSelectedCategory(askSnapshot.category);
+    setSelectedStatus(askSnapshot.status);
+    setGrants(askSnapshot.rows);
+    setTotalHits(askSnapshot.totalHits);
+    setHasMore(askSnapshot.hasMore);
+    setHasProfile(askSnapshot.hasProfile);
+    setSortedByRelevance(askSnapshot.sortedByRelevance);
+    setError(null);
+    setAskSnapshot(null);
   };
 
   const formatDate = (dateStr?: string) => {
@@ -191,6 +241,10 @@ export default function GrantsPanel({ email, tier }: GrantsPanelProps) {
           </div>
         )}
       </div>
+
+      {tabAskOn && (
+        <TabAskBox adapter={grantsAskAdapter} onAsk={handleTabAsk} onClear={clearTabAsk} />
+      )}
 
       {/* Search & Filters */}
       <div className="space-y-4">
