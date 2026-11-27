@@ -33,7 +33,8 @@ import {
 } from 'docx';
 import type { Block, ChartBlock, DocModel, TableBlock, TableColumn } from './model';
 import { resolveTheme, type Theme } from './theme';
-import { assumptionOrigin, clientCopy, DOC_STAGE_MARK, keepDash, stripHeadingNumber, chartShownByAdjacentTable, citationIndex, citeMarker, claimLabel, claimsPresent, formatColumn, formatChartValue, formatDocDate, usdColumnDecimals, parseInline, unverifiedStatements } from './format';
+import { assumptionOrigin, clientCopy, publicRecordId, DOC_STAGE_MARK, keepDash, stripHeadingNumber, chartShownByAdjacentTable, citationIndex, citeMarker, claimLabel, claimsPresent, formatColumn, formatChartValue, formatDocDate, usdColumnDecimals, parseInline, unverifiedStatements } from './format';
+import { extractCapability, isCapabilityStatement, type CapEntry, type CapField } from './capability-statement';
 import { TOC_MIN_SECTIONS } from './render-html';
 
 // The document's theme (theme.ts), resolved once per buildDocx call (which is synchronous). Every
@@ -194,6 +195,13 @@ function blockToDocx(b: Block, numberOf: Numberer, shownByAdjacentTable = false)
         children: [...labelRun(it.claim), ...runs(it.text), ...citeRun(it.cites, numberOf), ...originRun(it)],
       }));
     case 'table': {
+      // A citation-only caption rides on the last header cell (never a stray "[3]" line above the table).
+      const marker = citeMarker(b.cites, numberOf);
+      const citeOnly = !!marker && !b.caption && !claimLabel(b.claim) && !assumptionOrigin(b);
+      if (citeOnly) {
+        const cols = b.columns.map((c, i) => (i === b.columns.length - 1 ? { ...c, label: `${c.label} ${marker}` } : c));
+        return [table(cols, b.rows), spacer()];
+      }
       const cap = caption(b.caption, b.claim, b.cites, numberOf, undefined, b.origin);
       return [...(cap ? [cap] : []), table(b.columns, b.rows), spacer()];
     }
@@ -227,6 +235,7 @@ function blockToDocx(b: Block, numberOf: Numberer, shownByAdjacentTable = false)
 export function buildDocx(stored: DocModel): Document {
   const model = clientCopy(stored);
   useTheme(resolveTheme(model.theme));
+  if (isCapabilityStatement(model)) return buildCapabilityDocx(model);
   const { ordered, numberOf } = citationIndex(model);
   // Same rule as the PDF (render-html.ts): a contents list only for long documents, and never a page of its own.
   const showToc = model.sections.filter((s) => (s.level ?? 1) === 1).length >= TOC_MIN_SECTIONS;
@@ -345,7 +354,8 @@ export function buildDocx(stored: DocModel): Document {
     children.push(new Paragraph({ heading: HeadingLevel.HEADING_1, children: [new TextRun({ font: FONT, text: 'Sources' })] }));
     ordered.forEach((src, i) => {
       const parts: TextRun[] = [new TextRun({ font: FONT, text: `[${i + 1}] `, bold: true, size: 18, color: NAVY }), new TextRun({ font: FONT, text: src.label, size: 18 })];
-      if (src.recordId) parts.push(new TextRun({ font: FONT, text: ` (${src.recordId})`, size: 18, color: MUTED }));
+      const rid = publicRecordId(src);
+      if (rid) parts.push(new TextRun({ font: FONT, text: ` (${rid})`, size: 18, color: MUTED }));
       // No retrieval (data-freshness) date in client copy (Eric, 2026-11-27); retrievedAt stays in the stored model.
       if (src.url) parts.push(new TextRun({ font: FONT, text: ` ${src.url}`, size: 18, color: MUTED }));
       children.push(new Paragraph({ spacing: { after: 80 }, indent: { left: 360, hanging: 360 }, children: parts }));
@@ -390,6 +400,68 @@ export function buildDocx(stored: DocModel): Document {
       footers: { default: new Footer({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ font: FONT, children: ['Page ', PageNumber.CURRENT, ' of ', PageNumber.TOTAL_PAGES, ...(DOC_STAGE_MARK ? [`  \u00b7  ${DOC_STAGE_MARK}`] : [])], ...headerFooterRun })] })] }) },
       children,
     }],
+  });
+}
+
+/**
+ * The capability statement in Word, editable with the same structure as the PDF: a shaded header band (name,
+ * value statement), then a two-column table: Core Competencies / Past Performance / Differentiators on the left,
+ * a shaded Company Data + Point of Contact box on the right, then the provenance line. One page at 0.5in margins.
+ */
+function buildCapabilityDocx(model: DocModel): Document {
+  const cap = extractCapability(model);
+  const WHITE = T.colors.white;
+  const NONE = { style: BorderStyle.NONE, size: 0, color: WHITE };
+  const noBorders = { top: NONE, bottom: NONE, left: NONE, right: NONE };
+  const PAGE_DXA = 12240 - 2 * 720;
+  const LEFT_DXA = Math.round(PAGE_DXA * 0.61);
+  const RIGHT_DXA = PAGE_DXA - LEFT_DXA - 200;
+  const accent2 = T.colors.accent2;
+  const heading = (text: string) => new Paragraph({ spacing: { before: 140, after: 60 }, border: { bottom: { style: BorderStyle.SINGLE, size: 8, color: accent2, space: 2 } }, children: [new TextRun({ font: FONT, text: text.toUpperCase(), bold: true, size: 17, color: NAVY, characterSpacing: 20 })] });
+  const bullet = (e: CapEntry) => new Paragraph({ numbering: { reference: 'mindy-bullets', level: 0 }, spacing: { after: 40 }, children: e.lead
+    ? [new TextRun({ font: FONT, text: e.lead, bold: true, size: 18 }), ...(e.text ? [new TextRun({ font: FONT, text: ` \u00b7 ${e.text}`, size: 18 })] : [])]
+    : runs(e.text, { size: 18 }) });
+  const section = (title: string, items: CapEntry[]) => (items.length ? [heading(title), ...items.map(bullet)] : []);
+  const fields = (title: string, list: CapField[]) => (list.length ? [
+    new Paragraph({ spacing: { before: 60, after: 40 }, children: [new TextRun({ font: FONT, text: title.toUpperCase(), bold: true, size: 17, color: NAVY, characterSpacing: 20 })] }),
+    ...list.flatMap((f) => [
+      ...(f.label ? [new Paragraph({ spacing: { before: 60 }, children: [new TextRun({ font: FONT, text: f.label.toUpperCase(), bold: true, size: 14, color: MUTED })] })] : []),
+      new Paragraph({ spacing: { before: f.label ? 0 : 50, after: 20 }, children: [new TextRun({ font: FONT, text: f.value, bold: true, size: 18 })] }),
+    ]),
+  ] : []);
+  const left = [
+    ...cap.overview.map((p) => new Paragraph({ spacing: { after: 120 }, children: runs(p, { size: 20 }) })),
+    ...section('Core Competencies', cap.competencies),
+    ...section('Past Performance', cap.pastPerformance),
+    ...section('Differentiators', cap.differentiators),
+    ...cap.other.flatMap((o) => section(o.heading, o.items)),
+  ];
+  const right = [...fields('Company Data', cap.companyData), ...fields('Point of Contact', cap.contact)];
+  const children: (Paragraph | Table)[] = [
+    new Table({
+      width: { size: PAGE_DXA, type: WidthType.DXA }, columnWidths: [PAGE_DXA], borders: { ...noBorders, insideHorizontal: NONE, insideVertical: NONE },
+      rows: [new TableRow({ children: [new TableCell({ borders: noBorders, shading: { type: ShadingType.CLEAR, color: 'auto', fill: NAVY }, margins: { top: 180, bottom: 180, left: 240, right: 240 }, width: { size: PAGE_DXA, type: WidthType.DXA }, children: [
+        new Paragraph({ children: [new TextRun({ font: FONT, text: 'CAPABILITY STATEMENT', bold: true, size: 14, color: WHITE, characterSpacing: 30 })] }),
+        new Paragraph({ spacing: { before: 40, after: 40 }, children: [new TextRun({ font: FONT, text: cap.name, bold: true, size: 36, color: WHITE })] }),
+        ...(cap.tagline ? [new Paragraph({ children: [new TextRun({ font: FONT, text: cap.tagline, size: 20, color: WHITE })] })] : []),
+      ] })] })],
+    }),
+    new Paragraph({ spacing: { after: 120 }, children: [] }),
+    new Table({
+      width: { size: PAGE_DXA, type: WidthType.DXA }, columnWidths: [LEFT_DXA, 200, RIGHT_DXA], borders: { ...noBorders, insideHorizontal: NONE, insideVertical: NONE },
+      rows: [new TableRow({ children: [
+        new TableCell({ borders: noBorders, width: { size: LEFT_DXA, type: WidthType.DXA }, children: left.length ? left : [new Paragraph({ children: [] })] }),
+        new TableCell({ borders: noBorders, width: { size: 200, type: WidthType.DXA }, children: [new Paragraph({ children: [] })] }),
+        new TableCell({ borders: { ...noBorders, left: { style: BorderStyle.SINGLE, size: 18, color: NAVY } }, shading: right.length ? { type: ShadingType.CLEAR, color: 'auto', fill: T.colors.rowFill } : undefined, margins: { top: 160, bottom: 160, left: 200, right: 200 }, width: { size: RIGHT_DXA, type: WidthType.DXA }, children: right.length ? right : [new Paragraph({ children: [] })] }),
+      ] })],
+    }),
+    ...(cap.footer ? [new Paragraph({ spacing: { before: 200 }, border: { top: { style: BorderStyle.SINGLE, size: 4, color: T.colors.rule, space: 4 } }, children: [new TextRun({ font: FONT, text: cap.footer, size: 14, color: MUTED })] })] : []),
+  ];
+  return new Document({
+    creator: 'Mindy',
+    title: model.title,
+    numbering: { config: [{ reference: 'mindy-bullets', levels: [{ level: 0, format: LevelFormat.BULLET, text: '\u2022', alignment: AlignmentType.LEFT, style: { paragraph: { indent: { left: 300, hanging: 220 } } } }] }] },
+    sections: [{ properties: { page: { size: { width: 12240, height: 15840 }, margin: { top: 720, right: 720, bottom: 720, left: 720 } } }, children }],
   });
 }
 

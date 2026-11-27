@@ -10,7 +10,8 @@ import type { Block, Claim, DocModel, TableBlock } from './model';
 import { chartToSvg } from './charts';
 import { hex, resolveTheme, type Theme } from './theme';
 import { INTER_LATIN_FONT_FACE } from '@/lib/fonts/inter-latin-embedded';
-import { assumptionOrigin, clientCopy, keepDash, stripHeadingNumber, citationIndex, citeMarker, claimClass, claimLabel, claimsPresent, formatColumn, formatDocDate, parseInline, unverifiedStatements } from './format';
+import { CAP_LIMIT_STEPS, extractCapability, isCapabilityStatement, type CapEntry, type CapField, type CapLimits } from './capability-statement';
+import { assumptionOrigin, clientCopy, publicRecordId, keepDash, stripHeadingNumber, citationIndex, citeMarker, claimClass, claimLabel, claimsPresent, formatColumn, formatDocDate, parseInline, unverifiedStatements } from './format';
 
 /**
  * The document page may load nothing but itself: no scripts, no network, no frames; only its own
@@ -141,7 +142,11 @@ function labelChip(claim: Claim | undefined): string {
 }
 
 function tableHtml(b: TableBlock, marker: string): string {
-  const head = b.columns.map((c) => `<th class="${c.align === 'right' || ['usd', 'int', 'pct'].includes(c.format ?? '') ? 'num' : ''}">${escapeHtml(c.label)}</th>`).join('');
+  // A table whose only caption is its citation used to print the marker as a stray line of its own ("[3]") above
+  // the table. With no caption text, label or origin, the marker rides on the last header cell instead.
+  const citeOnly = !!marker && !b.caption && !labelChip(b.claim) && !originHtml(b);
+  const last = b.columns.length - 1;
+  const head = b.columns.map((c, i) => `<th class="${c.align === 'right' || ['usd', 'int', 'pct'].includes(c.format ?? '') ? 'num' : ''}">${escapeHtml(c.label)}${citeOnly && i === last ? ` <sup class="cite">${marker}</sup>` : ''}</th>`).join('');
   const cells = b.columns.map((c) => formatColumn(b.rows.map((r) => r[c.key] ?? null), c.format));
   const body = b.rows
     .map((r, ri) => `<tr>${b.columns
@@ -153,7 +158,7 @@ function tableHtml(b: TableBlock, marker: string): string {
       })
       .join('')}</tr>`)
     .join('');
-  const cap = [labelChip(b.claim), b.caption ? inline(b.caption) : '', marker ? `<sup class="cite">${marker}</sup>` : ''].filter(Boolean).join(' ') + originHtml(b);
+  const cap = citeOnly ? '' : [labelChip(b.claim), b.caption ? inline(b.caption) : '', marker ? `<sup class="cite">${marker}</sup>` : ''].filter(Boolean).join(' ') + originHtml(b);
   return `<div class="tablewrap">${cap ? `<div class="caption">${cap}</div>` : ''}<table${b.columns.length >= 6 ? ' class="wide"' : ''}><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div>`;
 }
 
@@ -211,10 +216,69 @@ export interface RenderHtmlOptions {
    * page gets side padding and no forced page breaks after the cover and contents.
    */
   screen?: boolean;
+  /** Capability statement only: the item limits for the one-page rule (renderPdf tightens these). */
+  capLimits?: CapLimits;
+}
+
+/**
+ * The one-page capability statement (capability-statement.ts): header band, two columns, a shaded Company Data
+ * box, one provenance line. No cover, no contents, no "How to read this", no citation markers, no Sources list.
+ */
+export function renderCapabilityHtml(model: DocModel, opts: RenderHtmlOptions = {}): string {
+  const theme = resolveTheme(model.theme);
+  const k = theme.colors;
+  const c = (h: string) => hex(h);
+  const cap = extractCapability(model, opts.capLimits ?? CAP_LIMIT_STEPS[0]);
+  const entry = (e: CapEntry) => `<li>${e.lead ? `<strong>${escapeHtml(e.lead)}</strong>${e.text ? ` &middot; ${inline(e.text)}` : ''}` : inline(e.text)}</li>`;
+  const block = (heading: string, items: CapEntry[], cls = '') => (items.length ? `<section class="cs-sec ${cls}"><h2>${escapeHtml(heading)}</h2><ul>${items.map(entry).join('')}</ul></section>` : '');
+  const fields = (list: CapField[]) => `<dl>${list.map((f) => `${f.label ? `<dt>${escapeHtml(f.label)}</dt>` : ''}<dd${f.label ? '' : ' class="line"'}>${inline(f.value)}</dd>`).join('')}</dl>`;
+  const [g0, g1] = theme.gradient ?? [k.accent, k.accent];
+  const css = `${INTER_LATIN_FONT_FACE}
+@page { size: Letter; margin: 0.45in 0.5in; }
+* { box-sizing: border-box; }
+html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+body { margin: 0; color: ${c(k.ink)}; background: ${c(k.white)}; font-family: 'Mindy Report Inter', ${theme.fonts.pdf}; font-size: 9.6pt; line-height: 1.38; }
+.cs { max-width: 7.5in; margin: 0 auto; }
+.cs-head { border-radius: 10px; padding: 16px 20px; color: ${c(k.white)}; background: linear-gradient(90deg, ${c(g0)}, ${c(g1)}); margin-bottom: 14px; }
+.cs-head .kick { font-size: 7.5pt; letter-spacing: .16em; text-transform: uppercase; font-weight: 700; opacity: .85; }
+.cs-head h1 { font-size: 20pt; line-height: 1.15; margin: 3px 0 4px; }
+.cs-head .tag { font-size: 10.5pt; opacity: .95; margin: 0; }
+.cs-cols { display: grid; grid-template-columns: 1.6fr 1fr; gap: 18px; align-items: start; }
+.cs-sec { margin: 0 0 11px; break-inside: avoid; }
+.cs-sec h2 { font-size: 9pt; letter-spacing: .1em; text-transform: uppercase; color: ${c(k.accent)}; margin: 0 0 5px; padding-bottom: 3px; border-bottom: 1.5px solid ${c(k.accent2)}; }
+.cs-sec ul { margin: 0; padding-left: 15px; }
+.cs-sec li { margin: 0 0 3px; }
+.cs-sec li::marker { color: ${c(k.accent2)}; }
+.cs-box { background: ${c(k.rowFill)}; border-left: 3px solid ${c(k.accent)}; border-radius: 0 8px 8px 0; padding: 12px 14px; }
+.cs-box h2 { font-size: 9pt; letter-spacing: .1em; text-transform: uppercase; color: ${c(k.accent)}; margin: 0 0 6px; }
+.cs-box h2 + dl { margin-top: 0; }
+.cs-box dl { margin: 0 0 10px; }
+.cs-box dt { font-size: 7.5pt; letter-spacing: .06em; text-transform: uppercase; color: ${c(k.muted)}; font-weight: 700; margin-top: 6px; }
+.cs-box dd { margin: 1px 0 0; font-weight: 600; word-break: break-word; }
+.cs-box dd.line { margin-top: 4px; }
+.cs-lead { margin: 0 0 11px; font-size: 10pt; line-height: 1.45; }
+.cs-foot { margin-top: 12px; padding-top: 6px; border-top: 1px solid ${c(k.rule)}; font-size: 7.5pt; color: ${c(k.muted)}; }
+${opts.screen ? 'body { padding: 20px 24px; } .cs { max-width: 8.2in; }' : ''}`;
+  const left = [
+    ...cap.overview.map((p) => `<p class="cs-lead">${inline(p)}</p>`),
+    block('Core Competencies', cap.competencies),
+    block('Past Performance', cap.pastPerformance, 'pp'),
+    block('Differentiators', cap.differentiators),
+    ...cap.other.map((o) => block(o.heading, o.items)),
+  ].join('');
+  const right = (cap.companyData.length || cap.contact.length)
+    ? `<aside class="cs-box">${cap.companyData.length ? `<h2>Company Data</h2>${fields(cap.companyData)}` : ''}${cap.contact.length ? `<h2>Point of Contact</h2>${fields(cap.contact)}` : ''}</aside>`
+    : '';
+  return `<!doctype html><html lang="en"><head><meta http-equiv="Content-Security-Policy" content="${DOC_HTML_CSP}"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${escapeHtml(keepDash(model.title))}</title><style>${css}</style></head><body><main class="cs">`
+    + `<header class="cs-head"><div class="kick">Capability Statement</div><h1>${escapeHtml(cap.name)}</h1>${cap.tagline ? `<p class="tag">${inline(cap.tagline)}</p>` : ''}</header>`
+    + `<div class="cs-cols"><div class="cs-left">${left}</div><div class="cs-right">${right}</div></div>`
+    + (cap.footer ? `<footer class="cs-foot">${escapeHtml(cap.footer)}</footer>` : '')
+    + `</main></body></html>`;
 }
 
 export function renderHtml(stored: DocModel, opts: RenderHtmlOptions = {}): string {
   const model = clientCopy(stored);
+  if (isCapabilityStatement(model)) return renderCapabilityHtml(model, opts);
   const theme = resolveTheme(model.theme);
   const { ordered, numberOf } = citationIndex(model);
   const showToc = opts.toc ?? model.sections.filter((s) => (s.level ?? 1) === 1).length >= TOC_MIN_SECTIONS;
@@ -279,7 +343,8 @@ export function renderHtml(stored: DocModel, opts: RenderHtmlOptions = {}): stri
     ? `<section class="sources"><h2>Sources</h2><ol>${ordered
       .map((s) => {
         const bits = [escapeHtml(s.label)];
-        if (s.recordId) bits.push(`<span class="meta">(${escapeHtml(s.recordId)})</span>`);
+        const rid = publicRecordId(s);
+        if (rid) bits.push(`<span class="meta">(${escapeHtml(rid)})</span>`);
         // No retrieval (data-freshness) date in client copy (Eric, 2026-11-27). retrievedAt stays in the stored model
         // for provenance; a date inside the cited document's own title is part of the label and is kept.
         if (s.url) bits.push(`<span class="meta">${escapeHtml(s.url)}</span>`);
