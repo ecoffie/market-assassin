@@ -13,6 +13,7 @@
  * gate on a valid session so anonymous traffic can't enumerate it.
  */
 
+import { canBrowseKnowledgeBase } from '@/lib/knowledge-base/access';
 import { NextRequest, NextResponse } from 'next/server';
 import { isHiddenKbDoc } from '@/lib/knowledge-base/hidden-types';
 import { createClient } from '@supabase/supabase-js';
@@ -49,6 +50,8 @@ export async function GET(request: NextRequest) {
   if (!auth.authenticated || !auth.email) {
     return NextResponse.json({ error: auth.error || 'Unauthorized' }, { status: 401 });
   }
+  // Staff only (Eric, 2026-11-27): customers cannot open corpus documents, by id or otherwise.
+  if (!canBrowseKnowledgeBase(auth.email)) return NextResponse.json({ error: 'not found' }, { status: 404 });
 
   // Pro gate: this serves the proprietary KB document text (the source-of-truth for
   // Mindy Chat). Paid feature — enforce server-side so Free can't read the KB.
@@ -61,7 +64,7 @@ export async function GET(request: NextRequest) {
   const supabase = getSupabase();
   const { data, error } = await supabase
     .from('mindy_rag_documents')
-    .select('id, title, doc_type, top_level_folder, source_path, full_text, word_count, one_line_summary')
+    .select('id, title, doc_type, top_level_folder, source_path, full_text, word_count, one_line_summary, has_pii')
     .eq('id', id)
     .maybeSingle();
 
@@ -69,7 +72,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'lookup failed', detail: error.message }, { status: 500 });
   }
   // Hidden types (podcast insights) cannot be opened from the app, even by id: same answer as a missing document.
-  if (!data || isHiddenKbDoc(data)) {
+  // A has_pii row is never served (the list already excluded it; by id it was not checked).
+  if (!data || isHiddenKbDoc(data) || (data as { has_pii?: boolean }).has_pii === true) {
     return NextResponse.json({ error: 'not found' }, { status: 404 });
   }
 
