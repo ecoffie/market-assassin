@@ -154,6 +154,11 @@ export interface DocSection {
 
 export interface DocModel {
   schema: typeof DOC_SCHEMA;
+  /**
+   * Document type, for layout only. 'capability_statement' renders the one-page capability statement layout
+   * (capability-statement.ts); anything else (or absent) is the report layout. Never changes validation.
+   */
+  kind?: 'report' | 'capability_statement';
   title: string;
   subtitle?: string;
   /** Who the document is for. Never auto-filled from the Vault. */
