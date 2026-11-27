@@ -35,7 +35,7 @@ const at = (iso: string) => { vi.useFakeTimers({ toFake: ['Date'] }); vi.setSyst
 const promo = (el: HTMLElement) => el.querySelector('[data-mindy-day-promo]');
 
 describe('/pricing Mindy Day line', () => {
-  it('with the monthly-only Team seat card on, offers Pro annual only (no Team annual claim)', async () => {
+  it('with the Team seat card on, gives the Team range by size (never the old single Team number)', async () => {
     vi.stubEnv('NEXT_PUBLIC_TEAM_SEAT_PRICING', 'on');
     try {
       at('2026-11-29T15:00:00Z');
@@ -43,9 +43,8 @@ describe('/pricing Mindy Day line', () => {
       expect(p).not.toBeNull();
       expect(p!.textContent).toContain('Pro');
       expect(p!.textContent).toContain((PRO_MONTHLY_CREDITS * 2).toLocaleString('en-US'));
-      expect(p!.textContent).not.toContain((TEAM_MONTHLY_CREDITS * 2).toLocaleString('en-US'));
-      expect(p!.textContent).not.toMatch(/Team/);
-      expect(p!.querySelector('a[data-mindy-day-cta]')?.textContent).toBe('Start Pro annual');
+      expect(p!.textContent).toContain('6,000 to 15,000 on Team');
+      expect(p!.querySelector('[data-mindy-day-cta]')?.textContent).toBe('See annual prices');
     } finally { vi.unstubAllEnvs(); }
   });
 

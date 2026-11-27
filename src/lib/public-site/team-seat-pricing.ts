@@ -47,7 +47,7 @@ export const TEAM_SEAT_PRICING = {
   status: 'PROPOSED — display only, needs Eric + Stripe prices',
   header: {
     title: 'Pricing',
-    sub: 'Monthly. Annual plans include training and onboarding.',
+    sub: 'Pay monthly, or pay yearly and save up to 33%.',
   },
   /** ⚠️ A claim: Eric must confirm Team really is the most popular plan, or remove it. */
   badge: 'Most popular',

@@ -11,7 +11,7 @@
  * says "$0 today" (the charge only comes after 14 days).
  * The credit-only MCP plans keep their own page at /mcp/pricing.
  */
-import { TEAM_SEAT_CREDITS_PER_USER } from '@/lib/billing/team-seat-plans';
+import { TEAM_SEAT_CREDITS_PER_USER, teamSeatPlan } from '@/lib/billing/team-seat-plans';
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import MemberProof from '@/components/public-site/MemberProof';
@@ -245,6 +245,8 @@ export default function SimplePricing({ proCredits, teamCredits, forecastsLabel,
     return () => { live = false; };
   }, []);
   const maxPct = pctOff(TEAM_ANNUAL_USD, TEAM_MONTHLY_USD);
+  // Seat plan for the chosen Team size (annual prices + Stripe ids live in team-seat-plans.ts).
+  const seatPlan = seatOpt ? teamSeatPlan(seatOpt.seats) : null;
 
   const basePlans: Plan[] = [
     {
@@ -297,26 +299,32 @@ export default function SimplePricing({ proCredits, teamCredits, forecastsLabel,
     },
   ];
 
-  // Team seat card (owner mockup): the chosen size sets the Team card's price, button and first
-  // feature. Monthly only, no trial line, no credit allowance (none approved — never a made-up
-  // number). The button goes to its configured checkout, or to sales while that is empty.
-  const withSeats = (p: Plan): Plan => (p.name !== 'Team' || !seatOpt ? p : {
-    ...p,
-    featured: true,
-    price: `$${fmt(seatOpt.monthlyUsd)}`,
-    was: undefined,
-    per: seatOpt.per,
-    trial: false,
-    takesPayment: teamSeatTakesPayment(seatOpt),
-    cta: seatOpt.cta,
-    href: teamSeatCtaHref(seatOpt),
-    lead: TEAM_SEAT_PRICING.lead,
-    base: TEAM_SEAT_PRICING.base,
-    features: [seatOpt.firstFeature, ...TEAM_SEAT_PRICING.features],
-    // Same number the grant uses (team-seat-plans.ts: seats x TEAM_SEAT_CREDITS_PER_USER).
-    usage: ['Monthly usage included', `${fmt(seatOpt.seats * TEAM_SEAT_CREDITS_PER_USER)} credits / month, shared by the team`],
-    footer: undefined,
-  });
+  // Team seat card (owner mockup): the chosen size sets the Team card's price, button, first
+  // feature and credits. Monthly or yearly (33% off) follows the Monthly/Annual toggle.
+  const withSeats = (p: Plan): Plan => {
+    if (p.name !== 'Team' || !seatOpt || !seatPlan) return p;
+    const yearly = annual && !!seatPlan.annualPriceId;
+    const credits = seatPlan.credits;
+    return {
+      ...p,
+      featured: true,
+      price: yearly ? `$${fmt(Math.round(seatPlan.annualUsd / 12))}` : `$${fmt(seatOpt.monthlyUsd)}`,
+      was: yearly ? `$${fmt(seatOpt.monthlyUsd)}` : undefined,
+      per: yearly ? `/ mo, billed annually ($${fmt(seatPlan.annualUsd)} / year). Add seats any time.` : seatOpt.per,
+      trial: false,
+      takesPayment: teamSeatTakesPayment(seatOpt),
+      cta: seatOpt.cta,
+      href: yearly ? `/api/checkout/team-seats?seats=${seatOpt.seats}&billing=annual` : teamSeatCtaHref(seatOpt),
+      lead: TEAM_SEAT_PRICING.lead,
+      base: TEAM_SEAT_PRICING.base,
+      features: [seatOpt.firstFeature, ...TEAM_SEAT_PRICING.features],
+      // Same number the grant uses (team-seat-plans.ts: seats x TEAM_SEAT_CREDITS_PER_USER).
+      usage: ['Monthly usage included', yearly && promoLine
+        ? <><s>{fmt(credits)}</s> {fmt(credits * 2)} credits / month, shared by the team, in your first year <span data-mindy-day-card>(Mindy Day deal)</span></>
+        : `${fmt(credits)} credits / month, shared by the team`],
+      footer: undefined,
+    };
+  };
   const plans = applyCurrentPlan(basePlans.map(withSeats), me);
   const byName = Object.fromEntries(plans.map((p) => [p.name, p]));
 
@@ -390,8 +398,7 @@ export default function SimplePricing({ proCredits, teamCredits, forecastsLabel,
       </section>
       )}
 
-      {/* The seat variant is monthly only (owner mockup: "Monthly. Annual plans include training and onboarding."). */}
-      {!seatOn && (
+      {(
       <div className="toggle" role="group" aria-label="Billing period">
         <button type="button" className={!annual ? 'on' : ''} aria-pressed={!annual} onClick={() => setAnnual(false)}>Monthly</button>
         <button type="button" className={annual ? 'on' : ''} aria-pressed={annual} onClick={() => setAnnual(true)}>Annual (up to {maxPct}% off){promoLine ? ' · 2× credits' : ''}</button>
@@ -405,16 +412,12 @@ export default function SimplePricing({ proCredits, teamCredits, forecastsLabel,
           style={{ maxWidth: 720, margin: '-12px auto 32px', padding: '18px 22px', textAlign: 'center', background: 'var(--mp-surface)', border: '2px solid var(--mp-navy)', borderRadius: 14, boxShadow: '0 6px 20px rgba(15,23,42,.08)' }}
         >
           <p style={{ margin: '0 0 6px', font: '600 12px var(--mp-font-sans)', letterSpacing: '.08em', textTransform: 'uppercase', color: 'var(--mp-navy)' }}>Mindy Day deal · ends Dec 5</p>
-          <p style={{ margin: '0 0 6px', font: '700 22px/1.25 var(--mp-font-serif)', color: 'var(--mp-ink)' }}>{seatOn ? 'Double credits for a full year on Pro annual' : 'Double credits for a full year on annual plans'}</p>
-          {/* The seat-based Team card is monthly only, so with it on the deal is Pro annual only. */}
+          <p style={{ margin: '0 0 6px', font: '700 22px/1.25 var(--mp-font-serif)', color: 'var(--mp-ink)' }}>Double credits for a full year on annual plans</p>
+          {/* Seat Team credits depend on the size (seats x 1,500), so the Team figure is a range. */}
           <p style={{ margin: 0, font: '400 15px/1.5 var(--mp-font-sans)', color: 'var(--mp-muted)' }}>
-            {seatOn ? `Start Pro on the annual plan by Dec 5 and get ${fmt(proCredits * 2)} credits a month (instead of ${fmt(proCredits)}) for your first paid year.` : promoLine}
+            {seatOn ? `Start an annual plan by Dec 5 and get double credits every month of your first paid year: ${fmt(proCredits * 2)} a month on Pro, and ${fmt(2 * TEAM_SEAT_CREDITS_PER_USER * 2)} to ${fmt(5 * TEAM_SEAT_CREDITS_PER_USER * 2)} on Team depending on team size.` : promoLine}
           </p>
-          {seatOn ? (
-            <a data-mindy-day-cta href={PRO_TRIAL_ANNUAL} onClick={() => trackTrialClick('pro', 'annual', 'mindy-day')}
-              style={{ display: 'inline-block', marginTop: 12, borderRadius: 10, padding: '10px 18px', background: 'var(--mp-navy)', color: 'var(--mp-surface)', font: '600 14px var(--mp-font-sans)', textDecoration: 'none' }}
-            >Start Pro annual</a>
-          ) : !annual && (
+          {!annual && (
             <button type="button" data-mindy-day-cta onClick={() => setAnnual(true)}
               style={{ marginTop: 12, border: 0, borderRadius: 10, padding: '10px 18px', background: 'var(--mp-navy)', color: 'var(--mp-surface)', font: '600 14px var(--mp-font-sans)', cursor: 'pointer' }}
             >See annual prices</button>
