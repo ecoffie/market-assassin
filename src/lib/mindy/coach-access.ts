@@ -31,10 +31,14 @@ export interface CoachAccessResult {
 }
 
 /** Client workspace caps by access path. */
-// The limits live in a client-safe module so customer copy (UpgradeModal, CoachPanel) shows the SAME numbers this
-// file enforces. Values unchanged.
+// Client-workspace caps per tier: Teams seat 5, grandfathered Pro org members 10 (the
+// historical cap, predating the add-on), Pro + Coach Mode add-on 3. The values live in a
+// client-safe module (./coach-limits) so customer copy (UpgradeModal, CoachPanel) shows the
+// SAME numbers this file enforces through maxClients below. Values unchanged by the move.
+// Enterprise and staff are unlimited (maxClients = null), as before.
 export { COACH_CLIENT_LIMITS } from './coach-limits';
 import { COACH_CLIENT_LIMITS } from './coach-limits';
+// (end of client-workspace caps)
 
 function getSupabase() {
   return createClient(
