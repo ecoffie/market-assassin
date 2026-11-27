@@ -76,6 +76,7 @@ import {
 } from '@/lib/saved-searches/alert-drain';
 import { dueSavedSearchFrequenciesAt, isSavedSearchDueAt } from '@/lib/saved-searches';
 import { storedNaicsValidity } from '@/lib/saved-searches/stored-naics';
+import { isStatementTimeout } from '@/lib/opportunities/search-failure';
 import { authorizeCronRequest } from '@/lib/cron/cron-request-auth';
 
 export const runtime = 'nodejs';
@@ -337,7 +338,23 @@ async function evaluateSavedSearch(
     let q = db.from('sam_opportunities').select(PIN_COLS).limit(200);
     q = applyMapFilters(q, f);
     const { data, error: qErr } = await q.order('posted_date', { ascending: false });
-    if (qErr) return { failureClass: 'opportunity_query_failed' };
+    if (qErr) {
+      // Diagnostic evidence for the intermittent Open failures (Mortgage Link1): the error used to be
+      // dropped here, so no log or run summary recorded whether it was a timeout or something else.
+      // Record the code + the search's SHAPE (sizes only, never the customer's words). No query change.
+      const errorCode = String((qErr as { code?: unknown }).code ?? '') || undefined;
+      const timeout = isStatementTimeout(qErr);
+      const terms = (f.search || '').trim() ? (f.search || '').trim().split(/[\s,]+/).length : 0;
+      console.error(
+        `[saved-search-alerts] ${s.id}: Open query failed`
+        + ` code=${errorCode ?? 'none'} timeout=${timeout}`
+        + ` search_chars=${(f.search || '').length} search_terms=${terms}`
+        + ` naics=${savedFilters.naics ? String(savedFilters.naics).split(',').length : 0}`
+        + ` scope=${savedFilters.scope ?? 'none'}:`,
+        String((qErr as { message?: unknown }).message ?? qErr).slice(0, 200),
+      );
+      return { failureClass: timeout ? 'opportunity_query_timeout' : 'opportunity_query_failed', errorCode };
+    }
     opps = data || [];
   }
 
