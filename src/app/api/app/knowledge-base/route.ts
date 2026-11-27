@@ -120,6 +120,7 @@ export async function GET(request: NextRequest) {
   try {
     facetRows = await fetchAllPaged<{ doc_type: string }>(() => sb()
       .from('mindy_rag_documents')
+      // truncation-ok: fetchAllPaged (above) pages through every row; this select is its page query.
       .select('doc_type')
       .eq('has_pii', false)
       .not('doc_type', 'in', `(${EXCLUDED_TYPES.join(',')})`)
