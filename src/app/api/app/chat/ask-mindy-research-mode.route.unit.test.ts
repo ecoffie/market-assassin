@@ -57,6 +57,7 @@ const ENV_KEYS = ['OPENAI_API_KEY', 'SUPABASE_SERVICE_ROLE_KEY', 'ASK_MINDY_INTE
 const saved: Record<string, string | undefined> = {};
 const openaiCalls: string[] = [];
 const openaiTools: string[] = [];
+const openaiSystems: string[] = [];
 const EMAIL = 'erika@example.com';
 const Q = 'Give me a full assessment of Ridgeline Digital.';
 type Block = Record<string, unknown>;
@@ -67,7 +68,7 @@ beforeEach(() => {
   process.env.OPENAI_API_KEY = 'sk-test';
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'srk-test';
   for (const k of ENV_KEYS.slice(2)) delete process.env[k];
-  openaiCalls.length = 0; openaiTools.length = 0; h.inserts.length = 0; h.overBudget = false; h.capUsed = 0; h.afterFns.length = 0;
+  openaiCalls.length = 0; openaiTools.length = 0; openaiSystems.length = 0; h.inserts.length = 0; h.overBudget = false; h.capUsed = 0; h.afterFns.length = 0;
   h.runMcpTool.mockReset();
   h.runMcpTool.mockImplementation(async (name: string) => ({ result: { ok: true, grounded: true, tool: name, note: 'obligated $1.2M' }, credits: 0 }));
   h.runGate.mockReset(); h.extract.mockReset(); h.extract.mockImplementation(async () => 'digital marketing');
@@ -80,6 +81,7 @@ beforeEach(() => {
     openaiCalls.push(String(url));
     const body = JSON.parse(String(init.body || '{}')) as Record<string, unknown>;
     for (const t of ((body.tools as Array<{ function?: { name?: string } }>) || [])) openaiTools.push(String(t.function?.name));
+    for (const m of ((body.messages as Array<{ role?: string; content?: unknown }>) || [])) if (m.role === 'system') openaiSystems.push(String(m.content));
     return isPlannerCall(body) ? plannerResponse([]) : answerStream(['Existing path answer.']);
   }));
   vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -342,5 +344,10 @@ describe('research mode in the chat route', () => {
       usage: { input: 700, output: 30 },
       error: { class: 'credit_balance_too_low', status: 400, steps: 1, call_count: 1 },
     });
+  });
+
+  it('standard answers carry the least-competition / where-to-start method too', async () => {
+    await ask('Where can I find opportunities where no one is bidding? I want to sell HVAC where there is the least competition.');
+    expect(openaiSystems.join('\n')).toContain('LEAST COMPETITION / WHERE TO START');
   });
 });
