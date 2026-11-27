@@ -182,12 +182,56 @@ describe('picker token never carries mail scopes (Slice B prerequisite, Agent 4 
   });
 
   it('if the provider will not limit the token, no token is returned', async () => {
-    h.token.mockResolvedValueOnce({ ok: true, token: 'stored-with-gmail', provider: 'google', connection: { ...connection, granted_scopes: [GMAIL] } });
+    h.token.mockResolvedValueOnce({ ok: true, token: 'stored-with-gmail', provider: 'google', connection: { ...connection, granted_scopes: ['https://www.googleapis.com/auth/drive.file', GMAIL] } });
     h.restricted.mockReset().mockResolvedValueOnce({ ok: false, reason: 'scope_not_restricted' });
     const { POST } = await import('./picker-token/route');
     const r = await POST(post('picker-token', { email: 'owner@acme.com', connection_id: 'conn-1' }));
     expect(r.status).toBe(502);
     const j = await r.json();
     expect(j).toEqual({ error: 'picker_scope_unavailable' });
+  });
+});
+
+describe('missing file permission: a plain reconnect answer, never the provider 403 page', () => {
+  const noFile = (provider: 'google' | 'microsoft') => ({ ok: true, token: 'access-tok', provider, connection: { ...connection, provider, granted_scopes: provider === 'google' ? ['openid', 'https://www.googleapis.com/auth/userinfo.email'] : ['User.Read', 'openid'] } });
+
+  it('picker-token: a Google grant without drive.file gets 403 file_permission_needed, and no token', async () => {
+    h.token.mockResolvedValueOnce(noFile('google'));
+    const { POST } = await import('./picker-token/route');
+    const r = await POST(post('picker-token', { email: 'owner@acme.com', connection_id: 'conn-1' }));
+    expect(r.status).toBe(403);
+    expect(await r.json()).toEqual({ error: 'file_permission_needed' });
+  });
+
+  it('selections and browse: a grant without the file scope gets the same answer before any provider call', async () => {
+    const f = vi.fn();
+    vi.stubGlobal('fetch', f);
+    h.token.mockResolvedValueOnce(noFile('google'));
+    const sel = await (await import('./selections/route')).POST(post('selections', { email: 'owner@acme.com', connection_id: 'conn-1', file_id: 'g1' }));
+    expect(sel.status).toBe(403);
+    expect((await sel.json()).error).toBe('file_permission_needed');
+    h.token.mockResolvedValueOnce(noFile('microsoft'));
+    const br = await (await import('./browse/route')).POST(post('browse', { email: 'owner@acme.com', connection_id: 'conn-1' }));
+    expect(br.status).toBe(403);
+    expect((await br.json()).error).toBe('file_permission_needed');
+    expect(f).not.toHaveBeenCalled();
+  });
+
+  it('a provider 403 anyway (scopes looked fine) is still answered with file_permission_needed', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('{}', { status: 403 })));
+    h.token.mockResolvedValueOnce({ ok: true, token: 'access-tok', provider: 'microsoft', connection: { ...connection, provider: 'microsoft', granted_scopes: ['Files.Read'] } });
+    const br = await (await import('./browse/route')).POST(post('browse', { email: 'owner@acme.com', connection_id: 'conn-1' }));
+    expect(br.status).toBe(403);
+    expect((await br.json()).error).toBe('file_permission_needed');
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('{}', { status: 403 })));
+    const sel = await (await import('./selections/route')).POST(post('selections', { email: 'owner@acme.com', connection_id: 'conn-1', file_id: 'g1' }));
+    expect((await sel.json()).error).toBe('file_permission_needed');
+  });
+
+  it('unknown scopes (the provider did not list them) never block', async () => {
+    vi.stubGlobal('fetch', meta());
+    h.token.mockResolvedValueOnce({ ok: true, token: 'access-tok', provider: 'google', connection: { ...connection, granted_scopes: [] } });
+    const sel = await (await import('./selections/route')).POST(post('selections', { email: 'owner@acme.com', connection_id: 'conn-1', file_id: 'g1' }));
+    expect(sel.status).toBe(200);
   });
 });
