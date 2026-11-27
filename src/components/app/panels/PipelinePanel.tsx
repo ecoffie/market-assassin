@@ -896,7 +896,7 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <div className="flex bg-surface rounded-lg p-1">
+          <div className="flex bg-surface rounded-lg p-1" data-tip="pipeline-view-toggle">
             <button
               onClick={() => setViewMode('board')}
               className={`px-3 py-1 text-sm rounded-md transition-colors ${
@@ -1112,6 +1112,7 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
                     key={opp.id}
                     role="button"
                     tabIndex={0}
+                    data-tip="pipeline-card"
                     onClick={() => openOpportunity(opp)}
                     onKeyDown={(event) => {
                       if (event.key === 'Enter' || event.key === ' ') {
@@ -1192,6 +1193,7 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
                               event.stopPropagation();
                               onPanelChange('proposals', { pursuit_id: opp.id });
                             }}
+                            data-tip="pipeline-draft"
                             className="mt-2 w-full rounded-md border border-amber-700/60 bg-amber-950/30 px-2 py-1.5 text-xs font-medium text-amber-200 transition-colors hover:bg-amber-900/40"
                             title="No SAM attachments — open Proposal Assist to upload an RFP manually"
                           >
@@ -1206,6 +1208,7 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
                             event.stopPropagation();
                             onPanelChange('proposals', { pursuit_id: opp.id });
                           }}
+                          data-tip="pipeline-draft"
                           className="mt-2 w-full rounded-md bg-emerald-600 px-2 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-emerald-500"
                           title={
                             opp.has_drafts

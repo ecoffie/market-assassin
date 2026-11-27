@@ -513,6 +513,7 @@ function IdentitySection({ email, data, onSaved }: { email: string; data: Identi
                 </span>
               </p>
               <button
+                data-tip="vault-autofill"
                 onClick={() => setShowAutoFill(true)}
                 className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded transition"
               >
@@ -1401,7 +1402,7 @@ function DocumentsSection({ email, items, onChanged }: { email: string; items: B
 
   return (
     <div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6" data-tip="vault-upload">
         <UploadCard
           title="Upload Capability Statement"
           body="PDF or Word. Mindy reads it and pulls out your Overview, Past Performance, and Capabilities into editable Vault sections — you review each before it's saved."
