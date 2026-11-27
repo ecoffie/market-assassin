@@ -125,7 +125,7 @@ import { intelligenceGateEnabledFor, runIntelligenceGate, type GateResult } from
 import Anthropic from '@anthropic-ai/sdk';
 import {
   researchModeEnabledFor, researchModel, researchSystemPrompt, toAnthropicTools, runResearchLoop, groundAnswer, progressLine,
-  RESEARCH_TURN_MS, RESEARCH_DEADLINE_MS, RESEARCH_NO_ANSWER, researchToolDefs, billedInputTokens, RESEARCH_SYSTEM_STATIC, researchSystemDynamic, wantsReport, type ResearchCall,
+  RESEARCH_TURN_MS, RESEARCH_DEADLINE_MS, RESEARCH_NO_ANSWER, researchToolDefs, billedInputTokens, describeResearchError, RESEARCH_SYSTEM_STATIC, researchSystemDynamic, type ResearchCall, wantsReport,
 } from '@/lib/ask-mindy/research-mode';
 import { toolLabel } from '@/lib/chat/context-sources';
 import { researchCapDecision } from '@/lib/ask-mindy/research-caps';
@@ -1373,8 +1373,19 @@ export async function POST(request: NextRequest) {
               }
               await finish(grounded.text, {}, rmSources);
             } catch (err) {
-              console.error('[chat] research mode failed:', (err as Error)?.message);
-              Object.assign(rmTrace, { stop: 'error', calls: callLog });
+              // The failure keeps its cost and its cause: usage accrued before the error is logged, and the trace records
+              // the error class (e.g. credit_balance_too_low), status and message, not just "error".
+              const failure = describeResearchError(err);
+              console.error('[chat] research mode failed:', failure.class, failure.status ?? '', failure.message);
+              if (failure.progress) {
+                const u = failure.progress.usage;
+                void recordLlmUsage({ userEmail: auth.email, tool: 'chat', job: 'research_mode_failed', provider: 'anthropic', model, usage: { prompt_tokens: billedInputTokens(u), completion_tokens: u.output } });
+                rmTrace.usage = { input: u.input, cache_read: u.cacheRead, cache_write: u.cacheWrite, output: u.output };
+              }
+              Object.assign(rmTrace, {
+                stop: 'error', calls: callLog,
+                error: { class: failure.class, status: failure.status, message: failure.message, ...(failure.progress ? { steps: failure.progress.steps, call_count: failure.progress.calls } : {}) },
+              });
               await finish('I could not finish this research because a service did not respond. Please try again in a moment.', {}, rmSources);
             }
             return;

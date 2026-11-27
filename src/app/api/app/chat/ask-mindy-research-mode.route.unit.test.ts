@@ -327,4 +327,20 @@ describe('research mode in the chat route', () => {
     await ask(Q);
     expect(h.afterFns).toHaveLength(0);
   });
+
+  it('a provider failure mid-run is traced with its class and the usage it had already cost', async () => {
+    flagOn();
+    let step = 0;
+    h.create.mockImplementation(async () => {
+      if (++step === 1) return { content: [{ type: 'tool_use', id: 'tu1', name: 'find_opportunities', input: { query: 'x' } }], stop_reason: 'tool_use', usage: { input_tokens: 700, output_tokens: 30, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 } };
+      throw Object.assign(new Error('credit'), { status: 400, error: { type: 'error', error: { type: 'invalid_request_error', message: 'Your credit balance is too low to access the Anthropic API.' } } });
+    });
+    const ev = await ask(Q);
+    expect(text(ev)).toMatch(/could not finish this research/);
+    expect(await savedTrace()).toMatchObject({
+      stop: 'error',
+      usage: { input: 700, output: 30 },
+      error: { class: 'credit_balance_too_low', status: 400, steps: 1, call_count: 1 },
+    });
+  });
 });
