@@ -17,7 +17,7 @@ type Db = Pick<SupabaseClient, 'from'>;
  */
 export async function applyUnsubscribe(
   db: Db, email: string, ctx: { emailType?: string | null; via: string },
-): Promise<{ ok: true; settingsRows: number } | { ok: false; error: string }> {
+): Promise<{ ok: true; settingsRows: number | null } | { ok: false; error: string }> {
   const now = new Date().toISOString();
   const { error: supErr } = await db.from('email_suppressions').upsert(
     { user_email: email, reason: 'unsubscribe', source: ctx.via, email_type: ctx.emailType ?? null, event_at: now, metadata: { via: ctx.via } },
@@ -28,7 +28,7 @@ export async function applyUnsubscribe(
     .update({ alerts_enabled: false, alert_frequency: 'paused', briefings_enabled: false, updated_at: now }, { count: 'exact' })
     .eq('user_email', email);
   if (error) return { ok: false, error: `settings update failed: ${error.message}` };
-  return { ok: true, settingsRows: count ?? 0 };
+  return { ok: true, settingsRows: count ?? null }; // null = count unknown, never 0
 }
 
 /**
