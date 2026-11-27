@@ -78,7 +78,7 @@ function matchesFor(src: DocSource, records: readonly ProvenanceRecord[]): Prove
 }
 
 /** Fill DocSource provenance and the data-date subtitle from tool-result records. Pure; never mutates its input. */
-export function applySourceProvenance(model: DocModel, records: readonly ProvenanceRecord[]): ApplyProvenanceResult {
+export function applySourceProvenance(model: DocModel, records: readonly ProvenanceRecord[], opts: { dataDateSubtitle?: boolean } = {}): ApplyProvenanceResult {
   const out: ApplyProvenanceResult = { model, filledRetrievedAt: 0, replacedRetrievedAt: 0, filledUrl: 0, filledRecordId: 0, unmatched: 0, removedUnverified: 0, subtitleSet: false };
   if (!model || !Array.isArray(model.sources)) return out;
   const usedAsOf: string[] = [];
@@ -110,7 +110,9 @@ export function applySourceProvenance(model: DocModel, records: readonly Provena
     return next;
   });
   let subtitle = model.subtitle;
-  if (!subtitle?.trim() && usedAsOf.length) {
+  // No "Data as of" subtitle (Eric, 2026-11-27: record dates make the data look stale). Kept behind an explicit
+  // opt-in only, for a caller that must show it.
+  if (opts.dataDateSubtitle && !subtitle?.trim() && usedAsOf.length) {
     // A range when the matched results disagree: the latest date alone would overstate how current the older data is.
     const dates = [...new Set(usedAsOf)].sort();
     subtitle = dates.length === 1 ? `Data as of ${dates[0]}` : `Data as of ${dates[0]} to ${dates[dates.length - 1]}`;

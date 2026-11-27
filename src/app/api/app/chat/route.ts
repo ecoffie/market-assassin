@@ -122,6 +122,7 @@ import { ASK_MINDY_RULES_LAYER, askMindyRulesEnabledFor, askMindyRulesPromptBloc
 import { askMindyRecipesEnabledFor } from '@/lib/ask-mindy/flags';
 import { loadCompanyProfile } from '@/lib/ask-mindy/company-profile';
 import { intelligenceGateEnabledFor, runIntelligenceGate, type GateResult } from '@/lib/ask-mindy/intelligence-gate';
+import { helpAnswerFor, helpAnswersEnabledFor } from '@/lib/ask-mindy/help-answers';
 import Anthropic from '@anthropic-ai/sdk';
 import {
   researchModeEnabledFor, researchModel, researchSystemPrompt, toAnthropicTools, runResearchLoop, groundAnswer, progressLine,
@@ -145,6 +146,7 @@ import { capabilityPlannerNote, interpretCapabilityNaics } from '@/lib/market/ca
 import { guardUnstatedStates, guardUnstatedCities } from '@/lib/chat/stated-filters';
 import { parseDisplayHint, displayHintNote } from '@/lib/chat/display-hint';
 import { appActionsEnabledFor, parseActionSurface, actionNamesFor, createAppActionProposer, proposeAppActionToolDef, PROPOSE_APP_ACTION, APP_ACTIONS_NOTE, type AppActionProposer } from '@/lib/chat/app-actions/propose';
+import { QUESTION_OVER_PROFILE, OUTREACH_AND_PLAN_RULES } from '@/lib/ask-mindy/outreach-rules';
 import { compileIntent, enforceIntent, dedupeToolCalls, isMapScopeNote, splitViewPreamble } from '@/lib/chat/intent-compiler';
 import { sessionTitleFrom } from '@/lib/chat/view-preamble';
 import { prepareChatToolArgs, renderExpiringRecords, renderStatusChecks, renderBuyingOffices, renderPricing, renderKeywords, renderVehicleMix, renderSbloContact, lintAnalysis, deterministicNextSteps, crossCheckOffices, checkSummaryAgainstRecords, EXPIRING_TOOL, PAST_CONTRACTS_TOOL, BUYING_OFFICES_TOOL, PRICING_TOOL, KEYWORDS_TOOL, VEHICLE_MIX_TOOL, SBLO_TOOL, type RenderedRecords } from '@/lib/chat/record-render';
@@ -380,7 +382,9 @@ WRITING STYLE:
 - Default to second person ("you / your") — you're talking TO the user, not ABOUT a hypothetical bidder.
 - NEVER mention tool names, internal mechanics, or "the [X] tool" to the user. Just answer with what you found, or — if you need one more detail to search (e.g. which agency) — ask for it naturally ("Which agency did you have in mind?"). The user never sees the plumbing.
 
-USER PROFILE (use to personalize answers when relevant; if blank, write generically using "your company"):
+${OUTREACH_AND_PLAN_RULES}
+
+USER PROFILE (use to personalize answers when relevant; if blank, write generically using "your company"; the customer's own words in this conversation override it):
 {userProfile}`;
 
 // (buildContextBlock / chunksToCitations / buildCitationChips removed 2026-08-02 — the entire RAG
@@ -711,6 +715,25 @@ export async function POST(request: NextRequest) {
         // Tell client which session this exchange belongs to right away
         send({ type: 'session', sessionId });
 
+        // Help answers (beta, ASK_MINDY_HELP_ANSWERS, default off; src/lib/ask-mindy/help-answers.ts): a plain how-to
+        // question is answered from the register, with no tools and no research run. No match, card chat, or a turn
+        // with screenshots falls through unchanged.
+        const help = !cardCtx && !turnImages.length && helpAnswersEnabledFor(auth.email)
+          ? helpAnswerFor(splitViewPreamble(message).rest || message, { hasAttachedOpportunity: !!selectedCtx, actionsEnabled: false })
+          : null;
+        if (help) {
+          send({ type: 'token', content: help.text });
+          send({ type: 'citations', sources: [] });
+          send({ type: 'done' });
+          closeStream();
+          persistExchange({
+            email: auth.email!, sessionId, userMessage: message, assistantMessage: help.text, citedSources: [],
+            tokensUsed: 0, latencyMs: Date.now() - startedAt,
+            trace: { engine: 'help_answer', help_id: help.id, help_kind: help.kind },
+          }).catch((err) => console.error('[chat] persist failed:', err));
+          return;
+        }
+
         // Load ONLY the bidder profile for context. The ENTIRE RAG corpus — the 8-year
         // teaching/curriculum chunks AND the podcast episodes — was REMOVED (Eric 2026-08-02:
         // "not just the podcast, the 8-year corpus training, anything not related to the data core
@@ -822,7 +845,8 @@ export async function POST(request: NextRequest) {
         const profile: BidderProfile = profileResult?.profile ?? {};
         const { rec: noticeRecord, origin: noticeOrigin, mention: mentionedNotice, facts: noticeFacts } = await noticeP;
         cardRecord = noticeRecord;
-        const userProfileBlock = formatProfileForPrompt(profile) + (
+        const profileText = formatProfileForPrompt(profile);
+        const userProfileBlock = profileText + (profileText.trim() ? `\n\n${QUESTION_OVER_PROFILE}` : '') + (
           !profileEmail
             ? '\n\nCOMPANY PROFILE NOT USED this turn: the acting workspace could not be confirmed, so no saved company profile applies. Say so if fit matters; use only what the customer has said in this conversation, and do not ask again for details they already gave.'
             : profileResult?.status === 'unavailable'
@@ -1323,7 +1347,9 @@ export async function POST(request: NextRequest) {
             const callLog: Array<{ tool: string; status: string; ms: number; args: unknown }> = [];
             let rmReport: { report_id: string | null; url: string | null; title: string; html: string } | null = null;
             const rmDeliverables: Array<{ format: string; document_id: string; file_name?: string; version?: number | null }> = [];
-            const rmSources: typeof turnSources = [];
+            // The SAME array create_document's provenance reads (provenanceRecords(turnSources, …)): research results land
+            // here, so a research report's sources get their record links, ids and read dates (the standard path never runs).
+            const rmSources: typeof turnSources = turnSources;
             const planner = { model, provider: 'anthropic' };
             const isWrite = (n: string) => executor.policyFor(n).decision === 'allowed_write';
             const execOne = async (c: ResearchCall) => {

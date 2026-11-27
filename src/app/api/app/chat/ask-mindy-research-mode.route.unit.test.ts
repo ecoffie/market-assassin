@@ -18,6 +18,7 @@ const h = vi.hoisted(() => ({
   capUsed: 0,
   afterFns: [] as Array<() => unknown>,
   inserts: [] as Array<Record<string, unknown>>,
+  genOpts: null as null | { provenance?: () => unknown[] },
 }));
 
 vi.mock('@supabase/supabase-js', () => {
@@ -51,9 +52,14 @@ vi.mock('@/lib/ask-mindy/research-caps-deps', () => ({
   },
 }));
 vi.mock('next/server', async (orig) => ({ ...(await orig<typeof import('next/server')>()), after: (fn: () => unknown) => { h.afterFns.push(fn); } }));
+// Captures create_document's options (provenance) while keeping the real tool.
+vi.mock('@/lib/chat/generate-document-tool', async (orig) => {
+  const real = await orig<typeof import('@/lib/chat/generate-document-tool')>();
+  return { ...real, makeGenerateDocumentTool: (opts: Parameters<typeof real.makeGenerateDocumentTool>[0]) => { h.genOpts = opts as never; return real.makeGenerateDocumentTool(opts); } };
+});
 vi.mock('@anthropic-ai/sdk', () => ({ default: class { messages = { create: (...a: unknown[]) => h.create(...a) }; } }));
 
-const ENV_KEYS = ['OPENAI_API_KEY', 'SUPABASE_SERVICE_ROLE_KEY', 'ASK_MINDY_INTELLIGENCE_GATE', 'ASK_MINDY_INTELLIGENCE_GATE_ALLOWLIST', 'ASK_MINDY_RESEARCH_MODE', 'ASK_MINDY_RESEARCH_MODE_ALLOWLIST', 'ASK_MINDY_RESEARCH_MODEL'] as const;
+const ENV_KEYS = ['OPENAI_API_KEY', 'SUPABASE_SERVICE_ROLE_KEY', 'ASK_MINDY_INTELLIGENCE_GATE', 'ASK_MINDY_INTELLIGENCE_GATE_ALLOWLIST', 'ASK_MINDY_RESEARCH_MODE', 'ASK_MINDY_RESEARCH_MODE_ALLOWLIST', 'ASK_MINDY_RESEARCH_MODEL', 'VAULT_GENERATED_FILES'] as const;
 const saved: Record<string, string | undefined> = {};
 const openaiCalls: string[] = [];
 const openaiTools: string[] = [];
@@ -68,7 +74,7 @@ beforeEach(() => {
   process.env.OPENAI_API_KEY = 'sk-test';
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'srk-test';
   for (const k of ENV_KEYS.slice(2)) delete process.env[k];
-  openaiCalls.length = 0; openaiTools.length = 0; openaiSystems.length = 0; h.inserts.length = 0; h.overBudget = false; h.capUsed = 0; h.afterFns.length = 0;
+  openaiCalls.length = 0; openaiTools.length = 0; openaiSystems.length = 0; h.inserts.length = 0; h.overBudget = false; h.capUsed = 0; h.afterFns.length = 0; h.genOpts = null;
   h.runMcpTool.mockReset();
   h.runMcpTool.mockImplementation(async (name: string) => ({ result: { ok: true, grounded: true, tool: name, note: 'obligated $1.2M' }, credits: 0 }));
   h.runGate.mockReset(); h.extract.mockReset(); h.extract.mockImplementation(async () => 'digital marketing');
@@ -329,6 +335,17 @@ describe('research mode in the chat route', () => {
   it('ordinary turns register no keep-alive', async () => {
     await ask(Q);
     expect(h.afterFns).toHaveLength(0);
+  });
+
+  it("a research report's provenance sees the research results (record links, ids and read dates for its sources)", async () => {
+    flagOn();
+    process.env.VAULT_GENERATED_FILES = 'true';
+    await ask(Q);
+    expect(h.genOpts?.provenance).toBeTypeOf('function');
+    // Both research calls (find_opportunities, search_contractors) are records create_document can date and link.
+    const recs = h.genOpts!.provenance!() as Array<{ retrievedAt: string }>;
+    expect(recs).toHaveLength(2);
+    for (const r of recs) expect(r.retrievedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
   });
 
   it('a research turn is labelled beta: a mode event before the answer, and the label in the saved trace; standard turns carry none', async () => {

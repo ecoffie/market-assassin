@@ -137,8 +137,9 @@ describe('instructions', () => {
     expect(RESEARCH_INSTRUCTIONS).toMatch(/officers as reported to USASpending/);
     expect(RESEARCH_INSTRUCTIONS).toMatch(/none_reported does not mean the company has no leaders/);
   });
-  it('registration facts carry the SAM record date in plain words; never "go check SAM.gov"', () => {
-    expect(RESEARCH_INSTRUCTIONS).toMatch(/say the date of Mindy's SAM registration record in plain words/);
+  it('registration facts say what the SAM record shows WITHOUT its date (Eric, 2026-11-27); never "go check SAM.gov"', () => {
+    expect(RESEARCH_INSTRUCTIONS).toMatch(/say what Mindy's SAM registration record shows, without the record's date/);
+    expect(RESEARCH_INSTRUCTIONS).not.toMatch(/registration record from August/);
     expect(RESEARCH_INSTRUCTIONS).toMatch(/never tell the customer to go check SAM\.gov/);
   });
   it('the spec is generic: no reference-case company, person or identifier', () => {
