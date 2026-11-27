@@ -12,7 +12,7 @@
  * the smallest code set that covers ~90% of the spend (for eligibility filtering).
  */
 import { fiscalYearTimePeriod, latestCompleteFiscalYear } from '@/lib/utils/fiscal-year';
-import { termOfArtSynonyms, sectorSubTradeKeywords } from './sector-expansions';
+import { termOfArtSynonyms, sectorSubTradeKeywords, termOfArtPscCodes } from './sector-expansions';
 
 /**
  * How many curated alternates the identity fallback may measure.
@@ -205,8 +205,9 @@ export function buildMarketFilter(opts: {
     // TERM-OF-ART PSC PIN (FM-10) — curated product knowledge, not a BQ share.
     // EOD → 1385/1386 even when Facilities Support holds the description-matched $.
     if (coverage.pinnedPscCodes?.length) {
+      // The PSC set IS the market ("what was bought"). ANDing the literal phrase back in returned $0 for a
+      // multi-word phrase that matches no award text (hospital construction, 2026-11-22).
       return {
-        keywords: [coverage.keyword],
         psc_codes: coverage.pinnedPscCodes,
         mode: 'keyword_psc',
         rankingLabel: `keyword "${coverage.keyword}" + PSC ${coverage.pinnedPscCodes.join('/')} (term of art)`,
@@ -650,6 +651,8 @@ export async function queryKeywordCoverage(
           ...cov,
           identityResolvedVia: measured.map((m) => m.term),
           identityBasis: 'curated_sector_family',
+          // A term-of-art PSC pin defines the market by what was bought (was never populated: always null).
+          pinnedPscCodes: termOfArtPscCodes(raw),
         };
         if (!opts?.signal?.aborted && !signal?.aborted) {
           _covCache.set(cacheKey, { at: Date.now(), val: resolved });
@@ -663,7 +666,7 @@ export async function queryKeywordCoverage(
       }
       return { status: 'NO_MATCHES_MEASURED', coverage: null, degraded: false };
     }
-    const coverage = rowToCoverage(row, coverageTarget);
+    const coverage = { ...rowToCoverage(row, coverageTarget), pinnedPscCodes: termOfArtPscCodes(raw) };
     if (!opts?.signal?.aborted && !signal?.aborted) {
       _covCache.set(cacheKey, { at: Date.now(), val: coverage });
     }
@@ -705,6 +708,10 @@ export { descriptionMatchPattern };
  */
 export async function codeMarketSize(opts: {
   psc?: string;
+  /** Several PSCs measured as ONE market (a term-of-art pin). Takes precedence over `psc`. */
+  pscCodes?: string[];
+  /** Awarding toptier agency name — scopes the measurement to that buyer (e.g. Department of Veterans Affairs). */
+  agency?: string;
   naics?: string;
   signal?: AbortSignal;
   perFetchMs?: number;
@@ -726,7 +733,8 @@ export async function codeMarketSize(opts: {
   questionKind: 'code_pinned_fy_category_total';
   fiscalYear: number;
 } | null> {
-  const psc = (opts.psc || '').trim();
+  const pscList = (opts.pscCodes?.length ? opts.pscCodes : [opts.psc || '']).map((c) => (c || '').trim().toUpperCase()).filter(Boolean);
+  const psc = pscList.join(',');
   const naics = (opts.naics || '').trim();
   if (!psc && !naics) return null;
   assertNotAborted(opts.signal);
@@ -739,8 +747,10 @@ export async function codeMarketSize(opts: {
     time_period: [fyPeriod],
     award_type_codes: ['A', 'B', 'C', 'D'],
   };
-  if (basis === 'psc') filters.psc_codes = [psc];
+  if (basis === 'psc') filters.psc_codes = pscList;
   else filters.naics_codes = [naics];
+  const agencyName = (opts.agency || '').trim();
+  if (agencyName) filters.agencies = [{ type: 'awarding', tier: 'toptier', name: agencyName }];
 
   const covOpts: KeywordCoverageOptions = { signal: opts.signal, perFetchMs: opts.perFetchMs };
   // In strict mode only the BASIS category is required evidence; the other one is
@@ -792,7 +802,7 @@ export async function codeMarketSize(opts: {
       windowKind: 'latest_complete_fy_live_api',
       // NOT keywordCoverageWindowLabel: that says "description match", and this total
       // is every award coded to the NAICS/PSC — no description is matched at all.
-      windowLabel: `FY${fiscalYear} (1 complete fiscal year · all awards coded ${basis === 'psc' ? 'PSC' : 'NAICS'} ${basis === 'psc' ? psc : naics})`,
+      windowLabel: `FY${fiscalYear} (1 complete fiscal year · all awards coded ${basis === 'psc' ? 'PSC' : 'NAICS'} ${basis === 'psc' ? pscList.join('/') : naics}${agencyName ? ` · ${agencyName} only` : ''})`,
       questionKind: 'code_pinned_fy_category_total',
       fiscalYear,
     };

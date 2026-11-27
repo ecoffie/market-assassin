@@ -62,6 +62,35 @@ export function sectorSubTradeKeywords(keyword: string): string[] | null {
 // each verified against live USASpending (drones → the UAS-manufacturing core; EOD → the PSC-1385/1386
 // performers). NOT a guess.
 export const TERM_OF_ART_EXPANSIONS: { match: RegExp; keywords: string[]; pscCodes?: string[]; naicsCodes?: string[] }[] = [
+  // HOSPITAL / MEDICAL-FACILITY CONSTRUCTION, RENOVATION and MAINTENANCE — PSC-PINNED (2026-11-22, VA report).
+  // The phrase measured nothing literally and fell to the generic construction sector expansion (11 trades,
+  // 163 NAICS incl. highways, top PSC Y1NZ "other utilities" — $17.0M at VA, off-subject).
+  // Verified live (Agent 4, USASpending spending_by_category/psc, FY2025 = 2024-10-01..2025-09-30, award types
+  // A–D, read 2026-11-22; national / VA): Y1DA construction of hospitals & infirmaries $1.213B / $806M ·
+  // Z2DA repair or alteration of hospitals & infirmaries $1.076B / $626M · Y1DZ construction of other hospital
+  // buildings (VA $362M) · Z1DA MAINTENANCE of hospitals & infirmaries $1.047B / $646M.
+  // Z1DA is recurring MAINTENANCE: pinned ONLY when the ask names maintenance — never folded silently into a
+  // construction/renovation market. C1DA (A&E design) is not pinned (no design ask yet).
+  // Order matters (first match wins): construction+maintenance, then maintenance only, then construction.
+  {
+    match: /(?=.*\b(hospital|hospitals|medical\s+cent(er|re)s?|vamc|infirmar(y|ies)|clinics?)\b)(?=.*\b(construct\w*|renovat\w*|alteration\w*|repairs?|build-?out|remodel\w*)\b)(?=.*\b(maintenance|maintain\w*|upkeep|preventive\s+maintenance)\b)/i,
+    keywords: ['hospital construction', 'hospital renovation', 'hospital maintenance'],
+    pscCodes: ['Y1DA', 'Z2DA', 'Y1DZ', 'Z1DA'],
+    naicsCodes: ['236220'],
+  },
+  {
+    match: /\b(hospital|hospitals|medical\s+cent(er|re)s?|vamc|infirmar(y|ies)|clinics?)\b[^.]{0,40}\b(maintenance|maintain\w*|upkeep|preventive\s+maintenance)\b|\b(maintenance|maintain\w*|upkeep|preventive\s+maintenance)\b[^.]{0,40}\b(hospital|hospitals|medical\s+cent(er|re)s?|vamc|infirmar(y|ies)|clinics?)\b/i,
+    keywords: ['hospital maintenance', 'medical center maintenance'],
+    pscCodes: ['Z1DA'],
+    naicsCodes: ['236220'],
+  },
+  {
+    // Requires a construction word, so "hospital staffing" / "medical center IT" never pin construction PSCs.
+    match: /\b(hospital|hospitals|medical\s+cent(er|re)s?|vamc|infirmar(y|ies)|clinics?)\b[^.]{0,40}\b(construct\w*|renovat\w*|alteration\w*|repairs?|build-?out|remodel\w*)\b|\b(construct\w*|renovat\w*|alteration\w*|repairs?|build-?out|remodel\w*)\b[^.]{0,40}\b(hospital|hospitals|medical\s+cent(er|re)s?|vamc|infirmar(y|ies)|clinics?)\b/i,
+    keywords: ['hospital construction', 'hospital renovation'],
+    pscCodes: ['Y1DA', 'Z2DA', 'Y1DZ'],
+    naicsCodes: ['236220'],
+  },
   {
     // Counter-UAS / drone defense — a distinct market from UAS itself. Checked BEFORE UAS.
     match: /\b(c-?uas|counter-?uas|counter-?drones?|drone\s+defense)\b/i,
