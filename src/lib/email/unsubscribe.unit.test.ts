@@ -7,7 +7,7 @@ import {
 } from './unsubscribe';
 
 const env = { ...process.env };
-beforeEach(() => { process.env.EMAIL_ACTION_SECRET = 'cur'; delete process.env.EMAIL_ACTION_SECRET_PREVIOUS; delete process.env.UNSUBSCRIBE_MAILTO; });
+beforeEach(() => { process.env.EMAIL_ACTION_SECRET = 'cur'; delete process.env.EMAIL_ACTION_SECRET_PREVIOUS; delete process.env.UNSUBSCRIBE_MAILTO; delete process.env.UNSUBSCRIBE_ACCEPT_ADMIN_LEGACY; delete process.env.EMAIL_ACTION_ACCEPT_ADMIN_LEGACY; });
 afterEach(() => { process.env = { ...env }; });
 const parts = (url: string) => { const u = new URL(url); return [u.searchParams.get('e'), u.searchParams.get('t')] as const; };
 
@@ -79,5 +79,26 @@ describe('no hand-built unsubscribe links in email code', () => {
       }
     }
     expect(bad).toEqual([]);
+  });
+});
+
+describe('legacy ADMIN_PASSWORD links keep working (unsubscribe links never expire)', () => {
+  it('EMAIL_ACTION_ACCEPT_ADMIN_LEGACY=off does NOT break an unsubscribe link signed with ADMIN_PASSWORD', async () => {
+    const { unsubscribeToken: tok } = await import('./unsubscribe');
+    process.env.ADMIN_PASSWORD = 'admin-legacy';
+    const legacy = tok('pat@example.com', 'admin-legacy');
+    process.env.EMAIL_ACTION_SECRET = 'new-dedicated';
+    process.env.EMAIL_ACTION_ACCEPT_ADMIN_LEGACY = 'off';
+    const e = Buffer.from('pat@example.com').toString('base64url');
+    expect(verifyUnsubscribe(e, legacy)).toBe('pat@example.com');
+  });
+  it('only UNSUBSCRIBE_ACCEPT_ADMIN_LEGACY=off retires the legacy secret for unsubscribe', async () => {
+    const { unsubscribeToken: tok } = await import('./unsubscribe');
+    process.env.ADMIN_PASSWORD = 'admin-legacy';
+    process.env.EMAIL_ACTION_SECRET = 'new-dedicated';
+    process.env.UNSUBSCRIBE_ACCEPT_ADMIN_LEGACY = 'off';
+    const e = Buffer.from('pat@example.com').toString('base64url');
+    expect(verifyUnsubscribe(e, tok('pat@example.com', 'admin-legacy'))).toBeNull();
+    expect(verifyUnsubscribe(e, tok('pat@example.com', 'new-dedicated'))).toBe('pat@example.com');
   });
 });
