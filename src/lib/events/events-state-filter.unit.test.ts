@@ -119,12 +119,24 @@ describe('regional catalog (official organizer pages only)', () => {
     expect(regionalCoverage(['ct', 'TX'])).toEqual({ covered: ['CT'], not_covered: ['TX'], fallback: cat.fallback });
     expect(regionalCoverage(['VA', 'MD', 'DC', 'FL'])).toMatchObject({ covered: ['VA', 'MD', 'DC', 'FL'], not_covered: [] });
   });
-  it('"near Arlington" (VA): the Virginia APEX row with no stated date → "check the organizer page"', async () => {
+  it('"near Arlington" (VA): the Virginia APEX row carries the date its own calendar feed states', async () => {
     const r = await searchFederalEvents({ near: 'Arlington, VA' });
     expect(r.regional_events!.map((e) => e.id)).toEqual(['va-apex-training']);
-    expect(r.regional_events![0].event_date).toBeNull();
-    expect(r.regional_events![0].date_note).toMatch(/Check the organizer page/);
+    const va = r.regional_events![0];
+    if (new Date().toISOString().slice(0, 10) <= '2026-12-01') {
+      expect(va).toMatchObject({ event_date: '2026-12-01', url: 'https://virginiaapex.ecenterdirect.com/events/5247', date_note: null });
+    } else {
+      expect(va.event_date).toBeNull(); // a past stated date is never shown as next
+    }
+    expect(va.source_url).toMatch(/^https:\/\/virginiaapex\.ecenterdirect\.com\/events\/feed\?/);
     expect(r.regional_coverage).toMatchObject({ covered: ['VA'], not_covered: [] });
+  });
+  it('VA row: the date comes from the organizer feed, and a past date reverts to "check the organizer page"', () => {
+    const before = regionalEventsForStates(['VA'], '2026-11-27', '2027-03-27')[0];
+    expect(before).toMatchObject({ event_date: '2026-12-01', event_end_date: '2026-12-01' });
+    const after = regionalEventsForStates(['VA'], '2026-12-02', '2027-04-02')[0];
+    expect(after.event_date).toBeNull();
+    expect(after.date_note).toMatch(/Check the organizer page/);
   });
   it('MD APEX shows the date its own calendar states; DC and FL rows are undated', () => {
     const rows = regionalEventsForStates(['MD', 'DC', 'FL'], '2026-11-27', '2027-03-27');

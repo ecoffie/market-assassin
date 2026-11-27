@@ -59,11 +59,17 @@
       "city": null,
       "kind": "apex",
       "description": "Free government-contracting training, workshops and special events for Virginia businesses.",
-      "next_occurrence": null,
+      "next_occurrence": {
+        "title": "Finding Government Contracting Opportunities (Virginia Beach, in person)",
+        "start": "2026-12-01",
+        "end": "2026-12-01",
+        "url": "https://virginiaapex.ecenterdirect.com/events/5247",
+        "location": "140 Independence Blvd, Virginia Beach, VA"
+      },
       "verification": {
         "verified_at": "2026-11-27",
-        "source_url": "https://virginiaapex.ecenterdirect.com/events",
-        "note": "Official training calendar loads its list by script; no date readable from the page, so no date is stated here."
+        "source_url": "https://virginiaapex.ecenterdirect.com/events/feed?source=conferences&start=2026-11-27&end=2027-03-27",
+        "note": "The organizer's own calendar feed (the endpoint its script-rendered calendar page calls). Soonest event the Virginia APEX Accelerator itself organizes or sponsors (event page: no fee, open); earlier same-day 'LOCAL EVENT' listings are third-party events and were not used."
       }
     },
     {
