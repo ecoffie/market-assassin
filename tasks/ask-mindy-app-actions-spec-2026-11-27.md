@@ -178,9 +178,11 @@ with the confirm UI.
   always also answer in words.
 - Honour the flag and the allowlist server-side.
 
-## Open questions for Eric
+## Decisions (Eric, 2026-11-27)
 
-1. Should slice 1 include `map.open_opportunity`, or stay strictly filters and search?
-2. For write actions, is a one-line inline confirm enough, or should saved searches and alerts open the existing save dialog
-   pre-filled?
-3. Should actions run inside the Map card chat (per-opportunity) at all, or only in the main Ask Mindy window?
+1. **`map.open_record` is in slice 1**, but only for a notice id that appeared in this turn's results.
+   - Server (Agent 1): only emit ids present in this turn's tool outputs.
+   - Client: holds the action until the answer finishes, then opens it only if the id appears in the answer text, its sources ledger or its report. Otherwise it is rejected (`rejected:unsourced`).
+2. **Write actions use a one-line inline confirm**, e.g. "Save 'VA construction FL' with weekly alerts? [Save] [Not now]". They do not open the pre-filled dialog.
+3. **No actions in the Map card chat** this release, only in the main Ask Mindy window. The server doesn't offer the tool on card turns, and the client ignores actions there.
+4. **Release:** everything ships labelled beta. The flag starts allowlisted for one end-to-end test by Claude Local, then goes on for everyone. Every change line carries "· Beta". Eric gave standing approval to merge action PRs after Agent 4's review.
