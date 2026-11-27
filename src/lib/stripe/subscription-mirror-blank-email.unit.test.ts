@@ -21,13 +21,13 @@ function db() {
         const f: Record<string, unknown> = {};
         const q = {
           eq: (c: string, v: unknown) => { f[c] = v; return q; },
-          select: async () => {
+          then: (res: (v: unknown) => void) => {
             const r = h.rows.get(String(f.id));
             if (r && r.email === f.email) {
               r.email = patch.email; h.updates.push({ id: String(f.id), email: patch.email, source: patch.metadata.email_source });
-              return { data: [{ id: f.id }], error: null };
+              return res({ count: 1, error: null });
             }
-            return { data: [], error: null };
+            return res({ count: 0, error: null });
           },
         };
         return q;

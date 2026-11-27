@@ -38,9 +38,9 @@ vi.mock('@/lib/supabase/server-clients', () => ({
         const f: Record<string, unknown> = {};
         const q = {
           eq: (c: string, v: unknown) => { f[c] = v; return q; },
-          select: async () => {
+          then: (res: (v: unknown) => void) => {
             state.fills.push({ id: f.id, email: patch.email, source: patch.metadata.email_source, onlyIfEmail: f.email });
-            return { data: [{ id: f.id }], error: null };
+            return res({ count: 1, error: null });
           },
         };
         return q;

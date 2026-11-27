@@ -78,12 +78,12 @@ export async function fillBlankCustomerEmail(
 ): Promise<{ filled: boolean; error?: string }> {
   const e = (email || '').trim().toLowerCase();
   if (!customerId || !e || !e.includes('@')) return { filled: false };
-  const { data, error } = await db.from('stripe_customers')
-    .update({ email: e, metadata: { email_source: source }, updated_at: new Date().toISOString() })
-    .eq('id', customerId).eq('email', '')
-    .select('id');
+  const { count, error } = await db.from('stripe_customers')
+    .update({ email: e, metadata: { email_source: source }, updated_at: new Date().toISOString() }, { count: 'exact' })
+    .eq('id', customerId).eq('email', '');
   if (error) return { filled: false, error: error.message };
-  return { filled: Array.isArray(data) && data.length > 0 };
+  if (count == null) return { filled: false, error: 'update count unknown' }; // unknown is not "filled"
+  return { filled: count > 0 };
 }
 
 export type MirrorResult =
