@@ -22,8 +22,9 @@ export const NO_DATA_DATES =
   + ' "record from <date>", "retrieved", "verified on", "last updated"), even when a tool result carries that date. Say what'
   + ' the record shows. When data may be behind, say so in words without a date ("recent awards may not appear yet",'
   + ' "confirm on SAM.gov before relying on it"); never drop that warning. Dates that are facts about the work stay: response deadlines,'
-  + ' contract end dates, registration expiry, campaign timing, and caveats such as "defense awards publish about 90 days'
-  + ' late, so a missing recent award does not mean they stopped buying". Contacts carry no dates either: cite their source'
+  + ' contract end dates, registration expiry, campaign timing, and caveats such as "Defense awards are published on'
+  + ' USAspending.gov with a delay of about 90 days (DoD reporting policy), so a missing recent award does not mean they'
+  + ' stopped buying". Contacts carry no dates either: cite their source'
   + ' with a citation marker.';
 
 /** Eric's outreach method (rules 0-6), the "Before you send" checklist and the closing line. */

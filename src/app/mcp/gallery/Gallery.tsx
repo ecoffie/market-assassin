@@ -321,6 +321,7 @@ function Preview({ item, large = false }: { item: GalleryItem; large?: boolean }
         <b>Mindy</b>
         <span>{item.docTitle}</span>
       </span>
+      <span className="mg-doc-ex" data-testid="gallery-example-tag">Example output (illustrative)</span>
       <span className="mg-doc-body">
         <Body p={item.preview} />
       </span>
@@ -755,6 +756,7 @@ const CSS = `
 .mg-doc{display:flex;flex-direction:column;box-shadow:0 14px 34px color-mix(in srgb,var(--mp-ink) 16%,transparent);background:var(--mp-surface);color:var(--mp-ink);font-family:var(--mp-font-sans);text-align:left}
 .mg-doc-bar{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:9px 14px;background:var(--mp-navy);color:var(--mp-surface);font-size:12px}
 .mg-doc-bar b{letter-spacing:.04em}
+.mg-doc-ex{display:block;padding:3px 14px;font:600 10px/1.4 Inter,system-ui,sans-serif;letter-spacing:.02em;color:var(--mp-ink);background:var(--mp-wash);border-bottom:1px solid var(--mp-line)}
 .mg-doc-bar span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .mg-doc-body{display:block;padding:14px;font-size:13.5px;line-height:1.4;flex:1}
 .mg-doc--lg .mg-doc-body{padding:20px;font-size:14px}
