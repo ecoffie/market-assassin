@@ -11785,8 +11785,8 @@ const ASK_MINDY_JS = `<script>(function(){
       },function(){ fail('Your report could not be loaded. Check your connection and try again.',true); });
     try{ if(window.__track) window.__track('tool_use','map_market_report_reopen',{}); }catch(e){}
   }
-  // "Research · Beta" tag (research mode for everyone, labelled beta): from the turn's {type:'mode', mode:'research',
-  // beta:true, label} event, or from History's research_mode {label}. Server text shown as plain text, bounded.
+  // "Research · Beta" tag (research mode for everyone, labelled beta): from the research mode event of this turn (type mode, mode research,
+  // beta true, with a label), or from the research_mode label History returns. Server text shown as plain text, bounded.
   // (literal, not a var: renderConversation can run at boot before a var assignment below has executed)
   function betaLabel(raw){ var BETA_DEFAULT='Research · Beta'; if(typeof raw!=='string') return BETA_DEFAULT; var o=''; for(var i=0;i<raw.length;i++){ var c=raw.charCodeAt(i); o+=(c<32||c===127)?' ':raw.charAt(i); }
     o=o.replace(/ +/g,' ').trim(); return (o&&o.length<=40)?o:BETA_DEFAULT; }
