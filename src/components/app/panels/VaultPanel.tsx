@@ -17,6 +17,8 @@ interface Props {
   tier: AppTier;
   /** Open straight to a section (e.g. the old /library deep link → 'generated'). */
   initialSection?: VaultSection;
+  /** The navigation context that carried initialSection; a new object re-applies it. */
+  sectionRequest?: unknown;
 }
 
 type VaultSection = 'identity' | 'past_performance' | 'capabilities' | 'team' | 'documents' | 'generated';
@@ -119,13 +121,15 @@ const SECTIONS: { id: VaultSection; label: string; icon: LucideIcon; blurb: stri
   { id: 'generated', label: 'Generated', icon: BookOpen, blurb: 'Everything Mindy has drafted for you', proOnly: true },
 ];
 
-export default function VaultPanel({ email, tier, initialSection }: Props) {
+export default function VaultPanel({ email, tier, initialSection, sectionRequest }: Props) {
   const [section, setSection] = useState<VaultSection>(initialSection || 'identity');
   // A deep link (e.g. the map's /app?panel=vault&section=documents) can arrive after mount —
   // follow it when it changes, but never override the user's own tab clicks otherwise.
+  // sectionRequest changes on every navigation that carries a section, so a repeat request (My Documents clicked
+  // while on another Vault tab) is followed too.
   useEffect(() => {
     if (initialSection) setSection(initialSection);
-  }, [initialSection]);
+  }, [initialSection, sectionRequest]);
   const [identity, setIdentity] = useState<IdentityProfile | null>(null);
   const [pastPerf, setPastPerf] = useState<PastPerf[]>([]);
   const [capabilities, setCapabilities] = useState<Capability[]>([]);
