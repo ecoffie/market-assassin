@@ -18,7 +18,7 @@ export const PRICING_TASK_EXAMPLES: Readonly<Record<string, string>> = {
   find: 'where-the-money-is',
   incumbent: 'who-holds-it',
   price: 'labor-rates',
-  playbook: 'capture-plan',
+  actionplan: 'capture-plan',
   teaming: 'teaming-partners',
   proposal: 'proposal-draft',
 };

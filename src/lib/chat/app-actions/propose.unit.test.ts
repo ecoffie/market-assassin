@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   appActionsEnabledFor, parseActionSurface, actionNamesFor, proposeAppActionToolDef, createAppActionProposer,
-  PROPOSE_APP_ACTION, type ActionEvent,
+  PROPOSE_APP_ACTION, APP_ACTIONS_NOTE, WRITE_CONFIRM_HINTS, pendingWriteNote, type ActionEvent,
 } from './propose';
 import { ACTIONS, MAX_ACTIONS_PER_TURN } from './registry';
 
@@ -106,11 +106,44 @@ describe('createAppActionProposer', () => {
       const pro = mk({ hasPro: true });
       const r = pro.p.propose({ name: 'map.save_test', args: { q: 'janitorial' } });
       expect(r).toMatchObject({ status: 'proposed' });
-      expect(String(r.note)).toMatch(/must confirm/);
+      expect(String(r.note)).toMatch(/NOT DONE YET/);
+      expect(String(r.note)).toContain('Click the button under this answer to confirm it.');
       expect(pro.sent[0]).toMatchObject({ name: 'map.save_test', needs_confirm: true });
     } finally {
       for (const k of Object.keys(ACTIONS)) if (!(k in saved)) delete ACTIONS[k];
     }
+  });
+});
+
+describe('pending writes are worded as waiting, never as done (prod: "I\'ve sent … to your pursuits" before Add)', () => {
+  it('every registered write has a hint, and its button matches the Map client\'s ACT_WRITES label', () => {
+    const writes = Object.entries(ACTIONS).filter(([, d]) => d.needsConfirm).map(([n]) => n).sort();
+    expect(Object.keys(WRITE_CONFIRM_HINTS).sort()).toEqual(writes);
+    const mapSrc = readFileSync(join(process.cwd(), 'src/app/opportunity-map/route.ts'), 'utf8');
+    const m = mapSrc.match(/var ACT_WRITES=(\{[^}]*\});/);
+    expect(m).not.toBeNull();
+    const client = JSON.parse(m![1].replace(/'/g, '"')) as Record<string, string>;
+    for (const n of writes) expect(client[n]).toBe(WRITE_CONFIRM_HINTS[n].button);
+  });
+
+  it('add_to_pursuits returns the click instruction and forbids done-wording', () => {
+    const note = pendingWriteNote('map.add_to_pursuits');
+    expect(note).toContain('Say exactly: "Click Add to save it to My Pursuits."');
+    expect(note).toMatch(/NOT DONE YET/);
+    expect(note).toMatch(/Never write "I've added", "I've sent"/);
+  });
+
+  it('the proposer hands the model that note for a real pursuits write', () => {
+    const { p, sent } = mk();
+    p.observeToolResult('find_opportunities', JSON.stringify({ open: [{ notice_id: 'abc123def' }] }));
+    const r = p.propose({ name: 'map.add_to_pursuits', args: { kind: 'opportunity', notice_id: 'abc123def' } });
+    expect(r).toMatchObject({ status: 'proposed', note: pendingWriteNote('map.add_to_pursuits') });
+    expect(sent[0]).toMatchObject({ name: 'map.add_to_pursuits', needs_confirm: true });
+  });
+
+  it('the system note tells the model a write is waiting until the click', () => {
+    expect(APP_ACTIONS_NOTE).toMatch(/only WAITING until the customer clicks/);
+    expect(APP_ACTIONS_NOTE).toContain('Click Add to save it to My Pursuits');
   });
 });
 

@@ -33,7 +33,7 @@ const LAYERS: { k: string; title: string; blurb: string; tools: { n: string; d: 
     tools: [
       { n: 'search_sam_opportunities', d: 'Open solicitations by keyword / NAICS / set-aside' },
       { n: 'get_expiring_contracts', d: 'Contracts expiring soon — your recompete targets' },
-      { n: 'get_agency_forecasts', d: 'Planned buys, often months before they hit SAM' },
+      { n: 'get_agency_forecasts', d: 'Planned buys before they hit SAM' },
       { n: 'get_solicitation_documents', d: 'The full RFP — SOW/PWS and attachments as text' },
     ],
   },

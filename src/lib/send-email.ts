@@ -525,10 +525,9 @@ export async function sendDatabaseAccessEmail({
     <p>Your payment has been confirmed. You now have <strong>lifetime access</strong> to our Federal Contractor Database featuring:</p>
 
     <ul style="color: #4b5563;">
-      <li><strong>3,500+</strong> federal prime contractors</li>
-      <li><strong>$430B+</strong> in contract data</li>
-      <li><strong>800+</strong> SBLO contacts with emails</li>
-      <li><strong>115+</strong> supplier portal links</li>
+      <li><strong>Federal prime contractors</strong> with their contract history</li>
+      <li><strong>SBLO contacts</strong> with emails where published</li>
+      <li><strong>Supplier portal links</strong> for primes that run them</li>
       <li>Searchable and filterable by NAICS, agency, contract size</li>
     </ul>
 
@@ -588,10 +587,9 @@ Your payment has been confirmed. You now have lifetime access to our Federal Con
 Access your database here: ${accessLink}
 
 Features included:
-- 3,500+ federal prime contractors
-- $430B+ in contract data
-- 800+ SBLO contacts with emails
-- 115+ supplier portal links
+- Federal prime contractors with their contract history
+- SBLO contacts with emails where published
+- Supplier portal links for primes that run them
 - Searchable and filterable by NAICS, agency, contract size
 
 Pro Tips:
@@ -1224,7 +1222,7 @@ export async function sendRecompeteEmail({
     <div style="background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%); border: 2px solid #059669; border-radius: 12px; padding: 20px; margin: 25px 0;">
       <h3 style="color: #065f46; margin: 0 0 15px 0;">📋 What You Can Do:</h3>
       <ul style="color: #047857; margin: 0; padding-left: 20px;">
-        <li><strong>6,900+ expiring contracts</strong> ready to recompete</li>
+        <li><strong>Expiring contracts</strong> ready to recompete</li>
         <li><strong>Filter by NAICS, agency, state, value</strong></li>
         <li><strong>See incumbent contractors</strong> and contract history</li>
         <li><strong>Export to CSV</strong> for your BD pipeline</li>
@@ -1287,7 +1285,7 @@ Hi${customerName ? ` ${customerName}` : ''},
 Thank you for your purchase! Your Recompete Tracker access is now active.
 
 What You Can Do:
-- 6,900+ expiring contracts ready to recompete
+- Expiring contracts ready to recompete
 - Filter by NAICS, agency, state, value
 - See incumbent contractors and contract history
 - Export to CSV for your BD pipeline
@@ -1333,23 +1331,23 @@ export async function sendBundleEmail({
       name: 'GovCon Starter Bundle',
       tools: [
         { name: 'Opportunity Hunter Pro', link: 'https://getmindy.ai/opportunity-hunter', description: 'Find agencies that buy what you sell' },
-        { name: 'Recompete Tracker', link: 'https://getmindy.ai/recompete', description: '6,900+ expiring contracts to pursue' },
-        { name: 'Federal Contractor Database', link: 'https://getmindy.ai/contractor-database', description: '3,500+ prime contractors with SBLO contacts' },
+        { name: 'Recompete Tracker', link: 'https://getmindy.ai/recompete', description: 'Expiring contracts to pursue' },
+        { name: 'Federal Contractor Database', link: 'https://getmindy.ai/contractor-database', description: 'Prime contractors with SBLO contacts' },
       ],
     },
     'govcon-starter-bundle': {
       name: 'GovCon Starter Bundle',
       tools: [
         { name: 'Opportunity Hunter Pro', link: 'https://getmindy.ai/opportunity-hunter', description: 'Find agencies that buy what you sell' },
-        { name: 'Recompete Tracker', link: 'https://getmindy.ai/recompete', description: '6,900+ expiring contracts to pursue' },
-        { name: 'Federal Contractor Database', link: 'https://getmindy.ai/contractor-database', description: '3,500+ prime contractors with SBLO contacts' },
+        { name: 'Recompete Tracker', link: 'https://getmindy.ai/recompete', description: 'Expiring contracts to pursue' },
+        { name: 'Federal Contractor Database', link: 'https://getmindy.ai/contractor-database', description: 'Prime contractors with SBLO contacts' },
       ],
     },
     'pro': {
       name: 'Pro Giant Bundle',
       tools: [
-        { name: 'Federal Contractor Database', link: 'https://getmindy.ai/contractor-database', description: '3,500+ prime contractors with SBLO contacts' },
-        { name: 'Recompete Tracker', link: 'https://getmindy.ai/recompete', description: '6,900+ expiring contracts to pursue' },
+        { name: 'Federal Contractor Database', link: 'https://getmindy.ai/contractor-database', description: 'Prime contractors with SBLO contacts' },
+        { name: 'Recompete Tracker', link: 'https://getmindy.ai/recompete', description: 'Expiring contracts to pursue' },
         { name: 'Market Assassin Standard', link: 'https://getmindy.ai/market-assassin', description: 'Strategic market intelligence reports' },
         { name: 'Content Reaper', link: 'https://getmindy.ai/content-generator', description: 'AI-powered LinkedIn content generator' },
         { name: 'Mindy AI - 1 Year Access', link: MINDY_PRODUCT_URL, description: 'Daily federal opportunity intelligence and briefings included for 1 year' },
@@ -1358,8 +1356,8 @@ export async function sendBundleEmail({
     'pro-giant-bundle': {
       name: 'Pro Giant Bundle',
       tools: [
-        { name: 'Federal Contractor Database', link: 'https://getmindy.ai/contractor-database', description: '3,500+ prime contractors with SBLO contacts' },
-        { name: 'Recompete Tracker', link: 'https://getmindy.ai/recompete', description: '6,900+ expiring contracts to pursue' },
+        { name: 'Federal Contractor Database', link: 'https://getmindy.ai/contractor-database', description: 'Prime contractors with SBLO contacts' },
+        { name: 'Recompete Tracker', link: 'https://getmindy.ai/recompete', description: 'Expiring contracts to pursue' },
         { name: 'Market Assassin Standard', link: 'https://getmindy.ai/market-assassin', description: 'Strategic market intelligence reports' },
         { name: 'Content Reaper', link: 'https://getmindy.ai/content-generator', description: 'AI-powered LinkedIn content generator' },
         { name: 'Mindy AI - 1 Year Access', link: MINDY_PRODUCT_URL, description: 'Daily federal opportunity intelligence and briefings included for 1 year' },
@@ -1369,8 +1367,8 @@ export async function sendBundleEmail({
       name: 'Ultimate GovCon Bundle',
       tools: [
         { name: 'Content Reaper Full Fix', link: 'https://getmindy.ai/content-generator', description: 'Advanced AI content with quote graphics' },
-        { name: 'Federal Contractor Database', link: 'https://getmindy.ai/contractor-database', description: '3,500+ prime contractors with SBLO contacts' },
-        { name: 'Recompete Tracker', link: 'https://getmindy.ai/recompete', description: '6,900+ expiring contracts to pursue' },
+        { name: 'Federal Contractor Database', link: 'https://getmindy.ai/contractor-database', description: 'Prime contractors with SBLO contacts' },
+        { name: 'Recompete Tracker', link: 'https://getmindy.ai/recompete', description: 'Expiring contracts to pursue' },
         { name: 'Market Assassin Premium', link: 'https://getmindy.ai/market-assassin', description: 'All 8 strategic intelligence reports' },
         { name: 'Opportunity Hunter Pro', link: 'https://getmindy.ai/opportunity-hunter', description: 'Find agencies that buy what you sell' },
         { name: 'Mindy AI - Lifetime Access', link: MINDY_PRODUCT_URL, description: 'Daily federal opportunity intelligence and briefings included for life' },
@@ -1380,8 +1378,8 @@ export async function sendBundleEmail({
       name: 'Ultimate GovCon Bundle',
       tools: [
         { name: 'Content Reaper Full Fix', link: 'https://getmindy.ai/content-generator', description: 'Advanced AI content with quote graphics' },
-        { name: 'Federal Contractor Database', link: 'https://getmindy.ai/contractor-database', description: '3,500+ prime contractors with SBLO contacts' },
-        { name: 'Recompete Tracker', link: 'https://getmindy.ai/recompete', description: '6,900+ expiring contracts to pursue' },
+        { name: 'Federal Contractor Database', link: 'https://getmindy.ai/contractor-database', description: 'Prime contractors with SBLO contacts' },
+        { name: 'Recompete Tracker', link: 'https://getmindy.ai/recompete', description: 'Expiring contracts to pursue' },
         { name: 'Market Assassin Premium', link: 'https://getmindy.ai/market-assassin', description: 'All 8 strategic intelligence reports' },
         { name: 'Opportunity Hunter Pro', link: 'https://getmindy.ai/opportunity-hunter', description: 'Find agencies that buy what you sell' },
         { name: 'Mindy AI - Lifetime Access', link: MINDY_PRODUCT_URL, description: 'Daily federal opportunity intelligence and briefings included for life' },

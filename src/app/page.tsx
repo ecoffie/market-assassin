@@ -155,10 +155,10 @@ export default function Home() {
               </p>
               <ul className="text-slate-400 text-sm space-y-2 mb-6">
                 <li className="flex items-center gap-2">
-                  <span className="text-green-500">✓</span> 6,900+ expiring contracts
+                  <span className="text-green-500">✓</span> Expiring contracts across every agency
                 </li>
                 <li className="flex items-center gap-2">
-                  <span className="text-green-500">✓</span> $77T+ total value
+                  <span className="text-green-500">✓</span> Contract value and end date on every record
                 </li>
                 <li className="flex items-center gap-2">
                   <span className="text-green-500">✓</span> Filter by agency & NAICS

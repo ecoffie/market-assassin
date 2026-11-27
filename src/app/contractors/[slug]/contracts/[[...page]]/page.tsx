@@ -344,7 +344,7 @@ export default async function ContractorContractsPage({ params }: PageProps) {
         <section className="mt-12 rounded-lg border border-(--mp-line) p-8 text-center bg-(--mp-wash)">
           <h2 className="text-xl font-bold font-(family-name:--mp-font-serif)">Get Alerted Before {displayName}&apos;s Next Recompete</h2>
           <p className="mt-2 max-w-2xl mx-auto text-(--mp-body) text-sm">
-            Mindy monitors active contracts and flags recompetes 12 months out so you can position to compete.
+            Mindy monitors active contracts and flags recompetes early so you can position to compete.
           </p>
           <Link
             href="/pricing"

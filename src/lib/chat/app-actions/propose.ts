@@ -83,7 +83,28 @@ export function proposeAppActionToolDef(surface: ActionSurface) {
 export const APP_ACTIONS_NOTE =
   'APP ACTIONS (beta): propose_app_action can change what the customer sees on this page (filters, horizons, zoom, opening'
   + ' a record). Use it only when they asked to see, filter, open or go somewhere, once per intent, and always answer in words'
-  + ' too. Never say the change was made: say what you set it to show.';
+  + ' too. Never say the change was made: say what you set it to show. A save, add, change or remove is only WAITING until the'
+  + ' customer clicks its button: tell them which button to click (for example "Click Add to save it to My Pursuits") and'
+  + ' never write "I\'ve added", "I\'ve sent", "saved" or "done" for it.';
+
+/**
+ * The button the client shows for each write (must match ACT_WRITES in the Map route) and what clicking it does.
+ * The model's reply while a write is pending quotes this, so the customer is told to click, never told it is done.
+ */
+export const WRITE_CONFIRM_HINTS: Record<string, { button: string; does: string }> = {
+  'map.save_search': { button: 'Save', does: 'save this view as a saved search with alerts' },
+  'map.update_alert': { button: 'Change', does: 'change how often that search sends alerts' },
+  'map.add_to_pursuits': { button: 'Add', does: 'save it to My Pursuits' },
+  'map.remove_from_pursuits': { button: 'Remove', does: 'remove it from My Pursuits' },
+};
+
+/** The reply text the model gets back for an accepted write: pending, with the exact sentence to use. */
+export function pendingWriteNote(name: string): string {
+  const h = WRITE_CONFIRM_HINTS[name];
+  const say = h ? `Click ${h.button} to ${h.does}.` : 'Click the button under this answer to confirm it.';
+  return `NOT DONE YET: the page is showing a confirm button and nothing changes until the customer clicks it. Say exactly: "${say}"`
+    + ' Never write "I\'ve added", "I\'ve sent", "I\'ve saved", "saved", "added" or "done" about it in this answer.';
+}
 
 export interface ActionEvent {
   type: 'action';
@@ -154,7 +175,7 @@ export function createAppActionProposer(opts: {
         status: 'proposed',
         id,
         note: def.needsConfirm
-          ? 'Sent to the page; the customer must confirm it. Do not say it was done.'
+          ? pendingWriteNote(check.action.name)
           : 'Sent to the page; it applies the change and offers Undo. Do not say it was done; say what you set it to show.',
       };
     },

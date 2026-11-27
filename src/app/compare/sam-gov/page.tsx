@@ -20,6 +20,7 @@
 import type { Metadata } from 'next';
 import { siteShareImages } from '@/lib/seo/share-image';
 import Link from 'next/link';
+import { forecastsLabel } from '@/lib/marketing-stats';
 
 export const metadata: Metadata = {
   title: 'SAM.gov Alternative [2026] — AI-Powered Federal Opportunity Alerts | Mindy',
@@ -77,12 +78,12 @@ const comparisonRows = [
   {
     feature: 'Recompete Timing',
     samGov: 'Not surfaced',
-    mindy: 'Flagged 12 months before incumbent contract expires',
+    mindy: 'Flagged well before the incumbent contract expires',
   },
   {
     feature: 'Forecast Coverage',
     samGov: 'Limited (per-agency forecast pages, scattered)',
-    mindy: '33,000+ federal forecasts aggregated in one feed',
+    mindy: `${forecastsLabel} federal forecasts aggregated in one feed`,
   },
   {
     feature: 'Grants.gov Coverage',
@@ -106,8 +107,8 @@ const comparisonRows = [
   },
   {
     feature: 'Time Investment',
-    samGov: '10–20 hours/week of manual searching',
-    mindy: '~15 minutes/day reviewing your briefing',
+    samGov: 'Hours of manual searching every week',
+    mindy: 'A few minutes a day reviewing your briefing',
   },
   {
     feature: 'Submitting Proposals',
@@ -128,7 +129,7 @@ const faqs = [
   },
   {
     q: "Why pay $149/mo when SAM.gov is free?",
-    a: "Because your time isn't free. Contractors spend 10–20 hours a week on SAM.gov scrolling, filtering, opening tabs, and trying to figure out who the incumbent is. At even $50/hour for your time, that's $2,000–$4,000 a month. Mindy compresses that into 15 minutes a day reviewing your briefing. The price isn't the data — it's the time and the intelligence.",
+    a: "Because your time isn't free. Contractors spend hours every week on SAM.gov scrolling, filtering, opening tabs, and trying to figure out who the incumbent is. Put a price on that time and it adds up fast. Mindy compresses that into a few minutes a day reviewing your briefing. The price isn't the data — it's the time and the intelligence.",
   },
   {
     q: "Can Mindy find an opportunity SAM.gov can't?",
@@ -140,7 +141,7 @@ const faqs = [
   },
   {
     q: "What does Mindy do when an incumbent contract is expiring?",
-    a: "Flag it 12 months in advance with the incumbent name, contract value, agency, NAICS code, and current expiration date. SAM.gov doesn't surface this at all — by the time the recompete solicitation drops, you have 30 days to respond and the incumbent has had 18 months to position. Mindy gives you the same 18-month head start.",
+    a: "Flag it well in advance with the incumbent name, contract value, agency, NAICS code, and current expiration date. SAM.gov doesn't surface this at all. By the time the recompete solicitation drops, your response window is short and the incumbent has had months to position. Mindy gives you that same head start.",
   },
   {
     q: "Is there a free version of Mindy?",
@@ -294,8 +295,8 @@ export default function SamGovComparePage() {
               <h3 className="text-(--mp-ink) font-semibold mb-2 text-lg">Missed Opportunities</h3>
               <p className="text-(--mp-muted) text-sm">
                 Contracts posted on a Tuesday get buried by Friday. By the time you find them
-                you have 5 days to respond. The incumbent saw it the morning it dropped and
-                has been positioning for 18 months.
+                you have only days left to respond. The incumbent saw it the morning it dropped and
+                has been positioning for months.
               </p>
             </div>
             <div className="bg-(--mp-surface) border border-(--mp-line) rounded-lg p-6">
@@ -396,7 +397,7 @@ export default function SamGovComparePage() {
                 {[
                   'Discovering opportunities matched to your business profile',
                   "Knowing who the incumbent is and when their contract expires",
-                  'Recompete alerts 12 months before solicitations drop',
+                  'Recompete alerts well before solicitations drop',
                   'Daily briefings instead of scrolling SAM.gov every morning',
                   'Forecast intelligence — what\'s coming before it posts',
                   'Weekly market analysis on spending in your NAICS codes',
@@ -430,28 +431,28 @@ export default function SamGovComparePage() {
             <div className="bg-(--mp-surface) border border-(--mp-line) rounded-lg p-8">
               <div className="text-sm font-semibold text-(--mp-muted) mb-2">SAM.gov Workflow</div>
               <div className="text-5xl font-bold text-(--mp-ink) mb-4">
-                10–20<span className="text-2xl text-(--mp-muted)">hrs/week</span>
+                Hours<span className="text-2xl text-(--mp-muted)"> every week</span>
               </div>
               <p className="text-(--mp-muted) text-sm">
                 Logging in, running searches, filtering noise, opening tabs, copying notice IDs,
                 Googling incumbents, building a tracking spreadsheet. Repeat every morning.
               </p>
               <p className="text-(--mp-muted) text-xs mt-4 italic">
-                At $50/hr for your time, that&apos;s $2,000–$4,000/mo.
+                Your time has a price, and this is where it goes.
               </p>
             </div>
 
             <div className="border border-(--mp-line) rounded-lg p-8 bg-(--mp-wash)">
               <div className="text-sm font-semibold text-(--mp-navy) mb-2">Mindy Workflow</div>
               <div className="text-5xl font-bold text-(--mp-ink) mb-4">
-                ~15<span className="text-2xl text-(--mp-muted)">min/day</span>
+                Minutes<span className="text-2xl text-(--mp-muted)"> a day</span>
               </div>
               <p className="text-(--mp-body) text-sm">
-                Open one email at 7 AM. Skim the briefing. Click through to the 2–3 opportunities
+                Open one email at 7 AM. Skim the briefing. Click through to the few opportunities
                 worth pursuing. Mindy did the searching, scoring, and incumbent research overnight.
               </p>
               <p className="text-(--mp-navy) text-xs mt-4 italic">
-                Pro is $149/mo. The time you save pays for it 10x over.
+                Pro is $149/mo. Weigh that against the hours you spend searching now.
               </p>
             </div>
           </div>

@@ -24,7 +24,7 @@ import { glossaryTerms } from '@/data/glossary';
 export const metadata: Metadata = {
   title: 'GovCon Glossary — Federal Contracting Terms Explained | Mindy',
   description:
-    '45+ federal contracting acronyms and terms defined. NAICS, FAR, DCAA, 8(a), HUBZone, SDVOSB, GSA, and more — in plain English.',
+    `${glossaryTerms.length} federal contracting acronyms and terms defined. NAICS, FAR, DCAA, 8(a), HUBZone, SDVOSB, GSA, and more — in plain English.`,
   alternates: {
     canonical: 'https://getmindy.ai/glossary',
   },
@@ -41,7 +41,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: 'GovCon Glossary — Federal Contracting Terms Explained | Mindy',
     description:
-      '45+ federal contracting acronyms and terms defined in plain English. From CAGE codes to IDIQs, the vocabulary you need to win federal work.',
+      `${glossaryTerms.length} federal contracting acronyms and terms defined in plain English. From CAGE codes to IDIQs, the vocabulary you need to win federal work.`,
     type: 'website',
     url: 'https://getmindy.ai/glossary',
     images: siteShareImages(),
@@ -50,7 +50,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: 'GovCon Glossary — Federal Contracting Terms Explained | Mindy',
     description:
-      '45+ federal contracting acronyms and terms defined in plain English. From CAGE codes to IDIQs, the vocabulary you need to win federal work.',
+      `${glossaryTerms.length} federal contracting acronyms and terms defined in plain English. From CAGE codes to IDIQs, the vocabulary you need to win federal work.`,
     images: siteShareImages(),
   },
 };
@@ -250,7 +250,7 @@ export default function GlossaryIndexPage() {
             Meet Mindy — Start 14-day free trial
           </Link>
           <p className="text-(--mp-muted) text-sm mt-4">
-            500+ small businesses already wake up to a Mindy briefing.
+            Small businesses already wake up to a Mindy briefing.
           </p>
         </div>
       </section>

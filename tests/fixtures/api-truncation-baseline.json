@@ -16,7 +16,6 @@
     "src/app/api/admin/user-health-scores/route.ts:305",
     "src/app/api/app/discover-events/route.ts:145",
     "src/app/api/app/discover-events/route.ts:204",
-    "src/app/api/app/knowledge-base/route.ts:122",
     "src/app/api/cron/aggregate-profiles/route.ts:60",
     "src/app/api/cron/snapshot-awards/route.ts:76",
     "src/app/api/cron/snapshot-multisite/route.ts:471",

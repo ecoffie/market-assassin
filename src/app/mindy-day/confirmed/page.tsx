@@ -31,7 +31,7 @@ export const metadata: Metadata = {
 };
 
 const AGENDA = [
-  'Find your full market from one keyword — the hidden 72%',
+  'Find your full market from one keyword, including the part one code misses',
   'See who holds any contract now — and when it expires',
   'Watch Mindy read a solicitation and draft the response',
   'Pull the real contacts for a buying office',
