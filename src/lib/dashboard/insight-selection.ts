@@ -45,3 +45,8 @@ function normalizeQuote(quote: string): string {
     .replace(/\s+/g, ' ')
     .trim();
 }
+
+/** Podcast-guest content is never shown on the dashboard insight card (Eric, 2026-11-27). */
+export function isPodcastSource(source: unknown): boolean {
+  return typeof source === 'string' && /podcast/i.test(source);
+}

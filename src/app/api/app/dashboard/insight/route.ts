@@ -9,8 +9,9 @@
  * Strategy (pulse vs lesson):
  *   1. Check cache — return immediately if today's row exists
  *   2. Build pulse candidate (briefing AI, else deterministic stats)
- *   3. Build lesson candidate (podcast guest, NAICS-fit + quality gate)
- *   4. selectPulseOrLesson() — urgent opp → pulse; strong guest fit → lesson
+ *   3. (Removed 2026-11-27, Eric: "remove podcast quotes from dashboard insight too".) No podcast-guest lesson is
+ *      built, selected or served; a cached or snapshotted podcast insight from before is replaced, never shown.
+ *   4. selectPulseOrLesson() with pulse candidates only
  *   5. Last resort: static fallback quote
  *
  * Content Reaper pattern #1 (visual quote cards) applied to in-app
@@ -25,8 +26,7 @@ import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/works
 import { saveSnapshot, readSnapshot, freshMeta, degradedMeta, isUpstreamOutage } from '@/lib/resilience/last-good';
 import { safeParseJSON } from '@/lib/utils/safe-parse-json';
 import { recordLlmUsage } from '@/lib/llm/usage-cost';
-import { dateSeed, isSimilarToRecent, selectInsightOpportunities } from '@/lib/dashboard/insight-selection';
-import { getPodcastInsightForProfile, podcastInsightFeatureEnabled } from '@/lib/rag/podcast-insights';
+import { dateSeed, isPodcastSource, isSimilarToRecent, selectInsightOpportunities } from '@/lib/dashboard/insight-selection';
 import {
   briefingHasUrgentOpportunity,
   selectPulseOrLesson,
@@ -128,7 +128,8 @@ export async function GET(request: NextRequest) {
         .eq('insight_date', today)
         .maybeSingle();
 
-  if (cached) {
+  // A podcast-guest insight cached before podcast quotes were removed is replaced, never served.
+  if (cached && !isPodcastSource(cached.source)) {
     const cachedPayload = {
       success: true,
       insight: {
@@ -159,48 +160,14 @@ export async function GET(request: NextRequest) {
     if (prev?.source) excludeSource = prev.source as DailyInsightSource;
   }
 
-  const { data: profileSettings, error: profileSettingsErr } = await supabase
-    .from('user_notification_settings')
-    .select('naics_codes, agencies')
-    .eq('user_email', userEmail)
-    .maybeSingle();
-  if (profileSettingsErr) console.error('[dashboard/insight] profile query error:', profileSettingsErr.message);
-  const profileNaics = (profileSettings?.naics_codes || []) as string[];
-  const profileAgencies = (profileSettings?.agencies || []) as string[];
+  // (The profile NAICS/agency read fed only the podcast lesson candidate; removed with it.)
 
-  const podcastLive = podcastInsightFeatureEnabled(userEmail);
   const briefingCtx = await loadUserBriefing(userEmail);
   const hasUrgency = briefingHasUrgentOpportunity(briefingCtx?.briefing);
 
-  let lesson: LessonCandidate | null = null;
+  // No lesson candidate: podcast-guest quotes are no longer selected (Eric, 2026-11-27).
+  const lesson: LessonCandidate | null = null;
   let pulse: InsightResponse | null = null;
-
-  if (podcastLive && profileNaics.length > 0) {
-    for (let attempt = 0; attempt < MAX_GENERATION_ATTEMPTS && !lesson; attempt++) {
-      try {
-        const guest = await getPodcastInsightForProfile({
-          naicsCodes: profileNaics,
-          agencies: profileAgencies,
-          today,
-          rotateSeed: refreshSeed + attempt,
-          recentQuotes,
-          qualityGate: true,
-        });
-        if (guest && !isSimilarToRecent(guest.quote, recentQuotes)) {
-          lesson = {
-            quote: guest.quote,
-            format: guest.format,
-            source: 'podcast_guest',
-            attribution: guest.attribution,
-            relevanceScore: guest.relevanceScore,
-            matchTier: guest.matchTier,
-          };
-        }
-      } catch (err) {
-        console.warn('[dashboard/insight] podcast lesson candidate failed:', err);
-      }
-    }
-  }
 
   for (let attempt = 0; attempt < MAX_GENERATION_ATTEMPTS && !pulse; attempt++) {
     try {
@@ -242,7 +209,7 @@ export async function GET(request: NextRequest) {
     pulse,
     lesson,
     briefingHasUrgency: hasUrgency,
-    podcastEnabled: podcastLive,
+    podcastEnabled: false,
     excludeSource,
     recentSources,
   });
@@ -299,7 +266,8 @@ export async function GET(request: NextRequest) {
     // insight with an "as of {time}" banner instead of a dead hero card.
     if (isUpstreamOutage(error)) {
       const snap = await readSnapshot<Record<string, unknown>>(snapshotKey);
-      if (snap) {
+      // Never serve a podcast-guest insight snapshotted before podcast quotes were removed.
+      if (snap && !isPodcastSource((snap.data as { insight?: { source?: unknown } })?.insight?.source)) {
         return NextResponse.json({ ...snap.data, ...degradedMeta(snap.savedAt) });
       }
     }
