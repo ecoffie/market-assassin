@@ -7,8 +7,10 @@ import { createRoot, type Root } from 'react-dom/client';
 vi.mock('./ForecastsPanel', () => ({ default: () => <div data-testid="forecasts-panel">Upcoming Buys</div> }));
 vi.mock('./CatalogTeaserFree', () => ({ default: () => <div data-testid="catalog-teaser">Teaser</div> }));
 vi.mock('./TeamPanel', () => ({ default: () => <div data-testid="team-panel">Team</div> }));
+vi.mock('./OsbpSmbResearchPanel', () => ({ default: () => <div data-testid="osbp-panel">OSBP</div> }));
 
 import PanelContainer, { tabTipsPanelId } from './index';
+import { getTabTips } from '@/lib/app/tab-tips';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -58,7 +60,9 @@ describe('PanelContainer tab tips', () => {
 
   it('ON but the tab has no entry: no box', async () => {
     vi.stubEnv('NEXT_PUBLIC_TAB_TIPS', 'on');
-    expect(await render({ activePanel: 'team' })).toBe('<div data-testid="team-panel">Team</div>');
+    // A panel id with no tips entry (precondition asserted so a future entry fails loudly here).
+    expect(getTabTips('osbp-smb')).toBeNull();
+    expect(await render({ activePanel: 'osbp-smb' })).toBe('<div data-testid="osbp-panel">OSBP</div>');
   });
 
   it('ON but a free user sees the teaser instead of the panel: no box (tips describe the full panel)', async () => {
