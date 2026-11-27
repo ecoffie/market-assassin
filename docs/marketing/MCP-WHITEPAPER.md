@@ -1,6 +1,6 @@
 # Mindy MCP: Federal Contracting Intelligence for Any AI Agent
 
-### How Mindy exposes 40 credit-metered GovCon intelligence tools to Claude, Cursor, or any agent you build — grounded in real federal data and an 8-year proprietary moat, with a contract that never fabricates
+### How Mindy exposes 52 GovCon intelligence tools to Claude, Cursor, or any agent you build — grounded in real federal data and a proprietary data moat, with a contract that never fabricates
 
 ---
 
@@ -33,7 +33,7 @@ Wrapping a public API is the price of entry. The moat is the intelligence that t
 Among them: `get_current_acquisition_intelligence` (8 credits) — what changed about how a buyer is buying for a capability, and what to do differently (LIVE compose only). `match_company_to_pathways` (8 credits) — which of those doors a company’s public record can support (two-sided PATHWAY FIT; `no_proven_door` is success).
 
 
-The hosted server exposes **40 credit-metered tools** (plus a free `get_balance` check). Thirty-six are purpose-built GovCon intelligence tools; four are the core public-data search tools reused from Mindy's own platform. They fall into four layers:
+The hosted server exposes **52 tools**: 47 credit-metered, plus 5 free (the `get_balance` check and the four saved-search schedule tools). They fall into four layers:
 
 ### Public data & search
 
