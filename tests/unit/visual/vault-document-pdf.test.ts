@@ -34,7 +34,7 @@ const MODEL: DocModel = {
 };
 
 /**
- * Claim labels ("Planning assumption", "Recommendation", "Unverified — no source") are floated tags: the PDF
+ * Claim labels ("Planning assumption", "Recommendation", "Unverified: no source") are floated tags: the PDF
  * text layer reads them after their paragraph, not before it. They are taken out of the line comparison and
  * counted on their own instead: the PDF must print every label as often as the preview shows it.
  */

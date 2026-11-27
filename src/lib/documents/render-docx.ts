@@ -33,7 +33,8 @@ import {
 } from 'docx';
 import type { Block, ChartBlock, DocModel, TableBlock, TableColumn } from './model';
 import { resolveTheme, type Theme } from './theme';
-import { assumptionOrigin, keepDash, stripHeadingNumber, chartShownByAdjacentTable, citationIndex, citeMarker, claimLabel, claimsPresent, formatColumn, formatChartValue, formatDocDate, usdColumnDecimals, parseInline, unverifiedStatements } from './format';
+import { assumptionOrigin, clientCopy, DOC_STAGE_MARK, keepDash, stripHeadingNumber, chartShownByAdjacentTable, citationIndex, citeMarker, claimLabel, claimsPresent, formatColumn, formatChartValue, formatDocDate, usdColumnDecimals, parseInline, unverifiedStatements } from './format';
+import { TOC_MIN_SECTIONS } from './render-html';
 
 // The document's theme (theme.ts), resolved once per buildDocx call (which is synchronous). Every
 // color and the font below come from it — nothing is hard-coded in this renderer.
@@ -223,10 +224,12 @@ function blockToDocx(b: Block, numberOf: Numberer, shownByAdjacentTable = false)
   }
 }
 
-export function buildDocx(model: DocModel): Document {
+export function buildDocx(stored: DocModel): Document {
+  const model = clientCopy(stored);
   useTheme(resolveTheme(model.theme));
   const { ordered, numberOf } = citationIndex(model);
-  const showToc = model.sections.length >= 4;
+  // Same rule as the PDF (render-html.ts): a contents list only for long documents, and never a page of its own.
+  const showToc = model.sections.filter((s) => (s.level ?? 1) === 1).length >= TOC_MIN_SECTIONS;
   const children: (Paragraph | Table)[] = [];
 
   // Cover. Built ONLY from the model's own metadata — nothing is generated for the cover.
@@ -293,10 +296,10 @@ export function buildDocx(model: DocModel): Document {
     'How to read this document. Facts carry a numbered citation like [1] that points to the Sources section.',
     present.has('assumption') ? 'Statements marked PLANNING ASSUMPTION are premises stated for this analysis, not recorded facts; each says where it comes from. Check them before relying on them.' : '',
     present.has('recommendation') ? 'Statements marked RECOMMENDATION are suggested actions.' : '',
-    unverified.length ? 'Statements marked UNVERIFIED — NO SOURCE could not be traced to a source and are listed in the Unverified statements section.' : '',
+    unverified.length ? 'Statements marked UNVERIFIED: NO SOURCE could not be traced to a source and are listed in the Unverified statements section.' : '',
   ].filter(Boolean).join(' ');
-  children.push(new Paragraph({ spacing: { before: 600 }, shading: { type: ShadingType.CLEAR, color: 'auto', fill: T.colors.panelBg }, children: [new TextRun({ font: FONT, text: reading, size: 17, color: T.colors.meta })] }));
-  children.push(new Paragraph({ children: [new PageBreak()] }));
+  children.push(new Paragraph({ spacing: { before: 240, after: 240 }, shading: { type: ShadingType.CLEAR, color: 'auto', fill: T.colors.panelBg }, children: [new TextRun({ font: FONT, text: reading, size: 17, color: T.colors.meta })] }));
+  // The cover flows into the first section (no cover-alone page), as in the PDF.
 
   // Contents
   if (showToc) {
@@ -315,7 +318,6 @@ export function buildDocx(model: DocModel): Document {
       children: [new TextRun({ font: FONT, size: 21, text: h.n === null ? (numberedToc ? `\t${h.text}` : h.text) : `${h.n}.\t${h.text}` })],
       tabStops: numberedToc ? [{ type: TabStopType.LEFT, position: 400 }] : undefined,
     })));
-    children.push(new Paragraph({ children: [new PageBreak()] }));
   }
 
   // Body
@@ -386,7 +388,7 @@ export function buildDocx(model: DocModel): Document {
     sections: [{
       properties: { page: { margin: { top: 1300, right: 1224, bottom: 1300, left: 1224 } } },
       headers: { default: new Header({ children: [new Paragraph({ tabStops: [{ type: TabStopType.RIGHT, position: CONTENT_DXA }], children: [new TextRun({ font: FONT, text: keepDash(model.title.length > 90 ? `${model.title.slice(0, 89)}…` : model.title), ...headerFooterRun }), new TextRun({ font: FONT, text: '\tPrepared with Mindy', ...headerFooterRun })] })] }) },
-      footers: { default: new Footer({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ font: FONT, children: ['Page ', PageNumber.CURRENT, ' of ', PageNumber.TOTAL_PAGES], ...headerFooterRun })] })] }) },
+      footers: { default: new Footer({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ font: FONT, children: ['Page ', PageNumber.CURRENT, ' of ', PageNumber.TOTAL_PAGES, ...(DOC_STAGE_MARK ? [`  \u00b7  ${DOC_STAGE_MARK}`] : [])], ...headerFooterRun })] })] }) },
       children,
     }],
   });
