@@ -197,10 +197,12 @@ describe('ported: evidence-gated Defense lag', () => {
   it('null when the window ends before the cutoff', () => {
     expect(warehouseDefenseLag({ fyTo: 2025, defenseEvidence: 'x', now: NOW })).toBeNull();
   });
-  it('applies with evidence and a recent window; the renderer shows only the tool note', () => {
+  it('applies with evidence and a recent window; the renderer states the lag in words, without a date', () => {
     const dl = warehouseDefenseLag({ fyTo: 2026, defenseEvidence: 'Defense office in results: X', now: NOW })!;
     expect(dl).toMatchObject({ applies: true, window_end: '2026-09-30', dod_complete_through: '2026-08-15' });
-    expect(defenseLagSentence({ defense_lag: dl })).toBe(dl.note);
+    const s = defenseLagSentence({ defense_lag: dl })!;
+    expect(s).toBe('Defense (DoD, including Navy, Army and Air Force) contract actions are published with about a 90-day delay, so the most recent Defense dollars may not be in these totals yet.');
+    expect(s).not.toMatch(/\d{4}-\d{2}-\d{2}/); // the dates stay in _meta.defense_lag (2026-11-27)
     expect(defenseLagSentence({})).toBeNull();
   });
 });

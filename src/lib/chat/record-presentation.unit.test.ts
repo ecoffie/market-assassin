@@ -75,8 +75,9 @@ describe('buying offices: presentation', () => {
     expect(note).toMatch(/net of deobligations/);
     expect(note).toMatch(/where the work was performed, not where the office sits/);
     expect(note).toMatch(/industry \(NAICS\) code/);
-    expect(note).toMatch(/latest action loaded 2026-09-30/);
-    expect(note).toMatch(/Defense \(DoD, including Navy, Army and Air Force\) contract actions are published with a ~90-day delay/);
+    expect(note).toMatch(/USASpending posts contract actions with a delay, so the most recent actions may not appear yet/);
+    expect(note).toMatch(/Defense \(DoD, including Navy, Army and Air Force\) contract actions are published with about a 90-day delay, so the most recent Defense dollars may not be in these totals yet/);
+    expect(note).not.toMatch(/\d{4}-\d{2}-\d{2}|latest action loaded|after about/); // no data dates (2026-11-27)
     // Everything before the table is at most the headline + one scope line.
     const header = lines.findIndex((l) => l.startsWith('| Office |'));
     expect(lines.slice(0, header).filter((l) => l.trim()).length).toBeLessThanOrEqual(2);

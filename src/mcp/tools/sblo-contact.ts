@@ -134,18 +134,17 @@ export async function getSbloContact(input: SbloContactToolInput): Promise<SbloC
 
   if (mcpFlags.aiHint) {
     const emailStatus = result._meta.email_status;
-    const emailVerifiedAt = c?.verification?.fields.email.verified_at ?? null;
     const emailCaveat = !hasEmail || emailStatus === 'verified'
       ? ''
       : emailStatus === 'stale'
-        ? `; ${result._meta.email_kind === 'role' ? 'mailbox' : 'personal email'} no longer shown on the company's page${emailVerifiedAt ? ` as of ${emailVerifiedAt}` : ''}`
-        : `; ${result._meta.email_kind === 'personal' ? 'personal email' : 'email'} not re-verified since ${emailVerifiedAt ?? 'it was recorded'}`;
+        ? `; ${result._meta.email_kind === 'role' ? 'mailbox' : 'personal email'} no longer shown on the company's page; confirm it before using it`
+        : `; ${result._meta.email_kind === 'personal' ? 'personal email' : 'email'} not re-verified; confirm it before using it`;
     const bqContext = fromBq
       ? `${c!.company} is a real federal prime — ${usd(c!.total_contract_value)} across ${c!.distinct_agency_count ?? 0} agencies (${c!.contract_count ?? 0} awards, live from USASpending)`
       : '';
     result._ai_hint = {
       summary: hasRegisteredPoc && !hasNamedSblo
-        ? `No curated SBLO for "${company}". ${registered!.company} lists these people on its SAM registration (${REGISTERED_POC_LABEL}): ${registered!.contacts.map((p) => `${p.name}${p.title ? `, ${p.title}` : ''}`).join('; ')}. As of ${registered!.as_of ?? 'unknown date'}.`
+        ? `No curated SBLO for "${company}". ${registered!.company} lists these people on its SAM registration (${REGISTERED_POC_LABEL}): ${registered!.contacts.map((p) => `${p.name}${p.title ? `, ${p.title}` : ''}`).join('; ')}.`
         : res.bqDegraded
         ? `No curated SBLO for "${company}", and the live award-context lookup was unavailable — treat as temporarily down, not as "no such prime". Retry shortly.`
         : !grounded

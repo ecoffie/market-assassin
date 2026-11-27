@@ -380,7 +380,7 @@ export function renderExpiringRecords(result: Rec, opts: { offset?: number; page
     // A capped retrieval says so right beside the total, and the agency breakdown is labeled as counted over the
     // RETRIEVED rows only: it is never a breakdown of all matches (Data Core review, 2026-11-22).
     const capped = retrieved < total;
-    lines.push(`${total} expiring record${total === 1 ? '' : 's'} match (${filters})${capped ? `; Mindy retrieved ${retrieved} of the ${total}` : ''}. Source: Mindy recompete data (USASpending)${meta.window && (meta.window as Rec).as_of ? `, as of ${str((meta.window as Rec).as_of)}` : ''}.`);
+    lines.push(`${total} expiring record${total === 1 ? '' : 's'} match (${filters})${capped ? `; Mindy retrieved ${retrieved} of the ${total}` : ''}. Source: Mindy recompete data (USASpending).`);
     const byAgency = new Map<string, number>();
     for (const r of records) { const a = title(str(r.awarding_agency)) || 'agency not recorded'; byAgency.set(a, (byAgency.get(a) ?? 0) + 1); }
     const breakdown = [...byAgency.entries()].sort((x, y) => y[1] - x[1] || (x[0] < y[0] ? -1 : 1)).map(([a, n]) => `${a} ${n}`).join('; ');
@@ -602,10 +602,11 @@ export const OFFICE_PAGE = 10;
 
 /**
  * The tool's freshness note without its internal wording. A sentence naming a field ("as_of") or the
- * warehouse is about how Mindy stores the data, not about what the customer can rely on.
+ * warehouse is about how Mindy stores the data, not about what the customer can rely on. No data date
+ * (Eric, 2026-11-27: "apply the no date rules everywhere"): the lag is said in words; as_of stays in _meta.
  */
 function customerFreshness(meta: Rec): string {
-  const loaded = str(meta.as_of) ? `latest action loaded ${str(meta.as_of)}` : '';
+  const loaded = str(meta.as_of) ? 'USASpending posts contract actions with a delay, so the most recent actions may not appear yet' : '';
   const note = str(meta.lag_note).split(/(?<=\.)\s+/).filter((x) => x && !/\b\w+_\w+\b|BigQuery|warehouse|ingested/i.test(x)).join(' ');
   return [loaded, note].filter(Boolean).join('; ');
 }
@@ -789,7 +790,6 @@ export function freshnessSentence(meta: Rec): string {
   const note = str(meta.lag_note);
   const through = note.match(/current through (?:about )?(\d{4}-\d{2}-\d{2})/i)?.[1];
   const delay = note.match(/~?(\d+)-day delay/i)?.[1];
-  const loaded = str(meta.as_of) || note.match(/last loaded (\d{4}-\d{2}-\d{2})/i)?.[1] || '';
   if (!through) return note ? 'Recent awards may not be published yet, so this list may be incomplete.' : '';
   // Name whose actions are delayed from the note itself, never "this agency" (R10: a DoD delay
   // sentence over a list with no DoD awards read as applying to the list's agencies).
@@ -797,7 +797,8 @@ export function freshnessSentence(meta: Rec): string {
   const agencyName = afA && typeof afA === 'object' ? str(afA.name) : str(afA);
   const who = /\bDoD\b|Defense/i.test(note) ? 'Defense (DoD, including Navy, Army and Air Force) contract actions reach'
     : agencyName && /by this agency/i.test(note) ? `${agencyName} contract actions reach` : 'Contract actions for this search reach';
-  return `${who} USASpending with about a ${delay || '90'}-day delay, so that data is reliably current through about ${through} only${loaded ? ` (last loaded ${loaded})` : ''}; awards made after that may not appear yet. For newer awards, check SAM.gov award notices or the agency's announcements.`;
+  // No data date (Eric, 2026-11-27): the delay is the caveat; the cutoff date stays in _meta.lag_note.
+  return `${who} USASpending with about a ${delay || '90'}-day delay, so awards from the last few months may not appear yet. For newer awards, check SAM.gov award notices or the agency's announcements.`;
 }
 
 
@@ -819,12 +820,15 @@ function awardFilterParts(af: Rec): string[] {
 }
 
 /**
- * Defense publication lag for warehouse-backed totals: the tool's own _meta.defense_lag.note, shown as
- * given. Never computed here — a renderer-computed caveat would state a date the evidence does not contain.
+ * Defense publication lag for warehouse-backed totals, from the tool's own _meta.defense_lag. Said in words
+ * without a date (Eric, 2026-11-27: no data dates in front of the customer); the note with its cutoff and
+ * window dates stays in _meta. Only shown when the tool says the lag applies.
  */
 export function defenseLagSentence(meta: Rec): string | null {
   const dl = (meta.defense_lag && typeof meta.defense_lag === 'object' ? meta.defense_lag : null) as Rec | null;
-  return dl && dl.applies === true && str(dl.note) ? str(dl.note) : null;
+  if (!dl || dl.applies !== true || !str(dl.note)) return null;
+  const days = num(dl.lag_days) ?? (Number(str(dl.note).match(/~?(\d+)-day delay/i)?.[1]) || null);
+  return `Defense (DoD, including Navy, Army and Air Force) contract actions are published with ${days ? `about a ${days}-day` : 'a'} delay, so the most recent Defense dollars may not be in these totals yet.`;
 }
 
 export const SBLO_TOOL = 'get_sblo_contact';
@@ -838,20 +842,18 @@ export const SBLO_TOOL = 'get_sblo_contact';
 /**
  * Data Core PR 3: label an email the source cannot vouch for. `verified` (field provenance with a
  * source URL) and contacts without a verification block render unchanged; an unverified email
- * carries its research date, a stale one says the company page no longer shows it.
+ * says it was not re-verified, a stale one says the company page no longer shows it. No dates (Eric, 2026-11-27):
+ * the warning is said in words; verified_at stays in the data.
  */
 function sbloEmailCaveat(c: Rec): string {
   const v = (c.verification && typeof c.verification === 'object' ? c.verification : null) as Rec | null;
   if (!v) return '';
   const status = str(v.email_status);
   if (!status || status === 'verified') return '';
-  const fields = (v.fields && typeof v.fields === 'object' ? v.fields : {}) as Rec;
-  const ef = (fields.email && typeof fields.email === 'object' ? fields.email : {}) as Rec;
-  const at = str(ef.verified_at);
   const kind = str(v.email_kind) === 'personal' ? 'personal email' : str(v.email_kind) === 'role' ? 'mailbox' : 'email';
   return status === 'stale'
-    ? ` (${kind}, no longer shown on the company's page${at ? ` as of ${at}` : ''})`
-    : ` (${kind}, not re-verified${at ? ` since ${at}` : ''})`;
+    ? ` (${kind}, no longer shown on the company's page; confirm it before using it)`
+    : ` (${kind}, not re-verified; confirm it before using it)`;
 }
 
 export function renderSbloContact(result: Rec): RenderedRecords | null {
@@ -869,7 +871,7 @@ export function renderSbloContact(result: Rec): RenderedRecords | null {
   const people = (Array.isArray(poc?.contacts) ? poc!.contacts : []) as Rec[];
   if (people.length) {
     lines.push('');
-    lines.push(`Registered SAM.gov points of contact (${people.length}), labeled by the source as "${str(poc!.label) || 'registered SAM point of contact'}"${str(poc!.as_of) ? `, as of ${str(poc!.as_of).slice(0, 10)}` : ''}:`);
+    lines.push(`Registered SAM.gov points of contact (${people.length}), labeled by the source as "${str(poc!.label) || 'registered SAM point of contact'}":`);
     people.forEach((p, i) => {
       const roles = (Array.isArray(p.roles) ? p.roles : []).map(str).filter(Boolean);
       lines.push(`${i + 1}. ${str(p.name) || 'name not reported'}${str(p.title) ? `, ${str(p.title)}` : ''}${roles.length ? ` · ${roles.join(', ')}` : ''}`);

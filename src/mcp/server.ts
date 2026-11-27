@@ -1335,7 +1335,7 @@ server.registerTool(
       'out-of-snapshot company is a real federal prime + returns live award context. A blank name/email (including ' +
       'every BigQuery-tier match — BQ has award data, not SBLO contacts) means no public SBLO was found; it surfaces ' +
       'the supplier portal and NEVER invents a contact. When no named SBLO is curated, returns registered_points_of_contact: ' +
-      'the people listed on the firm\'s SAM registration (from Mindy\'s stored SAM data, dated by as_of), labelled ' +
+      'the people listed on the firm\'s SAM registration (from Mindy\'s stored SAM data), labelled ' +
       '"registered SAM point of contact, not a designated small business liaison". SAM redacts POC email/phone; never ' +
       'invent them. grounded=false = not curated, not a matching prime, and no registered POC held.',
     inputSchema: {
