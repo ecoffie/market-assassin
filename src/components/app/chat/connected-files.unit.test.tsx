@@ -13,6 +13,8 @@ const h = vi.hoisted(() => ({
   list: { status: 200, body: { connections: [], providers: [{ provider: 'google', available: true }, { provider: 'microsoft', available: true }] } } as { status: number; body: Record<string, unknown> },
   start: { status: 200, body: { authorize_url: 'https://accounts.google.com/o/oauth2/v2/auth?x=1', access_note: 'Google will let Mindy open only the files you pick.' } } as { status: number; body: Record<string, unknown> },
   calls: [] as Array<{ url: string; body?: string; method?: string }>,
+  browse403: false,
+  pickerToken: null as null | { status: number; body: Record<string, unknown> },
 }));
 
 vi.mock('../authHeaders', () => ({
@@ -23,6 +25,8 @@ vi.mock('../authHeaders', () => ({
       h.list = { status: 200, body: { connections: [], providers: (h.list.body.providers as unknown[]) || [] } };
       return { ok: true, status: 200, json: async () => ({ status: 'disconnected' }) };
     }
+    if (url.includes('/browse') && h.browse403) return { ok: false, status: 403, json: async () => ({ error: 'file_permission_needed' }) };
+    if (url.includes('/picker-token') && h.pickerToken) { const t = h.pickerToken; return { ok: t.status < 300, status: t.status, json: async () => t.body }; }
     if (url.includes('/browse')) {
       const b = JSON.parse(init?.body || '{}');
       const items = b.folder_id === 'fold-1'
@@ -234,5 +238,52 @@ describe('ConnectedFiles: email drafts (Slice B)', () => {
     await click(button('Connect Google Drive'));
     const start = h.calls.find((c) => c.url.includes('/start'))!;
     expect(JSON.parse(start.body!).capabilities).toEqual(['file']);
+  });
+});
+
+describe('ConnectedFiles: missing file permission means reconnect, never a raw provider page', () => {
+  beforeEach(() => { h.browse403 = false; h.pickerToken = null; });
+  const conn = (provider: 'google' | 'microsoft', scopes: string[]) => ({ id: 'c-1', provider, connected_email: 'pat@acme.example.com', status: 'connected', granted_scopes: scopes });
+
+  it('a Google grant known to lack drive.file offers "Reconnect … to allow file access" instead of the picker, and re-consents for files', async () => {
+    h.list = { status: 200, body: { connections: [conn('google', ['openid', 'https://www.googleapis.com/auth/userinfo.email'])], providers: [{ provider: 'google', available: true }] } };
+    await mount();
+    await click(button('Use a file from Drive or OneDrive'));
+    expect(button('Pick from Google Drive')).toBeUndefined();
+    const re = button('Reconnect Google Drive to allow file access (pat@acme.example.com)');
+    expect(re).toBeTruthy();
+    await click(re);
+    const start = h.calls.find((c) => c.url.includes('/start'))!;
+    expect(JSON.parse(start.body!)).toMatchObject({ provider: 'google', capabilities: ['file'] });
+  });
+
+  it('unknown scopes (none listed) still show the picker', async () => {
+    h.list = { status: 200, body: { connections: [conn('google', [])], providers: [{ provider: 'google', available: true }] } };
+    await mount();
+    await click(button('Use a file from Drive or OneDrive'));
+    expect(button('Pick from Google Drive')).toBeTruthy();
+  });
+
+  it('if the picker token is refused for missing file permission, the customer gets the plain message and the reconnect item', async () => {
+    h.list = { status: 200, body: { connections: [conn('google', ['https://www.googleapis.com/auth/drive.file'])], providers: [{ provider: 'google', available: true }] } };
+    h.pickerToken = { status: 403, body: { error: 'file_permission_needed' } };
+    await mount();
+    await click(button('Use a file from Drive or OneDrive'));
+    await click(button('Pick from Google Drive'));
+    expect(el.textContent).toMatch(/does not have permission to open files in this account/);
+    await click(button('Use a file from Drive or OneDrive'));
+    expect(button('Reconnect Google Drive to allow file access')).toBeTruthy();
+    expect(button('Pick from Google Drive')).toBeUndefined();
+  });
+
+  it('OneDrive: a 403 from the listing closes the chooser with the plain message and offers the reconnect', async () => {
+    h.list = { status: 200, body: { connections: [conn('microsoft', ['Files.Read'])], providers: [{ provider: 'microsoft', available: true }] } };
+    h.browse403 = true;
+    await mount();
+    await click(button('Use a file from Drive or OneDrive'));
+    await click(button('Pick from OneDrive'));
+    expect(el.textContent).toMatch(/does not have permission to open files in this account/);
+    await click(button('Use a file from Drive or OneDrive'));
+    expect(button('Reconnect OneDrive to allow file access')).toBeTruthy();
   });
 });
