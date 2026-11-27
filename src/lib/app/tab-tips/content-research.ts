@@ -13,6 +13,9 @@ import type { TabTipsRegistry } from './types';
 //  alerts     → src/components/app/panels/AlertsPanel.tsx.
 //  research   → src/components/app/panels/MarketResearchPanel.tsx.
 //  today      → src/components/app/panels/TodayPanel.tsx (shown only while the Today home is on).
+//
+// Anchors: map / watchlist / saved are iframe tabs (TAB_TIPS_IFRAME_PANELS) and carry none. Every other
+// anchor matches an attribute in that panel's source (content-research-anchors.unit.test.ts checks it).
 export const TAB_TIPS: TabTipsRegistry = {
   map: {
     steps: [
@@ -40,41 +43,41 @@ export const TAB_TIPS: TabTipsRegistry = {
   },
   dashboard: {
     steps: [
-      'Under "Top Opportunities to Review", press Review Fit on a card to see why it may fit you.',
-      'Press Track to follow one in your pursuits, or Dismiss to hide it. Use All, Urgent or Teaming to filter.',
-      'Inside Review Fit, use the Tune Mindy buttons, like Good match or Not my industry, to give feedback.',
+      { text: 'Under "Top Opportunities to Review", press Review Fit on a card to see why it may fit you.', anchor: '[data-tip="dashboard-review-fit"]' },
+      { text: 'Press Track to follow one in your pursuits, or Dismiss to hide it. Use All, Urgent or Teaming to filter.', anchor: '[data-tour="dash-track"]' },
+      { text: 'Inside Review Fit, use the Tune Mindy buttons, like Good match or Not my industry, to give feedback.', anchor: '[data-tip="dashboard-tune"]' },
     ],
     tip: 'These picks come from your profile. In "Your targeting", press "Edit codes & keywords" to change your NAICS codes (numbers for types of work) and keywords.',
   },
   'my-market': {
     steps: [
-      'Press "Set up my Mindy" to add the agencies buying in your market to your Target List.',
-      'Look under "Open now" and "Coming up for recompete". Click a title to open the notice.',
-      'Press "Draft response" (or "Draft LOI") to go to Proposals, or Track to go to your pipeline.',
+      { text: 'Press "Set up my Mindy" to add the agencies buying in your market to your Target List.', anchor: '[data-tip="my-market-setup"]' },
+      { text: 'Look under "Open now" and "Coming up for recompete". Click a title to open the notice.', anchor: '[data-tip="my-market-title"]' },
+      { text: 'Press "Draft response" (or "Draft LOI") to go to Proposals, or Track to go to your pipeline.', anchor: '[data-tip="my-market-draft"]' },
     ],
     tip: 'A recompete is a contract that is ending, so the agency may buy it again. If nothing shows, add your codes and keywords in Settings.',
   },
   alerts: {
     steps: [
-      'Use All, Solicitations, Sources Sought, Set-Aside or Due Soon to narrow the list.',
-      'Type in the search box, or pick a state or a sort order. Click an opportunity to see its details.',
-      'Press Save (or Interested) on a card to keep track of it.',
+      { text: 'Use All, Solicitations, Sources Sought, Set-Aside or Due Soon to narrow the list.', anchor: '[data-tip="alerts-filters"]' },
+      { text: 'Type in the search box, or pick a state or a sort order. Click an opportunity to see its details.', anchor: '[data-tip="alerts-search"]' },
+      { text: 'Press Save (or Interested) on a card to keep track of it.', anchor: '[data-tip="alerts-save"]' },
     ],
     tip: 'Sources Sought means an agency is asking who can do the work before it buys. Your matches follow the NAICS codes, set-asides and states in your profile; change them in Settings.',
   },
   research: {
     steps: [
-      'Sport (the default) lets you research any industry without changing your settings. Auto uses your saved profile instead.',
-      'In Sport, describe the work and press "Suggest codes", or type a NAICS or PSC code.',
-      'Press "Build Market Map", then pick Market Map, Agency Intel or Competitor Intel under "Choose What You Need".',
+      { text: 'Sport (the default) lets you research any industry without changing your settings. Auto uses your saved profile instead.', anchor: '[data-tip="research-mode"]' },
+      { text: 'In Sport, describe the work and press "Suggest codes", or type a NAICS or PSC code.', anchor: '[data-tip="research-suggest-codes"]' },
+      { text: 'Press "Build Market Map", then pick Market Map, Agency Intel or Competitor Intel under "Choose What You Need".', anchor: '[data-tip="research-build"]' },
     ],
     tip: 'NAICS is a number for a type of work; PSC is a code for the product or service bought. After a report is built, use "Print / PDF" to save it.',
   },
   today: {
     steps: [
-      'Check "Your saved searches", or press "Open Watchlist" to see them in full.',
-      'Under "Closing soonest", press "Ask Mindy about this" to ask about an opportunity.',
-      'Press "Open the Map" to look for more.',
+      { text: 'Check "Your saved searches", or press "Open Watchlist" to see them in full.', anchor: '[aria-label="Your saved searches"]' },
+      { text: 'Under "Closing soonest", press "Ask Mindy about this" to ask about an opportunity.', anchor: '[data-tip="today-ask-mindy"]' },
+      { text: 'Press "Open the Map" to look for more.', anchor: '[data-testid="today-open-map"]' },
     ],
     tip: 'No saved searches yet? Save a search on the Map, and it will show here each day.',
   },

@@ -1588,6 +1588,7 @@ export default function DashboardPanel({ email, tier, onPanelChange }: Dashboard
                                 event.stopPropagation();
                                 toggleItem(item.id);
                               }}
+                              data-tip="dashboard-review-fit"
                               className="inline-flex min-h-[44px] items-center justify-center rounded bg-emerald-600 px-2.5 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-500 sm:px-3 md:min-h-0 md:py-1.5"
                             >
                               {isExpanded ? 'Hide Fit' : 'Review Fit'}
@@ -1666,7 +1667,7 @@ export default function DashboardPanel({ email, tier, onPanelChange }: Dashboard
                         </div>
                       </div>
 
-                      <div className={`transition-all duration-200 overflow-hidden ${
+                      <div data-tip="dashboard-tune" className={`transition-all duration-200 overflow-hidden ${
                         isExpanded
                           ? `${itemAttachments.length > 0 ? 'max-h-[40rem] overflow-y-auto' : 'max-h-96'} opacity-100 mt-4`
                           : 'max-h-0 opacity-0'
