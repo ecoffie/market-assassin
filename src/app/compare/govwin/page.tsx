@@ -39,7 +39,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: 'GovWin Alternative for Small Business — Mindy at $149/mo',
     description:
-      'Same federal market intelligence as GovWin (opportunities, recompetes, forecasts) at 1% of the price. No sales call, no annual contract.',
+      'Same federal market intelligence as GovWin (opportunities, recompetes, forecasts) at a small-business price. No sales call, no annual contract.',
     type: 'website',
     url: 'https://getmindy.ai/compare/govwin',
     images: siteShareImages(),
@@ -150,7 +150,7 @@ const faqs = [
   },
   {
     q: 'What if I outgrow Mindy?',
-    a: "Honest answer: if you scale into a 50+ person BD org with a dedicated capture team and you're chasing $50M+ contracts where a single bad bid kills your year, GovWin (or a similar enterprise platform) probably belongs in your stack. We'll be the first to tell you. Until then, Mindy gives you the core intelligence at 1% of the cost.",
+    a: "Honest answer: if you scale into a 50+ person BD org with a dedicated capture team and you're chasing $50M+ contracts where a single bad bid kills your year, GovWin (or a similar enterprise platform) probably belongs in your stack. We'll be the first to tell you. Until then, Mindy gives you the core intelligence at a fraction of the cost.",
   },
   {
     q: 'Do I need to talk to sales to sign up?',

@@ -59,7 +59,6 @@ const SURFACES: Record<string, Array<[claim: string, reason: string]>> = {
     ['$15,000', 'competitor price: held for Eric’s decision'],
     ['$50,000+', 'competitor price: held for Eric’s decision'],
     ['$50,000', 'competitor price: held for Eric’s decision'],
-    ['1%', 'price ratio vs GovWin: flagged (does not match the page’s own prices), held for Eric’s decision'],
     ['$1M', 'worked example or audience descriptor in guidance copy, not a market stat'],
     ['$50K', 'worked example or audience descriptor in guidance copy, not a market stat'],
     ['100+', 'worked example or audience descriptor in guidance copy, not a market stat'],
@@ -154,6 +153,14 @@ describe('no unsourced numbers on swept customer-facing surfaces', () => {
       expect(found.filter((c) => !ok.has(c)), 'unsourced number claims (wire to marketing-stats, cite an official source, or rewrite without the number)').toEqual([]);
     });
   }
+
+  it('no hand-typed GovWin price comparison ratio; the VA note points to SBA VetCert, not the retired CVE', () => {
+    const govwin = readFileSync(join(process.cwd(), 'src/app/compare/govwin/page.tsx'), 'utf8');
+    expect(govwin).not.toMatch(/\b\d+% of the (?:price|cost)\b/);
+    const agency = readFileSync(join(process.cwd(), 'src/app/agencies/[slug]/page.tsx'), 'utf8');
+    expect(agency).not.toMatch(/\bCVE verified\b/);
+    expect(agency).toContain('veterans.certify.sba.gov');
+  });
 
   it('corpus counts on these pages come from marketing-stats.ts, not hand-typed', () => {
     const s = readFileSync(join(process.cwd(), 'src/app/mindy-landing/page.tsx'), 'utf8');

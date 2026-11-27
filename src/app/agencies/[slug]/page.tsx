@@ -589,7 +589,7 @@ function SmallBusinessNote({ agency }: { agency: AgencySeo }) {
   // and from a curated list of agencies known to have strong programs.
   const STRONG_SB: Record<string, string> = {
     'department-of-veterans-affairs':
-      'VA is the most SDVOSB-friendly buyer in the federal government — the Vets First contracting program requires SDVOSB consideration before any other socioeconomic category. Get CVE verified and you have a structural advantage.',
+      'VA is the most SDVOSB-friendly buyer in the federal government — the Vets First contracting program requires SDVOSB consideration before any other socioeconomic category. Get certified through SBA’s Veteran Small Business Certification program (VetCert, veterans.certify.sba.gov) and you have a structural advantage.',
     'small-business-administration':
       'SBA sets small business policy and self-imposes high set-aside goals — 8(a), HUBZone, and WOSB awards are heavily concentrated here.',
     'department-of-agriculture':
