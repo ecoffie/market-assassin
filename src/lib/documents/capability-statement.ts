@@ -25,6 +25,16 @@ export const CAPABILITY_STATEMENT_KIND = 'capability_statement' as const;
 /** What the customer fills in when no completed project is on record (coaching itself stays in the chat answer). */
 export const PAST_PERFORMANCE_PLACEHOLDER = '[Add a completed project: agency or client, the work, and the value]';
 
+/**
+ * The palette a capability statement prints in. Eric (2026-11-27, on the live KoaMana statement): "I like the other
+ * color, not the Mindy colors": the navy and gold of the briefing theme, not the navy-to-purple Mindy gradient. The
+ * server stamps every document with the default 'mindy' theme, so for this layout 'mindy' (or none) means
+ * briefing; any other named theme is honoured as chosen.
+ */
+export function capabilityThemeName(theme: unknown): string {
+  return theme === undefined || theme === null || theme === '' || theme === 'mindy' ? 'briefing' : String(theme);
+}
+
 export function isCapabilityStatement(model: Pick<DocModel, 'title'> & { kind?: unknown }): boolean {
   if (model.kind === CAPABILITY_STATEMENT_KIND) return true;
   return /\bcapabilit(?:y|ies)\s+statement\b/i.test(String(model.title || ''));

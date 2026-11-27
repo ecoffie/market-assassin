@@ -10,7 +10,7 @@ import type { Block, Claim, DocModel, TableBlock } from './model';
 import { chartToSvg } from './charts';
 import { hex, resolveTheme, type Theme } from './theme';
 import { INTER_LATIN_FONT_FACE } from '@/lib/fonts/inter-latin-embedded';
-import { CAP_LIMIT_STEPS, extractCapability, isCapabilityStatement, type CapEntry, type CapField, type CapLimits } from './capability-statement';
+import { CAP_LIMIT_STEPS, capabilityThemeName, extractCapability, isCapabilityStatement, type CapEntry, type CapField, type CapLimits } from './capability-statement';
 import { assumptionOrigin, clientCopy, publicRecordId, keepDash, stripHeadingNumber, citationIndex, citeMarker, claimClass, claimLabel, claimsPresent, formatColumn, formatDocDate, parseInline, unverifiedStatements } from './format';
 
 /**
@@ -225,7 +225,7 @@ export interface RenderHtmlOptions {
  * box, one provenance line. No cover, no contents, no "How to read this", no citation markers, no Sources list.
  */
 export function renderCapabilityHtml(model: DocModel, opts: RenderHtmlOptions = {}): string {
-  const theme = resolveTheme(model.theme);
+  const theme = resolveTheme(capabilityThemeName(model.theme));
   const k = theme.colors;
   const c = (h: string) => hex(h);
   const cap = extractCapability(model, opts.capLimits ?? CAP_LIMIT_STEPS[0]);
