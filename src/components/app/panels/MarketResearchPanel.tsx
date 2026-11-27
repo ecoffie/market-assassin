@@ -1888,7 +1888,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
             </span>
           )}
           {/* Auto / Sport mode toggle — Mindy colors (purple/emerald). */}
-          <div className="inline-flex rounded-lg bg-surface/60 p-0.5 text-xs">
+          <div className="inline-flex rounded-lg bg-surface/60 p-0.5 text-xs" data-tip="research-mode">
             <button
               type="button"
               onClick={() => {
@@ -1992,6 +1992,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
               else { handleGenerateAll(undefined, { notifySuccess: true }); loadRecommendedOpportunities(); }
             }}
             disabled={isGenerating || profileLoading || sportSuggesting}
+            data-tip="research-build"
             className="rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:bg-input"
           >
             {isGenerating || sportSuggesting ? 'Building...' : reportData ? 'Refresh' : 'Build Market Map'}
@@ -2013,7 +2014,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
           {/* Keyword → code lookup (Eric: "if I want medical supplies, which
               codes?"). Type plain English, get NAICS/PSC to click into the
               fields. No need to memorize codes. */}
-          <div className="mb-3 rounded-lg border border-hairline/60 bg-ground-deep/40 p-3">
+          <div className="mb-3 rounded-lg border border-hairline/60 bg-ground-deep/40 p-3" data-tip="research-suggest-codes">
             <label className="text-xs text-ink-soft font-medium">Not sure of the codes? Describe what you want to research</label>
             <div className="flex gap-2 mt-1.5">
               <input

@@ -162,6 +162,7 @@ export default function MarketDossierPanel({ email, onNavigate }: { email: strin
             <button
               onClick={runAutoSetup}
               disabled={autoRunning}
+              data-tip="my-market-setup"
               className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
             >
               {autoRunning ? 'Setting up…' : <><Sparkles className="h-4 w-4 shrink-0" strokeWidth={2} /> Set up my Mindy</>}
@@ -243,7 +244,7 @@ function OppCard({ opp, onNavigate }: { opp: DossierOpp; onNavigate?: (p: AppPan
     <div className="rounded-xl border border-surface bg-ground/70 p-4 transition-colors hover:border-emerald-500/40">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
-          <a href={opp.url} target="_blank" rel="noreferrer" className="font-semibold text-white hover:text-emerald-300">{opp.title}</a>
+          <a href={opp.url} target="_blank" rel="noreferrer" data-tip="my-market-title" className="font-semibold text-white hover:text-emerald-300">{opp.title}</a>
           <div className="mt-0.5 text-xs text-faint">
             {opp.agency || 'Federal'}{opp.naics ? ` · NAICS ${opp.naics}` : ''}{opp.incumbent ? ` · incumbent: ${opp.incumbent}` : ''}
           </div>
@@ -256,7 +257,7 @@ function OppCard({ opp, onNavigate }: { opp: DossierOpp; onNavigate?: (p: AppPan
       <div className="mt-3 flex flex-wrap items-center gap-2">
         {opp.setAside && <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2 py-0.5 text-[11px] text-emerald-200"><Target className="h-3 w-3 shrink-0" strokeWidth={2} /> {opp.setAside}</span>}
         <div className="ml-auto flex gap-2">
-          <button onClick={() => onNavigate?.('proposals')} className="rounded-md bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-emerald-500">{opp.kind === 'recompete' ? 'Draft LOI' : 'Draft response'}</button>
+          <button onClick={() => onNavigate?.('proposals')} data-tip="my-market-draft" className="rounded-md bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-emerald-500">{opp.kind === 'recompete' ? 'Draft LOI' : 'Draft response'}</button>
           <button onClick={() => onNavigate?.('pipeline')} className="rounded-md border border-hairline px-2.5 py-1 text-xs text-ink-soft hover:bg-surface">Track</button>
         </div>
       </div>

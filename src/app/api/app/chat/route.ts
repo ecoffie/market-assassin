@@ -43,8 +43,9 @@ import { isUserOverBudget, recordLlmUsage } from '@/lib/llm/usage-cost';
 import { researchClient } from '@/lib/ask-mindy/research-client';
 import { makeTier0Tools, TIER0_TOOL_DEFS, TIER0_TOOL_NAMES } from '@/lib/chat/tier0-tools';
 import { makeMyDocumentsTool, MY_DOCUMENTS_TOOL_DEF, FIND_MY_DOCUMENTS } from '@/lib/chat/my-documents-tool';
-import { connectedAppsEnabledFor } from '@/lib/connected-apps/config';
+import { connectedAppsEnabledFor, connectedAppsDraftsEnabledFor } from '@/lib/connected-apps/config';
 import { loadConnectedFilesContext } from '@/lib/connected-apps/read-file-tool';
+import { makeEmailDraftTool, EMAIL_DRAFT_TOOL_DEF, CREATE_EMAIL_DRAFT, type VerifiedSource } from '@/lib/connected-apps/email-draft';
 import { makeSearchWebTool, SEARCH_WEB_TOOL_DEF, SEARCH_WEB, callerKeyFor } from '@/lib/chat/search-web-tool';
 import { makeReadWebPageTool, READ_WEB_PAGE_TOOL_DEF, READ_WEB_PAGE, urlsInText } from '@/lib/chat/read-web-page';
 import { makeGenerateDocumentTool, CREATE_DOCUMENT_TOOL_DEF, CREATE_DOCUMENT, isDocumentCreationRequest, parseCreateDocumentDeliverables, type CreateDocumentDeliverable } from '@/lib/chat/generate-document-tool';
@@ -1250,6 +1251,21 @@ export async function POST(request: NextRequest) {
                 : {}),
             })
             : null;
+          // Connected apps Slice B: save an email DRAFT in the customer's own Gmail / Outlook (never sends). Flag
+          // CONNECTED_APPS + allowlist AND CONNECTED_APPS_DRAFTS_ALLOWLIST (its own gate); never in card chat. The acting scope is re-resolved on every call, and the
+          // recipient is kept only when this turn's public records (or the attached notice's contacts) cite it.
+          const emailDraft = !cardCtx && connectedAppsDraftsEnabledFor(auth.email)
+            ? makeEmailDraftTool({
+              resolveScope: () => resolveChatActingScope(auth.email!, request),
+              callerEmail: auth.email!,
+              verifiedSources: (): VerifiedSource[] => [
+                ...turnSources
+                  .filter((x) => x.owner === null && (x.status === 'ok' || x.status === 'truncated'))
+                  .map((x) => ({ text: x.content, officialOnly: x.tool === 'search_web' || x.tool === 'read_web_page' })),
+                ...(noticeRecord ? [{ text: JSON.stringify((noticeRecord as { points_of_contact?: unknown }).points_of_contact ?? '') }] : []),
+              ],
+            })
+            : null;
           // Server-side web-search controls (per-turn cap, privacy guard, usage log): search-web-tool.ts.
           // Every document excerpt this turn has seen: the attached block plus each find_my_documents result.
           const turnDocumentTexts: string[] = [documentContext?.block, connectedFiles?.block].filter((t): t is string => !!t);
@@ -1271,8 +1287,8 @@ export async function POST(request: NextRequest) {
             ? createAppActionProposer({ surface: actionSurface, hasPro: chatPro, emit: (evt) => send(evt) })
             : null;
           const actionDefs = actions ? [proposeAppActionToolDef(actions.surface)] : [];
-          const privateDefs = [...TIER0_TOOL_DEFS, ...actionDefs, SEARCH_WEB_TOOL_DEF, ...(readPage ? [READ_WEB_PAGE_TOOL_DEF] : []), ...(myDocs ? [MY_DOCUMENTS_TOOL_DEF] : []), ...(genDoc ? [CREATE_DOCUMENT_TOOL_DEF] : [])];
-          const privateNames = new Set([...TIER0_TOOL_NAMES, ...(actions ? [PROPOSE_APP_ACTION] : []), SEARCH_WEB, ...(readPage ? [READ_WEB_PAGE] : []), ...(myDocs ? [FIND_MY_DOCUMENTS] : []), ...(genDoc ? [CREATE_DOCUMENT] : [])]);
+          const privateDefs = [...TIER0_TOOL_DEFS, ...actionDefs, SEARCH_WEB_TOOL_DEF, ...(readPage ? [READ_WEB_PAGE_TOOL_DEF] : []), ...(myDocs ? [MY_DOCUMENTS_TOOL_DEF] : []), ...(genDoc ? [CREATE_DOCUMENT_TOOL_DEF] : []), ...(emailDraft ? [EMAIL_DRAFT_TOOL_DEF] : [])];
+          const privateNames = new Set([...TIER0_TOOL_NAMES, ...(actions ? [PROPOSE_APP_ACTION] : []), SEARCH_WEB, ...(readPage ? [READ_WEB_PAGE] : []), ...(myDocs ? [FIND_MY_DOCUMENTS] : []), ...(genDoc ? [CREATE_DOCUMENT] : []), ...(emailDraft ? [CREATE_EMAIL_DRAFT] : [])]);
           const executor = createChatToolExecutor({
             userEmail: auth.email!,
             ...(actingScope.kind === 'client' ? { vaultEmail: actingScope.vaultEmail } : {}),
@@ -1295,6 +1311,7 @@ export async function POST(request: NextRequest) {
                   });
                 }
                 if (readPage && n === READ_WEB_PAGE) return readPage.execute(a);
+                if (emailDraft && n === CREATE_EMAIL_DRAFT) return emailDraft.execute(a);
                 if (myDocs && n === FIND_MY_DOCUMENTS) {
                   return myDocs.execute(a).then((r) => {
                     try { turnDocumentTexts.push(JSON.stringify(r)); } catch { /* unserializable result: nothing to guard */ }

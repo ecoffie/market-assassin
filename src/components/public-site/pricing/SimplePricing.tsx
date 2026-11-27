@@ -11,6 +11,7 @@
  * says "$0 today" (the charge only comes after 14 days).
  * The credit-only MCP plans keep their own page at /mcp/pricing.
  */
+import { TEAM_SEAT_CREDITS_PER_USER, teamSeatPlan } from '@/lib/billing/team-seat-plans';
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import MemberProof from '@/components/public-site/MemberProof';
@@ -39,7 +40,7 @@ type Plan = {
   cta: string; href: string; outline?: boolean;
   lead: string; base: string; features: Feature[];
   /** Omitted = no allowance to show (never a made-up number). */
-  usage?: [title: string, detail: string];
+  usage?: [title: string, detail: React.ReactNode];
   /** A non-trial button that still takes money (gets the no-refund note). */
   takesPayment?: boolean;
   footer?: React.ReactNode;
@@ -200,11 +201,15 @@ export function TeamSeatToggle({ value, onChange }: { value: TeamSeatOptionId; o
 type Cell = boolean | string;
 type CompareGroup = [group: string, rows: Array<[label: React.ReactNode, pro: Cell, team: Cell, ent: Cell]>];
 
-export default function SimplePricing({ proCredits, teamCredits, forecastsLabel, faqs, creditPlans = [] }: {
+export default function SimplePricing({ proCredits, teamCredits, forecastsLabel, faqs, creditPlans = [], promoLine = null }: {
   proCredits: number; teamCredits: number; forecastsLabel: string; faqs: { q: string; a: string }[];
   creditPlans?: CreditPlan[];
+  /** Mindy Day annual promo line, decided SERVER-side (mindyDayPromoLine); null = window closed. */
+  promoLine?: string | null;
 }) {
   const [annual, setAnnual] = useState(false);
+  // Mindy Day deal: the server decides the window (promoLine non-null = open). Doubling shows on annual cards only.
+  const promoAnnual = !!promoLine && annual;
   // Team seat card (held behind NEXT_PUBLIC_TEAM_SEAT_PRICING until Eric approves). Display only.
   const seatOn = isTeamSeatPricingEnabled();
   const [seatId, setSeatId] = useState<TeamSeatOptionId>(TEAM_SEAT_PRICING.defaultOption);
@@ -240,6 +245,8 @@ export default function SimplePricing({ proCredits, teamCredits, forecastsLabel,
     return () => { live = false; };
   }, []);
   const maxPct = pctOff(TEAM_ANNUAL_USD, TEAM_MONTHLY_USD);
+  // Seat plan for the chosen Team size (annual prices + Stripe ids live in team-seat-plans.ts).
+  const seatPlan = seatOpt ? teamSeatPlan(seatOpt.seats) : null;
 
   const basePlans: Plan[] = [
     {
@@ -256,7 +263,9 @@ export default function SimplePricing({ proCredits, teamCredits, forecastsLabel,
         ['Market research', 'Who buys, who wins and what they spend.'],
         ['Mindy in your AI', 'Use Mindy inside Claude, ChatGPT or Cursor.'],
       ],
-      usage: ['Monthly usage included', `${fmt(proCredits)} credits / month`],
+      usage: ['Monthly usage included', promoAnnual
+        ? <><s>{fmt(proCredits)}</s> {fmt(proCredits * 2)} credits / month in your first year <span data-mindy-day-card>(Mindy Day deal)</span></>
+        : `${fmt(proCredits)} credits / month`],
     },
     {
       name: 'Team', tag: 'Built for business development teams working several markets at once.',
@@ -271,7 +280,9 @@ export default function SimplePricing({ proCredits, teamCredits, forecastsLabel,
         ['Team dashboard and roles', 'See who is working what.'],
         ['Onboarding call', 'We set up your markets with you.'],
       ],
-      usage: ['Monthly usage included', `${fmt(teamCredits)} credits / month, shared by the team`],
+      usage: ['Monthly usage included', promoAnnual
+        ? <><s>{fmt(teamCredits)}</s> {fmt(teamCredits * 2)} credits / month, shared by the team, in your first year <span data-mindy-day-card>(Mindy Day deal)</span></>
+        : `${fmt(teamCredits)} credits / month, shared by the team`],
       footer: <>10 or more users? <a href={SALES_URL}>Talk to us for a volume quote</a></>,
     },
     {
@@ -288,25 +299,32 @@ export default function SimplePricing({ proCredits, teamCredits, forecastsLabel,
     },
   ];
 
-  // Team seat card (owner mockup): the chosen size sets the Team card's price, button and first
-  // feature. Monthly only, no trial line, no credit allowance (none approved — never a made-up
-  // number). The button goes to its configured checkout, or to sales while that is empty.
-  const withSeats = (p: Plan): Plan => (p.name !== 'Team' || !seatOpt ? p : {
-    ...p,
-    featured: true,
-    price: `$${fmt(seatOpt.monthlyUsd)}`,
-    was: undefined,
-    per: seatOpt.per,
-    trial: false,
-    takesPayment: teamSeatTakesPayment(seatOpt),
-    cta: seatOpt.cta,
-    href: teamSeatCtaHref(seatOpt),
-    lead: TEAM_SEAT_PRICING.lead,
-    base: TEAM_SEAT_PRICING.base,
-    features: [seatOpt.firstFeature, ...TEAM_SEAT_PRICING.features],
-    usage: undefined,
-    footer: undefined,
-  });
+  // Team seat card (owner mockup): the chosen size sets the Team card's price, button, first
+  // feature and credits. Monthly or yearly (33% off) follows the Monthly/Annual toggle.
+  const withSeats = (p: Plan): Plan => {
+    if (p.name !== 'Team' || !seatOpt || !seatPlan) return p;
+    const yearly = annual && !!seatPlan.annualPriceId;
+    const credits = seatPlan.credits;
+    return {
+      ...p,
+      featured: true,
+      price: yearly ? `$${fmt(Math.round(seatPlan.annualUsd / 12))}` : `$${fmt(seatOpt.monthlyUsd)}`,
+      was: yearly ? `$${fmt(seatOpt.monthlyUsd)}` : undefined,
+      per: yearly ? `/ mo, billed annually ($${fmt(seatPlan.annualUsd)} / year). Add seats any time.` : seatOpt.per,
+      trial: false,
+      takesPayment: teamSeatTakesPayment(seatOpt),
+      cta: seatOpt.cta,
+      href: yearly ? `/api/checkout/team-seats?seats=${seatOpt.seats}&billing=annual` : teamSeatCtaHref(seatOpt),
+      lead: TEAM_SEAT_PRICING.lead,
+      base: TEAM_SEAT_PRICING.base,
+      features: [seatOpt.firstFeature, ...TEAM_SEAT_PRICING.features],
+      // Same number the grant uses (team-seat-plans.ts: seats x TEAM_SEAT_CREDITS_PER_USER).
+      usage: ['Monthly usage included', yearly && promoLine
+        ? <><s>{fmt(credits)}</s> {fmt(credits * 2)} credits / month, shared by the team, in your first year <span data-mindy-day-card>(Mindy Day deal)</span></>
+        : `${fmt(credits)} credits / month, shared by the team`],
+      footer: undefined,
+    };
+  };
   const plans = applyCurrentPlan(basePlans.map(withSeats), me);
   const byName = Object.fromEntries(plans.map((p) => [p.name, p]));
 
@@ -331,7 +349,7 @@ export default function SimplePricing({ proCredits, teamCredits, forecastsLabel,
       ['Use Mindy in Claude, ChatGPT or Cursor', true, true, true],
       // Seat variant: today's Team allowance belongs to today's $499 plan, and no per-seat allowance
       // is approved, so the Team cell says so instead of showing a number (unknown is never zero).
-      ['Monthly credits', `${fmt(proCredits)}`, seatOn ? 'To be confirmed' : `${fmt(teamCredits)}, shared`, 'Custom'],
+      ['Monthly credits', `${fmt(proCredits)}`, seatOn ? `${fmt(TEAM_SEAT_CREDITS_PER_USER)} per user, shared` : `${fmt(teamCredits)}, shared`, 'Custom'],
       ['High-volume API and data feeds', false, false, true],
     ]],
     ['Team', [
@@ -380,12 +398,31 @@ export default function SimplePricing({ proCredits, teamCredits, forecastsLabel,
       </section>
       )}
 
-      {/* The seat variant is monthly only (owner mockup: "Monthly. Annual plans include training and onboarding."). */}
-      {!seatOn && (
+      {(
       <div className="toggle" role="group" aria-label="Billing period">
         <button type="button" className={!annual ? 'on' : ''} aria-pressed={!annual} onClick={() => setAnnual(false)}>Monthly</button>
-        <button type="button" className={annual ? 'on' : ''} aria-pressed={annual} onClick={() => setAnnual(true)}>Annual (up to {maxPct}% off)</button>
+        <button type="button" className={annual ? 'on' : ''} aria-pressed={annual} onClick={() => setAnnual(true)}>Annual (up to {maxPct}% off){promoLine ? ' · 2× credits' : ''}</button>
       </div>
+      )}
+      {/* Inline style, not the page stylesheet: the flag-off page markup is pinned byte-for-byte
+          (SimplePricing.team-seat.unit.test.tsx), and outside the window this renders nothing. */}
+      {promoLine && (
+        <aside
+          className="promo" data-mindy-day-promo aria-label="Mindy Day deal"
+          style={{ maxWidth: 720, margin: '-12px auto 32px', padding: '18px 22px', textAlign: 'center', background: 'var(--mp-surface)', border: '2px solid var(--mp-navy)', borderRadius: 14, boxShadow: '0 6px 20px rgba(15,23,42,.08)' }}
+        >
+          <p style={{ margin: '0 0 6px', font: '600 12px var(--mp-font-sans)', letterSpacing: '.08em', textTransform: 'uppercase', color: 'var(--mp-navy)' }}>Mindy Day deal · ends Dec 5</p>
+          <p style={{ margin: '0 0 6px', font: '700 22px/1.25 var(--mp-font-serif)', color: 'var(--mp-ink)' }}>Double credits for a full year on annual plans</p>
+          {/* Seat Team credits depend on the size (seats x 1,500), so the Team figure is a range. */}
+          <p style={{ margin: 0, font: '400 15px/1.5 var(--mp-font-sans)', color: 'var(--mp-muted)' }}>
+            {seatOn ? `Start an annual plan by Dec 5 and get double credits every month of your first paid year: ${fmt(proCredits * 2)} a month on Pro, and ${fmt(2 * TEAM_SEAT_CREDITS_PER_USER * 2)} to ${fmt(5 * TEAM_SEAT_CREDITS_PER_USER * 2)} on Team depending on team size.` : promoLine}
+          </p>
+          {!annual && (
+            <button type="button" data-mindy-day-cta onClick={() => setAnnual(true)}
+              style={{ marginTop: 12, border: 0, borderRadius: 10, padding: '10px 18px', background: 'var(--mp-navy)', color: 'var(--mp-surface)', font: '600 14px var(--mp-font-sans)', cursor: 'pointer' }}
+            >See annual prices</button>
+          )}
+        </aside>
       )}
 
       <section className="cards" id="plans">

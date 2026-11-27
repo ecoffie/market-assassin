@@ -6,15 +6,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyUserOwnsEmail } from '@/lib/api-auth';
 import { resolveChatActingScope } from '@/lib/chat/chat-acting-scope';
-import { ACCESS_DISCLOSURE, clientCreds, connectedAppsEnabledFor, connectedAppsSecrets, type Capability, type Provider } from '@/lib/connected-apps/config';
+import { ACCESS_DISCLOSURE, clientCreds, connectedAppsDraftsEnabledFor, connectedAppsEnabledFor, connectedAppsSecrets, type Capability, type Provider } from '@/lib/connected-apps/config';
 import { authorizeUrl, BINDING_COOKIE, BINDING_COOKIE_PATH, newBrowserBinding, pkcePair, safeReturnTo, signState, STATE_TTL_SEC } from '@/lib/connected-apps/oauth';
 import { scopeKeyFor } from '@/lib/connected-apps/store';
 import { checkRateLimit } from '@/lib/rate-limit';
 
 const START_LIMIT_PER_HOUR = 20;
 
-// This slice requests only file access. Draft and calendar are added with the tools that use them.
-const CAPS: readonly Capability[] = ['file'];
+// File access, and email drafts (Slice B: requested only when the customer first asks Mindy to save a draft).
+// Calendar is added with the tool that uses it.
+const CAPS: readonly Capability[] = ['file', 'draft'];
 
 export async function POST(request: NextRequest) {
   const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
@@ -40,6 +41,8 @@ export async function POST(request: NextRequest) {
   // Least privilege: only the capabilities this step needs (identity is always included).
   const caps = (Array.isArray(body.capabilities) ? body.capabilities : ['file']).filter((c): c is Capability => CAPS.includes(c as Capability));
   if (!caps.length) return NextResponse.json({ error: 'unsupported_capability' }, { status: 400 });
+  // Email drafts have their own allowlist: uploads can be on for everyone while drafts are not.
+  if (caps.includes('draft') && !connectedAppsDraftsEnabledFor(auth.email)) return NextResponse.json({ error: 'drafts_not_enabled' }, { status: 403 });
   const { verifier, challenge } = pkcePair();
   // Tie the flow to THIS browser: the callback refuses unless the same browser returns this cookie.
   const binding = newBrowserBinding();

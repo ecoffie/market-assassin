@@ -7,10 +7,11 @@
  */
 export type Provider = 'google' | 'microsoft';
 /**
- * Only the capabilities this slice uses. Draft (Gmail/Outlook) and calendar scopes are added, and reviewed, in
- * the slice that ships the tool that uses them; never requested ahead of time.
+ * Only the capabilities the shipped tools use. `draft` (Slice B) saves an email DRAFT in the customer's own mailbox;
+ * calendar scopes are added, and reviewed, in the slice that ships the tool that uses them. Each capability is
+ * requested only when the customer first needs it (incremental consent), never ahead of time.
  */
-export type Capability = 'identity' | 'file';
+export type Capability = 'identity' | 'file' | 'draft';
 
 export const PROVIDERS: readonly Provider[] = ['google', 'microsoft'];
 
@@ -20,6 +21,10 @@ export const SCOPES: Record<Provider, Record<Capability, string[]>> = {
     identity: ['openid', 'email', 'profile'],
     // drive.file = the app can open only files the user picks in Google Picker (or that the app created).
     file: ['https://www.googleapis.com/auth/drive.file'],
+    // gmail.compose = create drafts. Google's grant also allows sending; Mindy's mail client has no send method
+    // (email-draft.ts) and never calls a send endpoint. Never gmail.send, gmail.modify or https://mail.google.com/.
+    // gmail.compose is a Google RESTRICTED scope: test users work now; public use needs Google app verification.
+    draft: ['https://www.googleapis.com/auth/gmail.compose'],
   },
   microsoft: {
     identity: ['openid', 'profile', 'email', 'offline_access', 'User.Read'],
@@ -27,8 +32,24 @@ export const SCOPES: Record<Provider, Record<Capability, string[]>> = {
     // Microsoft has no delegated per-picked-file scope for personal consent. Mindy reads only the file the
     // customer picks, but the GRANT is broader, and ACCESS_DISCLOSURE says so before consent.
     file: ['Files.Read'],
+    // Mail.ReadWrite is the least Graph permission that can create a draft (POST /me/messages). It does NOT allow
+    // sending (that is Mail.Send, never requested). It also allows reading mail; Mindy only creates drafts.
+    draft: ['Mail.ReadWrite'],
   },
 };
+
+/** Scopes Mindy must never request: sending mail, full mailbox control, restricted Drive. Asserted by a test. */
+export const FORBIDDEN_SCOPES: readonly string[] = [
+  'https://mail.google.com/',
+  'https://www.googleapis.com/auth/gmail.send',
+  'https://www.googleapis.com/auth/gmail.modify',
+  'https://www.googleapis.com/auth/gmail.readonly',
+  'https://www.googleapis.com/auth/drive',
+  'https://www.googleapis.com/auth/drive.readonly',
+  'Mail.Send',
+  'Mail.Send.Shared',
+  'Mail.ReadWrite.Shared',
+];
 
 /**
  * What the provider grant actually allows, shown to the customer BEFORE they are sent to consent. Must describe
@@ -37,11 +58,19 @@ export const SCOPES: Record<Provider, Record<Capability, string[]>> = {
 export const ACCESS_DISCLOSURE: Record<Provider, Record<Exclude<Capability, 'identity'>, string>> = {
   google: {
     file: 'Google will let Mindy open only the files you pick. Mindy cannot see the rest of your Drive.',
+    draft: 'Google\'s permission to save email drafts in your Gmail also covers sending. Mindy never sends: it only saves a draft for you to review and send yourself, and you can disconnect at any time.',
   },
   microsoft: {
     file: 'Microsoft will let Mindy read all of the files in your OneDrive, not only the ones you pick. Mindy opens only a file you choose, and you can disconnect at any time.',
+    draft: 'Microsoft\'s permission to save email drafts in Outlook also lets an app read your mail. Mindy only saves a draft for you to review and send yourself; it does not read your mail and cannot send, and you can disconnect at any time.',
   },
 };
+
+/** True when a connection's granted scopes include everything a capability needs (Graph may prefix its resource URL). */
+export function hasCapability(provider: Provider, granted: readonly string[], cap: Exclude<Capability, 'identity'>): boolean {
+  const norm = new Set(granted.map((g) => g.replace(/^https:\/\/graph\.microsoft\.com\//i, '').toLowerCase()));
+  return SCOPES[provider][cap].every((s) => norm.has(s.toLowerCase()));
+}
 
 export function scopesFor(provider: Provider, caps: Capability[]): string[] {
   const set = new Set<string>(SCOPES[provider].identity);
@@ -106,5 +135,16 @@ export function connectedAppsSecrets(env: Env = process.env): ConnectedAppsSecre
 export function connectedAppsEnabledFor(email: string | null | undefined, env: Env = process.env): boolean {
   if (env.CONNECTED_APPS !== 'true' || !email) return false;
   const list = (env.CONNECTED_APPS_ALLOWLIST || '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
+  return list.includes('*') || list.includes(email.trim().toLowerCase());
+}
+
+/**
+ * Email drafts (Slice B) have their OWN allowlist, AND-ed with the uploads gate: uploads can go to everyone
+ * (CONNECTED_APPS_ALLOWLIST=*) while drafts stay with the people on CONNECTED_APPS_DRAFTS_ALLOWLIST (comma list or
+ * `*`). Empty or unset = nobody.
+ */
+export function connectedAppsDraftsEnabledFor(email: string | null | undefined, env: Env = process.env): boolean {
+  if (!connectedAppsEnabledFor(email, env) || !email) return false;
+  const list = (env.CONNECTED_APPS_DRAFTS_ALLOWLIST || '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
   return list.includes('*') || list.includes(email.trim().toLowerCase());
 }

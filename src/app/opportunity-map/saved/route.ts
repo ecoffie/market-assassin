@@ -28,6 +28,8 @@ import { SUBPAGE_APP_SHELL_CSS, applyAppShell, isAppShellRequest } from '../app-
 import { LOGIN_MODAL_CSS, LOGIN_MODAL_HTML, LOGIN_MODAL_JS } from '../login-modal';
 import { MAPS_HOME_PATH } from '@/lib/mindy/maps-home';
 import { ACCOUNT_MENU_CSS, ACCOUNT_MENU_HTML, ACCOUNT_MENU_JS } from '../account-menu';
+import { isTabAskEnabled } from '@/lib/app/tab-ask';
+import { applyWatchlistTabAsk } from './tab-ask-bridge';
 
 export const dynamic = 'force-dynamic';
 
@@ -617,5 +619,10 @@ export async function GET(request?: Request) {
   // ?shell=app — shown inside the signed-in app (/app?panel=watchlist|saved): hides only .zhead/.zrail.
   const shell = request ? isAppShellRequest(new URL(request.url)) : false;
   const html = shell ? applyAppShell(PAGE, SUBPAGE_APP_SHELL_CSS) : PAGE;
+  // Ask Mindy on this tab (NEXT_PUBLIC_TAB_ASK, default off): only inside the app, where the box lives.
+  // Off — or outside the app shell — the page is served exactly as before.
+  if (shell && isTabAskEnabled()) {
+    return new NextResponse(applyWatchlistTabAsk(html), { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } });
+  }
   return new NextResponse(html, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } });
 }

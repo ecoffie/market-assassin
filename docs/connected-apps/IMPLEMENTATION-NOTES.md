@@ -117,6 +117,45 @@ Use a file from Drive or OneDrive in Ask Mindy: server side plus the Ask Mindy c
     - Picks go through the same signed-handle `/selections`. The model still cannot list or search a drive.
 - **Tests:** 35 new (OneDrive listing, OData quote escaping, provider refusals, chooser flow; plus handle signing, isolation, expiry, domain separation, provider mapping and errors, export vs download, size cap, NUL strip, fence integrity, coach/client isolation, dead connection, file-id swap, route gates, token response shape).
 
+## 3b-2. Built in Slice B (branch `claude/connected-apps-email-drafts`, stacked on #2428, flag off)
+
+Save an email DRAFT in the customer's own Gmail or Outlook. Mindy never sends: the customer opens the draft, reviews it and sends it (Eric, 2026-11-27, beta).
+
+- **Scopes, asked only when the customer first wants a draft.**
+  - Google `gmail.compose`. Microsoft Graph `Mail.ReadWrite`.
+  - Never `gmail.send`, `gmail.modify`, `https://mail.google.com/`, `Mail.Send` or `*.Shared`. `FORBIDDEN_SCOPES` in `config.ts` is asserted by a test for every capability.
+  - Connecting an account still asks for files only. An "Allow email drafts in Gmail/Outlook (<account>)" item in the Drive/OneDrive menu re-runs consent with `['file', 'draft']`.
+  - The access note is honest about each grant. Google's draft permission also covers sending, and Mindy never sends. Microsoft's also lets an app read mail; Mindy does not read mail and cannot send.
+- **`create_email_draft {to, subject, body, connected_account_id}`** is a chat-private tool (`src/lib/connected-apps/email-draft.ts`).
+  - Offered only when `CONNECTED_APPS` is on for the verified caller. Never in card chat.
+  - Policy `allowed_write` (one per round, like every chat write). Free.
+  - Its result is a private source, so it can never verify a recipient later.
+- **Authority on every call.**
+  - The acting scope is re-resolved from the request (`resolveChatActingScope`), and the connection must belong to that scope and to the calling Mindy user (`store.ts`).
+  - An unknown `connected_account_id` is refused. Two accounts with no id gets "which one?".
+  - A file-only connection, a dead grant or no connection returns a plain message telling the model to give copy-paste text and how to connect or allow drafts. It never fails silently.
+- **The mail client has one method, `createDraft`**: Gmail `users.drafts.create`, or Graph `POST /me/messages` (saved in Drafts, not sent). A test asserts there is no send method and no send endpoint in the module.
+- **Recipient**: only an address cited in this turn's public records, the attached notice's points of contact, or an official `.gov` / `.mil` address from web text. Anything else is left blank and the answer says so. Never inferred.
+- **Content checks** (mechanical parts of the outreach rules). These run before any account lookup, and a refused draft goes back to the model to rewrite:
+  - under 150 words before the signature delimiter (a line with only `--`);
+  - no em or en dashes;
+  - certifications only in the credentials block under the signature;
+  - one-line subject, no header injection.
+  - The tool description carries the shared `OUTREACH_RULES` (#2515) verbatim. The draft follows rules 1 to 6; "Before you send" and the closing line stay in the chat answer.
+- **Logging**: one structured event per attempt (`connected_apps.email_draft`): who, provider, connected account, connection id, the recipient's domain, recipient status and outcome. Never the subject, body or full recipient. The chat execution log redacts free-text arguments as before.
+- **Idempotency**: the same payload retried in the same turn returns the first result. A `connected_actions` table (spec §4) for cross-turn dedupe is deferred, because it needs a migration.
+- **Admin, before live testing** (§3):
+  - Google Cloud: add `gmail.compose` to the consent screen. **It is a RESTRICTED scope**: test users work now; public use needs Google app verification (and possibly a security assessment).
+  - Entra: add the delegated `Mail.ReadWrite`. Still no `Mail.Send`.
+- **The Picker token never carries mail scopes.** Google's `include_granted_scopes` puts `gmail.compose` on the stored access token once drafts are allowed, and the Picker token reaches the browser. For a connection with a mail scope, `/picker-token` mints a fresh token from the refresh token limited to identity + `drive.file` (`restrictedAccessTokenFor`, not stored). It refuses (`picker_scope_unavailable`) if Google returns any other scope or does not say which. Files-only connections are unchanged.
+- **Its own gate.** `CONNECTED_APPS_DRAFTS_ALLOWLIST` (comma list or `*`; empty = nobody) is AND-ed with the uploads gate. Uploads can go to everyone (`CONNECTED_APPS_ALLOWLIST=*`) while drafts stay off. It is checked in three places:
+  - the chat tool registration;
+  - `/start` for the draft capability (403 `drafts_not_enabled`);
+  - the "Allow email drafts" menu, through `drafts` in the list response.
+- **Timeouts.** The Gmail and Graph draft calls time out at 15 s. A timeout is reported as unconfirmed ("check Drafts before trying again"), with the copy-paste fallback; never as saved.
+- **Rollout**: after Mindy Day, except Eric's own account (`CONNECTED_APPS_DRAFTS_ALLOWLIST=<eric>`).
+- **Testing rule**: no customer contact. Drafts go only to the eric@ / erika@ test accounts.
+
 ## 3c. Live acceptance (Slice A), each provider independently
 
 Not run yet. As of 2026-11-24 there are no `CONNECTED_APPS_*` variables in any environment, and `20261124_connected_accounts.sql` is pending.
@@ -165,7 +204,7 @@ Not run yet. As of 2026-11-24 there are no `CONNECTED_APPS_*` variables in any e
   - It reads only the selected file and extracts bounded text with `extract.ts`.
   - The output carries `provider`, `connected_account`, `source_id`, `source_url` and `retrieved_at` provenance, separate from federal-record provenance.
   - Prompt-injection guard on file content.
-- **Slice B:** `create_outreach_draft`. Adds the `draft` capability and its scopes (Gmail `gmail.compose`, Graph `Mail.ReadWrite`) for review in that PR.
+- **Slice B:** built as `create_email_draft` (see 3b-2). Adds the `draft` capability and its scopes (Gmail `gmail.compose`, Graph `Mail.ReadWrite`).
   - Server-validated approval of the exact payload (action id plus payload hash).
   - Gmail `users.drafts.create` or Graph `POST /me/messages`. Never send.
   - No invented recipients.

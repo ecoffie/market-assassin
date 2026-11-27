@@ -16,12 +16,13 @@ vi.mock('@/lib/rate-limit', () => ({ checkRateLimit: vi.fn(async (key: string, l
 vi.mock('@/lib/chat/chat-acting-scope', () => ({ resolveChatActingScope: vi.fn(async () => h.scope) }));
 vi.mock('@/lib/connected-apps/store', async (orig) => ({ ...(await orig<typeof import('@/lib/connected-apps/store')>()), saveConnection: h.save, listConnections: h.list, disconnect: h.disconnect }));
 
-const ENV = ['CONNECTED_APPS', 'CONNECTED_APPS_ALLOWLIST', 'CONNECTED_APPS_STATE_SECRET', 'CONNECTED_APPS_TOKEN_ENC_KEY', 'CONNECTED_APPS_GOOGLE_CLIENT_ID', 'CONNECTED_APPS_GOOGLE_CLIENT_SECRET', 'CONNECTED_APPS_MICROSOFT_CLIENT_ID', 'CONNECTED_APPS_MICROSOFT_CLIENT_SECRET'] as const;
+const ENV = ['CONNECTED_APPS', 'CONNECTED_APPS_ALLOWLIST', 'CONNECTED_APPS_DRAFTS_ALLOWLIST', 'CONNECTED_APPS_STATE_SECRET', 'CONNECTED_APPS_TOKEN_ENC_KEY', 'CONNECTED_APPS_GOOGLE_CLIENT_ID', 'CONNECTED_APPS_GOOGLE_CLIENT_SECRET', 'CONNECTED_APPS_MICROSOFT_CLIENT_ID', 'CONNECTED_APPS_MICROSOFT_CLIENT_SECRET'] as const;
 const saved: Record<string, string | undefined> = {};
 beforeEach(() => {
   for (const k of ENV) saved[k] = process.env[k];
   process.env.CONNECTED_APPS = 'true';
   process.env.CONNECTED_APPS_ALLOWLIST = 'owner@acme.com';
+  delete process.env.CONNECTED_APPS_DRAFTS_ALLOWLIST;
   process.env.CONNECTED_APPS_STATE_SECRET = 'state-secret-test-0123456789abcdef0123';
   process.env.CONNECTED_APPS_TOKEN_ENC_KEY = 'token-key-test-0123456789abcdef01234567';
   process.env.CONNECTED_APPS_GOOGLE_CLIENT_ID = 'g-id';
@@ -79,9 +80,25 @@ describe('POST /start', () => {
     expect(c).toMatch(/SameSite=lax/i);
     expect(c).toMatch(/Path=\/api\/app\/connected-apps\/callback/);
   });
-  it('mail and calendar capabilities are not grantable in this slice', async () => {
+  it('calendar is not grantable yet: alone it is refused, next to draft it is filtered out', async () => {
+    process.env.CONNECTED_APPS_DRAFTS_ALLOWLIST = 'owner@acme.com';
     const { POST } = await import('./start/route');
-    expect((await POST(post({ ...startBody, capabilities: ['draft', 'calendar'] }))).status).toBe(400);
+    expect((await POST(post({ ...startBody, capabilities: ['calendar'] }))).status).toBe(400);
+    const r = await POST(post({ ...startBody, capabilities: ['draft', 'calendar'] }));
+    expect(r.status).toBe(200);
+    const scope = new URL((await r.json()).authorize_url).searchParams.get('scope')!;
+    expect(scope).toContain('gmail.compose');
+    expect(scope).not.toMatch(/calendar/i);
+  });
+  it('email drafts: asked for only when requested, with the honest note for both grants', async () => {
+    process.env.CONNECTED_APPS_DRAFTS_ALLOWLIST = 'owner@acme.com';
+    const { POST } = await import('./start/route');
+    const fileOnly = await (await POST(post({ ...startBody }))).json();
+    expect(new URL(fileOnly.authorize_url).searchParams.get('scope')).not.toMatch(/gmail/);
+    const withDraft = await (await POST(post({ ...startBody, capabilities: ['file', 'draft'] }))).json();
+    expect(new URL(withDraft.authorize_url).searchParams.get('scope')).toContain('https://www.googleapis.com/auth/gmail.compose');
+    expect(withDraft.access_note).toMatch(/only the files you pick/);
+    expect(withDraft.access_note).toMatch(/Mindy never sends/);
   });
   it('rate-limited per user: a burst of consent starts gets 429 with Retry-After', async () => {
     const { POST } = await import('./start/route');
@@ -91,6 +108,23 @@ describe('POST /start', () => {
     expect(r.status).toBe(429);
     expect(Number(r.headers.get('Retry-After'))).toBeGreaterThan(0);
     expect(h.rlKeys.at(-1)).toBe('connected-apps:start:owner@acme.com');
+  });
+  it('drafts have their own gate: uploads on, drafts allowlist empty -> the draft capability is refused (403); files still work', async () => {
+    process.env.CONNECTED_APPS_ALLOWLIST = '*';
+    process.env.CONNECTED_APPS_DRAFTS_ALLOWLIST = '';
+    const { POST } = await import('./start/route');
+    const refused = await POST(post({ ...startBody, capabilities: ['file', 'draft'] }));
+    expect(refused.status).toBe(403);
+    expect(await refused.json()).toEqual({ error: 'drafts_not_enabled' });
+    expect((await POST(post({ ...startBody }))).status).toBe(200);
+  });
+  it('the listing says whether this caller may allow email drafts', async () => {
+    const { GET } = await import('./route');
+    const get = () => GET(new NextRequest('https://getmindy.ai/api/app/connected-apps?email=owner@acme.com'));
+    process.env.CONNECTED_APPS_DRAFTS_ALLOWLIST = '';
+    expect((await (await get()).json()).drafts).toBe(false);
+    process.env.CONNECTED_APPS_DRAFTS_ALLOWLIST = 'owner@acme.com';
+    expect((await (await get()).json()).drafts).toBe(true);
   });
   it('returns the access note for the provider', async () => {
     const { POST } = await import('./start/route');

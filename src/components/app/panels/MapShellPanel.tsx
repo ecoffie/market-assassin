@@ -38,6 +38,8 @@ import {
 import { parseAppDeepLink } from '@/lib/app/deep-link-params';
 import { isKnownPanel } from '@/lib/app/known-panels';
 import { MAP_SELECTED_OPP_KEY, serializeMapSelectedOpp } from '@/lib/chat/chat-handoff';
+import { isTabAskEnabled } from '@/lib/app/tab-ask';
+import WatchlistTabAsk from './WatchlistTabAsk';
 
 const TITLES: Record<Panel, string> = {
   map: 'Opportunity Map',
@@ -147,7 +149,7 @@ export default function MapShellPanel({ panel, onPanelChange }: Props) {
     go(loc.pathname, loc.search, loc.hash);
   }, [go]);
 
-  return (
+  const frame = (
     <iframe
       ref={frameRef}
       key={panel}
@@ -159,4 +161,15 @@ export default function MapShellPanel({ panel, onPanelChange }: Props) {
       allow="geolocation; clipboard-write"
     />
   );
+
+  // Ask Mindy on the Saved searches tab (NEXT_PUBLIC_TAB_ASK, default off). Off: the frame alone, as before.
+  if (panel === 'watchlist' && isTabAskEnabled()) {
+    return (
+      <div className="flex flex-col w-full h-full flex-1 min-h-0" data-testid="map-shell-watchlist-ask">
+        <WatchlistTabAsk frameRef={frameRef} />
+        {frame}
+      </div>
+    );
+  }
+  return frame;
 }

@@ -71,11 +71,11 @@ describe('team seat display config (PROPOSED, display only)', () => {
     for (const o of TEAM_SEAT_PRICING.options) expect(teamSeatPlan(o.seats)?.monthlyUsd).toBe(o.monthlyUsd);
   });
 
-  it('has no checkout yet: every button goes to contact sales and takes no money', () => {
+  it('every size goes to its own monthly seat checkout and takes payment', () => {
     for (const o of TEAM_SEAT_PRICING.options) {
-      expect(o.checkoutUrl).toBe('');
-      expect(teamSeatCtaHref(o)).toBe(SALES_URL);
-      expect(teamSeatTakesPayment(o)).toBe(false);
+      expect(o.checkoutUrl).toBe(`/api/checkout/team-seats?seats=${o.seats}&billing=monthly`);
+      expect(teamSeatCtaHref(o)).toBe(o.checkoutUrl);
+      expect(teamSeatTakesPayment(o)).toBe(true);
     }
   });
 
@@ -98,11 +98,11 @@ describe('/pricing with the seat switch ON (server render)', () => {
     doc = parse(render());
   });
 
-  it('shows the mockup header and footer, monthly only', () => {
+  it('shows the header, footer and the Monthly/Annual toggle', () => {
     const h = doc.querySelector('[data-testid="seat-pricing-header"]')!;
     expect(h.querySelector('h1')?.textContent).toBe('Pricing');
-    expect(h.textContent).toContain('Monthly. Annual plans include training and onboarding.');
-    expect(doc.querySelector('[aria-label="Billing period"]')).toBeNull();
+    expect(h.textContent).toContain('Pay monthly, or pay yearly and save up to 33%.');
+    expect(doc.querySelector('[aria-label="Billing period"]')).not.toBeNull();
     const foot = doc.querySelector('.seat-foot')!;
     expect(foot.textContent).toBe('Questions about a rollout: hello@getmindy.ai');
     expect(foot.querySelector('a')?.getAttribute('href')).toBe('mailto:hello@getmindy.ai');
@@ -125,15 +125,14 @@ describe('/pricing with the seat switch ON (server render)', () => {
     ]);
   });
 
-  it('renders the 2-user Team card from the mockup, button to sales, no trial or refund line', () => {
+  it('renders the 2-user Team card from the mockup, button to the 2-seat checkout with the no-refund note', () => {
     const t = teamCard(doc);
     expect(t.querySelector('.price .now')?.textContent).toBe('$249');
     expect(t.querySelector('.per')?.textContent).toBe('/ mo, billed monthly. Add seats any time.');
     const cta = t.querySelector('a.cta')!;
     expect(cta.textContent).toBe('Start with 2 seats');
-    expect(cta.getAttribute('href')).toBe(SALES_URL);
-    expect(t.querySelector('.trial')).toBeNull();
-    expect(t.querySelector('[data-no-refund-note]')).toBeNull();
+    expect(cta.getAttribute('href')).toBe('/api/checkout/team-seats?seats=2&billing=monthly');
+    expect(t.querySelector('[data-no-refund-note]')).not.toBeNull();
     expect(t.querySelector('.lead')?.textContent).toBe('Win more as a team.');
     expect(t.querySelector('.base')?.textContent).toBe('All Pro features, plus');
     expect([...t.querySelectorAll('li b')].map((b) => b.textContent)).toEqual([
@@ -142,13 +141,12 @@ describe('/pricing with the seat switch ON (server render)', () => {
     expect(t.textContent).toContain('Add up to 5 as the team grows, at any time.');
   });
 
-  it('never shows a credit number for Team (unknown is never zero)', () => {
+  it('shows the seat credits the grant uses (2 seats x 1,500 = 3,000, shared)', () => {
     const t = teamCard(doc);
-    expect(t.querySelector('.usage')).toBeNull();
-    expect(t.textContent).not.toMatch(/credit/i);
+    expect(t.querySelector('.usage')?.textContent).toBe('Monthly usage included3,000 credits / month, shared by the team');
     const table = doc.querySelector('section.cmp table')!;
     const row = [...table.querySelectorAll('tr')].find((r) => r.querySelector('th')?.textContent === 'Monthly credits')!;
-    expect([...row.querySelectorAll('td')].map((c) => c.textContent)).toEqual(['1,500', 'To be confirmed', 'Custom']);
+    expect([...row.querySelectorAll('td')].map((c) => c.textContent)).toEqual(['1,500', '1,500 per user, shared', 'Custom']);
   });
 
   it('keeps Pro and Enterprise copy as live', () => {
@@ -194,7 +192,7 @@ describe('/pricing seat toggle (client)', () => {
     expect(state()).toMatchObject({ price: '$249', cta: 'Start with 2 seats', first: '2 users included', checked: 'false' });
     await act(async () => { radio('5 users').click(); });
     expect(state()).toEqual({
-      price: '$599', cta: 'Start with 5 seats', href: SALES_URL,
+      price: '$599', cta: 'Start with 5 seats', href: '/api/checkout/team-seats?seats=5&billing=monthly',
       first: '5 users included', firstDetail: 'Room for the whole business development team on one plan.', checked: 'true',
     });
     expect([...teamCard(host).querySelectorAll('li b')].slice(1).map((b) => b.textContent)).toEqual([

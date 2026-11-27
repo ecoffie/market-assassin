@@ -17,6 +17,7 @@ import { HardDrive, Loader2, X } from 'lucide-react';
 import { authedFetch } from '../authHeaders';
 import { OneDriveChooser } from './OneDriveChooser';
 import { parseResultCookie, RESULT_COOKIE } from '@/lib/connected-apps/result-cookie';
+import { hasCapability, type Capability } from '@/lib/connected-apps/config';
 
 export interface ConnectedFile {
   handle: string;
@@ -24,7 +25,9 @@ export interface ConnectedFile {
   provider: 'google' | 'microsoft';
 }
 
-interface Connection { id: string; provider: 'google' | 'microsoft'; connected_email: string; status: string }
+interface Connection { id: string; provider: 'google' | 'microsoft'; connected_email: string; status: string; granted_scopes?: string[] }
+
+const MAIL_LABEL = { google: 'Gmail', microsoft: 'Outlook' } as const;
 
 const PROVIDER_LABEL = { google: 'Google Drive', microsoft: 'OneDrive' } as const;
 const CONNECT_REASON: Record<string, string> = {
@@ -85,6 +88,8 @@ export function ConnectedFiles({ email, files, onChange, disabled }: {
   const [enabled, setEnabled] = useState(false);
   const [connections, setConnections] = useState<Connection[]>([]);
   const [providers, setProviders] = useState<Array<{ provider: 'google' | 'microsoft'; available: boolean }>>([]);
+  // Email drafts have their own allowlist (the list endpoint says whether this caller is on it).
+  const [draftsAllowed, setDraftsAllowed] = useState(false);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -103,6 +108,7 @@ export function ConnectedFiles({ email, files, onChange, disabled }: {
       setEnabled(true);
       setConnections((j.connections || []).filter((c: Connection) => c.status === 'connected' || c.status === 'reauth_needed'));
       setProviders(j.providers || []);
+      setDraftsAllowed(j.drafts === true);
     } catch { setEnabled(false); }
   }, [email]);
 
@@ -134,13 +140,14 @@ export function ConnectedFiles({ email, files, onChange, disabled }: {
     }
   }, [enabled, load]);
 
-  const startConnect = useCallback(async (provider: 'google' | 'microsoft') => {
+  // `capabilities`: 'file' to connect; ['file', 'draft'] when the customer allows email drafts (asked only then).
+  const startConnect = useCallback(async (provider: 'google' | 'microsoft', capabilities: Capability[] = ['file']) => {
     setBusy(true); setMessage(null);
     try {
       const res = await authedFetch('/api/app/connected-apps/start', email, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, provider, capabilities: ['file'], returnTo: window.location.pathname + window.location.search }),
+        body: JSON.stringify({ email, provider, capabilities, returnTo: window.location.pathname + window.location.search }),
       });
       const j = await res.json().catch(() => ({}));
       if (!res.ok || !j.authorize_url) { setMessage(CONNECT_REASON[j.error] || 'Connecting is not available right now.'); return; }
@@ -270,6 +277,12 @@ export function ConnectedFiles({ email, files, onChange, disabled }: {
               {providers.filter((p) => p.available && !connectedProviders.has(p.provider)).map((p) => (
                 <button key={p.provider} type="button" className="block w-full rounded px-2 py-1.5 text-left text-white hover:bg-white/5" onClick={() => startConnect(p.provider)}>
                   Connect {PROVIDER_LABEL[p.provider]}
+                </button>
+              ))}
+              {/* Email drafts (Slice B): asked for only when the customer chooses it. Mindy saves drafts; it never sends. */}
+              {draftsAllowed && connections.filter((c) => c.status === 'connected' && !hasCapability(c.provider, c.granted_scopes || [], 'draft')).map((c) => (
+                <button key={`dr-${c.id}`} type="button" data-testid="allow-email-drafts" className="block w-full rounded px-2 py-1.5 text-left text-white hover:bg-white/5" onClick={() => { setOpen(false); void startConnect(c.provider, ['file', 'draft']); }}>
+                  Allow email drafts in {MAIL_LABEL[c.provider]} ({c.connected_email})
                 </button>
               ))}
               {connections.length > 0 && <div className="my-1 border-t border-hairline" />}

@@ -1,6 +1,9 @@
 'use client';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { authedFetch } from '../authHeaders';
+import TabAskBox from '@/components/app/TabAskBox';
+import { isTabAskEnabled, type TabAskCount } from '@/lib/app/tab-ask';
+import { knowledgeBaseAskAdapter, type KnowledgeBaseAskParams } from '@/lib/app/tab-ask-adapters/knowledge-base';
 
 /**
  * Knowledge Base — searchable repository over Mindy's source corpus
@@ -35,12 +38,15 @@ export default function KnowledgeBasePanel({ email, initialDocId }: { email: str
   // title showing an 82k-word book's text). Only the LATEST openDoc call may write.
   const reqSeq = useRef(0);
 
-  const load = useCallback(async () => {
-    if (!email) return;
+  // The tab's ONE list load (GET /api/app/knowledge-base). Resolves to the rows it showed, or null when
+  // the load failed (unknown — never reported as 0). The search box and Ask Mindy both go through it.
+  const fetchList = async (qv: string, dt: string): Promise<TabAskCount> => {
+    if (!email) return null;
     setLoading(true);
     const p = new URLSearchParams({ email });
-    if (q.trim()) p.set('q', q.trim());
-    if (docType) p.set('docType', docType);
+    if (qv.trim()) p.set('q', qv.trim());
+    if (dt) p.set('docType', dt);
+    let count: TabAskCount = null;
     try {
       const res = await authedFetch(`/api/app/knowledge-base?${p}`, email);
       const d = await res.json();
@@ -52,9 +58,16 @@ export default function KnowledgeBasePanel({ email, initialDocId }: { email: str
         // ?doc=<id> deep-link is loading (else the auto-preview races the deep-link
         // and the two can land title-of-one over body-of-the-other).
         if (!selected && !initialDocId && d.docs?.[0]) openDoc(d.docs[0]);
+        const shown = (d.docs || []).length;
+        count = { shown, more: (d.total || 0) > shown };
       }
     } catch { /* ignore */ }
     setLoading(false);
+    return count;
+  };
+
+  const load = useCallback(async () => {
+    await fetchList(q, docType);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [email, q, docType]);
 
@@ -95,6 +108,27 @@ export default function KnowledgeBasePanel({ email, initialDocId }: { email: str
     })();
   }, [initialDocId, email]);
 
+  // ── Ask Mindy on this tab (OFF unless NEXT_PUBLIC_TAB_ASK=on) ────────────────────────────────
+  // The question becomes THIS tab's search phrase (within the type pill the user picked) and reloads
+  // THIS tab's list; Clear puts back exactly what was on screen before the first question, no request.
+  const tabAskOn = isTabAskEnabled();
+  const [askSnapshot, setAskSnapshot] = useState<null | { q: string; docs: KbDoc[]; facets: Facet[]; total: number }>(null);
+
+  const handleTabAsk = async (p: KnowledgeBaseAskParams): Promise<TabAskCount> => {
+    if (!askSnapshot) setAskSnapshot({ q, docs, facets, total });
+    setQ(p.q);
+    return fetchList(p.q, docType);
+  };
+
+  const clearTabAsk = () => {
+    if (!askSnapshot) return;
+    setQ(askSnapshot.q);
+    setDocs(askSnapshot.docs);
+    setFacets(askSnapshot.facets);
+    setTotal(askSnapshot.total);
+    setAskSnapshot(null);
+  };
+
   return (
     <div className="p-6">
       <div className="mb-4">
@@ -104,6 +138,12 @@ export default function KnowledgeBasePanel({ email, initialDocId }: { email: str
         </p>
       </div>
 
+      {tabAskOn && (
+        <div className="mb-4">
+          <TabAskBox adapter={knowledgeBaseAskAdapter} onAsk={handleTabAsk} onClear={clearTabAsk} />
+        </div>
+      )}
+
       {/* Search + type filter */}
       <div className="flex flex-wrap gap-3 mb-4">
         <input
@@ -111,11 +151,12 @@ export default function KnowledgeBasePanel({ email, initialDocId }: { email: str
           onChange={e => setQ(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') load(); }}
           placeholder="Search the knowledge base…"
+          data-tip="knowledge-base-search"
           className="flex-1 min-w-[240px] h-10 px-3 bg-surface border border-hairline rounded-lg text-white text-sm placeholder-faint focus:border-emerald-500 focus:outline-none"
         />
         <button onClick={load} className="h-10 px-5 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded-lg">Search</button>
       </div>
-      <div className="flex flex-wrap gap-1.5 mb-4">
+      <div className="flex flex-wrap gap-1.5 mb-4" data-tip="knowledge-base-types">
         <button onClick={() => setDocType('')} className={`px-3 py-1 rounded-full text-xs ${!docType ? 'bg-emerald-600 text-white' : 'bg-surface text-muted hover:text-white'}`}>All ({total})</button>
         {facets.map(f => (
           <button key={f.docType} onClick={() => setDocType(f.docType)} className={`px-3 py-1 rounded-full text-xs ${docType === f.docType ? 'bg-emerald-600 text-white' : 'bg-surface text-muted hover:text-white'}`}>
@@ -127,7 +168,7 @@ export default function KnowledgeBasePanel({ email, initialDocId }: { email: str
       {/* Split pane */}
       <div className="grid grid-cols-1 lg:grid-cols-[360px_1fr] gap-4">
         {/* List */}
-        <div className="border border-surface rounded-xl bg-ground overflow-hidden">
+        <div className="border border-surface rounded-xl bg-ground overflow-hidden" data-tip="knowledge-base-list">
           <div className="max-h-[600px] overflow-y-auto divide-y divide-slate-800">
             {loading && <div className="p-4 text-sm text-faint">Loading…</div>}
             {!loading && docs.length === 0 && <div className="p-4 text-sm text-faint">No documents match.</div>}

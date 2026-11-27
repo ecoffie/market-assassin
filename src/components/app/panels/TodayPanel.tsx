@@ -80,6 +80,7 @@ export function TodayView({ searches, matches, onAskMindy, onOpenMap, onOpenWatc
                 <button
                   type="button"
                   onClick={() => onAskMindy(m)}
+                  data-tip="today-ask-mindy"
                   className="h-9 px-3 rounded-lg border border-surface text-sm font-medium hover:bg-surface"
                 >
                   Ask Mindy about this

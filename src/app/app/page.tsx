@@ -29,6 +29,7 @@ import { magicLinkErrorMessage } from '@/lib/mindy/magic-link-error';
 import { MAP_SHELL_HOME_EVENT, isMapShellPanel } from '@/lib/app/map-shell';
 import { KNOWN_PANELS } from '@/lib/app/known-panels';
 import { homePanel, isTodayHomeEnabled, isTodayPanelParam } from '@/lib/app/today-home';
+import { TAB_ASK_CHAT_EVENT } from '@/lib/app/tab-ask';
 import TrialOfferBanner from '@/components/app/TrialOfferBanner';
 import { TRIAL_CTA_LABEL } from '@/lib/public-site/trial-cta';
 
@@ -672,6 +673,14 @@ function AppDashboard() {
     syncAppUrl(nextPanel, context);
     trackEngagement('page_view', { panel: nextPanel, tier });
   }, [flushPanelTime, tier, trackEngagement, syncAppUrl]);
+
+  // Ask Mindy on a tab → "Ask Mindy in chat instead": the box already seeded the question in the chat
+  // panel's existing seed key; open the chat. Only ever fired by TabAskBox (NEXT_PUBLIC_TAB_ASK).
+  useEffect(() => {
+    const openChat = () => handlePanelChange('chat');
+    window.addEventListener(TAB_ASK_CHAT_EVENT, openChat);
+    return () => window.removeEventListener(TAB_ASK_CHAT_EVENT, openChat);
+  }, [handlePanelChange]);
 
   // The top-right account avatar (shared with the map and public pages) is the ONE way to reach
   // Settings and Sign out. Inside /app its Settings link switches panels in place and its Sign out

@@ -17,6 +17,9 @@ import PursuitComments from './PursuitComments';
 import SavedOnMapList from '../saved/SavedOnMapList';
 import SavedSearchesList from '../saved/SavedSearchesList';
 import MindyLoader from '@/components/app/MindyLoader';
+import TabAskBox from '@/components/app/TabAskBox';
+import { isTabAskEnabled, type TabAskCount } from '@/lib/app/tab-ask';
+import { pipelineAskAdapter, pursuitMatches, type PipelineAskParams } from '@/lib/app/tab-ask-adapters/pipeline';
 
 interface PipelinePanelProps {
   email: string | null;
@@ -226,6 +229,12 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
   // Active saved view (one-click board filter). null = no view. Toggling a view off
   // returns to the full board.
   const [activeView, setActiveView] = useState<string | null>(null);
+  // Ask Mindy on this tab (OFF unless NEXT_PUBLIC_TAB_ASK=on): the asked facets narrow the loaded
+  // pursuits. null = no question asked, and every list below is exactly what it was without the feature.
+  const [askParams, setAskParams] = useState<PipelineAskParams | null>(null);
+  const [askSnapshot, setAskSnapshot] = useState<null | {
+    noticeType: string; owner: 'all' | 'mine' | 'others'; view: string | null;
+  }>(null);
   const [voiceOpen, setVoiceOpen] = useState(false);          // Voice capture modal (#119)
   // Which view of My Pursuits: the pursuits themselves, things saved on the Opportunity Map
   // (user_saved_opportunities), or the map's saved searches (saved_searches).
@@ -378,7 +387,7 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
     // Always exclude archived from board view. Board is the
     // operating surface — archived means "out of mind", so they
     // shouldn't clutter it.
-    return opportunities.filter(opp => opp.stage === stage && !opp.is_archived);
+    return opportunities.filter(opp => opp.stage === stage && !opp.is_archived && (!askParams || pursuitMatches(opp, askParams)));
   };
 
   // Parse value estimate to number for sorting (e.g., "$3.5M" -> 3500000)
@@ -452,9 +461,10 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
   // Team/Mine filter at all (solo users never see it).
   const hasSharedPursuits = stageScoped.some(o => ownerOf(o) && ownerOf(o) !== me);
 
+  const askScoped = askParams ? stageScoped.filter(o => pursuitMatches(o, askParams)) : stageScoped;
   const noticeFiltered = noticeTypeFilter === 'all'
-    ? stageScoped
-    : stageScoped.filter(o => noticeBucket(o.notice_type) === noticeTypeFilter);
+    ? askScoped
+    : askScoped.filter(o => noticeBucket(o.notice_type) === noticeTypeFilter);
 
   // Saved-view predicate (built-in views) applied on top of the owner/notice filters.
   const viewFiltered = activeView
@@ -489,6 +499,37 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
     }
     return sortDirection === 'asc' ? comparison : -comparison;
   });
+
+  // ── Ask Mindy on this tab ────────────────────────────────────────────────────────────────────
+  // The question becomes THIS tab's filter over the pursuits it already loaded from /api/pipeline
+  // (no request). The tab's other filters reset to "all" so the answer is the whole match; Clear puts
+  // back exactly the filters that were on screen before the first question.
+  const tabAskOn = isTabAskEnabled();
+  const handleTabAsk = async (p: PipelineAskParams): Promise<TabAskCount> => {
+    if (!askSnapshot) setAskSnapshot({ noticeType: noticeTypeFilter, owner: ownerFilter, view: activeView });
+    setNoticeTypeFilter('all');
+    setOwnerFilter('all');
+    setActiveView(null);
+    setAskParams(p);
+    track('tool_use', 'pipeline', {
+      action: 'tab_ask',
+      has_agency: p.agencies.length > 0,
+      has_naics: p.naics.length > 0,
+      has_set_aside: p.setAsides.length > 0,
+      has_query: p.keywords.length > 0,
+    });
+    // The pursuits did not load → the count is unknown, never 0.
+    if (error) return null;
+    return { shown: stageScoped.filter(o => pursuitMatches(o, p)).length, more: false };
+  };
+  const clearTabAsk = () => {
+    setAskParams(null);
+    if (!askSnapshot) return;
+    setNoticeTypeFilter(askSnapshot.noticeType);
+    setOwnerFilter(askSnapshot.owner);
+    setActiveView(askSnapshot.view);
+    setAskSnapshot(null);
+  };
 
   const handleSort = (field: typeof sortField) => {
     if (sortField === field) {
@@ -896,7 +937,7 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <div className="flex bg-surface rounded-lg p-1">
+          <div className="flex bg-surface rounded-lg p-1" data-tip="pipeline-view-toggle">
             <button
               onClick={() => setViewMode('board')}
               className={`px-3 py-1 text-sm rounded-md transition-colors ${
@@ -964,6 +1005,10 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
             X
           </button>
         </div>
+      )}
+
+      {tabAskOn && (
+        <TabAskBox adapter={pipelineAskAdapter} onAsk={handleTabAsk} onClear={clearTabAsk} />
       )}
 
       {/* Stats Bar - Only active stages + completed toggle.
@@ -1064,7 +1109,7 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
         <span className="text-[11px] font-medium text-faint mr-0.5">Views:</span>
         {SAVED_VIEWS.map((v) => {
           // Count over the current stage scope so the chip shows the view's size.
-          const count = stageScoped.filter((o) => v.match(o, me)).length;
+          const count = askScoped.filter((o) => v.match(o, me)).length;
           const active = activeView === v.id;
           if (count === 0 && !active) return null; // hide empty views to reduce clutter
           return (
@@ -1112,6 +1157,7 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
                     key={opp.id}
                     role="button"
                     tabIndex={0}
+                    data-tip="pipeline-card"
                     onClick={() => openOpportunity(opp)}
                     onKeyDown={(event) => {
                       if (event.key === 'Enter' || event.key === ' ') {
@@ -1192,6 +1238,7 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
                               event.stopPropagation();
                               onPanelChange('proposals', { pursuit_id: opp.id });
                             }}
+                            data-tip="pipeline-draft"
                             className="mt-2 w-full rounded-md border border-amber-700/60 bg-amber-950/30 px-2 py-1.5 text-xs font-medium text-amber-200 transition-colors hover:bg-amber-900/40"
                             title="No SAM attachments — open Proposal Assist to upload an RFP manually"
                           >
@@ -1206,6 +1253,7 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
                             event.stopPropagation();
                             onPanelChange('proposals', { pursuit_id: opp.id });
                           }}
+                          data-tip="pipeline-draft"
                           className="mt-2 w-full rounded-md bg-emerald-600 px-2 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-emerald-500"
                           title={
                             opp.has_drafts
@@ -1312,6 +1360,7 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
                   return (
                     <tr
                       key={opp.id}
+                      data-tip="pipeline-card"
                       onClick={() => openOpportunity(opp)}
                       className={`border-b border-surface/50 hover:bg-surface/50 cursor-pointer transition-colors ${
                         urgency?.label === 'OVERDUE' ? 'bg-red-500/5' : ''
@@ -1505,6 +1554,7 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
                                     onPanelChange('proposals', { pursuit_id: opp.id });
                                   }}
                                   title="No SAM attachments — open Proposal Assist to upload an RFP"
+                                  data-tip="pipeline-draft"
                                   className="inline-flex items-center rounded border border-amber-700/60 bg-amber-950/40 px-1.5 py-1 font-medium text-amber-200 hover:bg-amber-900/50"
                                 >
                                   <Paperclip className="h-3.5 w-3.5" strokeWidth={2} />
@@ -1525,6 +1575,7 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
                                       ? 'Draft Proposal — SAM docs still downloading'
                                       : 'Draft Proposal'
                                 }
+                                data-tip="pipeline-draft"
                                 className="inline-flex items-center rounded bg-purple-600 px-1.5 py-1 font-semibold text-white hover:bg-purple-700"
                               >
                                 <PenLine className="h-3.5 w-3.5" strokeWidth={2} />

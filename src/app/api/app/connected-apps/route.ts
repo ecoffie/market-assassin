@@ -4,7 +4,7 @@
  * Auth: verifyUserOwnsEmail; scope from the same acting-scope resolver as Vault and chat.
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { clientCreds, PROVIDERS } from '@/lib/connected-apps/config';
+import { clientCreds, connectedAppsDraftsEnabledFor, PROVIDERS } from '@/lib/connected-apps/config';
 import { disconnect, listConnections } from '@/lib/connected-apps/store';
 import { connectedAppsGate as gate } from '@/lib/connected-apps/route-gate';
 
@@ -15,6 +15,8 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({
     connections,
     providers: PROVIDERS.map((p) => ({ provider: p, available: !!clientCreds(p) })),
+    // Whether this caller may allow email drafts (its own allowlist); the UI offers "Allow email drafts" only then.
+    drafts: connectedAppsDraftsEnabledFor(g.email),
   });
 }
 

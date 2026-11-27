@@ -818,6 +818,7 @@ export default function MyTargetListPanel({
                             form inline beneath the card. */}
                         <button
                           type="button"
+                          data-tip="target-list-outreach"
                           onClick={() => setExpandedId(expandedId === t.id ? null : t.id)}
                           className="text-xs text-emerald-400 hover:text-emerald-300 transition-colors"
                         >
@@ -829,6 +830,7 @@ export default function MyTargetListPanel({
                     {/* Right rail: status dropdown + remove */}
                     <div className="shrink-0 flex flex-col items-end gap-2">
                       <select
+                        data-tip="target-list-status"
                         value={t.status}
                         onChange={(e) => updateTarget(t.id, { status: e.target.value as TargetRow['status'] })}
                         className={`text-xs px-2 py-1 rounded border outline-none cursor-pointer ${statusColor(t.status)}`}

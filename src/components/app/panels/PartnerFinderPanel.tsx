@@ -20,6 +20,9 @@ import { useState, useCallback } from 'react';
 import { Search, Users, Building2, Loader2, BookmarkPlus, Check, Info } from 'lucide-react';
 import type { AppTier } from '../UnifiedSidebar';
 import { useAppTracker } from '../track';
+import TabAskBox from '@/components/app/TabAskBox';
+import { isTabAskEnabled, type TabAskCount } from '@/lib/app/tab-ask';
+import { partnerFinderAskAdapter, type PartnerFinderAskParams } from '@/lib/app/tab-ask-adapters/partner-finder';
 
 interface PartnerFinderPanelProps {
   email: string | null;
@@ -74,17 +77,18 @@ export default function PartnerFinderPanel({ email, tier }: PartnerFinderPanelPr
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<Record<string, boolean>>({});
 
-  const run = useCallback(async (overrideQuery?: string) => {
-    const q = (overrideQuery ?? query).trim();
-    if (mode === 'describe' && !q) return;
-    if (mode === 'complement' && !anchorUei.trim()) return;
-
+  // The tab's ONE list load (GET /api/app/capability-search). Resolves to the rows it showed, or null
+  // when the load failed (unknown — never reported as 0). The search form and Ask Mindy both use it.
+  const loadMatches = useCallback(async (args: {
+    mode: 'describe' | 'complement'; q: string; uei: string; state: string; tier: string;
+  }): Promise<TabAskCount> => {
+    const { mode, q, uei } = args;
     setLoading(true); setError(null); setSearched(true);
     try {
       const p = new URLSearchParams();
-      if (mode === 'describe') p.set('q', q); else p.set('uei', anchorUei.trim());
-      if (state.trim()) p.set('state', state.trim().toUpperCase());
-      if (tierFilter && mode === 'describe') p.set('tier', tierFilter);
+      if (mode === 'describe') p.set('q', q); else p.set('uei', uei);
+      if (args.state.trim()) p.set('state', args.state.trim().toUpperCase());
+      if (args.tier && mode === 'describe') p.set('tier', args.tier);
       p.set('limit', '25');
 
       const res = await fetch(`/api/app/capability-search?${p}`);
@@ -96,13 +100,59 @@ export default function PartnerFinderPanel({ email, tier }: PartnerFinderPanelPr
       // AppEventType/AppEventSource are fixed unions — use the existing 'tool_use' + a
       // metadata action rather than inventing event names the schema doesn't know.
       track('tool_use', 'pipeline', { action: 'partner_finder_search', mode, resultCount: (data.matches || []).length });
+      return { shown: (data.matches || []).length, more: false };
     } catch (e) {
       setError((e as Error).message);
       setMatches([]);
     } finally {
       setLoading(false);
     }
-  }, [mode, query, anchorUei, state, tierFilter, track]);
+    return null;
+  }, [track]);
+
+  const run = useCallback(async (overrideQuery?: string) => {
+    const q = (overrideQuery ?? query).trim();
+    if (mode === 'describe' && !q) return;
+    if (mode === 'complement' && !anchorUei.trim()) return;
+    await loadMatches({ mode, q, uei: anchorUei.trim(), state, tier: tierFilter });
+  }, [mode, query, anchorUei, state, tierFilter, loadMatches]);
+
+  // ── Ask Mindy on this tab (OFF unless NEXT_PUBLIC_TAB_ASK=on) ────────────────────────────────
+  // The question becomes THIS tab's "Describe the work" search + state and reloads THIS tab's list;
+  // Clear puts back exactly what was on screen before the first question, without another request.
+  const tabAskOn = isTabAskEnabled();
+  const [askSnapshot, setAskSnapshot] = useState<null | {
+    mode: 'describe' | 'complement'; query: string; anchorUei: string; anchorName: string | null;
+    state: string; tierFilter: string; matches: Match[]; scanned: number; searched: boolean; error: string | null;
+  }>(null);
+
+  const handleTabAsk = async (p: PartnerFinderAskParams): Promise<TabAskCount> => {
+    if (!askSnapshot) {
+      setAskSnapshot({ mode, query, anchorUei, anchorName, state, tierFilter, matches, scanned, searched, error });
+    }
+    setMode('describe');
+    setQuery(p.q);
+    setState(p.state);
+    // The question carries no concentration filter, so none narrows the answer silently.
+    setTierFilter('');
+    track('tool_use', 'pipeline', { action: 'partner_finder_tab_ask', has_state: !!p.state });
+    return loadMatches({ mode: 'describe', q: p.q, uei: '', state: p.state, tier: '' });
+  };
+
+  const clearTabAsk = () => {
+    if (!askSnapshot) return;
+    setMode(askSnapshot.mode);
+    setQuery(askSnapshot.query);
+    setAnchorUei(askSnapshot.anchorUei);
+    setAnchorName(askSnapshot.anchorName);
+    setState(askSnapshot.state);
+    setTierFilter(askSnapshot.tierFilter);
+    setMatches(askSnapshot.matches);
+    setScanned(askSnapshot.scanned);
+    setSearched(askSnapshot.searched);
+    setError(askSnapshot.error);
+    setAskSnapshot(null);
+  };
 
   /** Save into the EXISTING teaming CRM (user_teaming_partners) — no new storage. */
   const savePartner = useCallback(async (m: Match) => {
@@ -164,6 +214,12 @@ export default function PartnerFinderPanel({ email, tier }: PartnerFinderPanelPr
         </p>
       </div>
 
+      {tabAskOn && (
+        <div className="mb-4" data-testid="tab-ask-slot">
+          <TabAskBox adapter={partnerFinderAskAdapter} onAsk={handleTabAsk} onClear={clearTabAsk} />
+        </div>
+      )}
+
       {/* Mode toggle */}
       <div className="mb-4 inline-flex rounded-lg border border-line bg-surface p-1">
         <button
@@ -173,6 +229,7 @@ export default function PartnerFinderPanel({ email, tier }: PartnerFinderPanelPr
           Describe the work
         </button>
         <button
+          data-tip="partner-finder-complement"
           onClick={() => { setMode('complement'); setMatches([]); setSearched(false); }}
           className={`rounded px-3 py-1.5 text-sm font-medium ${mode === 'complement' ? 'bg-accent text-white' : 'text-ink-soft hover:text-ink'}`}
         >
@@ -184,7 +241,7 @@ export default function PartnerFinderPanel({ email, tier }: PartnerFinderPanelPr
       <div className="mb-4 space-y-3">
         {mode === 'describe' ? (
           <>
-            <div className="flex gap-2">
+            <div data-tip="partner-finder-describe" className="flex gap-2">
               <div className="relative flex-1">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-faint" />
                 <input
@@ -318,7 +375,7 @@ export default function PartnerFinderPanel({ email, tier }: PartnerFinderPanelPr
                       </span>
                     </div>
                   </div>
-                  <div className="flex shrink-0 flex-col gap-1.5">
+                  <div data-tip="partner-finder-save" className="flex shrink-0 flex-col gap-1.5">
                     <button
                       onClick={() => savePartner(m)}
                       disabled={!email || saved[m.rollup_uei]}

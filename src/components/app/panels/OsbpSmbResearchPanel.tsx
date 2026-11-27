@@ -13,6 +13,9 @@
 import { useState, useCallback } from 'react';
 import { Download } from 'lucide-react';
 import { authedFetch } from '../authHeaders';
+import TabAskBox from '@/components/app/TabAskBox';
+import { isTabAskEnabled, type TabAskCount } from '@/lib/app/tab-ask';
+import { osbpSmbAskAdapter, type OsbpSmbAskParams } from '@/lib/app/tab-ask-adapters/osbp-smb';
 
 interface Props { email: string }
 
@@ -38,16 +41,18 @@ export default function OsbpSmbResearchPanel({ email }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [lastQuery, setLastQuery] = useState('');
 
-  const run = useCallback(async (newOffset: number, append: boolean) => {
-    if (!psc.trim() && !naics.trim()) {
+  // The tab's ONE list load (GET /api/app/osbp/smb-search). Resolves to the rows it showed, or null when
+  // the search failed (unknown — never reported as 0). The form and Ask Mindy both go through it.
+  const search = useCallback(async (pscV: string, naicsV: string, newOffset: number, append: boolean): Promise<TabAskCount> => {
+    if (!pscV.trim() && !naicsV.trim()) {
       setError('Enter a PSC code (what you\'re buying — best match) and/or a NAICS code.');
-      return;
+      return null;
     }
     setLoading(true); setError(null);
     try {
       const params = new URLSearchParams({ email, limit: String(PAGE), offset: String(newOffset) });
-      if (psc.trim()) params.set('psc', psc.trim());
-      if (naics.trim()) params.set('naics', naics.trim());
+      if (pscV.trim()) params.set('psc', pscV.trim());
+      if (naicsV.trim()) params.set('naics', naicsV.trim());
       if (maxM) params.set('maxObligated', String((parseFloat(maxM) || 25) * 1_000_000));
       if (setAsideOnly) params.set('setAsideOnly', '1');
       const res = await authedFetch(`/api/app/osbp/smb-search?${params.toString()}`, email);
@@ -55,13 +60,47 @@ export default function OsbpSmbResearchPanel({ email }: Props) {
       if (!data.success) throw new Error(data.error || 'Search failed');
       const next = (data.results || []) as Row[];
       setRows(prev => append && prev ? [...prev, ...next] : next);
-      setTotal(data.total ?? next.length);
+      const nextTotal = data.total ?? next.length;
+      setTotal(nextTotal);
       setOffset(newOffset);
-      setLastQuery([psc && `PSC ${psc.toUpperCase()}`, naics && `NAICS ${naics}`, `≤$${maxM}M`].filter(Boolean).join(' · '));
+      setLastQuery([pscV && `PSC ${pscV.toUpperCase()}`, naicsV && `NAICS ${naicsV}`, `≤$${maxM}M`].filter(Boolean).join(' · '));
+      return { shown: next.length, more: next.length < nextTotal };
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Search failed');
+      return null;
     } finally { setLoading(false); }
-  }, [email, psc, naics, maxM, setAsideOnly]);
+  }, [email, maxM, setAsideOnly]);
+
+  const run = useCallback(async (newOffset: number, append: boolean) => {
+    await search(psc, naics, newOffset, append);
+  }, [search, psc, naics]);
+
+  // ── Ask Mindy on this tab (OFF unless NEXT_PUBLIC_TAB_ASK=on) ────────────────────────────────
+  // The question becomes THIS tab's PSC/NAICS fields (the $ ceiling and set-aside box stay as the user
+  // set them) and reruns THIS tab's search; Clear puts back exactly what was on screen, no request.
+  const tabAskOn = isTabAskEnabled();
+  const [askSnapshot, setAskSnapshot] = useState<null | {
+    psc: string; naics: string; rows: Row[] | null; total: number; offset: number; lastQuery: string; error: string | null;
+  }>(null);
+
+  const handleTabAsk = async (p: OsbpSmbAskParams): Promise<TabAskCount> => {
+    if (!askSnapshot) setAskSnapshot({ psc, naics, rows, total, offset, lastQuery, error });
+    setPsc(p.psc);
+    setNaics(p.naics);
+    return search(p.psc, p.naics, 0, false);
+  };
+
+  const clearTabAsk = () => {
+    if (!askSnapshot) return;
+    setPsc(askSnapshot.psc);
+    setNaics(askSnapshot.naics);
+    setRows(askSnapshot.rows);
+    setTotal(askSnapshot.total);
+    setOffset(askSnapshot.offset);
+    setLastQuery(askSnapshot.lastQuery);
+    setError(askSnapshot.error);
+    setAskSnapshot(null);
+  };
 
   const exportCsv = useCallback(() => {
     if (!rows || !rows.length) return;
@@ -93,12 +132,16 @@ export default function OsbpSmbResearchPanel({ email }: Props) {
         </p>
       </div>
 
+      {tabAskOn && (
+        <TabAskBox adapter={osbpSmbAskAdapter} onAsk={handleTabAsk} onClear={clearTabAsk} />
+      )}
+
       {/* Search */}
       <div className="bg-ground border border-surface rounded-xl p-5 space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
             <label className="block text-xs text-faint mb-1">PSC Code <span className="text-emerald-400/70">(what you\'re buying — best match)</span></label>
-            <input value={psc} onChange={e => setPsc(e.target.value)} placeholder="J998 (ship repair)"
+            <input data-tip="osbp-smb-psc" value={psc} onChange={e => setPsc(e.target.value)} placeholder="J998 (ship repair)"
               className="w-full px-3 py-2 bg-surface border border-hairline rounded-lg text-white text-sm placeholder-faint focus:border-emerald-500 focus:outline-none uppercase" />
           </div>
           <div>
@@ -108,7 +151,7 @@ export default function OsbpSmbResearchPanel({ email }: Props) {
           </div>
           <div>
             <label className="block text-xs text-faint mb-1">Max federal $ <span className="text-slate-600">(smaller = smaller firms)</span></label>
-            <select value={maxM} onChange={e => setMaxM(e.target.value)}
+            <select data-tip="osbp-smb-max" value={maxM} onChange={e => setMaxM(e.target.value)}
               className="w-full px-3 py-2 bg-surface border border-hairline rounded-lg text-white text-sm focus:border-blue-500 focus:outline-none">
               <option value="5">≤ $5M</option>
               <option value="25">≤ $25M</option>
@@ -123,7 +166,7 @@ export default function OsbpSmbResearchPanel({ email }: Props) {
             </button>
           </div>
         </div>
-        <label className="inline-flex items-center gap-2 text-sm text-ink-soft cursor-pointer">
+        <label data-tip="osbp-smb-set-aside" className="inline-flex items-center gap-2 text-sm text-ink-soft cursor-pointer">
           <input type="checkbox" checked={setAsideOnly} onChange={e => setSetAsideOnly(e.target.checked)}
             className="rounded border-slate-600 bg-surface" />
           Only firms that have won small-business set-aside work

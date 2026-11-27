@@ -12,6 +12,9 @@ import { useState, useCallback, useEffect } from 'react';
 import { Package, Flame, Zap } from 'lucide-react';
 import { authedFetch } from '../authHeaders';
 import type { AppTier } from '../UnifiedSidebar';
+import TabAskBox from '@/components/app/TabAskBox';
+import { isTabAskEnabled, type TabAskCount } from '@/lib/app/tab-ask';
+import { dibbsAskAdapter, type DibbsAskParams } from '@/lib/app/tab-ask-adapters/dibbs';
 
 interface Props {
   email: string | null;
@@ -65,9 +68,15 @@ export default function DibbsPanel({ email }: Props) {
   const [includeExpired, setIncludeExpired] = useState(false);
   const [freshnessWarning, setFreshnessWarning] = useState<string | null>(null);
 
+  // The tab's ONE list load (GET /api/app/dibbs). `terms` overrides the search boxes (Ask Mindy sets
+  // them in the same tick, before state has settled). Resolves to the rows shown, or null when the load
+  // failed or could not run (unknown — never reported as 0).
   const search = useCallback(
-    async (offset = 0) => {
-      if (!email) return;
+    async (offset = 0, terms?: { q: string; nsn: string; fsc: string }): Promise<TabAskCount> => {
+      if (!email) return null;
+      const qv = terms ? terms.q : q;
+      const nsnv = terms ? terms.nsn : nsn;
+      const fscv = terms ? terms.fsc : fsc;
       if (offset === 0) setIsLoading(true);
       else setLoadingMore(true);
       setError(null);
@@ -78,9 +87,9 @@ export default function DibbsPanel({ email }: Props) {
           limit: String(PAGE),
           offset: String(offset),
         });
-        if (q.trim()) params.set('q', q.trim());
-        if (nsn.trim()) params.set('nsn', nsn.trim());
-        if (fsc.trim()) params.set('fsc', fsc.trim());
+        if (qv.trim()) params.set('q', qv.trim());
+        if (nsnv.trim()) params.set('nsn', nsnv.trim());
+        if (fscv.trim()) params.set('fsc', fscv.trim());
         if (includeExpired) params.set('includeExpired', '1');
 
         const res = await authedFetch(`/api/app/dibbs?${params.toString()}`, email);
@@ -93,12 +102,14 @@ export default function DibbsPanel({ email }: Props) {
           const warning = data.freshness?.warning;
           setFreshnessWarning(typeof warning === 'string' && warning ? warning : null);
         }
+        return { shown: (data.rfqs || []).length, more: !!data.hasMore };
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Search failed');
       } finally {
         setIsLoading(false);
         setLoadingMore(false);
       }
+      return null;
     },
     [email, q, nsn, fsc, sort, includeExpired],
   );
@@ -112,6 +123,35 @@ export default function DibbsPanel({ email }: Props) {
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     search(0);
+  };
+
+  // ── Ask Mindy on this tab (OFF unless NEXT_PUBLIC_TAB_ASK=on) ────────────────────────────────
+  // The question becomes THIS tab's search boxes and reloads THIS tab's list; Clear puts back exactly
+  // what was on screen before the first question (boxes + rows), without another request.
+  const tabAskOn = isTabAskEnabled();
+  const [askSnapshot, setAskSnapshot] = useState<null | {
+    q: string; nsn: string; fsc: string; rows: Rfq[]; total: number; hasMore: boolean; freshnessWarning: string | null;
+  }>(null);
+
+  const handleTabAsk = async (p: DibbsAskParams): Promise<TabAskCount> => {
+    if (!askSnapshot) setAskSnapshot({ q, nsn, fsc, rows: rfqs, total, hasMore, freshnessWarning });
+    setQ(p.q);
+    setNsn(p.nsn);
+    setFsc(p.fsc);
+    return search(0, p);
+  };
+
+  const clearTabAsk = () => {
+    if (!askSnapshot) return;
+    setQ(askSnapshot.q);
+    setNsn(askSnapshot.nsn);
+    setFsc(askSnapshot.fsc);
+    setRfqs(askSnapshot.rows);
+    setTotal(askSnapshot.total);
+    setHasMore(askSnapshot.hasMore);
+    setFreshnessWarning(askSnapshot.freshnessWarning);
+    setError(null);
+    setAskSnapshot(null);
   };
 
   return (
@@ -130,9 +170,13 @@ export default function DibbsPanel({ email }: Props) {
         )}
       </div>
 
+      {tabAskOn && (
+        <TabAskBox adapter={dibbsAskAdapter} onAsk={handleTabAsk} onClear={clearTabAsk} />
+      )}
+
       {/* Search / filters */}
       <form onSubmit={onSubmit} className="bg-ground border border-surface rounded-xl p-4 space-y-3">
-        <div className="flex flex-col md:flex-row gap-3">
+        <div data-tip="dibbs-search" className="flex flex-col md:flex-row gap-3">
           <input
             value={q}
             onChange={e => setQ(e.target.value)}
@@ -158,7 +202,7 @@ export default function DibbsPanel({ email }: Props) {
             Search
           </button>
         </div>
-        <div className="flex flex-wrap items-center gap-4 text-sm">
+        <div data-tip="dibbs-sort" className="flex flex-wrap items-center gap-4 text-sm">
           <label className="flex items-center gap-2 text-ink-soft">
             Sort
             <select
@@ -221,6 +265,7 @@ export default function DibbsPanel({ email }: Props) {
             const isSoon = dl !== null && dl > 3 && dl <= 10;
             return (
               <a
+                data-tip="dibbs-result"
                 key={r.solicitationNumber}
                 href={r.url || r.pdfUrl || '#'}
                 target="_blank"
