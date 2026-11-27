@@ -72,7 +72,7 @@ describe('question over profile, and no data dates', () => {
   it('no freshness dates, but opportunity dates stay', () => {
     expect(NO_DATA_DATES).toMatch(/never print how current Mindy's data is/);
     expect(NO_DATA_DATES).toMatch(/response deadlines, contract end dates, registration expiry/);
-    expect(NO_DATA_DATES).toMatch(/defense awards publish about 90 days late/);
+    expect(NO_DATA_DATES).toMatch(/Defense awards are published on USAspending\.gov with a delay of about 90 days \(DoD reporting policy\)/);
   });
 });
 

@@ -358,7 +358,7 @@ const REGULATORY_DEMAND_TOOL_DEF = {
     name: 'get_regulatory_demand',
     description:
       'Leading "demand before SAM" indicator: recent Federal Register rules/notices for a topic or ' +
-      'agency. A proposed/final rule often precedes agency solicitations by 6-18 months. Federal ' +
+      'agency. A proposed/final rule can precede agency solicitations by months. Federal ' +
       'Register does NOT tag items to NAICS — any NAICS mapping is inference, not data. Pass at least ' +
       'one of query/agency. Federal Register regulation only (rules, proposed rules, notices) — NOT ' +
       'congressional bills, NDAA status or public-law status: use get_legislation_status for those.',
@@ -536,7 +536,7 @@ const GRANTS_TOOL_DEF = {
   function: {
     name: 'search_grants',
     description:
-      'Federal GRANT opportunities from Grants.gov ($700B+ of assistance funding — a different lane than ' +
+      'Federal GRANT opportunities from Grants.gov (assistance funding — a different lane than ' +
       'SAM.gov contracts). Search by keyword / agency / funding category. Returns title, agency, close date, ' +
       'award ceiling, CFDA, link. Grants are assistance (a different application path than contracts). ' +
       'grounded=false when nothing matches — broaden the keyword; do not invent grants.',
@@ -585,13 +585,13 @@ const FORECASTS_TOOL_DEF = {
   function: {
     name: 'get_agency_forecasts',
     description:
-      'Upcoming federal procurement FORECASTS — planned buys 6-18 months before a solicitation posts (the ' +
+      'Upcoming federal procurement FORECASTS — planned buys, often months before a solicitation posts (the ' +
       '"get in early" signal, ~33,000 records across 21 agencies and 388 buying offices). Filter by NAICS / ' +
       'agency / state / set-aside / ' +
       'fiscal year / keyword. Returns title, agency, NAICS, fiscal year+quarter, estimated value, set-aside, ' +
       'incumbent. A forecast is a PLAN, not a posted opportunity — dates slip and some cancel. grounded=false ' +
       'when nothing matches (may be a coverage gap, not absence of demand). ' +
-      'LOCATION CAVEAT: 37% of forecasts (12,276 of 33,075) carry NO place of performance — the agency said "TBD" or ' +
+      'LOCATION CAVEAT: many forecasts carry NO place of performance — the agency said "TBD" or ' +
       '"vendor\'s facility", withheld it, or published no location field at all. A state filter therefore ' +
       'CANNOT see them, and a state-filtered result is a subset, never the whole market. Say so rather than ' +
       'implying the state has no upcoming work.',
@@ -956,7 +956,7 @@ const ANNUAL_OBLIGATIONS_TOOL_DEF = {
       'tells you whether a parent record existed. ' +
       "USE THIS INSTEAD OF summing search_past_contracts: that returns each award's LIFETIME total, unchanged by " +
       'its date filter, so the same dollars come back in every window and summing double-counts (measured: one ' +
-      'award returns an identical $2.09B in both an FY2023 and an FY2024 window, and its period of performance ' +
+      'award returns the identical lifetime total in both an FY2023 and an FY2024 window, and its period of performance ' +
       'ended in 2021). Optionally scope to one NAICS or awarding agency. ' +
       'Obligations are NOT recognized revenue - timing can lead or lag, and this is prime-only, so subcontract ' +
       'earnings never appear. grounded=false when nothing matches: try the exact legal entity name or the UEI ' +
@@ -1896,7 +1896,7 @@ const SBA_GOALING_TOOL_DEF = {
   function: {
     name: 'get_sba_goaling_share',
     description:
-      'The "is this a good small-business market?" read: the STATUTORY government-wide small-business goals (Small ' +
+      'The "is this a good small-business market?" read: the STATUTORY government-wide small-business goals (15 U.S.C. 644(g): Small ' +
       'Business 23% · WOSB 5% · SDB/8(a) 5% · SDVOSB 3% · HUBZone 3%) set against an agency\'s ACTUAL set-aside ' +
       'obligations from USASpending, per category, with the gap and an above/below flag. It is a SET-ASIDE-BASED ' +
       'INDICATOR, not an official SBA goaling scorecard: every row carries measure "set_aside_code_share". NOTE: actuals measure dollars ' +

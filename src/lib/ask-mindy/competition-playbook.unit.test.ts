@@ -6,7 +6,8 @@ describe('least-competition / where-to-start method (Claude + MCP, as written)',
   it('A: the call order, the competition signals, and honesty about bidder counts', () => {
     expect(COMPETITION_AND_START_PLAYBOOK).toMatch(/find_opportunities\(query = X\); get_expiring_contracts\(naics, agency, state\); assess_market_depth\(naics, set_aside, state\); get_award_detail on the top 2 to 3; get_agency_spending_detail\(agency\)/);
     expect(COMPETITION_AND_START_PLAYBOOK).toMatch(/capable_depth, eligible_population and tiers/);
-    expect(COMPETITION_AND_START_PLAYBOOK).toMatch(/orders under about \$250K draw fewer bidders/);
+    expect(COMPETITION_AND_START_PLAYBOOK).toMatch(/a smaller order is an easier first win/);
+    expect(COMPETITION_AND_START_PLAYBOOK).not.toMatch(/\$\d/); // Eric 2026-11-27: no unsourced numbers
     expect(COMPETITION_AND_START_PLAYBOOK).toMatch(/number_of_offers and competition_type are EMPTY .* never imply bidders were counted/);
     expect(COMPETITION_AND_START_PLAYBOOK).toMatch(/Never call it "no competition" because a search came back empty or a contract is still within its term/);
     expect(COMPETITION_AND_START_PLAYBOOK).toMatch(/only holds a registration is not a competitor/);
