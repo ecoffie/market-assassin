@@ -3974,6 +3974,8 @@ const VIEWPORT_JS = `<script>
     }catch(e){}
     return st;
   }
+  // Ask Mindy actions (Undo): the current view in the exact {mode, filters, bbox} shape __applySavedSearch restores.
+  window.__mapSnapshot=function(){ var st=_mapState()||{}; var md=window.__mapMode==='recompete'?'recompete':'open'; return {mode:md,filters:st.filters||{},bbox:st.bbox}; };
 
   // ── RETURN CONTINUITY: remember the MARKET, not just the viewport ─────────
   // Measured 2026-09-21: 8,096 of 9,315 30-day users are one-day-only, and
@@ -10948,6 +10950,8 @@ const ASK_MINDY_CSS =
   + '.amk-rp-cur{margin-top:3px;color:#475569}.amk-rp-still{margin-top:3px;font-size:11.5px;color:#6b7787}.amk-rp-still[hidden]{display:none}.amk-rp-tog{margin-top:4px;border:0;background:none;padding:0;cursor:pointer;font:600 11.5px Inter,system-ui,sans-serif;color:#6b7787}.amk-rp-tog:hover{color:#334155}'
   + '.amk-rp-steps{margin:4px 0 0;padding:0 0 0 16px;font-size:12px;color:#64748b}.amk-rp-steps[hidden]{display:none}.amk-rp-sum{background:none;border:0;padding:0;color:#6b7787;font-size:12px}'
   + '@media(prefers-color-scheme:dark){.amk-rp{background:#0d141d;border-color:#202b39;color:#cdd8e4}.amk-rp-hd b{color:#eaf1f8}.amk-rp-cur{color:#b6c3d1}.amk-rp-sum{background:none}}'
+  + '.amk-actnote{margin:0 0 6px;font:500 12px Inter,system-ui,sans-serif;color:#334155;background:#f1f5ff;border:1px solid #dbe4ff;border-radius:8px;padding:5px 9px}.amk-actbeta{font-weight:700;color:#4338ca}.amk-actundo{border:0;background:none;padding:0;cursor:pointer;font:600 12px Inter,system-ui,sans-serif;color:#2563eb;text-decoration:underline}.amk-actundo:disabled{color:#6b7787;text-decoration:none;cursor:default}'
+  + '@media(prefers-color-scheme:dark){.amk-actnote{background:#122033;border-color:#1f3a5c;color:#cdd8e4}.amk-actbeta{color:#c7d2fe}.amk-actundo{color:#7fb0ff}}'
   + '.amk-notices{margin-top:8px;display:flex;flex-direction:column;gap:4px}.amk-notice{font:500 12px Inter,system-ui,sans-serif;color:#92400e;background:#fffbeb;border:1px solid #fde68a;border-radius:7px;padding:4px 8px}'
   + '@media(prefers-color-scheme:dark){.amk-notice{color:#fcd34d;background:rgba(245,158,11,.1);border-color:rgba(245,158,11,.25)}}'
   + '.amk-hd-tools{display:flex;gap:6px;flex:none}.amk-card .amk-hd-tools{display:none}.amk-tool{border:1px solid #dde3ec;background:#fff;color:#334155;font:600 11.5px Inter,system-ui,sans-serif;border-radius:7px;padding:4px 9px;cursor:pointer}.amk-tool:hover{background:#f1f5f9}'
@@ -11443,8 +11447,111 @@ const ASK_MINDY_JS = `<script>(function(){
     try{
       fetch('/api/app/chat/capabilities?email='+encodeURIComponent(email()),{headers:{'x-mi-auth-token':tok()||'','x-user-email':email()}})
         .then(function(r){ return r.ok?r.json():null; },function(){ return null; })
-        .then(function(d){ if(d && d.screenshots===true) buildShots(); },function(){});
+        .then(function(d){ if(d && d.screenshots===true) buildShots(); if(d && d.actions===true) actionsOn=true; },function(){});
     }catch(e){}
+  }
+  // ── ASK MINDY CONTROLS THE MAP (beta). The server proposes {type:'action', id, name, args} on the chat stream; this
+  // runs it through the function behind today's button and shows what changed with one-click Undo. Only when the
+  // SERVER says actions are on for this account (/api/app/chat/capabilities → actions). Unknown names, unknown arg
+  // keys or bad values are rejected whole. Mirrors src/lib/chat/app-actions/registry.ts (parity-tested).
+  var actionsOn=false, actUndo=null;
+  var MAP_FILTER_KEYS=['state','setAside','setAsideMulti','agency','subAgency','office','naics','psc','noticeType','noticeMulti','closingDays','postedDays','valueRange','vehicle','hasDocs','hasContact','likelihood'];
+  var MAP_ACTIONS={
+    'map.apply_view':['mode','q','filters','horizons','replace'],
+    'map.search':['q'],
+    'map.set_horizons':['open','recompete','forecast','isolate'],
+    'map.go_to':['state','national'],
+    'map.open_record':['notice_id']
+  };
+  var ACT_PLAIN=/^[A-Za-z0-9 ,.&()'/:_-]+$/, ACT_HZ=['open','recompete','forecast'];
+  function actPlain(v,max){ if(typeof v!=='string') return null; var s=v.replace(/ +/g,' ').trim(); return (s&&s.length<=max&&ACT_PLAIN.test(s))?s:null; }
+  function actHas(arr,v){ for(var i=0;i<arr.length;i++){ if(arr[i]===v) return true; } return false; }
+  function actValidate(ev){
+    if(!ev||typeof ev.id!=='string'||!/^[A-Za-z0-9_-]{1,64}$/.test(ev.id)) return null;
+    var keys=MAP_ACTIONS[ev.name]; if(!keys) return null;
+    var raw=(ev.args&&typeof ev.args==='object'&&!Array.isArray(ev.args))?ev.args:{}, a={}, k;
+    for(k in raw){ if(!actHas(keys,k)) return null; }
+    if(ev.name==='map.apply_view'||ev.name==='map.search'){
+      if(raw.q!=null){ var q=actPlain(raw.q,120); if(q==null||q.length<2) return null; a.q=q; }
+      if(ev.name==='map.search'&&a.q==null) return null;
+      if(raw.mode!=null){ if(raw.mode!=='open'&&raw.mode!=='recompete') return null; a.mode=raw.mode; }
+      if(raw.replace!=null){ if(typeof raw.replace!=='boolean') return null; a.replace=raw.replace; }
+      if(raw.filters!=null){ if(typeof raw.filters!=='object'||Array.isArray(raw.filters)) return null; a.filters={};
+        for(k in raw.filters){ if(!actHas(MAP_FILTER_KEYS,k)) return null; var s=actPlain(raw.filters[k],80); if(s==null) return null;
+          if(k==='state'){ s=s.toUpperCase().replace(/ /g,''); if(!/^[A-Z][A-Z](,[A-Z][A-Z])*$/.test(s)) return null; } a.filters[k]=s; } }
+      if(raw.horizons!=null){ if(typeof raw.horizons!=='object'||Array.isArray(raw.horizons)) return null; a.horizons={};
+        for(k in raw.horizons){ if(!actHas(ACT_HZ,k)||typeof raw.horizons[k]!=='boolean') return null; a.horizons[k]=raw.horizons[k]; } }
+      if(ev.name==='map.apply_view'&&a.q==null&&!a.filters&&!a.horizons&&!a.mode) return null;
+    } else if(ev.name==='map.set_horizons'){
+      if(raw.isolate!=null){ if(!actHas(ACT_HZ,raw.isolate)) return null; a.isolate=raw.isolate; }
+      for(var i=0;i<ACT_HZ.length;i++){ var h=ACT_HZ[i]; if(raw[h]!=null){ if(typeof raw[h]!=='boolean') return null; a[h]=raw[h]; } }
+      var any=false; for(k in a){ any=true; } if(!any) return null;
+    } else if(ev.name==='map.go_to'){
+      if(raw.national===true) a.national=true; else if(typeof raw.state==='string'&&/^[A-Za-z][A-Za-z]$/.test(raw.state)) a.state=raw.state.toUpperCase(); else return null;
+    } else if(ev.name==='map.open_record'){
+      if(typeof raw.notice_id!=='string'||!/^[A-Za-z0-9_-]{6,64}$/.test(raw.notice_id)) return null; a.notice_id=raw.notice_id;
+    }
+    return {id:ev.id,name:ev.name,args:a};
+  }
+  function actSnapshot(){ try{ if(typeof window.__mapSnapshot==='function') return window.__mapSnapshot(); }catch(e){} return null; }
+  function actStateName(st){ var n=window.__STATE_NAMES; return (n&&n[st])||st; }
+  function actDescribe(act){ var a=act.args, parts=[], k;
+    if(act.name==='map.go_to') return a.national?'Showing the whole country':('Zoomed to '+actStateName(a.state));
+    if(act.name==='map.open_record') return 'Opened the opportunity';
+    if(act.name==='map.set_horizons'){ if(a.isolate) return 'Showing '+({open:'Open now',recompete:'Coming back',forecast:'Coming soon'}[a.isolate]); return 'Changed what the map shows'; }
+    if(a.q) parts.push('"'+a.q+'"');
+    if(a.filters){ for(k in a.filters){ parts.push(k==='state'?a.filters[k].split(',').map(actStateName).join(', '):a.filters[k]); } }
+    if(a.mode==='recompete') parts.push('Coming back');
+    return parts.length?('Filtered to '+parts.join(' · ')):'Changed your view';
+  }
+  function actRun(act){
+    var a=act.args;
+    if(act.name==='map.apply_view'||act.name==='map.search'){
+      if(typeof window.__applySavedSearch!=='function') return false;
+      var snap=actSnapshot()||{mode:'open',filters:{}}, base=(a.replace?{}:(snap.filters||{})), f={}, k;
+      for(k in base){ f[k]=base[k]; }
+      if(a.filters){ for(k in a.filters){ f[k]=a.filters[k]; } }
+      if(a.q!=null) f.q=a.q;
+      if(a.horizons){ var h=f.horizons||{open:true,recompete:false,forecast:false}, nh={open:h.open,recompete:h.recompete,forecast:h.forecast}; for(k in a.horizons){ nh[k]=a.horizons[k]; } f.horizons=nh; }
+      window.__applySavedSearch({mode:a.mode||snap.mode||'open',filters:f}); return true;
+    }
+    if(act.name==='map.set_horizons'){
+      if(a.isolate){ if(typeof window.__isolateHorizon!=='function') return false; window.__isolateHorizon(a.isolate); return true; }
+      if(typeof window.toggleHorizon!=='function') return false; var cur=window.__horizons||{};
+      for(var i=0;i<ACT_HZ.length;i++){ var hz=ACT_HZ[i]; if(a[hz]==null) continue; var have=(hz==='open')?cur.open!==false:!!cur[hz]; if(have!==a[hz]) window.toggleHorizon(hz); }
+      return true;
+    }
+    if(act.name==='map.go_to'){
+      if(a.national){ if(typeof window.__mapNationalView!=='function') return false; window.__mapNationalView(); return true; }
+      var c=(window.__STATE_CENTROIDS||{})[a.state]; if(!c||typeof window.__applySavedSearch!=='function') return false;
+      var s2=actSnapshot()||{mode:'open',filters:{}}; var d=(a.state==='AK')?9:3.2;
+      window.__applySavedSearch({mode:s2.mode||'open',filters:s2.filters||{},bbox:{s:c[0]-d,n:c[0]+d,w:c[1]-d*1.4,e:c[1]+d*1.4}}); return true;
+    }
+    if(act.name==='map.open_record'){ if(typeof window.openOppDrawer!=='function') return false; window.openOppDrawer(a.notice_id); return true; }
+    return false;
+  }
+  function actTrack(act,outcome){ try{ if(window.__track) window.__track('tool_use','ask_mindy_action',{name:act?act.name:'unknown',outcome:outcome}); }catch(e){} }
+  function actNote(aEl,text,undoFn){
+    var n=document.createElement('div'); n.className='amk-actnote'; n.setAttribute('data-testid','amk-action-note'); n.setAttribute('role','status');
+    var t=document.createElement('span'); t.textContent=text; n.appendChild(t);
+    var b=document.createElement('span'); b.className='amk-actbeta'; b.textContent='Beta'; n.appendChild(document.createTextNode(' · ')); n.appendChild(b);
+    if(undoFn){ n.appendChild(document.createTextNode(' · ')); var u=document.createElement('button'); u.type='button'; u.className='amk-actundo'; u.setAttribute('data-testid','amk-action-undo'); u.textContent='Undo';
+      u.onclick=function(){ undoFn(); u.disabled=true; u.textContent='Undone'; actUndo=null; }; n.appendChild(u); }
+    var bub=aEl.querySelector('.bub'); aEl.insertBefore(n,bub||null); body.scrollTop=body.scrollHeight; return n;
+  }
+  function onAction(ev,aEl,turn){
+    if(!actionsOn||oppCtx) return;
+    if(turn.count>=3){ actTrack(null,'rejected:max'); return; }
+    var act=actValidate(ev);
+    if(!act){ actTrack(ev&&typeof ev.name==='string'?{name:String(ev.name).slice(0,60)}:null,'rejected:invalid'); if(!turn.noted){ turn.noted=true; actNote(aEl,'Mindy suggested a change this page can’t make',null); } return; }
+    turn.count++;
+    // Undo for this action only: the previous action's Undo is withdrawn (one level).
+    if(actUndo&&actUndo.btn){ actUndo.btn.disabled=true; actUndo.btn.style.display='none'; }
+    var snap=(act.name==='map.open_record')?null:actSnapshot();
+    if(!actRun(act)){ actTrack(act,'rejected:unavailable'); actNote(aEl,'Mindy suggested a change this page can’t make',null); return; }
+    actTrack(act,'ran');
+    var note=actNote(aEl,actDescribe(act),snap?function(){ try{ window.__applySavedSearch(snap); actTrack(act,'undone'); }catch(e){} }:null);
+    actUndo={btn:note.querySelector('.amk-actundo')};
   }
   // ── REPORT PANE. A document Mindy just saved (create_document) opens HERE, in the chat, as a readable page:
   // no download needed. Reuses the Vault: GET /api/app/vault/documents/preview renders the stored DocModel with
@@ -11822,6 +11929,7 @@ const ASK_MINDY_JS = `<script>(function(){
       saveView(); release(); body.scrollTop=body.scrollHeight;
     }
     var acc='', started=false, gotDone=false, gotError=false, ledger=null, turnDoc=false, turnFiles=null, turnReport=null;
+    var actTurn={count:0,noted:false};
     // Research steps ('progress' events): a calm panel, not warnings. Timer, current step, count, Show steps, and a
     // "still working" line after 20 s of quiet. Collapses to "Researched · N steps · m:ss" once the answer starts
     // (or the turn ends any other way). A phase ('writing'|'checking') is the headline, not a step.
@@ -11914,6 +12022,7 @@ const ASK_MINDY_JS = `<script>(function(){
           parts.forEach(function(p){ var line=p.split('\\n').filter(function(l){return l.indexOf('data:')===0;}).map(function(l){return l.slice(5).trim();}).join(''); if(!line)return;
             var ev; try{ ev=JSON.parse(line); }catch(e){ return; }
             if(ev.type==='session'){ sessionId=ev.sessionId||sessionId; }
+            else if(ev.type==='action'){ try{ onAction(ev,aEl,actTurn); }catch(e){} }
             else if(ev.type==='sources'){ ledger=(ev.ledger&&typeof ev.ledger==='object')?ev.ledger:null; if(turnDoc&&rep&&ledger){ rep.ledger=ledger; repWrite(); } }
             // create_document saved a document: a card under the answer and the report opens in the pane (view mode only).
             else if(ev.type==='deliverables'&&Array.isArray(ev.files)&&!oppCtx){ turnDoc=true; turnFiles=ev.files; try{ repOnDeliverables(ev.files,aEl); }catch(e){} }
