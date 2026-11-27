@@ -18,7 +18,7 @@ vi.mock('@/lib/pdf/launch-browser', () => ({
 import { SAMPLE_REPORT } from './__fixtures__/sample-report';
 import { DOC_SCHEMA, type DocModel } from './model';
 import { validateDocModel, demoteUncitedFacts, repairDocModelStructure, hardenedAssumptions, DEFAULT_ASSUMPTION_ORIGIN, repeatedSentences, fixtureMarkers } from './validate';
-import { keepDash, noEmDash, claimLabel, DOC_STAGE_MARK, citationIndex, citeMarker, formatCell, formatColumn, formatChartValue, chartDuplicatesTable, parseInline, NOT_AVAILABLE, fileBaseName } from './format';
+import { keepDash, noEmDash, clientCopy, claimLabel, DOC_STAGE_MARK, citationIndex, citeMarker, formatCell, formatColumn, formatChartValue, chartDuplicatesTable, parseInline, NOT_AVAILABLE, fileBaseName } from './format';
 import { renderHtml, DOC_HTML_CSP, TOC_MIN_SECTIONS } from './render-html';
 import { renderDocx } from './render-docx';
 import { renderPdf, pdfOptions } from './render-pdf';
@@ -1268,6 +1268,21 @@ describe('research report launch (Design & Output, 2026-11-27)', () => {
     expect(noEmDash('\u2014')).toBe(NOT_AVAILABLE);
     expect(noEmDash('\u2014 leading and trailing \u2014')).toBe('leading and trailing');
     expect(noEmDash('FY2024\u2013FY2026')).toBe('FY2024\u2013FY2026');
+  });
+  it('noEmDash: an em dash between numbers or amounts is a range and becomes an en dash, never a comma', () => {
+    expect(noEmDash('$10M\u2014$19M')).toBe('$10M\u2013$19M');
+    expect(noEmDash('the FHWA $10M \u2014 $19M program')).toBe('the FHWA $10M\u2013$19M program');
+    expect(noEmDash('2024\u20142026')).toBe('2024\u20132026');
+    expect(noEmDash('FY2024\u2014FY2026')).toBe('FY2024\u2013FY2026');
+    expect(noEmDash('10%\u201415% of awards')).toBe('10%\u201315% of awards');
+    expect(noEmDash('Won 3 awards \u2014 all small')).toBe('Won 3 awards, all small');
+  });
+  it('source titles and URLs are quoted verbatim (exempt from client-copy rewriting)', () => {
+    const m = clone();
+    m.sources[0] = { ...m.sources[0], label: 'GAO-26-1 \u2014 Federal Facilities: Backlog', url: 'https://example.com/a\u2014b' };
+    const out = clientCopy(m);
+    expect(out.sources[0].label).toBe('GAO-26-1 \u2014 Federal Facilities: Backlog');
+    expect(out.sources[0].url).toBe('https://example.com/a\u2014b');
   });
   it('no em dash reaches the reader anywhere in the PDF/HTML or Word output, and the stored model is unchanged', async () => {
     const m = clone();

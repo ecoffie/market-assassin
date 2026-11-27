@@ -188,19 +188,24 @@ export function claimLabel(claim: Claim | undefined): string | null {
  * Client copy carries no em dashes (Eric, 2026-11-27). Applied at RENDER time to a copy of the model, after
  * validation, so grounding, citations and the stored model are untouched. A spaced or unspaced em dash between
  * words becomes ", " in running text and ": " in a heading or title; a leading or trailing one is dropped; a
- * cell that is only a dash means "no value" and reads Not available. En dashes (ranges such as FY2024–FY2026)
- * are kept.
+ * cell that is only a dash means "no value" and reads Not available. An em dash between two numbers or amounts is a
+ * RANGE ("$10M—$19M", "FY2024—FY2026") and becomes an en dash, never a comma. En dashes are kept.
  */
 export function noEmDash(text: string, mode: 'text' | 'heading' = 'text'): string {
   if (!text.includes('\u2014')) return text;
   if (/^\s*\u2014\s*$/.test(text)) return NOT_AVAILABLE;
   return text
+    // A range: digit (optionally a unit: K, M, B, T, bn, %) on the left; a number, amount or fiscal year on the right.
+    .replace(/(\d(?:[KMBT]|bn|k|%)?)\s*\u2014\s*(?=(?:\$|US\$|FY|Q)?\s?\d)/g, '$1\u2013')
     .replace(/^\s*\u2014\s*|\s*\u2014\s*$/g, '')
     .replace(/\s*\u2014\s*/g, mode === 'heading' ? ': ' : ', ')
     .replace(/([,:])\s*([,:.;])/g, '$2');
 }
 
-/** The model with noEmDash applied to every string a reader sees (renderers call this; the stored model is unchanged). */
+/**
+ * The model with noEmDash applied to the copy Mindy writes (renderers call this; the stored model is unchanged).
+ * Source titles and URLs are exempt: a cited document's title is quoted verbatim.
+ */
 export function clientCopy(model: DocModel): DocModel {
   const t = (s: string | undefined) => (typeof s === 'string' ? noEmDash(s) : s);
   const h = (s: string | undefined) => (typeof s === 'string' ? noEmDash(s, 'heading') : s);
@@ -226,7 +231,7 @@ export function clientCopy(model: DocModel): DocModel {
     subtitle: t(model.subtitle),
     preparedFor: t(model.preparedFor),
     meta: model.meta ? { ...model.meta, attention: t(model.meta.attention) } : model.meta,
-    sources: model.sources.map((s) => ({ ...s, label: noEmDash(s.label) })),
+    // Sources are cited documents: their titles and URLs stay verbatim (never rewritten).
     sections: model.sections.map((s) => ({ ...s, heading: h(s.heading)!, blocks: s.blocks.map(block) })),
   };
 }
