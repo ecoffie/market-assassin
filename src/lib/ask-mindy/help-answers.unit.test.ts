@@ -47,7 +47,8 @@ describe('help-match: routing', () => {
   });
 
   it('covers every entry in the register', () => {
-    const routed = new Set(FIXTURES.map(([, id]) => id));
+    // The email / either intents are covered by the unsubscribe tests below.
+    const routed = new Set<HelpIntentId>([...FIXTURES.map(([, id]) => id), 'stop_emails', 'unsubscribe_either']);
     for (const id of Object.keys(HELP_ENTRIES)) expect(routed.has(id as HelpIntentId)).toBe(true);
   });
 
@@ -95,7 +96,7 @@ describe('help-answers: content rules', () => {
   it.each(ALL.map((e) => [e.id, e] as const))('%s: no em or en dashes, 3 to 6 steps (cancel: one step, no maze)', (_id, e) => {
     expect(e.answer).not.toMatch(/[–—]/);
     const n = (e.answer.match(/^\d+\. /gm) || []).length;
-    if (e.id === 'cancel_subscription') { expect(n).toBe(0); expect(e.answer.length).toBeLessThan(400); return; }
+    if (['cancel_subscription', 'stop_emails', 'unsubscribe_either'].includes(e.id)) { expect(n).toBe(0); expect(e.answer.length).toBeLessThan(400); return; }
     expect(n).toBeGreaterThanOrEqual(3);
     expect(n).toBeLessThanOrEqual(6);
   });
@@ -216,13 +217,26 @@ describe('capability statement: one answer, always the draft offer', () => {
   });
 });
 
-describe('cancel: one step, any phrasing', () => {
-  it.each(['cancel my subscription', 'Unsubscribe', 'Please stop billing me', 'I want to cancel my plan', 'How do I cancel my subscription?'])('"%s" routes to cancel', (q) => {
+describe('cancel vs unsubscribe: paid plan, emails, or both', () => {
+  it.each(['cancel my subscription', 'Please stop billing me', 'I want to cancel my plan', 'How do I cancel my subscription?', 'end my plan', 'I want a refund'])('"%s" is cancel only', (q) => {
     expect(matchHelpIntent(q)).toBe('cancel_subscription');
+    const a = helpAnswerFor(q)!.text;
+    expect(a).toContain('https://getmindy.ai/account/cancel');
+    expect(a).not.toContain('/alerts/preferences');
   });
 
-  it('unsubscribing from emails or alerts is not cancelling', () => {
-    expect(matchHelpIntent('unsubscribe me from these emails')).not.toBe('cancel_subscription');
-    expect(matchHelpIntent('how do I unsubscribe from alerts')).not.toBe('cancel_subscription');
+  it.each(['unsubscribe me from these emails', 'how do I unsubscribe from alerts', 'stop the daily alerts', 'too many emails'])('"%s" is email only', (q) => {
+    expect(matchHelpIntent(q)).toBe('stop_emails');
+    const a = helpAnswerFor(q)!.text;
+    expect(a).toContain('https://getmindy.ai/alerts/preferences');
+    expect(a).toContain('**Unsubscribe** link at the bottom of any Mindy email');
+    expect(a).not.toContain('/account/cancel');
+  });
+
+  it.each(['unsubscribe', 'Unsubscribe from Mindy', 'how do I unsubscribe?'])('"%s" is ambiguous: both links in one answer', (q) => {
+    expect(matchHelpIntent(q)).toBe('unsubscribe_either');
+    const a = helpAnswerFor(q)!.text;
+    expect(a).toMatch(/To stop Mindy emails:.*\/alerts\/preferences/);
+    expect(a).toMatch(/To cancel your paid plan:.*\/account\/cancel/);
   });
 });

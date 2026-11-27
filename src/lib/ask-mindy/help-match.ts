@@ -8,7 +8,7 @@
  */
 export type HelpIntentId =
   | 'find_contracts' | 'pull_bids_from_map' | 'build_shortlist' | 'upload_capability_statement' | 'find_events'
-  | 'connect_chatgpt' | 'cancel_subscription'
+  | 'connect_chatgpt' | 'cancel_subscription' | 'stop_emails' | 'unsubscribe_either'
   | 'write_capability_statement' | 'set_asides' | 'disadvantaged_meaning' | 'certifications' | 'first_bid' | 'write_proposal';
 
 /** The question is asking how to do something, what something means, or for help writing. */
@@ -16,14 +16,18 @@ const HOW_TO = /\b(how (do|can|should|would) (i|we|you)|how to|how does|where (d
 
 /**
  * Matched WITHOUT a how-to form, because the bare phrase has one meaning.
- *   - Cancel (Eric, 2026-11-27: cancelling must be easy): "cancel my subscription", "unsubscribe", "stop billing me".
- *     Unsubscribing from EMAILS or alerts is not cancelling, so it is left to the normal path.
+ *   - Emails: "unsubscribe from emails", "stop the alerts", "too many emails" mean EMAIL, never the paid plan.
+ *   - Cancel (Eric, 2026-11-27: cancelling must be easy): "cancel my subscription", "stop billing me", "end my plan",
+ *     "refund". Paid plan only.
+ *   - A bare "unsubscribe" (or "unsubscribe from Mindy") could mean either, so the answer gives both links.
  *   - Capability statement questions (one customer asked five ways in eleven minutes and got five different answers):
  *     "I need a capability statement", "do you have a capability statement template". An imperative ("write my
  *     capability statement", "draft a capability statement from my upload") is NOT matched: it goes straight to drafting.
  */
 const DIRECT: Array<{ id: HelpIntentId; re: RegExp; unless?: RegExp }> = [
-  { id: 'cancel_subscription', re: /\b(cancel(l?ing)? (my |the |our )?(mindy )?(subscription|plan|membership|account|pro|team|trial)|unsubscribe|stop (billing|charging)|cancel mindy)\b/i, unless: /\b(e-?mails?|alerts?|newsletter|notifications?|briefings?)\b/i },
+  { id: 'stop_emails', re: /\b(unsubscribe|stop|turn off|opt out|pause|too many|fewer|less)\b.{0,30}\b(e-?mails?|alerts?|newsletters?|notifications?|briefings?|digests?)\b/i },
+  { id: 'cancel_subscription', re: /\b(cancel(l?ing)? (my |the |our )?(mindy )?(subscription|plan|membership|account|pro|team|trial)|stop (billing|charging)|end (my |the )?(subscription|plan|membership)|refund|cancel mindy)\b/i },
+  { id: 'unsubscribe_either', re: /\bunsubscribe\b/i },
   { id: 'write_capability_statement', re: /\b(need|want|looking for|template|example|sample|format)\b.{0,40}\b(capabilit(y|ies) statement|cap statement)\b|\b(capabilit(y|ies) statement|cap statement)\b.{0,30}\b(template|example|sample|format)\b|\bwhat should (my|a) (capabilit(y|ies) statement|cap statement) (include|say|have|look like)\b/i },
 ];
 
@@ -36,7 +40,7 @@ const RULES: Array<{ id: HelpIntentId; re: RegExp }> = [
   { id: 'set_asides', re: /\bset[- ]?asides?\b/i },
   { id: 'first_bid', re: /\b(first|1st) (bid|contract|proposal|federal contract|government contract)\b|\bpursue (this|that|an|my|the|a) (opportunit\w*|bid|contract|solicitation)\b|\b(bid on|respond to|go after) (this|that|an|a) (opportunit\w*|solicitation|contract)\b/i },
   // Product how-to.
-  { id: 'cancel_subscription', re: /\b(cancel|unsubscribe|end|stop)\b.{0,30}\b(subscription|plan|membership|billing|account|mindy|trial)\b|\bcancel my\b/i },
+  { id: 'cancel_subscription', re: /\b(cancel|end|stop)\b.{0,30}\b(subscription|plan|membership|billing|account|mindy|trial)\b|\bcancel my\b/i },
   { id: 'connect_chatgpt', re: /\b(chat\s?gpt|openai|claude desktop|claude\.ai|mcp|connector)\b/i },
   { id: 'upload_capability_statement', re: /\b(upload|add|attach|put|load|import|share|give)\b.{0,40}\b(capabilit(y|ies) statement|cap statement|past performance|resume|document|file|pdf|word doc)\b/i },
   { id: 'find_events', re: /\b(events?|industry days?|conferences?|outreach (sessions?|events?)|matchmaking|vendor days?)\b/i },
