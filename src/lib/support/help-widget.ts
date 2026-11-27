@@ -9,7 +9,7 @@
  * Rules:
  *  - never on /admin, /support (that page IS the form), embeds (?embed=) or the OAuth screens
  *  - never on the signed-in app page (/app): there the floating button is Ask Mindy (AskMindyFab),
- *    and support is the account menu's "Contact support" row (owner, 2026-11-27)
+ *    and support is the account menu's "Get help" row (owner, 2026-11-27)
  *  - the email is prefilled from the signed-in Mindy email when the browser has one
  *  - it sends the page PATH only (no query string)
  *  - success is shown only when the server says it was delivered; otherwise the email fallback

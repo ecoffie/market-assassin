@@ -3,7 +3,7 @@
 /**
  * The floating "Ask Mindy" button in the signed-in app (owner, 2026-11-27): it replaces the public
  * "Get help" button inside /app and opens the Ask Mindy chat panel in place. Public pages keep
- * Get help; support inside the app is the account menu's "Contact support" row.
+ * Get help; support inside the app is the account menu's "Get help" row.
  *
  * Hidden on the chat panel itself (it would open what is already open) and over the in-app map,
  * which has its own Ask Mindy. On phones it sits bottom-left (the voice-capture button is bottom-right);
