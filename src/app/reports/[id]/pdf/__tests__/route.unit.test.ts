@@ -75,9 +75,10 @@ describe('GET /reports/[id]/pdf — download response', () => {
     expect(strip(page)).toBe(strip(html));
   });
 
-  it('uses the report’s own date, not today’s, so a later download still matches the preview', async () => {
+  it('prints no generation or freshness date, so a later download still matches the preview (Eric, 2026-11-27)', async () => {
     const [html] = (await GET(req(), params(REPORT.id)), htmlToPdf.mock.calls[0]);
-    expect(html).toContain('July 16, 2026');
+    expect(html).not.toContain('July 16, 2026');
+    expect(html).not.toContain(new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }));
   });
 });
 

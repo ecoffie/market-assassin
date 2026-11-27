@@ -230,56 +230,41 @@ function kpi(status: string | undefined, n: unknown): string {
 const SOURCE_NAMES: Record<string, string> = {
   bigquery_usaspending_awards: 'USASpending.gov award records',
 };
-/** "September 30, 2026" from an ISO date or timestamp; '' when it is not a real date. */
-function longDate(v: unknown): string {
-  if (typeof v !== 'string' || !/^\d{4}-\d{2}-\d{2}/.test(v)) return '';
-  const d = new Date(`${v.slice(0, 10)}T00:00:00Z`);
-  return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
-}
 function hostOf(v: unknown): string {
   try { return typeof v === 'string' && /^https?:\/\//.test(v) ? new URL(v).hostname.replace(/^www\./, '') : ''; } catch { return ''; }
-}
-/** Earliest and latest of a set of ISO dates, as "A" or "A to B"; '' when there are none. */
-function dateSpan(values: unknown[]): string {
-  const days = [...new Set(values.map((v) => (typeof v === 'string' ? v.slice(0, 10) : '')).filter((d) => longDate(d)))].sort();
-  if (!days.length) return '';
-  return days.length === 1 || days[0] === days[days.length - 1] ? longDate(days[0]) : `${longDate(days[0])} to ${longDate(days[days.length - 1])}`;
 }
 
 export interface ProvenanceRow { section: string; source: string; window: string }
 
+/**
+ * Where each section's figures come from. Sources and data WINDOWS (fiscal years, the method) only: customer-facing
+ * output carries no data-freshness or provenance dates (Eric, 2026-11-27: "as of", "last synced", "through"). The
+ * stored report keeps those fields.
+ */
 export function provenanceRows(report: Pick<ReportLike, 'summary' | 'sections'>): ProvenanceRow[] {
   const rows: ProvenanceRow[] = [];
   const ms = (report.sections.market_size ?? null) as { source?: unknown; windowLabel?: unknown; sourceMaxActionDate?: unknown } | null;
   if (ms) {
     const source = typeof ms.source === 'string' ? SOURCE_NAMES[ms.source] ?? '' : '';
-    const through = longDate(ms.sourceMaxActionDate);
-    const window = [typeof ms.windowLabel === 'string' ? ms.windowLabel : '', through ? `awards through ${through}` : ''].filter(Boolean).join('; ');
+    const window = typeof ms.windowLabel === 'string' ? ms.windowLabel : '';
     if (source || window) rows.push({ section: 'Total market and market composition', source, window });
   }
   const basisTier = (report.summary.size_tiers ?? []).find((t) => t.role === 'sections_basis');
   if (basisTier?.method) rows.push({ section: 'Who is buying · Competitive landscape', source: '', window: basisTier.method });
   const contacts = report.sections.contacts as { source_label?: unknown; as_of?: unknown; as_of_label?: unknown; people?: unknown[] } | null | undefined;
   if (contacts && contacts.people?.length) {
-    const asOf = longDate(contacts.as_of);
     const source = typeof contacts.source_label === 'string' ? contacts.source_label : '';
-    const label = typeof contacts.as_of_label === 'string' ? contacts.as_of_label : 'as of';
-    if (source || asOf) rows.push({ section: 'Who to call', source, window: asOf ? `${label}: ${asOf}` : '' });
+    if (source) rows.push({ section: 'Who to call', source, window: '' });
   }
   // Recompetes: each row's own provenance (Data Core #2399); a stored report from before it has only last_synced_at.
   const recompetes = report.sections.recompetes as { contracts: unknown[]; sources?: Array<{ label?: unknown; count?: unknown }> };
-  const recRows = recompetes.contracts as Row[];
   const recSources = (recompetes.sources ?? [])
     .filter((x) => typeof x.label === 'string' && typeof x.count === 'number' && x.count > 0)
     .map((x) => (x.label === 'not_stated' ? `not stated (${x.count})` : `${String(x.label)} (${x.count})`));
-  const recompeteSync = dateSpan(recRows.map((c) => (c.provenance as { as_of?: unknown } | undefined)?.as_of ?? c.last_synced_at));
-  if (recSources.length || recompeteSync) {
-    rows.push({ section: 'Recompetes on the horizon', source: recSources.join(', '), window: recompeteSync ? `records last synced ${recompeteSync}` : '' });
-  }
+  if (recSources.length) rows.push({ section: 'Recompetes on the horizon', source: recSources.join(', '), window: '' });
   const forecasts = report.sections.forecasts.forecasts as Row[];
   const hosts = [...new Set(forecasts.map((f) => hostOf(f.source_url)).filter(Boolean))];
-  const asOf = dateSpan(forecasts.map((f) => f.as_of));
-  if (hosts.length || asOf) rows.push({ section: 'Upcoming forecasts', source: hosts.join(', '), window: asOf ? `records as of ${asOf}` : '' });
+  if (hosts.length) rows.push({ section: 'Upcoming forecasts', source: hosts.join(', '), window: '' });
   return rows;
 }
 
@@ -335,7 +320,6 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
   const { subject, summary, sections, generated_for } = report;
   const statusByName = new Map((report._meta.section_status ?? []).map((x) => [x.name, x.status]));
   const st = (name: string) => statusByName.get(name);
-  const date = opts.date || new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 
   // Every section states WHAT IT MEASURED. An unlabelled figure loses the "your data is
   // wrong" argument even when it's the more accurate one.
@@ -648,7 +632,7 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
       const prov = provenanceRows(report);
       return prov.length
         ? section('Data and sources', 'Where each section\u2019s figures come from and how current they are, as recorded in this report\u2019s data. Sections without a stated source or date are not listed.',
-            `<div class="prov">${table(['Section', 'Source', 'Window / as of'], prov.map((r) => [esc(r.section), esc(r.source || '—'), esc(r.window || '—')]), undefined, [1, 2])}</div>`)
+            `<div class="prov">${table(['Section', 'Source', 'Window'], prov.map((r) => [esc(r.section), esc(r.source || '—'), esc(r.window || '—')]), undefined, [1, 2])}</div>`)
         : '';
     })(),
   ].join('\n');
@@ -754,10 +738,7 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
   <header class="rp" style="position:relative">
     <div class="kick">Federal Market Report</div>
     <h1>${esc(displayTitle(subject))}</h1>
-    <div class="meta">${generated_for ? `Prepared for ${esc(generated_for)} · ` : ''}${esc(date)}${(() => {
-      const through = longDate((sections.market_size as { sourceMaxActionDate?: unknown } | null)?.sourceMaxActionDate);
-      return through ? ` · Award data through ${esc(through)}` : '';
-    })()}</div>
+    <div class="meta">${generated_for ? `Prepared for ${esc(generated_for)}` : 'Federal market intelligence from Mindy'}</div>
     ${opts.pdfUrl
       ? `<a class="pdfbtn" href="${esc(opts.pdfUrl)}" download>Download PDF</a>`
       : '<button class="pdfbtn" onclick="window.print()">Save as PDF</button>'}

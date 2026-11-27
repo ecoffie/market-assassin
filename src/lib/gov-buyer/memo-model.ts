@@ -330,8 +330,7 @@ export function buildMemoModel(input: {
     datePrepared: today.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
     scope,
     dataSources:
-      'SAM.gov entity registrations, USASpending.gov award history, and the federal award record. ' +
-      `Data as of ${today.toLocaleDateString()}.`,
+      'SAM.gov entity registrations, USASpending.gov award history, and the federal award record.',
     sections,
     closing:
       'This determination was generated to support acquisition planning. The contracting officer ' +
