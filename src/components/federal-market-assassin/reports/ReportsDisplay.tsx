@@ -4495,22 +4495,22 @@ function LockedSectionOverlay({ sectionName, onUpgrade }: { sectionName: string;
     'Subcontracting Opportunities': {
       icon: '🔗',
       benefit: 'Find prime contractors actively seeking small business partners',
-      dataPreview: '50+ prime contractors with SBLO contacts'
+      dataPreview: 'Prime contractors with SBLO contacts'
     },
     'IDV Contracts': {
       icon: '📋',
       benefit: 'Discover BPAs, IDIQs, and GWACs you can compete on',
-      dataPreview: '100+ contract vehicles in your NAICS'
+      dataPreview: 'Contract vehicles in your NAICS'
     },
     'Similar Awards': {
       icon: '📊',
       benefit: 'See past contracts in your NAICS to identify patterns',
-      dataPreview: '200+ historical awards analyzed'
+      dataPreview: 'Historical awards in your NAICS'
     },
     'Tribal Contracting': {
       icon: '🏛️',
       benefit: 'Find tribal partnerships and 8(a) teaming opportunities',
-      dataPreview: '25+ tribal businesses in your region'
+      dataPreview: 'Tribal businesses in your region'
     }
   };
 

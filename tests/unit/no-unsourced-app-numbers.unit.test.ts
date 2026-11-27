@@ -27,6 +27,8 @@ const SURFACES: Record<string, RegExp[]> = {
   'src/components/app/panels/AlertsPanel.tsx': [/35% APEX/, /14 CTAs/],
   'src/app/opportunity-map/route.ts': [/thousands of real, comparable/],
   'src/components/app/panels/GovDecisionMakersPanel.tsx': [/100% list/],
+  'src/components/federal-market-assassin/forms/CoreInputForm.tsx': [/5,000\+ contracts/],
+  'src/components/federal-market-assassin/reports/ReportsDisplay.tsx': [/'50\+ prime/, /'100\+ contract vehicles/, /'200\+ historical/, /'25\+ tribal/],
 };
 
 describe('no unsourced numbers on the swept App and Map surfaces', () => {
