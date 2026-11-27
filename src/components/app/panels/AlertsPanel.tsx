@@ -175,7 +175,6 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
   const [feedbackByAlert, setFeedbackByAlert] = useState<Record<string, FeedbackType>>({});
   const [savingFeedbackIds, setSavingFeedbackIds] = useState<Set<string>>(new Set());
   const [dismissedAlertIds, setDismissedAlertIds] = useState<Set<string>>(new Set());
-  const [totalCount, setTotalCount] = useState(0);
   const [ctaOptions, setCtaOptions] = useState<CtaCodeOption[]>([]);
   const [selectedCtaIds, setSelectedCtaIds] = useState<string[]>([]);
   const [ctaSectionOpen, setCtaSectionOpen] = useState(false);
@@ -269,7 +268,6 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
 
       if (data.success) {
         setAlerts(data.opportunities || []);
-        setTotalCount(data.count || 0);
         setCtaNeedsBackfill(Boolean(data.ctaFilter?.needsBackfill));
         if (data.searchCriteria) {
           setSearchCriteria({
@@ -776,20 +774,14 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
     return true;
   };
 
-  const filterCounts = useMemo<Record<AlertFilter, number>>(() => ({
-    all: alerts.length,
-    solicitation: alerts.filter(alert => matchesFilter(alert, 'solicitation')).length,
-    sources: alerts.filter(alert => matchesFilter(alert, 'sources')).length,
-    setaside: alerts.filter(alert => matchesFilter(alert, 'setaside')).length,
-    urgent: alerts.filter(alert => matchesFilter(alert, 'urgent')).length,
-  }), [alerts]);
-
-  const filteredAlerts = useMemo(() => {
+  // Every client-side filter EXCEPT the type pill. The pill counts and the
+  // header count come from these rows, so they agree with the list shown
+  // (they used to count rows before the state filter).
+  const baseVisibleAlerts = useMemo(() => {
     const normalizedSearch = searchQuery.trim().toLowerCase();
 
     return alerts
       .filter(alert => !dismissedAlertIds.has(alert.id))
-      .filter(alert => matchesFilter(alert, filter))
       .filter(alert => !stateFilter || alert.popState === stateFilter)
       .filter(alert => {
         if (!normalizedSearch) return true;
@@ -805,7 +797,20 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
           alert.popZip,
           alert.popCountry,
         ].some(value => value?.toLowerCase().includes(normalizedSearch));
-      })
+      });
+  }, [alerts, dismissedAlertIds, searchQuery, stateFilter]);
+
+  const filterCounts = useMemo<Record<AlertFilter, number>>(() => ({
+    all: baseVisibleAlerts.length,
+    solicitation: baseVisibleAlerts.filter(alert => matchesFilter(alert, 'solicitation')).length,
+    sources: baseVisibleAlerts.filter(alert => matchesFilter(alert, 'sources')).length,
+    setaside: baseVisibleAlerts.filter(alert => matchesFilter(alert, 'setaside')).length,
+    urgent: baseVisibleAlerts.filter(alert => matchesFilter(alert, 'urgent')).length,
+  }), [baseVisibleAlerts]);
+
+  const filteredAlerts = useMemo(() => {
+    return baseVisibleAlerts
+      .filter(alert => matchesFilter(alert, filter))
       .sort((a, b) => {
         if (sortMode === 'recommendation') {
           // Server already sorted by recommendationScore (set-aside fit +
@@ -821,7 +826,7 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
         }
         return new Date(a.responseDeadline || 8640000000000000).getTime() - new Date(b.responseDeadline || 8640000000000000).getTime();
       });
-  }, [alerts, dismissedAlertIds, filter, searchQuery, sortMode, stateFilter]);
+  }, [baseVisibleAlerts, filter, sortMode]);
 
   const availableStates = useMemo(() => {
     const set = new Set<string>();
@@ -918,7 +923,7 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
               </div>
               <p className="text-sm text-muted mt-1">
                 {todayFormatted}
-                {totalCount > 0 && <span className="text-emerald-400 ml-2">• {totalCount} matches found</span>}
+                {filteredAlerts.length > 0 && <span className="text-emerald-400 ml-2">• {filteredAlerts.length} matches found</span>}
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2 shrink-0">
