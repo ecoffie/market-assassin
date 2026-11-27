@@ -2562,7 +2562,7 @@ async function dispatchMcpTool(
       max_value: typeof args.max_value === 'number' ? args.max_value : undefined,
       likelihood: args.likelihood === 'high' || args.likelihood === 'medium' || args.likelihood === 'low' ? args.likelihood : undefined,
       limit: typeof args.limit === 'number' ? args.limit : undefined,
-    })) as unknown as Record<string, unknown>;
+    }, { competition: true })) as unknown as Record<string, unknown>;
     return { result, credits };
   }
 
