@@ -33,7 +33,7 @@ const LAYERS: { k: string; title: string; blurb: string; tools: { n: string; d: 
     tools: [
       { n: 'search_sam_opportunities', d: 'Open solicitations by keyword / NAICS / set-aside' },
       { n: 'get_expiring_contracts', d: 'Contracts expiring soon — your recompete targets' },
-      { n: 'get_agency_forecasts', d: 'Planned buys 6–18 months before they hit SAM' },
+      { n: 'get_agency_forecasts', d: 'Planned buys, often months before they hit SAM' },
       { n: 'get_solicitation_documents', d: 'The full RFP — SOW/PWS and attachments as text' },
     ],
   },
@@ -53,7 +53,7 @@ const LAYERS: { k: string; title: string; blurb: string; tools: { n: string; d: 
     title: 'Agency & award intelligence',
     blurb: 'The buyer beneath the department label — the specific buying office, its budget trend, its set-aside behavior, and the named people who actually buy.',
     tools: [
-      { n: 'search_federal_contacts', d: 'Named POCs at a specific buying office (~167K rows)' },
+      { n: 'search_federal_contacts', d: 'Named POCs at a specific buying office' },
       { n: 'get_sba_goaling_share', d: 'Small-business goals vs. actual set-aside obligations' },
       { n: 'search_agency_opps_by_office', d: 'Opportunities anchored to one buying office' },
       { n: 'get_agency_intel', d: 'The buyer brief — priorities, spend and angles' },
@@ -150,7 +150,7 @@ export default function McpAboutPage() {
           <ul className="mt-5 grid gap-3 sm:grid-cols-2">
             {[
               ['Office-level buying contacts', 'The named contracting officers & small-business POCs at a specific buying office — not the whole-department firehose.'],
-              ['A curated SBLO teaming roster', 'The Small Business Liaison at 200 primes, re-researched and verified — so an agent knows who to call to team.'],
+              ['A curated SBLO teaming roster', 'The Small Business Liaison at major primes, re-researched and verified — so an agent knows who to call to team.'],
             ].map(([t, d]) => (
               <li key={t} className="rounded-none border border-(--mp-line) bg-(--mp-wash) p-4">
                 <div className="text-[13.5px] font-semibold text-(--mp-navy)">{t}</div>
