@@ -631,7 +631,7 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
     (() => {
       const prov = provenanceRows(report);
       return prov.length
-        ? section('Data and sources', 'Where each section\u2019s figures come from and how current they are, as recorded in this report\u2019s data. Sections without a stated source or date are not listed.',
+        ? section('Data and sources', 'Where each section\u2019s figures come from, as recorded in this report\u2019s data. Sections without a stated source are not listed.',
             `<div class="prov">${table(['Section', 'Source', 'Window'], prov.map((r) => [esc(r.section), esc(r.source || '—'), esc(r.window || '—')]), undefined, [1, 2])}</div>`)
         : '';
     })(),

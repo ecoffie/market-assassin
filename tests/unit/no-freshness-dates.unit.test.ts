@@ -25,6 +25,8 @@ describe('packaged market report (hosted page and PDF HTML)', () => {
 
   it('prints no data-freshness date or generated stamp', () => {
     expect(text.match(FRESHNESS)?.[0] ?? null).toBeNull();
+    expect(text).not.toMatch(/how current they are|stated source or date/i);
+    expect(text).toContain('Where each section\u2019s figures come from, as recorded in this report\u2019s data. Sections without a stated source are not listed.');
     expect(text).not.toMatch(/November 2[0-2], 2026/); // the fixture's generated / synced / through dates
   });
 
