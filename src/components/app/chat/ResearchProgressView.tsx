@@ -10,7 +10,7 @@ import {
   currentLine, formatElapsed, stepCountLabel, summaryLine, STILL_WORKING_MS, STILL_WORKING_TEXT, type ResearchProgress,
 } from '@/lib/chat/research-progress';
 
-export function ResearchProgressView({ progress, running, finishedAt }: { progress: ResearchProgress; running: boolean; finishedAt?: number }) {
+export function ResearchProgressView({ progress, running, finishedAt, tag }: { progress: ResearchProgress; running: boolean; finishedAt?: number; tag?: string }) {
   const [now, setNow] = useState(() => Date.now());
   const [open, setOpen] = useState(false);
   // Collapsing closes an open steps list, so the answer is not pushed down.
@@ -61,6 +61,7 @@ export function ResearchProgressView({ progress, running, finishedAt }: { progre
       <div className="flex items-center gap-2 text-[12.5px] text-slate-200">
         <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-purple-400" aria-hidden />
         <span className="font-medium">Researching</span>
+        {tag && <span data-testid="research-progress-tag" className="rounded-full border border-purple-400/40 bg-purple-500/10 px-1.5 py-px text-[10px] font-medium text-purple-200">{tag}</span>}
         <span className="tabular-nums text-faint" data-testid="research-elapsed">{formatElapsed(now - progress.startedAt)}</span>
         {progress.total > 0 && <span className="text-faint">· {stepCountLabel(progress.total)}</span>}
       </div>
