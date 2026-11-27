@@ -39,7 +39,7 @@ type Plan = {
   cta: string; href: string; outline?: boolean;
   lead: string; base: string; features: Feature[];
   /** Omitted = no allowance to show (never a made-up number). */
-  usage?: [title: string, detail: string];
+  usage?: [title: string, detail: React.ReactNode];
   /** A non-trial button that still takes money (gets the no-refund note). */
   takesPayment?: boolean;
   footer?: React.ReactNode;
@@ -207,6 +207,8 @@ export default function SimplePricing({ proCredits, teamCredits, forecastsLabel,
   promoLine?: string | null;
 }) {
   const [annual, setAnnual] = useState(false);
+  // Mindy Day deal: the server decides the window (promoLine non-null = open). Doubling shows on annual cards only.
+  const promoAnnual = !!promoLine && annual;
   // Team seat card (held behind NEXT_PUBLIC_TEAM_SEAT_PRICING until Eric approves). Display only.
   const seatOn = isTeamSeatPricingEnabled();
   const [seatId, setSeatId] = useState<TeamSeatOptionId>(TEAM_SEAT_PRICING.defaultOption);
@@ -258,7 +260,9 @@ export default function SimplePricing({ proCredits, teamCredits, forecastsLabel,
         ['Market research', 'Who buys, who wins and what they spend.'],
         ['Mindy in your AI', 'Use Mindy inside Claude, ChatGPT or Cursor.'],
       ],
-      usage: ['Monthly usage included', `${fmt(proCredits)} credits / month`],
+      usage: ['Monthly usage included', promoAnnual
+        ? <><s>{fmt(proCredits)}</s> {fmt(proCredits * 2)} credits / month in your first year <span data-mindy-day-card>(Mindy Day deal)</span></>
+        : `${fmt(proCredits)} credits / month`],
     },
     {
       name: 'Team', tag: 'Built for business development teams working several markets at once.',
@@ -273,7 +277,9 @@ export default function SimplePricing({ proCredits, teamCredits, forecastsLabel,
         ['Team dashboard and roles', 'See who is working what.'],
         ['Onboarding call', 'We set up your markets with you.'],
       ],
-      usage: ['Monthly usage included', `${fmt(teamCredits)} credits / month, shared by the team`],
+      usage: ['Monthly usage included', promoAnnual
+        ? <><s>{fmt(teamCredits)}</s> {fmt(teamCredits * 2)} credits / month, shared by the team, in your first year <span data-mindy-day-card>(Mindy Day deal)</span></>
+        : `${fmt(teamCredits)} credits / month, shared by the team`],
       footer: <>10 or more users? <a href={SALES_URL}>Talk to us for a volume quote</a></>,
     },
     {
@@ -386,16 +392,25 @@ export default function SimplePricing({ proCredits, teamCredits, forecastsLabel,
       {!seatOn && (
       <div className="toggle" role="group" aria-label="Billing period">
         <button type="button" className={!annual ? 'on' : ''} aria-pressed={!annual} onClick={() => setAnnual(false)}>Monthly</button>
-        <button type="button" className={annual ? 'on' : ''} aria-pressed={annual} onClick={() => setAnnual(true)}>Annual (up to {maxPct}% off)</button>
+        <button type="button" className={annual ? 'on' : ''} aria-pressed={annual} onClick={() => setAnnual(true)}>Annual (up to {maxPct}% off){promoLine ? ' · 2× credits' : ''}</button>
       </div>
       )}
       {/* Inline style, not the page stylesheet: the flag-off page markup is pinned byte-for-byte
           (SimplePricing.team-seat.unit.test.tsx), and outside the window this renders nothing. */}
-      {!seatOn && promoLine && (
-        <p
-          className="promo" data-mindy-day-promo
-          style={{ maxWidth: 640, margin: '-20px auto 28px', padding: '0 16px', textAlign: 'center', font: '500 14px/1.5 var(--mp-font-sans)', color: 'var(--mp-navy)' }}
-        >{promoLine}</p>
+      {promoLine && (
+        <aside
+          className="promo" data-mindy-day-promo aria-label="Mindy Day deal"
+          style={{ maxWidth: 720, margin: '-12px auto 32px', padding: '18px 22px', textAlign: 'center', background: 'var(--mp-surface)', border: '2px solid var(--mp-navy)', borderRadius: 14, boxShadow: '0 6px 20px rgba(15,23,42,.08)' }}
+        >
+          <p style={{ margin: '0 0 6px', font: '600 12px var(--mp-font-sans)', letterSpacing: '.08em', textTransform: 'uppercase', color: 'var(--mp-navy)' }}>Mindy Day deal · ends Dec 5</p>
+          <p style={{ margin: '0 0 6px', font: '700 22px/1.25 var(--mp-font-serif, Georgia, serif)', color: 'var(--mp-ink, #111)' }}>Double credits for a full year on annual plans</p>
+          <p style={{ margin: 0, font: '400 15px/1.5 var(--mp-font-sans)', color: 'var(--mp-muted)' }}>{promoLine}</p>
+          {!seatOn && !annual && (
+            <button type="button" data-mindy-day-cta onClick={() => setAnnual(true)}
+              style={{ marginTop: 12, border: 0, borderRadius: 10, padding: '10px 18px', background: 'var(--mp-navy)', color: 'var(--mp-surface)', font: '600 14px var(--mp-font-sans)', cursor: 'pointer' }}
+            >See annual prices</button>
+          )}
+        </aside>
       )}
 
       <section className="cards" id="plans">
