@@ -157,6 +157,6 @@ describe('chat route wiring (static guard)', () => {
     expect(src).toMatch(/onResult: \(n: string, c: string\) => actions\.observeToolResult\(n, c\)/);
   });
   it('research mode: the actions note rides in the per-turn system part, never the cached static prefix', () => {
-    expect(src).toMatch(/system: RESEARCH_SYSTEM_STATIC,\n\s*systemDynamic: researchSystemDynamic\(\{ today, profileBlock: userProfileBlock \}\) \+ \(actions \? `\\n\\n\$\{APP_ACTIONS_NOTE\}` : ''\),/);
+    expect(src).toMatch(/system: RESEARCH_SYSTEM_STATIC,\n\s*systemDynamic: researchSystemDynamic\(\{ today, profileBlock: userProfileBlock, attachments: researchAttachmentsBlock\(\[documentContext\?\.block, connectedFiles\?\.block\]\) \}\) \+ \(actions \? `\\n\\n\$\{APP_ACTIONS_NOTE\}` : ''\),/);
   });
 });
