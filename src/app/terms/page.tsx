@@ -220,7 +220,7 @@ export default function TermsPage() {
           <H3 id="early-upgrade">Upgrading early from a trial</H3>
           <UL>
             <li>While on a card trial you may choose to upgrade early. Your card is charged immediately and your trial ends at that moment.</li>
-            <li>An early upgrade may include promotional bonus credits (currently 500). Bonus credits are added only after the payment succeeds, are added once per subscription, and are promotional credits under Section 8.</li>
+            <li>Trials and upgrades may include promotional bonus credits as offered in the app. Bonus credits are added only after any required payment succeeds, at most once per person, and are promotional credits under Section 8.</li>
             <li>If the payment fails, nothing is charged, no bonus is added and your trial continues.</li>
             <li>An early upgrade is a purchase and is final under Section 7.</li>
           </UL>

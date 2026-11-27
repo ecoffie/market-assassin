@@ -667,6 +667,14 @@ export async function POST(request: NextRequest) {
           const subId = typeof session.subscription === 'string' ? session.subscription : session.subscription.id;
           const sub = await stripe.subscriptions.retrieve(subId);
           if (isMindyAppSubscription(sub)) {
+            // Trial users get 500 Mindy credits once (owner 2026-11-18): the monthly grant only
+            // counts paid subscriptions. Non-fatal: a failed grant never blocks access or email.
+            try {
+              const { grantTrialCredits } = await import('@/lib/mcp/trial-credits');
+              await grantTrialCredits(sub, email);
+            } catch (creditErr) {
+              console.error('[stripe-webhook] trial credits grant failed (non-fatal):', creditErr);
+            }
             const { trialContextFromSubscription, sendTrialStepEmail, firstNameOf } = await import('@/lib/billing/trial-onboarding-emails');
             const ctx = trialContextFromSubscription(sub, email, firstNameOf(customerName));
             if (ctx) {

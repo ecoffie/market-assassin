@@ -117,13 +117,17 @@ export const PRO_MONTHLY_CREDITS = Math.max(
 );
 
 /**
- * One-time bonus for ending a Pro/Team free trial early and paying now (owner, 2026-11-13:
- * "on the free trials give them the option to upgrade and get an extra 500 credits").
- * Granted ONCE per subscription by the Stripe webhook, only after the invoice that ends the
- * trial is PAID (src/lib/mcp/trial-upgrade-bonus.ts). Ledger reason `trial_upgrade_bonus`
- * (promotional, does not reset the ChatGPT attribution window — see grant-reasons.ts).
+ * One-time upgrade bonus: 1,000 credits on a person's FIRST paid Pro/Team payment (owner,
+ * 2026-11-18: "give the free members incentive to upgrade, 1000 credits — give the trial members
+ * the same incentive"; was +500 for ending a trial early, 2026-11-13). Covers a free member who
+ * upgrades, a trial that pays early, and a trial that converts at day 14. Granted by the Stripe
+ * webhook from the paid invoice, once per email, never on a renewal
+ * (src/lib/mcp/trial-upgrade-bonus.ts). Ledger reason `upgrade_bonus` (promotional, does not
+ * reset the ChatGPT attribution window — see grant-reasons.ts).
  */
-export const TRIAL_UPGRADE_BONUS_CREDITS = 500;
+export const UPGRADE_BONUS_CREDITS = 1000;
+/** The trial "Upgrade now" offer shows the same bonus. */
+export const TRIAL_UPGRADE_BONUS_CREDITS = UPGRADE_BONUS_CREDITS;
 
 /**
  * Credits included with an active Team ($499/mo) subscription, granted monthly.

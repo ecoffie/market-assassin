@@ -1,5 +1,5 @@
 /**
- * /api/app/billing/trial-upgrade — "Upgrade now, get +500 credits" (owner, 2026-11-13).
+ * /api/app/billing/trial-upgrade — "Upgrade now, get the 1,000-credit upgrade bonus" (owner, 2026-11-13).
  *
  *   GET  ?email=…                     → the caller's eligible Pro/Team trial offers (usually 0 or 1)
  *   POST { email, subscriptionId? }   → end that trial now and charge the first invoice today
@@ -8,7 +8,7 @@
  * THAT email — a claimed email alone is refused). Ownership of the subscription is checked
  * against the Stripe customers behind the caller's verified + linked emails.
  *
- * The 500 bonus credits are NOT granted here. They are granted by the Stripe webhook when the
+ * The bonus credits (UPGRADE_BONUS_CREDITS) are NOT granted here. They are granted by the Stripe webhook when the
  * invoice that ends the trial is PAID (src/lib/mcp/trial-upgrade-bonus.ts). Logic and every
  * refusal live in src/lib/billing/trial-upgrade.ts.
  */
