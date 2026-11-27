@@ -116,10 +116,12 @@ export function capFor(email: string, f: PlanFacts, cfg: CapsConfig): { cap: num
   return best!;
 }
 
-export function capNotice(cap: number, plan: CapDecision['plan'], cfg: CapsConfig): string {
-  const nextPlan = plan === 'staff' || plan === 'account' ? undefined : NEXT_PLAN[plan];
-  const upgrade = nextPlan && cfg.caps[nextPlan] > cap ? ` The ${PLAN_LABEL[nextPlan]} plan includes ${cfg.caps[nextPlan]} a day.` : '';
-  return `You've used today's ${cap} in-depth research answer${cap === 1 ? '' : 's'}, so this one is a standard answer. In-depth research resets tomorrow.${upgrade}`;
+/**
+ * The plain line that opens a standard answer at the daily cap. Research mode is a BETA (Eric, 2026-11-27): the cap
+ * reads as a beta allowance, in plain language, with no plan names; never an error.
+ */
+export function capNotice(cap: number, _plan?: CapDecision['plan'], _cfg?: CapsConfig): string {
+  return `You've used today's ${cap} research answer${cap === 1 ? '' : 's'} on the beta. Standard answers are unlimited; research answers reset tomorrow.`;
 }
 
 /** Start of the current UTC day. */

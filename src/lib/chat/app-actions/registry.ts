@@ -22,13 +22,87 @@ export const MAP_FILTER_KEYS = [
 ] as const;
 export type MapFilterKey = (typeof MAP_FILTER_KEYS)[number];
 
-export const ACTIONS: Record<string, { surfaces: ActionSurface[]; kind: ActionKind; args: readonly string[] }> = {
-  'map.apply_view': { surfaces: ['map'], kind: 'view', args: ['mode', 'q', 'filters', 'horizons', 'replace'] },
-  'map.search': { surfaces: ['map'], kind: 'view', args: ['q'] },
-  'map.set_horizons': { surfaces: ['map'], kind: 'view', args: ['open', 'recompete', 'forecast', 'isolate'] },
-  'map.go_to': { surfaces: ['map'], kind: 'view', args: ['state', 'national'] },
-  'map.open_record': { surfaces: ['map'], kind: 'view', args: ['notice_id'] },
+/** 'none': anything the visible control already allows; 'signed_in'/'pro': the same check the button uses (pro = hasProAccess). */
+export type ActionGate = 'none' | 'signed_in' | 'pro';
+type JsonSchema = Record<string, unknown>;
+
+export interface ActionDef {
+  surfaces: ActionSurface[];
+  kind: ActionKind;
+  /** Every write action needs the one-line inline confirm; view actions never do. */
+  needsConfirm: boolean;
+  gate: ActionGate;
+  /** Model-facing: when to propose it (one line). */
+  description: string;
+  args: readonly string[];
+  /** JSON Schema for the args (additionalProperties: false); mirrors validateAction. */
+  argsSchema: JsonSchema;
+}
+
+const PLAIN_PATTERN = "^[A-Za-z0-9 ,.&()'/:_-]+$";
+const str = (maxLength: number, extra: JsonSchema = {}): JsonSchema => ({ type: 'string', minLength: 1, maxLength, pattern: PLAIN_PATTERN, ...extra });
+const HORIZON_PROPS = { open: { type: 'boolean' }, recompete: { type: 'boolean' }, forecast: { type: 'boolean' } };
+
+export const ACTIONS: Record<string, ActionDef> = {
+  'map.apply_view': {
+    surfaces: ['map'], kind: 'view', needsConfirm: false, gate: 'none',
+    description: 'Show a view on the Opportunity Map: keyword, filters (state, agency, NAICS, set-aside, …) and which horizons are on. Merges onto the current view unless replace is true.',
+    args: ['mode', 'q', 'filters', 'horizons', 'replace'],
+    argsSchema: {
+      type: 'object', additionalProperties: false, minProperties: 1,
+      properties: {
+        mode: { type: 'string', enum: ['open', 'recompete'] },
+        q: str(120, { minLength: 2 }),
+        filters: {
+          type: 'object', additionalProperties: false,
+          properties: Object.fromEntries((['state', 'setAside', 'setAsideMulti', 'agency', 'subAgency', 'office', 'naics', 'psc', 'noticeType', 'noticeMulti', 'closingDays', 'postedDays', 'valueRange', 'vehicle', 'hasDocs', 'hasContact', 'likelihood'] as const).map((k) => [k, k === 'state' ? { type: 'string', pattern: '^[A-Za-z]{2}( *, *[A-Za-z]{2})*$', maxLength: 80 } : str(80)])),
+        },
+        horizons: { type: 'object', additionalProperties: false, properties: HORIZON_PROPS },
+        replace: { type: 'boolean' },
+      },
+    },
+  },
+  'map.search': {
+    surfaces: ['map'], kind: 'view', needsConfirm: false, gate: 'none',
+    description: 'Search the Opportunity Map for a keyword, exactly as if typed into the search box.',
+    args: ['q'],
+    argsSchema: { type: 'object', additionalProperties: false, required: ['q'], properties: { q: str(120, { minLength: 2 }) } },
+  },
+  'map.set_horizons': {
+    surfaces: ['map'], kind: 'view', needsConfirm: false, gate: 'none',
+    description: 'Choose what the map shows: Open now (open), Coming back (recompete), Coming soon (forecast). Use isolate to show only one.',
+    args: ['open', 'recompete', 'forecast', 'isolate'],
+    argsSchema: { type: 'object', additionalProperties: false, minProperties: 1, properties: { ...HORIZON_PROPS, isolate: { type: 'string', enum: ['open', 'recompete', 'forecast'] } } },
+  },
+  'map.go_to': {
+    surfaces: ['map'], kind: 'view', needsConfirm: false, gate: 'none',
+    description: 'Zoom the map to one US state (2-letter code) or back to the whole country.',
+    args: ['state', 'national'],
+    argsSchema: { type: 'object', additionalProperties: false, properties: { state: { type: 'string', pattern: '^[A-Za-z]{2}$' }, national: { type: 'boolean', const: true } }, oneOf: [{ required: ['state'] }, { required: ['national'] }] },
+  },
+  'map.open_record': {
+    surfaces: ['map'], kind: 'view', needsConfirm: false, gate: 'none',
+    description: 'Open one opportunity on the map. Only a notice id that appeared in THIS turn\'s tool results.',
+    args: ['notice_id'],
+    argsSchema: { type: 'object', additionalProperties: false, required: ['notice_id'], properties: { notice_id: { type: 'string', pattern: '^[A-Za-z0-9_-]{6,64}$' } } },
+  },
 };
+
+/**
+ * The input schema for the server's propose_app_action tool (Agent 1): one of the registered actions with its own
+ * args schema. The server still calls validateAction() before emitting — the model's JSON is never trusted.
+ */
+export function toolInputSchema(surfaces: ActionSurface[] = ['map', 'app']): JsonSchema {
+  const names = Object.entries(ACTIONS).filter(([, d]) => d.surfaces.some((x) => surfaces.includes(x)));
+  return {
+    type: 'object',
+    oneOf: names.map(([name, d]) => ({
+      type: 'object', additionalProperties: false, required: ['name', 'args'],
+      description: d.description,
+      properties: { name: { const: name }, args: d.argsSchema },
+    })),
+  };
+}
 
 const PLAIN = /^[A-Za-z0-9 ,.&()'/:_-]+$/;
 const STATES = /^[A-Z]{2}(,[A-Z]{2})*$/;

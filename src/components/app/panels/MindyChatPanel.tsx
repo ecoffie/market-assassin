@@ -31,6 +31,7 @@ import {
   SCREENSHOT_MAX_COUNT, SCREENSHOT_MESSAGES, SCREENSHOT_DEFAULT_PROMPT, screenshotRefusalNote, screenshotsFit, type PreparedScreenshot,
 } from '@/lib/chat/screenshot-client';
 import { ResearchProgressView } from '../chat/ResearchProgressView';
+import { researchTagFromEvent, cleanResearchLabel } from '@/lib/chat/research-mode-tag';
 import { addProgress, startProgress, type ResearchProgress } from '@/lib/chat/research-progress';
 import { UpgradeModal } from '../UpgradeModal';
 import { renderSafeMarkdown } from '@/lib/chat/safe-markdown';
@@ -93,6 +94,8 @@ interface ChatMessage {
   report?: ChatInlineReport;
   /** A packaged market report in a reopened conversation: History keeps its id and title; the pane reloads it. */
   savedReport?: ChatSavedReport;
+  /** "Research · Beta": set by the turn's mode event, or by History for a saved research answer. */
+  modeLabel?: string;
   /** Live research steps for this turn ('progress' events). Not persisted; the answer is what History keeps. */
   progress?: ResearchProgress;
   /** When the answer started arriving: the research summary's elapsed time stops here. */
@@ -358,7 +361,10 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
           if (!payload) continue;
           try {
             const evt = JSON.parse(payload);
-            if (evt.type === 'session' && evt.sessionId) {
+            if (evt.type === 'mode') {
+              const label = researchTagFromEvent(evt);
+              if (label) setMessages(prev => prev.map(m => m.id === assistantMsg.id ? { ...m, modeLabel: label } : m));
+            } else if (evt.type === 'session' && evt.sessionId) {
               setSessionId(evt.sessionId);
             } else if (evt.type === 'token' && typeof evt.content === 'string') {
               finalContent += evt.content;
@@ -496,6 +502,7 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
           cited_sources?: CitedSource[];
           deliverables?: { files?: GeneratedDownloadFile[]; pdf_note?: string };
           market_report?: { report_id?: unknown; title?: unknown };
+          research_mode?: { label?: unknown };
         }) => {
           const files = Array.isArray(m.deliverables?.files)
             ? m.deliverables!.files!.filter((f) => f && typeof f.document_id === 'string' && typeof f.format === 'string')
@@ -510,6 +517,7 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
             ...(m.role === 'assistant' && validReportId(m.market_report?.report_id)
               ? { savedReport: { id: m.market_report!.report_id as string, title: typeof m.market_report?.title === 'string' && m.market_report.title ? m.market_report.title.slice(0, 160) : 'Market report' } }
               : {}),
+            ...(m.role === 'assistant' && m.research_mode ? { modeLabel: cleanResearchLabel(m.research_mode.label) } : {}),
           };
         }));
         setSessionId(sid);
@@ -809,6 +817,11 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
                   {msg.role === 'assistant' && (
                     <div className="flex items-center gap-2 mb-1.5">
                       <span className="text-xs font-semibold text-purple-300">Mindy</span>
+                      {msg.modeLabel && (
+                        <span data-testid="research-beta-tag" className="rounded-full border border-purple-400/40 bg-purple-500/10 px-2 py-0.5 text-[10.5px] font-medium text-purple-200">
+                          {msg.modeLabel}
+                        </span>
+                      )}
                       {msg.isStreaming && (
                         <span className="inline-block w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse" />
                       )}
@@ -816,7 +829,7 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
                   )}
                   {/* Report first; Export lives in the open pane header (Claude/ChatGPT), not under the answer. */}
                   {msg.role === 'assistant' && msg.progress && (
-                    <ResearchProgressView progress={msg.progress} running={!!msg.isStreaming && !msg.content && !msg.errored} finishedAt={msg.progressDoneAt} />
+                    <ResearchProgressView progress={msg.progress} running={!!msg.isStreaming && !msg.content && !msg.errored} finishedAt={msg.progressDoneAt} tag={msg.modeLabel} />
                   )}
                   {msg.role === 'assistant' && !msg.isStreaming && !msg.errored && email && msg.report && (
                     <ChatReportPreview email={email} inline={msg.report} files={msg.deliverables} pdfNote={msg.deliverablePdfNote} />

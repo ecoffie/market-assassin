@@ -10945,6 +10945,8 @@ const ASK_MINDY_CSS =
   + '.amk-in textarea:focus{border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.12)}'
   + '.amk-send{flex:none;width:40px;height:40px;border:0;border-radius:11px;background:#2563eb;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center}'
   + '.amk-send:disabled{opacity:.45;cursor:default}.amk-send svg{width:18px;height:18px}'
+  + '.amk-beta{display:inline-block;margin:0 0 6px;border:1px solid #c7d2fe;background:#eef2ff;color:#4338ca;border-radius:999px;padding:1px 8px;font:600 10.5px Inter,system-ui,sans-serif}.amk-rp-tag:empty{display:none}.amk-rp-tag{display:inline-block;margin:0 4px 0 2px;border:1px solid #c7d2fe;background:#eef2ff;color:#4338ca;border-radius:999px;padding:0 6px;font:600 10px Inter,system-ui,sans-serif;vertical-align:1px}'
+  + '@media(prefers-color-scheme:dark){.amk-beta,.amk-rp-tag{background:rgba(99,102,241,.15);border-color:rgba(129,140,248,.4);color:#c7d2fe}}'
   + '.amk-rp{margin:0 0 8px;border:1px solid #e6ebf0;border-radius:10px;background:#f8fafc;padding:8px 10px;font:500 12.5px Inter,system-ui,sans-serif;color:#334155}.amk-rp-hd b{font-weight:600;color:#0f172a}.amk-rp-time,.amk-rp-n{color:#6b7787;font-variant-numeric:tabular-nums}'
   + '.amk-rp-spin{display:inline-block;width:11px;height:11px;margin-right:6px;vertical-align:-1px;border:2px solid #c7d2fe;border-top-color:#6366f1;border-radius:50%;animation:amkspin .9s linear infinite}@keyframes amkspin{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){.amk-rp-spin{animation:none}}'
   + '.amk-rp-cur{margin-top:3px;color:#475569}.amk-rp-still{margin-top:3px;font-size:11.5px;color:#6b7787}.amk-rp-still[hidden]{display:none}.amk-rp-tog{margin-top:4px;border:0;background:none;padding:0;cursor:pointer;font:600 11.5px Inter,system-ui,sans-serif;color:#6b7787}.amk-rp-tog:hover{color:#334155}'
@@ -11211,7 +11213,7 @@ const ASK_MINDY_JS = `<script>(function(){
   function readView(){ try{ var o=JSON.parse(sessionStorage.getItem(VIEW_KEY)||'null'); return (o&&o.email&&o.email===email()&&(o.ws||'')===wsKey()&&Array.isArray(o.history))?o:null; }catch(e){ return null; } }
   function renderConversation(msgs){
     body.innerHTML='';
-    msgs.forEach(function(m){ if(!m||typeof m.content!=='string') return; var d=addMsg(m.role==='user'?'user':'assistant', m.content); if(m.role!=='user'&&m.files&&m.files.length) repCard(cleanFiles(m.files),d); if(m.role!=='user'){ var r=savedReport(m.report); if(r) repSavedCard(r,d); } });
+    msgs.forEach(function(m){ if(!m||typeof m.content!=='string') return; var d=addMsg(m.role==='user'?'user':'assistant', m.content); if(m.role!=='user'&&m.files&&m.files.length) repCard(cleanFiles(m.files),d); if(m.role!=='user'){ var r=savedReport(m.report); if(r) repSavedCard(r,d); if(m.tag) betaTag(d,betaLabel(m.tag)); } });
     body.scrollTop=body.scrollHeight; // a reopened conversation shows its end (its report card) above the composer
   }
   function newChat(){
@@ -11269,7 +11271,7 @@ const ASK_MINDY_JS = `<script>(function(){
         sessionId=sid;
         history=d.messages.filter(function(m){ return m&&(m.role==='user'||m.role==='assistant')&&typeof m.content==='string'; }).map(function(m){
           var h={role:m.role,content:m.content}; var f=m.deliverables&&Array.isArray(m.deliverables.files)?m.deliverables.files:null; if(f&&f.length) h.files=f;
-          var r=m.market_report?savedReport({id:m.market_report.report_id,title:m.market_report.title}):null; if(r) h.report=r; return h; });
+          var r=m.market_report?savedReport({id:m.market_report.report_id,title:m.market_report.title}):null; if(r) h.report=r; if(m.role==='assistant'&&m.research_mode) h.tag=betaLabel(m.research_mode.label); return h; });
         clearFollowups(); hideHistory(); renderConversation(history); saveView();
         try{ if(window.__track) window.__track('tool_use','map_chat_reopen',{messages:history.length}); }catch(e){}
       })
@@ -11900,6 +11902,12 @@ const ASK_MINDY_JS = `<script>(function(){
       },function(){ fail('Your report could not be loaded. Check your connection and try again.',true); });
     try{ if(window.__track) window.__track('tool_use','map_market_report_reopen',{}); }catch(e){}
   }
+  // "Research · Beta" tag (research mode for everyone, labelled beta): from the research mode event of this turn (type mode, mode research,
+  // beta true, with a label), or from the research_mode label History returns. Server text shown as plain text, bounded.
+  // (literal, not a var: renderConversation can run at boot before a var assignment below has executed)
+  function betaLabel(raw){ var BETA_DEFAULT='Research · Beta'; if(typeof raw!=='string') return BETA_DEFAULT; var o=''; for(var i=0;i<raw.length;i++){ var c=raw.charCodeAt(i); o+=(c<32||c===127)?' ':raw.charAt(i); }
+    o=o.replace(/ +/g,' ').trim(); return (o&&o.length<=40)?o:BETA_DEFAULT; }
+  function betaTag(el,label){ if(!el||!label||el.querySelector('.amk-beta')) return; var t=document.createElement('span'); t.className='amk-beta'; t.setAttribute('data-testid','amk-beta-tag'); t.textContent=label; el.insertBefore(t,el.firstChild); }
   function addMsg(role, text){ var d=document.createElement('div'); d.className='amk-msg '+(role==='user'?'u':'a'); d.innerHTML=(role==='user')?esc(text):('<div class="bub"></div>'); if(role!=='user'){ var bb=d.querySelector('.bub'); if(text) paint(bb,text); else bb.textContent=''; } body.appendChild(d); body.scrollTop=body.scrollHeight; return d; }
   function upsell(){ body.innerHTML='<div class="amk-up"><h4>\\ud83d\\udd12 Ask Mindy is a Pro feature</h4><p>Get grounded, real-data answers on set-asides, agencies, opportunities, teaming and proposals \\u2014 with sources.</p><a href="/market-intelligence">Upgrade to Pro</a></div>'; }
   // opts (card chat only): turnId = reuse this question's id (retry/reopen); replay = only fetch the saved answer.
@@ -11933,7 +11941,7 @@ const ASK_MINDY_JS = `<script>(function(){
     if(ctrl){ stopBtn=document.createElement('button'); stopBtn.type='button'; stopBtn.className='amk-stop'; stopBtn.setAttribute('data-testid','amk-stop'); stopBtn.textContent='Stop';
       stopBtn.onclick=function(){ stopped=true; try{ ctrl.abort(); }catch(e){} }; aEl.appendChild(stopBtn); }
     function stoppedEnd(){
-      if(acc){ paint(bub,acc); history.push({role:'user',content:shown}); history.push(ledger?{role:'assistant',content:acc,sources:ledger}:{role:'assistant',content:acc}); }
+      if(acc){ paint(bub,acc); history.push({role:'user',content:shown}); history.push(ledger?{role:'assistant',content:acc,sources:ledger}:{role:'assistant',content:acc}); if(turnTag) history[history.length-1].tag=turnTag; }
       else bub.textContent='';
       var sn=document.createElement('div'); sn.className='amk-credits'; sn.setAttribute('data-testid','amk-stopped'); sn.textContent=acc?'You stopped this answer, so it may be incomplete.':'You stopped this answer.'; aEl.appendChild(sn);
       saveView(); release(); body.scrollTop=body.scrollHeight;
@@ -11943,7 +11951,7 @@ const ASK_MINDY_JS = `<script>(function(){
     // Research steps ('progress' events): a calm panel, not warnings. Timer, current step, count, Show steps, and a
     // "still working" line after 20 s of quiet. Collapses to "Researched · N steps · m:ss" once the answer starts
     // (or the turn ends any other way). A phase ('writing'|'checking') is the headline, not a step.
-    var rp=null;
+    var rp=null, turnTag=null;
     function rpFmt(ms){ var s=Math.max(0,Math.floor(ms/1000)); var r=s%60; return Math.floor(s/60)+':'+(r<10?'0':'')+r; }
     function rpCount(n){ return n===1?'1 step':(n+' steps'); }
     function rpList(){ var ol=rp.el.querySelector('.amk-rp-steps'); if(!ol)return; ol.innerHTML='';
@@ -11957,12 +11965,13 @@ const ASK_MINDY_JS = `<script>(function(){
       var text=String(ev.message||'').replace(/ +/g,' ').trim().slice(0,200); if(!text)return;
       if(!rp){
         var el=document.createElement('div'); el.className='amk-rp'; el.setAttribute('role','status'); el.setAttribute('aria-live','polite'); el.setAttribute('data-testid','amk-research');
-        el.innerHTML='<div class="amk-rp-hd"><span class="amk-rp-spin" aria-hidden="true"></span><b>Researching</b> <span class="amk-rp-time">0:00</span><span class="amk-rp-n"></span></div><div class="amk-rp-cur"></div><div class="amk-rp-still" hidden>Still working. Research answers can take a few minutes.</div><button type="button" class="amk-rp-tog" aria-expanded="false" data-testid="amk-research-toggle">Show steps</button><ol class="amk-rp-steps" hidden></ol>';
+        el.innerHTML='<div class="amk-rp-hd"><span class="amk-rp-spin" aria-hidden="true"></span><b>Researching</b> <span class="amk-rp-tag"></span><span class="amk-rp-time">0:00</span><span class="amk-rp-n"></span></div><div class="amk-rp-cur"></div><div class="amk-rp-still" hidden>Still working. Research answers can take a few minutes.</div><button type="button" class="amk-rp-tog" aria-expanded="false" data-testid="amk-research-toggle">Show steps</button><ol class="amk-rp-steps" hidden></ol>';
         aEl.insertBefore(el,bub); if(!started) bub.style.display='none';
         rp={steps:[],total:0,headline:null,start:Date.now(),last:Date.now(),el:el,done:false,timer:null};
         var tog=el.querySelector('.amk-rp-tog'), ol=el.querySelector('.amk-rp-steps');
         tog.onclick=function(){ var open=ol.hidden; ol.hidden=!open; tog.textContent=open?'Hide steps':'Show steps'; tog.setAttribute('aria-expanded',open?'true':'false'); if(open) rpList(); };
         rp.timer=setInterval(rpPaint,1000);
+        if(turnTag){ var rt=el.querySelector('.amk-rp-tag'); rt.textContent=turnTag; rt.setAttribute('data-testid','amk-research-tag'); }
       }
       if(rp.done)return;
       rp.last=Date.now();
@@ -12032,6 +12041,8 @@ const ASK_MINDY_JS = `<script>(function(){
           parts.forEach(function(p){ var line=p.split('\\n').filter(function(l){return l.indexOf('data:')===0;}).map(function(l){return l.slice(5).trim();}).join(''); if(!line)return;
             var ev; try{ ev=JSON.parse(line); }catch(e){ return; }
             if(ev.type==='session'){ sessionId=ev.sessionId||sessionId; }
+            else if(ev.type==='mode'&&ev.mode==='research'&&ev.beta===true){ turnTag=betaLabel(ev.label); betaTag(aEl,turnTag);
+              if(rp&&!rp.done){ var rt=rp.el.querySelector('.amk-rp-tag'); if(rt){ rt.textContent=turnTag; rt.setAttribute('data-testid','amk-research-tag'); } } }
             else if(ev.type==='action'){ try{ onAction(ev,aEl,actTurn); }catch(e){} }
             else if(ev.type==='sources'){ ledger=(ev.ledger&&typeof ev.ledger==='object')?ev.ledger:null; if(turnDoc&&rep&&ledger){ rep.ledger=ledger; repWrite(); } }
             // create_document saved a document: a card under the answer and the report opens in the pane (view mode only).
@@ -12061,6 +12072,7 @@ const ASK_MINDY_JS = `<script>(function(){
           if(!started&&!acc&&!gotError)bub.textContent='Mindy had no answer for that \\u2014 try rephrasing.';
           if(!(turnId&&gotError&&!acc)){ history.push({role:'user',content:shown}); history.push(ledger?{role:'assistant',content:acc,sources:ledger}:{role:'assistant',content:acc}); }
           if(turnFiles&&history.length&&history[history.length-1].role==='assistant') history[history.length-1].files=turnFiles;
+          if(turnTag&&history.length&&history[history.length-1].role==='assistant') history[history.length-1].tag=turnTag;
           if(turnReport&&history.length&&history[history.length-1].role==='assistant') history[history.length-1].report=turnReport;
           saveCard(); saveView(); if(acc)paint(bub,acc);
           // Follow-ups only after a real outcome (report/files) or a finished Q&A answer — never mid-gather.

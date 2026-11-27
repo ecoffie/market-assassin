@@ -85,4 +85,18 @@ describe('chat-sessions: a reopened conversation carries its market report id an
     expect(d.messages[0].deliverables).toEqual({ files: [{ format: 'pdf', document_id: DOC, file_name: 'R.pdf', version: 1 }] });
     expect(d.messages[0].market_report).toEqual({ report_id: REPORT_ID, title: 'R' });
   });
+
+  it('a research-mode beta answer carries its tag label only; standard answers and user rows carry none', async () => {
+    state.messages = [
+      { id: '1', session_id: S1, role: 'user', content: 'Assess Ridgeline', created_at: '1', trace: { engine: 'research_mode', beta: true, label: 'Research · Beta' } },
+      msg('2', { engine: 'research_mode', beta: true, label: 'Research · Beta', model: 'secret-model', calls: [{ tool: 'find_opportunities', args: { q: 'SECRET ARGS' } }] }),
+      msg('3', { engine: 'standard' }),
+      msg('4', null),
+    ];
+    const d = await open();
+    expect(d.messages.map((m: Record<string, unknown>) => m.research_mode)).toEqual([undefined, { label: 'Research · Beta' }, undefined, undefined]);
+    const raw = JSON.stringify(d);
+    expect(raw).not.toContain('secret-model');
+    expect(raw).not.toContain('SECRET ARGS');
+  });
 });

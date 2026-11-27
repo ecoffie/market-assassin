@@ -42,7 +42,7 @@ describe('counting', () => {
     expect(await decide(pro, 9)).toMatchObject({ allowed: true, used: 9, cap: 10, notice: null });
     const capped = await decide(pro, 10);
     expect(capped).toMatchObject({ allowed: false, used: 10 });
-    expect(capped.notice).toBe("You've used today's 10 in-depth research answers, so this one is a standard answer. In-depth research resets tomorrow. The MCP Mid plan includes 15 a day.");
+    expect(capped.notice).toBe("You've used today's 10 research answers on the beta. Standard answers are unlimited; research answers reset tomorrow.");
   });
   it('turns with no tool calls (and non-research turns) are not counted', () => {
     expect(countsTowardCap(trace(0))).toBe(false);
@@ -82,12 +82,13 @@ describe('config, not code', () => {
   });
 });
 
-describe('notice text', () => {
-  it('names the next plan up; the top plan and account overrides get no upsell', () => {
-    expect(capNotice(2, 'free', cfg)).toMatch(/today's 2 in-depth research answers.*resets tomorrow\. The Pro plan includes 10 a day\.$/);
-    expect(capNotice(25, 'mcp_growth', cfg)).not.toMatch(/plan includes/);
-    expect(capNotice(40, 'account', cfg)).not.toMatch(/plan includes/);
-    expect(capNotice(1, 'free', researchCapsConfig({ ASK_MINDY_RESEARCH_CAPS: '{"free":1}' }))).toMatch(/today's 1 in-depth research answer,/);
+describe('notice text (beta allowance, plain language)', () => {
+  it('reads as a beta allowance with no plan names, never an error', () => {
+    expect(capNotice(2, 'free', cfg)).toBe("You've used today's 2 research answers on the beta. Standard answers are unlimited; research answers reset tomorrow.");
+    expect(capNotice(1, 'free', cfg)).toBe("You've used today's 1 research answer on the beta. Standard answers are unlimited; research answers reset tomorrow.");
+    for (const t of [capNotice(25, 'mcp_growth', cfg), capNotice(40, 'account', cfg), capNotice(10, 'pro_monthly', cfg)]) {
+      expect(t).not.toMatch(/plan|Pro|MCP|Team|error|limit reached/i);
+    }
   });
 });
 
