@@ -51,12 +51,13 @@ interface PricingData {
     competitiveRate: number;
     premiumRate: number;
   };
-  topVendors: Array<{
+  /** Missing/null = the API did not return a vendor list (unknown, never 0). An empty array = none found. */
+  topVendors?: Array<{
     name: string;
     avgRate: number;
     recordCount: number;
     businessSize: string;
-  }>;
+  }> | null;
   naicsCode: string;
   naicsDescription: string;
   totalRecordsAnalyzed: number;
@@ -68,6 +69,12 @@ interface Props {
 }
 
 const fmtMoney = (n: number) => `$${n.toFixed(2)}`;
+
+/** "Top vendors found" tile: a real count only when the API returned a vendor list; unknown is never 0. */
+export function vendorCountStat(topVendors: PricingData['topVendors']): { value: string; hint: string } {
+  if (!Array.isArray(topVendors)) return { value: 'Not available', hint: 'vendor list not returned' };
+  return { value: String(topVendors.length), hint: 'ranked by record count' };
+}
 
 export default function PricingIntelPanel({ email, tier }: Props) {
   const isFree = tier === 'free';
@@ -317,8 +324,7 @@ export default function PricingIntelPanel({ email, tier }: Props) {
               />
               <StatCard
                 label="Top vendors found"
-                value={String(data.topVendors.length)}
-                hint="ranked by record count"
+                {...vendorCountStat(data.topVendors)}
               />
             </div>
           </div>
@@ -383,7 +389,7 @@ export default function PricingIntelPanel({ email, tier }: Props) {
           </div>
 
           {/* Top vendors — quick view of who's competing in this NAICS */}
-          {data.topVendors.length > 0 && (
+          {Array.isArray(data.topVendors) && data.topVendors.length > 0 && (
             <div className="rounded-lg border border-surface bg-ground/40 overflow-hidden">
               <div className="px-4 py-3 border-b border-surface">
                 <h3 className="text-sm font-semibold text-white">Top Vendors</h3>
@@ -447,8 +453,8 @@ function RateTile({
   return (
     <div className={`rounded-lg border bg-ground/40 p-4 ${accent.split(' ')[0]}`}>
       <div className={`text-xs font-semibold uppercase tracking-wider ${accent.split(' ')[1]}`}>{label}</div>
-      <div className="mt-1 text-3xl font-bold text-white">{fmtMoney(rate)}</div>
-      <div className="mt-1 text-xs text-faint">{hint}/hr · {hint}</div>
+      <div className="mt-1 text-3xl font-bold text-white">{fmtMoney(rate)}<span className="text-sm font-normal text-faint">/hr</span></div>
+      <div className="mt-1 text-xs text-faint">{hint}</div>
     </div>
   );
 }
