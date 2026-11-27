@@ -12060,7 +12060,7 @@ const ASK_MINDY_JS = `<script>(function(){
     // source ledger saved with the report is what lets "revise it" resolve to THAT document. It rides along as
     // the oldest assistant turn (the server verifies the signature and the owner; a forged one is ignored).
     if(!oppCtx&&!history.length&&rep&&rep.ledger&&rep.email===em){ history.push({role:'assistant',content:'I saved your report'+(rep.title?' "'+rep.title+'"':'')+' to your Vault.',sources:rep.ledger}); }
-    var payload={email:em,message:sendMsg,sessionId:sessionId||undefined,history:history.slice(-8).map(function(h){ return h.sources?{role:h.role,content:h.content,sources:h.sources}:{role:h.role,content:h.content}; }),display:'narrow_panel'};
+    var payload={email:em,message:sendMsg,sessionId:sessionId||undefined,history:history.slice(-8).map(function(h){ return h.sources?{role:h.role,content:h.content,sources:h.sources}:{role:h.role,content:h.content}; }),display:'narrow_panel',surface:'map'};
     if(shotsAtSend.length) payload.images=shotsAtSend.map(function(x){ return {media_type:x.media_type,data:x.data}; });
     if(attAtSend){ payload.context={kind:'opportunity',notice_id:attAtSend.id}; try{ if(window.__track) window.__track('tool_use','ask_mindy_with_notice',{}); }catch(e){} }
     if(oppCtx){ payload.context={kind:'opportunity',notice_id:oppCtx.id}; payload.turn_id=turnId; if(opts.replay)payload.replay_only=true;

@@ -212,5 +212,14 @@ describe('Ask Mindy controls the Map', () => {
     expect(t.doc.querySelector('[data-testid="amk-action-undo"]')).toBeNull();
   });
 
+
+  it('the Map tells the server which surface it is (surface: map) so the right actions are offered', async () => {
+    const t = boot({ actions: true });
+    const bodies: Array<Record<string, unknown>> = [];
+    const orig = t.w.fetch as unknown as (u: string, i?: { body?: string }) => unknown;
+    t.w.fetch = ((u: string, i?: { body?: string }) => { if (u === '/api/app/chat') bodies.push(JSON.parse(String(i?.body))); return orig(u, i); }) as never;
+    await t.send('q');
+    expect(bodies[0]).toMatchObject({ display: 'narrow_panel', surface: 'map' });
+  });
 });
 
