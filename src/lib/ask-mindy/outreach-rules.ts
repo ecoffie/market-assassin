@@ -18,8 +18,10 @@ export const QUESTION_OVER_PROFILE =
 
 /** No data-freshness dates in what the customer reads. */
 export const NO_DATA_DATES =
-  'DATES: never print how current Mindy\'s data is or when a record was read ("as of", "data through", "record from'
-  + ' <date>", "retrieved"). Say what the record shows. Dates that are facts about the work stay: response deadlines,'
+  'DATES: never print how current Mindy\'s data is or when a record was read ("as of", "data through", "current through",'
+  + ' "record from <date>", "retrieved", "verified on", "last updated"), even when a tool result carries that date. Say what'
+  + ' the record shows. When data may be behind, say so in words without a date ("recent awards may not appear yet",'
+  + ' "confirm on SAM.gov before relying on it"); never drop that warning. Dates that are facts about the work stay: response deadlines,'
   + ' contract end dates, registration expiry, campaign timing, and caveats such as "defense awards publish about 90 days'
   + ' late, so a missing recent award does not mean they stopped buying". Contacts carry no dates either: cite their source'
   + ' with a citation marker.';

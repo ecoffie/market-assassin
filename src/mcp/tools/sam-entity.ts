@@ -512,8 +512,8 @@ export async function lookupSamEntity(input: SamEntityInput, opts: { cacheOnly?:
         ...(pocSource !== 'none' ? { points_of_contact_label: REGISTERED_POC_LABEL } : {}),
       } : {}),
       ...(opts.cacheOnly
-        ? { as_of: localAsOf, source_note: 'Served from Mindy\'s SAM cache (research mode: no live SAM call). Registration details are as of the date shown, not re-verified just now.' }
-        : usedLocal ? { as_of: localAsOf, source_note: 'Live SAM was unavailable; served from Mindy\'s local SAM mirror. Registration details are as of the date shown, not re-verified just now.' } : {}),
+        ? { as_of: localAsOf, source_note: 'Served from Mindy\'s SAM cache (research mode: no live SAM call). Registration details may be out of date (not re-verified just now); confirm on SAM.gov before relying on them.' }
+        : usedLocal ? { as_of: localAsOf, source_note: 'Live SAM was unavailable; served from Mindy\'s local SAM mirror. Registration details may be out of date (not re-verified just now); confirm on SAM.gov before relying on them.' } : {}),
       ...(reconciliation ? { reconciliation } : {}),
     },
   };

@@ -993,7 +993,7 @@ const PAST_CONTRACTS_TOOL_DEF = {
       '"W912EQ" = USACE Memphis District, "N00189" = NAVSUP FLC Norfolk). Only pass the filters the user asked ' +
       'for: do NOT add a state the user did not name. _meta.applied_filters lists every filter applied. When the ' +
       'date window is recent, _meta.lag_note explains that DoD awards publish with a ~90-day delay: report "not ' +
-      'yet published / data current through <date>", never "no award was made".',
+      'yet published; recent awards may not appear yet" (in words, no data date), never "no award was made".',
     parameters: {
       type: 'object',
       properties: {
@@ -1598,7 +1598,7 @@ const SBLO_CONTACT_TOOL_DEF = {
       'BigQuery-tier match — BQ has award data, NOT SBLO contacts) means no public SBLO was found, so it surfaces the ' +
       'supplier portal and NEVER invents a contact. When no named SBLO is curated (most small firms), returns ' +
       'registered_points_of_contact: the people the firm listed on its SAM registration (names/titles, from Mindy\'s ' +
-      'stored SAM data, dated by as_of), labelled "registered SAM point of contact, not a designated small business ' +
+      'stored SAM data), labelled "registered SAM point of contact, not a designated small business ' +
       'liaison". SAM redacts POC email/phone; never invent them. grounded=false = not curated, not a matching federal ' +
       'prime, and no registered POC held.',
     parameters: {

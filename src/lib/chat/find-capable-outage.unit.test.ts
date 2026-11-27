@@ -48,7 +48,8 @@ describe('find_capable_contractors: an outage is never "none found"', () => {
     mode = 'unavailable';
     const r = await run({ naics: '541512' });
     expect(r).toMatchObject({ count: 1, degraded: true, served_from: 'last_good', snapshot_at: '2026-11-10T12:00:00.000Z' });
-    expect(String(r.note)).toMatch(/saved answer from 2026-11-10/);
+    expect(String(r.note)).toMatch(/saved answer from an earlier lookup; they may be out of date/); // snapshot_at stays in the data; no date in the note (2026-11-27)
+    expect(String(r.note)).not.toMatch(/2026-11-10/);
     const { classifyBillingOutcome } = await import('@/lib/mcp/credit-integrity');
     expect(classifyBillingOutcome(r)).toBe('nonbillable_system_failure');
   });

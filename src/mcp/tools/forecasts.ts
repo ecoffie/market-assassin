@@ -127,7 +127,7 @@ export async function agencyForecasts(input: ForecastsToolInput): Promise<Foreca
     const top = res.forecasts[0];
     result._ai_hint = {
       summary: res.served_from === 'last_good'
-        ? `Live forecast lookup errored; these ${res.forecasts.length} results are a saved answer from ${res.snapshot_at}. Say so; do not present them as current.`
+        ? `Live forecast lookup errored; these ${res.forecasts.length} results are a saved answer from an earlier lookup and may be out of date. Say so in words (no date); do not present them as current.`
         : res.degraded
         ? 'Forecast lookup errored — retry; do not state there are no forecasts.'
         : grounded
