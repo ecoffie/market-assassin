@@ -122,6 +122,7 @@ import { ASK_MINDY_RULES_LAYER, askMindyRulesEnabledFor, askMindyRulesPromptBloc
 import { askMindyRecipesEnabledFor } from '@/lib/ask-mindy/flags';
 import { loadCompanyProfile } from '@/lib/ask-mindy/company-profile';
 import { intelligenceGateEnabledFor, runIntelligenceGate, type GateResult } from '@/lib/ask-mindy/intelligence-gate';
+import { helpAnswerFor, helpAnswersEnabledFor } from '@/lib/ask-mindy/help-answers';
 import Anthropic from '@anthropic-ai/sdk';
 import {
   researchModeEnabledFor, researchModel, researchSystemPrompt, toAnthropicTools, runResearchLoop, groundAnswer, progressLine,
@@ -706,6 +707,25 @@ export async function POST(request: NextRequest) {
       try {
         // Tell client which session this exchange belongs to right away
         send({ type: 'session', sessionId });
+
+        // Help answers (beta, ASK_MINDY_HELP_ANSWERS, default off; src/lib/ask-mindy/help-answers.ts): a plain how-to
+        // question is answered from the register, with no tools and no research run. No match, card chat, or a turn
+        // with screenshots falls through unchanged.
+        const help = !cardCtx && !turnImages.length && helpAnswersEnabledFor(auth.email)
+          ? helpAnswerFor(splitViewPreamble(message).rest || message, { hasAttachedOpportunity: !!selectedCtx, actionsEnabled: false })
+          : null;
+        if (help) {
+          send({ type: 'token', content: help.text });
+          send({ type: 'citations', sources: [] });
+          send({ type: 'done' });
+          closeStream();
+          persistExchange({
+            email: auth.email!, sessionId, userMessage: message, assistantMessage: help.text, citedSources: [],
+            tokensUsed: 0, latencyMs: Date.now() - startedAt,
+            trace: { engine: 'help_answer', help_id: help.id, help_kind: help.kind },
+          }).catch((err) => console.error('[chat] persist failed:', err));
+          return;
+        }
 
         // Load ONLY the bidder profile for context. The ENTIRE RAG corpus — the 8-year
         // teaching/curriculum chunks AND the podcast episodes — was REMOVED (Eric 2026-08-02:
