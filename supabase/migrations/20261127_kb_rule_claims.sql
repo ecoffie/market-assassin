@@ -12,10 +12,10 @@
 -- Idempotent and additive: new table only. Apply with `npm run migrate -- --go --only 20261127_kb_rule_claims.sql`.
 
 CREATE TABLE IF NOT EXISTS kb_rule_claims (
-  claim_id              text PRIMARY KEY CHECK (claim_id ~ '^KB-[0-9]+$'),
+  claim_id              text PRIMARY KEY CHECK (claim_id ~ '^KB-([CX])?[0-9]+$'),  -- KB-n rules, KB-Cn consortia, KB-Xn other checks
   kb_doc                text NOT NULL,                 -- the repo file the claim comes from
   entry_no              int  NOT NULL,
-  part                  text NOT NULL CHECK (part IN ('A', 'B', 'C')),
+  part                  text NOT NULL CHECK (part IN ('A', 'B', 'C', 'D')),  -- D = Fix 1C verification rows
   claim                 text NOT NULL,                 -- the entry heading: one sentence a report can carry
   change                text,
   source_text           text,
@@ -25,11 +25,11 @@ CREATE TABLE IF NOT EXISTS kb_rule_claims (
   how_to_use            text,
   practice_text         text,                          -- Part C only (GovCon Giants practice, not law)
   -- [{url, kind: official|official_mirror|secondary, fetch_status: ok|fetch_failed|not_fetched_secondary,
-  --   passage, fetched_from, fetched_at, fetch_error, absent_phrases}]
+  --   passage, fetched_from, fetched_at, fetch_error, absent_phrases}]  (consortium_primary for Fix 1C rows)
   sources               jsonb NOT NULL DEFAULT '[]'::jsonb,
   legal_status          text NOT NULL CHECK (legal_status IN (
                           'final_rule', 'class_deviation', 'proposed_rule', 'statute', 'withdrawn',
-                          'executive_order', 'omb_memo', 'agency_memo', 'regulation', 'practice')),
+                          'executive_order', 'omb_memo', 'agency_memo', 'regulation', 'practice', 'operational_fact')),
   effective_date        date,
   verified              boolean NOT NULL,              -- false when the entry carries any [Not fully verified] tag
   caveats               text[] NOT NULL DEFAULT '{}',  -- every [Not fully verified: …] caveat, verbatim

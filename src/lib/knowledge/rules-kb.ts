@@ -24,16 +24,22 @@ export type LegalStatus =
   | 'omb_memo'
   | 'agency_memo'
   | 'regulation'
-  | 'practice';
+  | 'practice'
+  /** A verified fact about the market (a consortium is issuing calls), not a rule. Fix 1C register rows. */
+  | 'operational_fact';
 
-export type SourceKind = 'official' | 'official_mirror' | 'secondary';
+export type SourceKind = 'official' | 'official_mirror' | 'secondary' | 'consortium_primary';
 export type RegisterStatus = 'current' | 'superseded' | 'unverified' | 'pending';
 
 export interface RuleSource {
   url: string;
   kind: SourceKind;
   /** Filled by the fetch step (scripts/kb/fetch-rule-sources.ts). Absent until then. */
-  fetch_status?: 'ok' | 'fetch_failed' | 'not_fetched_secondary';
+  /**
+   * ok = the official text was fetched by scripts/kb/fetch-rule-sources.ts and `passage` is its own words.
+   * research_note = a Fix 1C row: `passage` is the dated evidence recorded by the verification check, not quoted text.
+   */
+  fetch_status?: 'ok' | 'fetch_failed' | 'not_fetched_secondary' | 'research_note';
   passage?: string | null;
   fetched_at?: string | null;
   fetch_error?: string | null;
@@ -42,7 +48,8 @@ export interface RuleSource {
 export interface RuleEntry {
   claim_id: string; // "KB-1" … "KB-16"
   entry_no: number;
-  part: 'A' | 'B' | 'C';
+  /** A/B/C = the rules file's parts; D = Fix 1C verification rows (consortia, 2808a). */
+  part: 'A' | 'B' | 'C' | 'D';
   /** The entry heading, verbatim (minus the "[Not fully verified]" tag). One sentence a report can carry. */
   claim: string;
   change: string | null;
@@ -80,6 +87,10 @@ export const RECHECK_DAYS: Record<LegalStatus, number> = {
   executive_order: 180,
   omb_memo: 180,
   practice: 180,
+  // Eric's Fix 1: "consortium is active and issuing calls" = re-verify before EVERY use. With interval 0, checkClaims
+  // reports such a claim as stale (→ "Not currently confirmed.") unless it was re-verified the same day. Intended.
+  // Follow-up (not built): a recheck job that re-verifies these rows before a report runs.
+  operational_fact: 0,
   statute: 365,
   final_rule: 365,
   regulation: 365,
@@ -367,4 +378,58 @@ export function rankRuleClaims<T extends Rankable>(query: string, rows: T[], lim
     .sort((a, b) => b.score - a.score || a.r.claim_id.localeCompare(b.r.claim_id))
     .slice(0, limit)
     .map((s) => s.r);
+}
+
+// ── Fix 1C verification rows (consortia, 2808a) ──────────────────────────────────────────────
+
+export interface VerificationFile {
+  doc: string;
+  checked_on: string;
+  method: string;
+  rows: Array<{
+    claim_id: string; short: string; name: string; claim: string;
+    status: RegisterStatus; verified: boolean; interval?: number;
+    sources: Array<{ url: string; kind: SourceKind; evidence: string; exact_url: boolean }>;
+    notes: string | null; supersedes: string | null;
+  }>;
+}
+
+/**
+ * Register rows from the verification file (docs/knowledge/consortia-status-2026-11-27.json). Conditions (Agent 4
+ * review): verified=true only where a primary page was opened; changed-sponsor claims name the CURRENT sponsor and
+ * the old one goes to supersedes; not-established rows say "No confirmed active calls for …" and are unverified —
+ * never "dead". Evidence dates live in sources, never in the claim text.
+ */
+export function buildVerificationRows(file: VerificationFile): RegisterRow[] {
+  return file.rows.map((v, i) => {
+    const sources = v.sources.map((s) => ({
+      url: s.url, kind: s.kind,
+      fetch_status: 'research_note' as const,
+      passage: s.evidence,
+      fetched_from: s.url, fetched_at: file.checked_on, fetch_error: null,
+    }));
+    const legal: LegalStatus = v.claim_id.startsWith('KB-X') ? 'agency_memo' : 'operational_fact';
+    return {
+      claim_id: v.claim_id,
+      entry_no: 100 + i + 1,
+      part: 'D' as const,
+      claim: v.claim,
+      change: null, source_text: null, status_text: null, affects: null, common_mistake: null, how_to_use: null,
+      practice_text: null,
+      keywords: [v.short, v.name],
+      sources,
+      legal_status: legal,
+      effective_date: null,
+      verified: v.verified,
+      caveats: v.verified ? [] : ['[Not fully verified: backed by a secondary source, or a primary page was not opened.]'],
+      recheck_interval_days: v.interval ?? RECHECK_DAYS[legal],
+      status: v.status,
+      verified_on: file.checked_on,
+      supersedes: v.supersedes,
+      superseded_by: null,
+      notes: v.notes,
+      kb_doc: file.doc,
+      search_text: [v.claim_id, v.claim, v.name, v.short, v.notes, ...v.sources.map((s) => s.evidence)].filter(Boolean).join('\n'),
+    };
+  });
 }

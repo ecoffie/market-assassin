@@ -10,15 +10,19 @@
  */
 import { readFileSync } from 'node:fs';
 import { createClient } from '@supabase/supabase-js';
-import { buildRegisterRows, parseRulesKb, RULES_KB_DOC, type SourcesSnapshot } from '../../src/lib/knowledge/rules-kb';
+import { buildRegisterRows, buildVerificationRows, parseRulesKb, RULES_KB_DOC, type SourcesSnapshot, type VerificationFile } from '../../src/lib/knowledge/rules-kb';
 
 const SNAPSHOT = 'docs/knowledge/how-government-buys-now-2026-11-27.sources.json';
+const VERIFICATION = 'docs/knowledge/consortia-status-2026-11-27.json';
 
 async function main() {
   const go = process.argv.includes('--go');
   const entries = parseRulesKb(readFileSync(RULES_KB_DOC, 'utf8'));
   const snapshot = JSON.parse(readFileSync(SNAPSHOT, 'utf8')) as SourcesSnapshot;
-  const rows = buildRegisterRows(entries, snapshot);
+  const rows = [
+    ...buildRegisterRows(entries, snapshot),
+    ...buildVerificationRows(JSON.parse(readFileSync(VERIFICATION, 'utf8')) as VerificationFile),
+  ];
 
   const srcs = rows.flatMap((r) => r.sources);
   const count = (f: (s: (typeof srcs)[number]) => boolean) => srcs.filter(f).length;
@@ -26,7 +30,7 @@ async function main() {
   console.log(`  verified=false: ${rows.filter((r) => !r.verified).length} (${rows.filter((r) => !r.verified).map((r) => r.claim_id).join(', ')})`);
   console.log(`  status: ${Object.entries(rows.reduce<Record<string, number>>((a, r) => ({ ...a, [r.status]: (a[r.status] ?? 0) + 1 }), {})).map(([k, v]) => `${k}=${v}`).join(' ')}`);
   console.log(`  legal_status: ${Object.entries(rows.reduce<Record<string, number>>((a, r) => ({ ...a, [r.legal_status]: (a[r.legal_status] ?? 0) + 1 }), {})).map(([k, v]) => `${k}=${v}`).join(' ')}`);
-  console.log(`  sources: ${srcs.length} (official ok ${count((s) => s.kind !== 'secondary' && s.fetch_status === 'ok')}, fetch_failed ${count((s) => s.fetch_status === 'fetch_failed')}, secondary not fetched ${count((s) => s.fetch_status === 'not_fetched_secondary')})`);
+  console.log(`  sources: ${srcs.length} (official ok ${count((s) => s.kind !== 'secondary' && s.fetch_status === 'ok')}, fetch_failed ${count((s) => s.fetch_status === 'fetch_failed')}, secondary not fetched ${count((s) => s.fetch_status === 'not_fetched_secondary')}, Fix 1C research notes ${count((s) => s.fetch_status === 'research_note')})`);
   const sample = rows.find((r) => r.claim_id === 'KB-6')!;
   console.log('\nsample row (KB-6):', JSON.stringify({ ...sample, search_text: `${sample.search_text.length} chars`, sources: sample.sources.map((s) => ({ ...s, passage: s.passage ? `${s.passage.slice(0, 120)}…` : null })) }, null, 2));
 
@@ -48,9 +52,9 @@ async function main() {
   const { error } = await db.from('kb_rule_claims').upsert(payload, { onConflict: 'claim_id' });
   if (error) throw new Error(`upsert failed: ${error.message}`);
   // Verify against the table, not the client's "ok".
-  const { count: n, error: cErr } = await db.from('kb_rule_claims').select('claim_id', { count: 'exact', head: true }).eq('kb_doc', RULES_KB_DOC);
+  const { count: n, error: cErr } = await db.from('kb_rule_claims').select('claim_id', { count: 'exact', head: true }).in('kb_doc', [RULES_KB_DOC, VERIFICATION]);
   if (cErr) throw new Error(`verify read failed: ${cErr.message}`);
-  console.log(`\nupserted ${payload.length}; table now holds ${n} rows for ${RULES_KB_DOC}`);
+  console.log(`\nupserted ${payload.length}; table now holds ${n} rows for ${RULES_KB_DOC} + ${VERIFICATION}`);
   if (n !== rows.length) process.exitCode = 1;
 }
 

@@ -175,3 +175,59 @@ describe('DB reads (rules-kb-db)', () => {
     expect(c.ok && c.checks[0].state).toBe('ok');
   });
 });
+
+describe('Fix 1C verification rows (consortia, 2808a)', async () => {
+  const { buildVerificationRows, FRESHNESS_PHRASE: FP } = await import('./rules-kb');
+  const file = JSON.parse(readFileSync(join(process.cwd(), 'docs/knowledge/consortia-status-2026-11-27.json'), 'utf8'));
+  const v = buildVerificationRows(file);
+  const vb = Object.fromEntries(v.map((r) => [r.claim_id, r]));
+  it('23 consortia + 2808a, part D, unique ids that do not collide with the rules', () => {
+    expect(v).toHaveLength(24);
+    expect(v.filter((r) => r.claim_id.startsWith('KB-C'))).toHaveLength(23);
+    expect(new Set([...v, ...rows].map((r) => r.claim_id)).size).toBe(40);
+    expect(v.every((r) => r.part === 'D')).toBe(true);
+  });
+  it('consortium claims are interval 0: stale unless re-verified the same day (→ "Not currently confirmed.")', () => {
+    const c = vb['KB-C8'];
+    expect(c.recheck_interval_days).toBe(0);
+    expect(checkClaims(['KB-C8'], v, file.checked_on)[0].state).toBe('ok');
+    expect(checkClaims(['KB-C8'], v, '2026-11-28')[0].state).toBe('stale');
+  });
+  it('not-established rows: unverified, "No confirmed active calls for …", never "dead"', () => {
+    const ne = v.filter((r) => r.status === 'unverified');
+    expect(ne.map((r) => r.claim_id).sort()).toEqual(['KB-C12', 'KB-C23', 'KB-C3', 'KB-C4', 'KB-C6'].sort());
+    for (const r of ne) {
+      expect(r.claim).toMatch(/^No confirmed active calls for /);
+      expect(r.claim).not.toMatch(/\b(dead|defunct|ended|inactive|closed)\b/i);
+      expect(checkClaims([r.claim_id], v, file.checked_on)[0].state).toBe('unverified');
+    }
+    expect(vb['KB-C23'].notes).toMatch(/no evidence of enactment/);
+  });
+  it('changed-sponsor rows quote the CURRENT sponsor; the old one is in supersedes', () => {
+    expect(vb['KB-C2'].claim).toMatch(/PEO IEW&S and Marine Corps Systems Command/);
+    expect(vb['KB-C2'].supersedes).toMatch(/Army DEVCOM/);
+    expect(vb['KB-C11'].claim).toMatch(/Corps of Engineers/);
+    expect(vb['KB-C15'].claim).toMatch(/FutureG Office and TRMC/);
+    expect(vb['KB-C22'].claim).toMatch(/WIRE/);
+    expect(vb['KB-C22'].supersedes).toMatch(/MCEIP/);
+  });
+  it('verified=true only with a primary page; snippet-only / unresolved hosts are false', () => {
+    for (const id of ['KB-C4', 'KB-C6', 'KB-C13', 'KB-C21', 'KB-X1']) expect(vb[id].verified, id).toBe(false);
+    for (const id of ['KB-C1', 'KB-C8', 'KB-C17']) expect(vb[id].verified, id).toBe(true);
+    for (const r of v.filter((x) => x.verified)) {
+      expect(r.sources.some((s) => s.kind === 'consortium_primary' || s.kind === 'official'), r.claim_id).toBe(true);
+    }
+  });
+  it('no freshness dates in claim text; dates live in sources', () => {
+    for (const r of v) {
+      expect(FP.test(r.claim), r.claim).toBe(false);
+      expect(r.claim, r.claim_id).not.toMatch(/\b20\d\d-\d\d-\d\d\b|\b(January|February|March|April|May|June|July|August|September|October|November|December) \d{1,2}, 20\d\d\b/);
+    }
+    expect(vb['KB-X1'].claim).toBe("No DoW-wide implementing guidance yet for construction other transactions under 10 U.S.C. 2808a; USACE has published a playbook, 'Executing PDB with OTA'.");
+    expect(vb['KB-X1'].sources.map((s) => s.passage).join(' ')).toMatch(/12 June 2026/);
+  });
+  it('retrieval finds a consortium by name', () => {
+    expect(rankRuleClaims('MTEC medical consortium', [...rows, ...v])[0].claim_id).toBe('KB-C7');
+    expect(rankRuleClaims('2808a construction OTA guidance', [...rows, ...v])[0].claim_id).toBe('KB-X1');
+  });
+});
