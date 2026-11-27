@@ -18,7 +18,8 @@ import { createClient } from '@supabase/supabase-js';
 import { normalizeAgencyKey, isValidDodaac } from '@/lib/gov-contacts/agency-key';
 import { displayContactName } from '@/lib/gov-contacts/contact-quality';
 import { searchEventsViaAI } from '@/lib/events/ai-event-discovery';
-import { catalogOccurrencesForAgency } from '@/lib/events/catalog-occurrences';
+import { catalogOccurrencesForAgency, catalogOccurrencesForStates } from '@/lib/events/catalog-occurrences';
+import { regionalCoverage, regionalEventsForStates, type RegionalEvent } from '@/lib/events/regional-catalog';
 import { cleanEventLocation } from '@/lib/events/location';
 import { loadHiddenRows, loadRetiredSourceNoticeIds, notInList } from '@/lib/events/event-currency-live';
 import type { HiddenReason } from '@/lib/events/event-currency';
@@ -50,6 +51,27 @@ export interface FederalEventsInput {
   /** Current year, passed in for the AI year-biasing (e.g. "AFCEA 2026"). */
   currentYear: number;
   limit?: number;
+  /**
+   * Optional LOCATION filter: 2-letter state codes (normalized by the caller). SAM rows match on the notice's place
+   * of performance (sam_opportunities.pop_state), else the buying office's state (office_address.state) — never on
+   * the free-text event_location. Rows whose location cannot be established are COUNTED (locationUnknownCount),
+   * never returned as matches and never silently dropped. With states set, agency becomes optional.
+   */
+  states?: string[];
+  /** Optional city inside the requested state(s): orders that city's regional rows first. Never widens the filter. */
+  nearCity?: string | null;
+}
+
+/** How a SAM event's state was established for the location filter. */
+export type EventStateBasis = 'place_of_performance' | 'buying_office' | 'unknown';
+
+/** Pure: the state a SAM event is placed in, from its notice's own fields. Free-text location is never used. */
+export function eventStateFor(loc: { pop_state?: string | null; office_address?: { state?: string | null } | null } | null | undefined): { state: string | null; basis: EventStateBasis } {
+  const pop = (loc?.pop_state || '').trim().toUpperCase();
+  if (/^[A-Z]{2}$/.test(pop)) return { state: pop, basis: 'place_of_performance' };
+  const off = (loc?.office_address?.state || '').trim().toUpperCase();
+  if (/^[A-Z]{2}$/.test(off)) return { state: off, basis: 'buying_office' };
+  return { state: null, basis: 'unknown' };
 }
 
 export interface FederalEvent {
@@ -67,6 +89,9 @@ export interface FederalEvent {
   description: string | null;
   matched_office: string | null; // the decoded buying office, not "DEFENSE"
   confidence: number | null; // AI rows only (0..1); null for grounded SAM rows
+  /** Set when a state filter ran: the event's state and how it was established. */
+  state?: string | null;
+  state_basis?: EventStateBasis | 'catalog_venue';
   /** Set only with `includeHidden`: why a normal listing leaves this row out. */
   hidden_reason?: HiddenReason | null;
 }
@@ -82,6 +107,22 @@ export interface FederalEventsResult {
   /** off = not requested; ran = executed; unavailable = requested but Serper/Groq not configured. */
   aiDiscovery: 'off' | 'ran' | 'unavailable';
   degraded: boolean; // the grounded SAM read hard-failed
+  /**
+   * Location filter report (null when no state filter ran). location_unknown = SAM rows in the window whose state
+   * could not be established — reported as "N more with no stated location", never shown as matches. null = the
+   * location lookup itself failed (unknown, not zero).
+   */
+  locationFilter: {
+    states: string[];
+    matched: number;
+    matched_by_place_of_performance: number;
+    matched_by_buying_office: number;
+    other_states: number;
+    location_unknown: number | null;
+  } | null;
+  /** State/regional matchmakers + APEX events for the requested states (official organizer pages only). */
+  regional: RegionalEvent[];
+  regionalCoverage: { covered: string[]; not_covered: string[]; fallback: { name: string; url: string } } | null;
 }
 
 type SamEventRow = {
@@ -132,6 +173,12 @@ export async function queryFederalEvents(input: FederalEventsInput): Promise<Fed
   // strips everything (all-stopword input).
   const key = normalizeAgencyKey(agency) || agency;
   const term = key.replace(/[%_,]/g, ' ').trim();
+  const states = [...new Set((input.states || []).map((x) => x.trim().toUpperCase()).filter((x) => /^[A-Z]{2}$/.test(x)))];
+  const hasStates = states.length > 0;
+  // With a location filter the SAM read takes the whole window (the upcoming attendable set is small, ~100 rows),
+  // then filters by the joined notice location, then applies the limit.
+  const readLimit = hasStates ? 500 : limit;
+  let locationFilter: FederalEventsResult['locationFilter'] = null;
 
   let degraded = false;
   const events: FederalEvent[] = [];
@@ -140,12 +187,11 @@ export async function queryFederalEvents(input: FederalEventsInput): Promise<Fed
   let samNoticeTotal: number | null = null;
 
   // ── Source 1: sam_events (grounded, dated) ────────────────────────────────
-  if (term) {
+  if (term || hasStates) {
     const byAgency = (q: ReturnType<ReturnType<typeof supabase.from>['select']>) =>
-      q
-        .or(`agency.ilike.%${term}%,inferred_office.ilike.%${term}%,inferred_subagency.ilike.%${term}%`)
+      (term ? q.or(`agency.ilike.%${term}%,inferred_office.ilike.%${term}%,inferred_subagency.ilike.%${term}%`) : q)
         .order('event_date', { ascending: true, nullsFirst: false })
-        .limit(limit);
+        .limit(readLimit);
     // An attendable event whose notice states no date keeps event_date NULL (the extractor no
     // longer substitutes the response deadline). Those are returned as "date unknown" when the
     // notice was re-read recently, so an industry day is not hidden just because its date is.
@@ -186,8 +232,27 @@ export async function queryFederalEvents(input: FederalEventsInput): Promise<Fed
       }
       return unique;
     };
-    const attendable = dedup(attendableRes.data);
-    const notices = dedup(noticeRes.data);
+    let attendable = dedup(attendableRes.data);
+    let notices = dedup(noticeRes.data);
+    const stateOf = new Map<string, { state: string | null; basis: EventStateBasis }>();
+    if (hasStates) {
+      const ids = [...new Set([...attendable, ...notices].map((r) => r.notice_id).filter(Boolean) as string[])];
+      const locs = await loadNoticeLocations(supabase, ids);
+      const lf = { states, matched: 0, matched_by_place_of_performance: 0, matched_by_buying_office: 0, other_states: 0, location_unknown: 0 as number | null };
+      const keep = (r: SamEventRow) => {
+        const s0 = locs ? eventStateFor(locs.get(r.notice_id || '')) : { state: null, basis: 'unknown' as const };
+        stateOf.set(r.notice_id || r.title, s0);
+        if (!s0.state) { if (lf.location_unknown != null) lf.location_unknown++; return false; }
+        if (!states.includes(s0.state)) { lf.other_states++; return false; }
+        lf.matched++;
+        if (s0.basis === 'place_of_performance') lf.matched_by_place_of_performance++; else lf.matched_by_buying_office++;
+        return true;
+      };
+      attendable = attendable.filter(keep);
+      notices = notices.filter(keep);
+      if (!locs) lf.location_unknown = null; // the lookup failed: unknown, not zero
+      locationFilter = lf;
+    }
     const slots = allocateEventSlots(attendable.length, notices.length, limit);
     for (const row of [...attendable.slice(0, slots.attendable), ...notices.slice(0, slots.notices)]) {
       const isAi = row.source === 'ai_web_search'; // AI rows already backfilled into the table
@@ -202,6 +267,7 @@ export async function queryFederalEvents(input: FederalEventsInput): Promise<Fed
         matched_office: row.inferred_office || row.inferred_subagency || row.agency || null,
         confidence: isAi && typeof row.confidence === 'number' ? row.confidence : null,
         ...(input.includeHidden ? { hidden_reason: hiddenById.get(row.notice_id || '') ?? null } : {}),
+        ...(hasStates ? { state: stateOf.get(row.notice_id || row.title)?.state ?? null, state_basis: stateOf.get(row.notice_id || row.title)?.basis ?? 'unknown' } : {}),
       });
     }
   }
@@ -212,7 +278,10 @@ export async function queryFederalEvents(input: FederalEventsInput): Promise<Fed
   // row is dropped, so one event never appears twice.
   let catalogCount = 0;
   if (input.includeCatalog) {
-    const rows = catalogOccurrencesForAgency(agency, todayStr, horizonStr).filter((o) => !seen.has(o.title.toLowerCase().slice(0, 60)));
+    const base = hasStates
+      ? (agency ? catalogOccurrencesForAgency(agency, todayStr, horizonStr).filter((o) => o.state && states.includes(o.state)) : catalogOccurrencesForStates(states, todayStr, horizonStr))
+      : catalogOccurrencesForAgency(agency, todayStr, horizonStr);
+    const rows = base.filter((o) => !seen.has(o.title.toLowerCase().slice(0, 60)));
     for (const o of rows) {
       seen.add(o.title.toLowerCase().slice(0, 60));
       // Undated events sort after every dated one.
@@ -230,6 +299,7 @@ export async function queryFederalEvents(input: FederalEventsInput): Promise<Fed
         confidence: null,
         source_url: o.source_url,
         verified_at: o.verified_at,
+        ...(hasStates ? { state: o.state, state_basis: 'catalog_venue' as const } : {}),
       });
     }
     catalogCount = rows.length;
@@ -237,7 +307,8 @@ export async function queryFederalEvents(input: FederalEventsInput): Promise<Fed
 
   // ── Source 2: on-demand AI web discovery (optional, paid) ─────────────────
   let aiDiscovery: FederalEventsResult['aiDiscovery'] = 'off';
-  if (input.includeAiDiscovery && agency) {
+  // AI discovery stays agency-scoped and is skipped under a location filter: its rows carry no structured state.
+  if (input.includeAiDiscovery && agency && !hasStates) {
     const ai = await searchEventsViaAI({
       agency,
       horizonDays: months * 30,
@@ -267,7 +338,27 @@ export async function queryFederalEvents(input: FederalEventsInput): Promise<Fed
   }
   const aiCount = events.length - samCount - catalogCount;
 
-  return { events, samCount, aiCount, catalogCount, samAttendableTotal, samNoticeTotal, aiDiscovery, degraded };
+  const regional = hasStates ? regionalEventsForStates(states, todayStr, horizonStr, input.nearCity) : [];
+  return {
+    events, samCount, aiCount, catalogCount, samAttendableTotal, samNoticeTotal, aiDiscovery, degraded,
+    locationFilter, regional, regionalCoverage: hasStates ? regionalCoverage(states) : null,
+  };
+}
+
+/**
+ * pop_state + office_address for the notices behind SAM events. null when the read fails (callers report the
+ * location as unknown, never as zero). Chunked to stay well inside PostgREST URL limits.
+ */
+async function loadNoticeLocations(
+  supabase: { from: (t: string) => any }, ids: string[], // eslint-disable-line @typescript-eslint/no-explicit-any
+): Promise<Map<string, { pop_state: string | null; office_address: { state?: string | null } | null }> | null> {
+  const out = new Map<string, { pop_state: string | null; office_address: { state?: string | null } | null }>();
+  for (let i = 0; i < ids.length; i += 150) {
+    const { data, error } = await supabase.from('sam_opportunities').select('notice_id, pop_state, office_address').in('notice_id', ids.slice(i, i + 150));
+    if (error) { console.error('[events:query] notice location read failed:', error.message); return null; }
+    for (const r of (data || []) as Array<{ notice_id: string; pop_state: string | null; office_address: { state?: string | null } | null }>) out.set(r.notice_id, r);
+  }
+  return out;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

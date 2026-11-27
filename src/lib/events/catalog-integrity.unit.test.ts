@@ -74,6 +74,7 @@ describe('federal events catalog integrity', () => {
       start: '2026-12-08',
       end: '2026-12-09',
       location: 'Huntington Convention Center, Cleveland, OH',
+      state: 'OH', // structured venue state for the location filter (2026-11-27)
       registration_url: 'https://portal.vetbiz.va.gov/nvsbe/2026/reg-fees/',
       verified_at: '2026-11-07',
       source_url: 'https://www.va.gov/osdbu/nvsbe/',
