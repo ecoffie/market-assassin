@@ -26,39 +26,53 @@ export function samKeySlots(env: NodeJS.ProcessEnv = process.env): Array<{ slot:
   return out;
 }
 
-const dead = new Map<string, { status: number; slot: string; at: string }>();
+const dead = new Map<string, { status: number; slot: string; at: string; until: number | null }>();
 
 /** A status that means the KEY is unusable (not the request): rejected or throttled. */
 export function isKeyUnusableStatus(status: number | undefined | null): boolean {
   return status === 401 || status === 403 || status === 429;
 }
 
-/** Record a rejected key (401/403). 429 is not recorded: quota returns tomorrow. */
-export function markSamKeyRejected(key: string, status: number): void {
+/** A 403 without a credential body may be a transient edge block (Akamai), so its dead mark expires (Agent 4). */
+export const TRANSIENT_403_TTL_MS = 60 * 60 * 1000;
+const CREDENTIAL_BODY = /900901|API_KEY_INVALID|invalid credentials|api key.*(invalid|expired)/i;
+
+/**
+ * Record a rejected key. 401 = SAM rejected the credential → dead for the process (a redeploy picks up replaced
+ * env values). 403 → dead for the process only when the response body confirms a credential error; otherwise the
+ * mark expires after TRANSIENT_403_TTL_MS. 429 is never recorded: quota returns.
+ */
+export function markSamKeyRejected(key: string, status: number, body?: string | null): void {
   if (!key || (status !== 401 && status !== 403)) return;
-  if (dead.has(key)) return;
+  if (isSamKeyRejected(key)) return;
+  const permanent = status === 401 || (!!body && CREDENTIAL_BODY.test(body));
   const slot = samKeySlots().find((s) => s.key === key)?.slot ?? 'unknown slot';
-  dead.set(key, { status, slot, at: new Date().toISOString() });
-  console.error(`[SAM keys] ${slot} rejected by SAM (${status}) — skipped for this process; replace it in the environment`);
+  dead.set(key, { status, slot, at: new Date().toISOString(), until: permanent ? null : Date.now() + TRANSIENT_403_TTL_MS });
+  console.error(`[SAM keys] ${slot} rejected by SAM (${status}) — skipped ${permanent ? 'for this process; replace it in the environment' : 'for 1h (403 without a credential body)'}`);
 }
 
 export function isSamKeyRejected(key: string): boolean {
-  return dead.has(key);
+  const d = dead.get(key);
+  if (!d) return false;
+  if (d.until !== null && Date.now() >= d.until) { dead.delete(key); return false; }
+  return true;
 }
 
 /** Slots (never values) currently known dead in this process — for health payloads and alerts. */
 export function rejectedSamKeySlots(): Array<{ slot: string; status: number; at: string }> {
-  return [...dead.values()].map(({ slot, status, at }) => ({ slot, status, at }));
+  return [...dead.entries()].filter(([k]) => isSamKeyRejected(k)).map(([, { slot, status, at }]) => ({ slot, status, at }));
 }
 
 /** Drop known-dead keys. If EVERY key is dead, returns [] so callers fail loudly ("no usable key"), never silently. */
 export function withoutRejected(keys: string[]): string[] {
-  return keys.filter((k) => !dead.has(k));
+  return keys.filter((k) => !isSamKeyRejected(k));
 }
 
 /** The key-unusable status (429 / 401 / 403) carried in an upstream error message, else null. */
 export function keyStatusFromError(message: string): 429 | 401 | 403 | null {
-  const m = String(message).match(/\b(429|401|403)\b/);
+  // Anchored to the status forms our callers produce ("SAM.gov API error: 401 - …", "HTTP 403", "noticedesc 429"), so a
+  // 401/403/429 elsewhere in a message (an id, a count) is never read as a key status (Agent 4 review of #2490).
+  const m = String(message).match(/(?:API error:|\bHTTP|\bnoticedesc)\s*(429|401|403)\b/i);
   return m ? (Number(m[1]) as 429 | 401 | 403) : null;
 }
 
@@ -79,11 +93,11 @@ export class SamKeyWalker {
   }
   currentSlot(): string | null { return this.current() ? this.slots[this.idx].slot : null; }
   /** Returns false when no usable key remains. */
-  fail(status: number): boolean {
+  fail(status: number, body?: string | null): boolean {
     const cur = this.slots[this.idx];
     if (cur) {
       this.failures.push({ slot: cur.slot, status });
-      markSamKeyRejected(cur.key, status);
+      markSamKeyRejected(cur.key, status, body);
     }
     this.idx++;
     const next = this.current();

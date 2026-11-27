@@ -262,7 +262,7 @@ async function fetchOpportunitiesPage(
       }
       const errorText = await response.text().catch(() => 'Unknown error');
       if (isKeyUnusableStatus(response.status)) {
-        if (samKeys.fail(response.status)) continue;
+        if (samKeys.fail(response.status, errorText)) continue;
         throw new Error(samKeys.message(response.status));
       }
       throw new Error(`SAM.gov API error: ${response.status} - ${errorText.substring(0, 200)}`);

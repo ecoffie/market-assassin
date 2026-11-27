@@ -5,7 +5,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   SamKeyWalker, samKeySlots, markSamKeyRejected, isSamKeyRejected, withoutRejected, rejectedSamKeySlots,
-  isKeyUnusableStatus, keyStatusFromError, __resetSamKeyHealthForTests,
+  isKeyUnusableStatus, keyStatusFromError, __resetSamKeyHealthForTests, TRANSIENT_403_TTL_MS,
 } from './key-health';
 import { classifySamSyncRuns, isCredentialError } from './sync-run-health';
 
@@ -109,5 +109,49 @@ describe('sam-sync-watchdog run health', () => {
     expect(isCredentialError('API_KEY_INVALID')).toBe(true);
     expect(isCredentialError('every SAM key is unusable (last 401; tried …)')).toBe(true);
     expect(isCredentialError('SAM.gov API error: 503')).toBe(false);
+  });
+});
+
+describe('follow-ups to #2490 (Agent 4 review)', () => {
+  it('403 WITHOUT a credential body expires after 1h (transient edge block); 401 never expires', () => {
+    vi.useFakeTimers();
+    try {
+      markSamKeyRejected('edge', 403, '<html>Access Denied</html>');
+      markSamKeyRejected('cred', 401);
+      expect(isSamKeyRejected('edge')).toBe(true);
+      vi.advanceTimersByTime(TRANSIENT_403_TTL_MS + 1);
+      expect(isSamKeyRejected('edge')).toBe(false);
+      expect(withoutRejected(['edge', 'cred'])).toEqual(['edge']);
+      expect(rejectedSamKeySlots()).toHaveLength(1);
+    } finally { vi.useRealTimers(); }
+  });
+  it.each(['{"code":"900901","message":"Invalid Credentials"}', 'API_KEY_INVALID', 'An invalid api_key was supplied'.replace('An invalid api_key', 'API key is invalid')])(
+    '403 whose body confirms a credential error stays dead for the process: %s', (body) => {
+      vi.useFakeTimers();
+      try {
+        markSamKeyRejected('k', 403, body);
+        vi.advanceTimersByTime(TRANSIENT_403_TTL_MS * 5);
+        expect(isSamKeyRejected('k')).toBe(true);
+      } finally { vi.useRealTimers(); }
+    });
+  it('walker passes the body through: a transient 403 moves on for the run but expires', () => {
+    vi.useFakeTimers();
+    try {
+      const w = new SamKeyWalker(SLOTS);
+      expect(w.fail(403, 'Forbidden')).toBe(true);
+      expect(w.current()).toBe('live-3');
+      vi.advanceTimersByTime(TRANSIENT_403_TTL_MS + 1);
+      expect(new SamKeyWalker(SLOTS).current()).toBe('dead-2');
+    } finally { vi.useRealTimers(); }
+  });
+  it.each([
+    ['SAM.gov API error: 401 - Unauthorized', 401],
+    ['SAM noticedesc HTTP 403 for abc', 403],
+    ['noticedesc 429', 429],
+    ['every SAM key is unusable: SAM_API_KEY_2=401', null],
+    ['notice 4031-ABC failed with HTTP 500', null],
+    ['fetched 401 rows then timed out', null],
+  ])('keyStatusFromError reads only anchored status forms: %s → %s', (msg, want) => {
+    expect(keyStatusFromError(msg)).toBe(want);
   });
 });

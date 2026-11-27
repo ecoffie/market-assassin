@@ -177,7 +177,7 @@ export async function GET(request: NextRequest) {
       } else if (v.status === 'no_timestamp') {
         stale.push({ key: lc.key, name: lc.name, cadence: 'live-sync', ageDays: 9999, refreshWith: `${lc.refreshWith} (table empty / no timestamp)` });
       } else if (v.status === 'stale') {
-        stale.push({ key: lc.key, name: lc.name, cadence: 'live-sync', ageDays: v.ageDays, refreshWith: `${lc.refreshWith} (threshold ${lc.staleDays}d)` });
+        stale.push({ key: lc.key, name: lc.name, cadence: 'live-sync', ageDays: v.ageDays, refreshWith: `${lc.refreshWith} (threshold ${lc.staleHours != null ? `${lc.staleHours}h, age ${v.ageHours}h` : `${lc.staleDays}d`})` });
       }
     } catch (e) {
       stale.push({ key: lc.key, name: lc.name, cadence: 'live-sync', ageDays: -1, refreshWith: `${lc.refreshWith} (check failed: ${e instanceof Error ? e.message : 'unknown'})` });
