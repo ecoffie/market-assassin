@@ -10951,6 +10951,7 @@ const ASK_MINDY_CSS =
   + '.amk-rp-steps{margin:4px 0 0;padding:0 0 0 16px;font-size:12px;color:#64748b}.amk-rp-steps[hidden]{display:none}.amk-rp-sum{background:none;border:0;padding:0;color:#6b7787;font-size:12px}'
   + '@media(prefers-color-scheme:dark){.amk-rp{background:#0d141d;border-color:#202b39;color:#cdd8e4}.amk-rp-hd b{color:#eaf1f8}.amk-rp-cur{color:#b6c3d1}.amk-rp-sum{background:none}}'
   + '.amk-actnote{margin:0 0 6px;font:500 12px Inter,system-ui,sans-serif;color:#334155;background:#f1f5ff;border:1px solid #dbe4ff;border-radius:8px;padding:5px 9px}.amk-actbeta{font-weight:700;color:#4338ca}.amk-actundo{border:0;background:none;padding:0;cursor:pointer;font:600 12px Inter,system-ui,sans-serif;color:#2563eb;text-decoration:underline}.amk-actundo:disabled{color:#6b7787;text-decoration:none;cursor:default}'
+  + '.amk-actyes,.amk-actno{margin-left:6px;border-radius:6px;padding:2px 9px;cursor:pointer;font:600 11.5px Inter,system-ui,sans-serif}.amk-actyes{border:1px solid #2563eb;background:#2563eb;color:#fff}.amk-actno{border:1px solid #cbd5e1;background:#fff;color:#334155}.amk-actyes:disabled,.amk-actno:disabled{opacity:.55;cursor:default}.amk-actconfirm a{color:#2563eb;font-weight:600}'
   + '@media(prefers-color-scheme:dark){.amk-actnote{background:#122033;border-color:#1f3a5c;color:#cdd8e4}.amk-actbeta{color:#c7d2fe}.amk-actundo{color:#7fb0ff}}'
   + '.amk-notices{margin-top:8px;display:flex;flex-direction:column;gap:4px}.amk-notice{font:500 12px Inter,system-ui,sans-serif;color:#92400e;background:#fffbeb;border:1px solid #fde68a;border-radius:7px;padding:4px 8px}'
   + '@media(prefers-color-scheme:dark){.amk-notice{color:#fcd34d;background:rgba(245,158,11,.1);border-color:rgba(245,158,11,.25)}}'
@@ -11461,7 +11462,11 @@ const ASK_MINDY_JS = `<script>(function(){
     'map.search':['q'],
     'map.set_horizons':['open','recompete','forecast','isolate'],
     'map.go_to':['state','national'],
-    'map.open_record':['notice_id']
+    'map.open_record':['notice_id'],
+    'map.save_search':['name','alert_frequency'],
+    'map.update_alert':['search_id','alert_frequency'],
+    'map.add_to_pursuits':['kind','notice_id','contract_id'],
+    'map.remove_from_pursuits':['pursuit_id','notice_id']
   };
   var ACT_PLAIN=/^[A-Za-z0-9 ,.&()'/:_-]+$/, ACT_HZ=['open','recompete','forecast'];
   function actPlain(v,max){ if(typeof v!=='string') return null; var s=v.replace(/ +/g,' ').trim(); return (s&&s.length<=max&&ACT_PLAIN.test(s))?s:null; }
@@ -11471,6 +11476,7 @@ const ASK_MINDY_JS = `<script>(function(){
     var keys=MAP_ACTIONS[ev.name]; if(!keys) return null;
     var raw=(ev.args&&typeof ev.args==='object'&&!Array.isArray(ev.args))?ev.args:{}, a={}, k;
     for(k in raw){ if(!actHas(keys,k)) return null; }
+    if(ACT_WRITES[ev.name]){ var wa=actValidateWrite(ev.name,raw); return wa?{id:ev.id,name:ev.name,args:wa}:null; }
     if(ev.name==='map.apply_view'||ev.name==='map.search'){
       if(raw.q!=null){ var q=actPlain(raw.q,120); if(q==null||q.length<2) return null; a.q=q; }
       if(ev.name==='map.search'&&a.q==null) return null;
@@ -11492,6 +11498,70 @@ const ASK_MINDY_JS = `<script>(function(){
       if(typeof raw.notice_id!=='string'||!/^[A-Za-z0-9_-]{6,64}$/.test(raw.notice_id)) return null; a.notice_id=raw.notice_id;
     }
     return {id:ev.id,name:ev.name,args:a};
+  }
+  // Write actions (slice 2): never run without a click. One line: "<what> · Beta [Save] [Not now]". On Yes the drawer
+  // POSTs /api/app/mindy-actions (Agent 3; same session + workspace as the buttons; the route calls the existing lib).
+  // save_search saves EXACTLY the view on screen (filters/mode from the snapshot, never from the model).
+  var ACT_FREQ=['daily','weekly','off'], ACT_UUID=/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+  var ACT_WRITES={'map.save_search':'Save','map.update_alert':'Change','map.add_to_pursuits':'Add','map.remove_from_pursuits':'Remove'};
+  function actValidateWrite(name,raw){ var a={};
+    if(name==='map.save_search'){ var n=actPlain(raw.name,80); if(n==null||!actHas(ACT_FREQ,raw.alert_frequency)) return null; a.name=n; a.alert_frequency=raw.alert_frequency; return a; }
+    if(name==='map.update_alert'){ if(typeof raw.search_id!=='string'||!ACT_UUID.test(raw.search_id)||!actHas(ACT_FREQ,raw.alert_frequency)) return null; a.search_id=raw.search_id; a.alert_frequency=raw.alert_frequency; return a; }
+    if(name==='map.add_to_pursuits'){
+      if(raw.kind==='opportunity'&&typeof raw.notice_id==='string'&&/^[A-Za-z0-9_-]{6,64}$/.test(raw.notice_id)&&raw.contract_id==null){ a.kind='opportunity'; a.notice_id=raw.notice_id; return a; }
+      if(raw.kind==='recompete'&&raw.notice_id==null){ var c=actPlain(raw.contract_id,64); if(c==null) return null; a.kind='recompete'; a.contract_id=c; return a; }
+      return null; }
+    if(name==='map.remove_from_pursuits'){ var hp=raw.pursuit_id!=null, hn=raw.notice_id!=null; if(hp===hn) return null;
+      if(hp){ if(typeof raw.pursuit_id!=='string'||!ACT_UUID.test(raw.pursuit_id)) return null; a.pursuit_id=raw.pursuit_id; return a; }
+      if(typeof raw.notice_id!=='string'||!/^[A-Za-z0-9_-]{6,64}$/.test(raw.notice_id)) return null; a.notice_id=raw.notice_id; return a; }
+    return null;
+  }
+  function actFreqText(f){ return f==='off'?'no alerts':(f+' alerts'); }
+  function actConfirmText(act){ var a=act.args;
+    if(act.name==='map.save_search') return 'Save this view as "'+a.name+'" with '+actFreqText(a.alert_frequency)+'?';
+    if(act.name==='map.update_alert') return 'Change this saved search to '+actFreqText(a.alert_frequency)+'?';
+    if(act.name==='map.add_to_pursuits') return 'Add this '+(a.kind==='recompete'?'recompete':'opportunity')+' to My Pursuits?';
+    return 'Remove this from My Pursuits?';
+  }
+  function actPost(name,args,id){
+    return fetch('/api/app/mindy-actions',{method:'POST',headers:withWorkspace({'Content-Type':'application/json','x-mi-auth-token':tok()||'','x-user-email':email()}),
+      body:JSON.stringify({email:email(),action_id:id,name:name,args:args,confirmed:true})})
+      .then(function(r){ return r.json().then(function(d){ return {status:r.status,d:d||{}}; },function(){ return {status:r.status,d:{}}; }); },function(){ return {status:0,d:{}}; });
+  }
+  function actResultText(res){
+    if(res.status===401) return 'Please sign in again to let Mindy save this.';
+    var m=(res.d&&typeof res.d.message==='string')?res.d.message.replace(/ +/g,' ').trim():'';
+    if(m&&m.length<=300) return m;
+    return (res.d&&res.d.ok)?'Done.':'Mindy couldn’t save that right now. Nothing was changed.';
+  }
+  function actWrite(act,aEl){
+    if(!tok()||!email()){ actTrack(act,'rejected:signed_out'); if(window.openSignInModal) window.openSignInModal('let Mindy save this',function(){}); return; }
+    var box=document.createElement('div'); box.className='amk-actnote amk-actconfirm'; box.setAttribute('data-testid','amk-action-confirm'); box.setAttribute('role','group');
+    var t=document.createElement('span'); t.className='amk-acttext'; t.textContent=actConfirmText(act); box.appendChild(t);
+    box.appendChild(document.createTextNode(' · ')); var bt=document.createElement('span'); bt.className='amk-actbeta'; bt.textContent='Beta'; box.appendChild(bt); box.appendChild(document.createTextNode(' '));
+    var yes=document.createElement('button'); yes.type='button'; yes.className='amk-actyes'; yes.setAttribute('data-testid','amk-action-yes'); yes.textContent=ACT_WRITES[act.name];
+    var no=document.createElement('button'); no.type='button'; no.className='amk-actno'; no.setAttribute('data-testid','amk-action-no'); no.textContent='Not now';
+    box.appendChild(yes); box.appendChild(no);
+    var bub=aEl.querySelector('.bub'); aEl.insertBefore(box,bub||null); body.scrollTop=body.scrollHeight;
+    function settle(text){ yes.parentNode&&box.removeChild(yes); no.parentNode&&box.removeChild(no); t.textContent=text; }
+    no.onclick=function(){ actTrack(act,'declined'); settle('Not saved.'); };
+    yes.onclick=function(){
+      yes.disabled=true; no.disabled=true; actTrack(act,'confirmed');
+      var args={}, k; for(k in act.args){ args[k]=act.args[k]; }
+      if(act.name==='map.save_search'){ var snap=actSnapshot()||{mode:'open',filters:{}}; args.mode=snap.mode==='recompete'?'recompete':'open'; args.filters=snap.filters||{}; }
+      var route=act.name.replace(/^map[.]/,'');
+      actPost(route,args,act.id).then(function(res){
+        var ok=!!(res.d&&res.d.ok); actTrack(act,ok?'saved':'failed'); settle(actResultText(res));
+        var tg=res.d&&res.d.target;
+        if(ok&&tg&&typeof tg.href==='string'&&tg.href.charAt(0)==='/'&&tg.href.charAt(1)!=='/'){ box.appendChild(document.createTextNode(' · ')); var lk=document.createElement('a'); lk.href=tg.href; lk.textContent='Open'; lk.setAttribute('data-testid','amk-action-link'); box.appendChild(lk); }
+        // Undo (10 s) only where the route has an exact inverse: a NEW pursuit can be removed by its id.
+        if(ok&&!res.d.already&&act.name==='map.add_to_pursuits'&&tg&&typeof tg.id==='string'&&ACT_UUID.test(tg.id)){
+          box.appendChild(document.createTextNode(' · ')); var u=document.createElement('button'); u.type='button'; u.className='amk-actundo'; u.setAttribute('data-testid','amk-action-undo'); u.textContent='Undo'; box.appendChild(u);
+          var timer=setTimeout(function(){ if(u.parentNode) u.parentNode.removeChild(u); },10000);
+          u.onclick=function(){ clearTimeout(timer); u.disabled=true; actPost('remove_from_pursuits',{pursuit_id:tg.id},act.id+'-undo').then(function(r2){ actTrack(act,(r2.d&&r2.d.ok)?'undone':'undo_failed'); u.textContent=(r2.d&&r2.d.ok)?'Undone':'Couldn’t undo'; }); };
+        }
+      });
+    };
   }
   function actSnapshot(){ try{ if(typeof window.__mapSnapshot==='function') return window.__mapSnapshot(); }catch(e){} return null; }
   function actStateName(st){ var n=window.__STATE_NAMES; return (n&&n[st])||st; }
@@ -11543,6 +11613,7 @@ const ASK_MINDY_JS = `<script>(function(){
     var list=turn.pending||[]; turn.pending=[];
     for(var i=0;i<list.length;i++){ var act=list[i];
       if(String(evidence||'').indexOf(act.args.notice_id)<0){ actTrack(act,'rejected:unsourced'); continue; }
+      if(ACT_WRITES[act.name]){ actWrite(act,aEl); continue; }
       if(!actRun(act)){ actTrack(act,'rejected:unavailable'); continue; }
       actTrack(act,'ran'); actNote(aEl,actDescribe(act),null); }
   }
@@ -11554,7 +11625,8 @@ const ASK_MINDY_JS = `<script>(function(){
     turn.count++;
     // Opening a record waits for the answer to finish: the id must appear in what this turn actually returned
     // (the answer text or its sources), so an id from a prompt-injected page is never opened (Eric, 2026-11-27).
-    if(act.name==='map.open_record'){ (turn.pending||(turn.pending=[])).push(act); return; }
+    if(act.name==='map.open_record'||(act.name==='map.add_to_pursuits'&&act.args.notice_id)){ (turn.pending||(turn.pending=[])).push(act); return; }
+    if(ACT_WRITES[act.name]){ actWrite(act,aEl); return; }
     // Undo for this action only: the previous action's Undo is withdrawn (one level).
     if(actUndo&&actUndo.btn){ actUndo.btn.disabled=true; actUndo.btn.style.display='none'; }
     var snap=(act.name==='map.open_record')?null:actSnapshot();
