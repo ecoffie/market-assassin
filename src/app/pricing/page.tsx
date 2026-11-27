@@ -27,6 +27,12 @@ import { PRO_MONTHLY_CREDITS, SUBSCRIPTION_PLANS, TEAM_MONTHLY_CREDITS } from '@
 // Corpus counts come from ONE place — see the file header for why (they were hand-typed
 // in 32 spots and every one understated the real table by 4.3x).
 import { forecastsLabel } from '@/lib/marketing-stats';
+import { mindyDayPromoLine } from '@/lib/billing/mindy-day-annual-promo';
+
+// The Mindy Day promo line is a SERVER-side date check, so the page re-renders every 5 minutes
+// (ISR) instead of freezing whatever was true at build time. The line therefore appears and
+// disappears within 5 minutes of the window's edges (Nov 28 / Dec 6 00:00 New York).
+export const revalidate = 300;
 
 // Checkout links live in src/components/public-site/pricing/app-plan-links.ts.
 // FAQ is mirrored in JSON-LD below — same list the page renders.
@@ -65,6 +71,7 @@ export const metadata: Metadata = {
 };
 
 export default function PricingPage() {
+  const promoLine = mindyDayPromoLine(new Date(), { proCredits: PRO_MONTHLY_CREDITS, teamCredits: TEAM_MONTHLY_CREDITS });
   // JSON-LD graph. Organization @id matches the landing + comparison
   // pages so Google consolidates brand entity. SoftwareApplication
   // offers mirror the visible price cards (Pro, Team; Enterprise is quote-only).
@@ -136,7 +143,7 @@ export default function PricingPage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
-      <SimplePricing proCredits={PRO_MONTHLY_CREDITS} teamCredits={TEAM_MONTHLY_CREDITS} forecastsLabel={forecastsLabel} faqs={faqs} creditPlans={creditPlans} />
+      <SimplePricing proCredits={PRO_MONTHLY_CREDITS} teamCredits={TEAM_MONTHLY_CREDITS} forecastsLabel={forecastsLabel} faqs={faqs} creditPlans={creditPlans} promoLine={promoLine} />
     </>
   );
 }

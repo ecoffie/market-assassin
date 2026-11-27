@@ -152,6 +152,36 @@ export async function replenishPool(org: PooledOrg, month: string = monthKey()):
   };
 }
 
+/**
+ * The ceiling to replenish a pool to this month when an allowance multiplier applies (the
+ * Mindy Day annual promo, src/lib/billing/mindy-day-annual-promo.ts).
+ *
+ * mcp_replenish_pool claims a (month, ceiling) pair, and a NEW ceiling in a month already
+ * claimed tops the pool up by the difference (that is how a mid-month upgrade works). The
+ * promo must never do that: a month already replenished at the normal allowance stays as it
+ * is, and the doubled ceiling starts with the next unclaimed month. So:
+ *   · multiplier 1, or no allowance  → the normal ceiling (behaviour unchanged);
+ *   · nothing claimed yet this month, or the doubled ceiling already claimed → doubled;
+ *   · this month already claimed at another ceiling → the normal ceiling (a no-op re-claim
+ *     when that is what was claimed).
+ * A failed read throws: the caller defers to the daily run rather than guess.
+ */
+export async function promoPoolCeiling(org: PooledOrg, month: string, multiplier: number): Promise<number> {
+  const base = Math.floor(org.monthlyCredits);
+  if (!(multiplier > 1) || base <= 0) return base;
+  const promo = base * Math.floor(multiplier);
+  const prefix = poolReplenishKey(org.orgId, month);
+  const { data, error } = await getReadClient()
+    .from('mcp_pool_credit_grants')
+    .select('idempotency_key')
+    .like('idempotency_key', `${prefix.replace(/[\\%_]/g, (c) => `\\${c}`)}:c%`)
+    .limit(50);
+  if (error) throw new Error(`team-pools: pool claim lookup failed: ${error.message}`);
+  const keys = (data ?? []).map((r) => (r as { idempotency_key: string }).idempotency_key);
+  if (keys.length === 0 || keys.includes(`${prefix}:c${promo}`)) return promo;
+  return base;
+}
+
 export interface ProvisionInput {
   subscriptionId: string;
   customerId?: string | null;

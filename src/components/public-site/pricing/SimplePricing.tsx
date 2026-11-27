@@ -200,9 +200,11 @@ export function TeamSeatToggle({ value, onChange }: { value: TeamSeatOptionId; o
 type Cell = boolean | string;
 type CompareGroup = [group: string, rows: Array<[label: React.ReactNode, pro: Cell, team: Cell, ent: Cell]>];
 
-export default function SimplePricing({ proCredits, teamCredits, forecastsLabel, faqs, creditPlans = [] }: {
+export default function SimplePricing({ proCredits, teamCredits, forecastsLabel, faqs, creditPlans = [], promoLine = null }: {
   proCredits: number; teamCredits: number; forecastsLabel: string; faqs: { q: string; a: string }[];
   creditPlans?: CreditPlan[];
+  /** Mindy Day annual promo line, decided SERVER-side (mindyDayPromoLine); null = window closed. */
+  promoLine?: string | null;
 }) {
   const [annual, setAnnual] = useState(false);
   // Team seat card (held behind NEXT_PUBLIC_TEAM_SEAT_PRICING until Eric approves). Display only.
@@ -386,6 +388,14 @@ export default function SimplePricing({ proCredits, teamCredits, forecastsLabel,
         <button type="button" className={!annual ? 'on' : ''} aria-pressed={!annual} onClick={() => setAnnual(false)}>Monthly</button>
         <button type="button" className={annual ? 'on' : ''} aria-pressed={annual} onClick={() => setAnnual(true)}>Annual (up to {maxPct}% off)</button>
       </div>
+      )}
+      {/* Inline style, not the page stylesheet: the flag-off page markup is pinned byte-for-byte
+          (SimplePricing.team-seat.unit.test.tsx), and outside the window this renders nothing. */}
+      {!seatOn && promoLine && (
+        <p
+          className="promo" data-mindy-day-promo
+          style={{ maxWidth: 640, margin: '-20px auto 28px', padding: '0 16px', textAlign: 'center', font: '500 14px/1.5 var(--mp-font-sans)', color: 'var(--mp-navy)' }}
+        >{promoLine}</p>
       )}
 
       <section className="cards" id="plans">

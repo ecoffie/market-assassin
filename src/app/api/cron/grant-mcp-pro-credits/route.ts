@@ -14,6 +14,10 @@
  * here (they get a ONE-TIME 200 via scripts/grant-member-mcp-credits.ts, not a monthly grant).
  * Idempotent per month via applyCreditOnce(key='pro:<email>:<YYYY-MM>').
  *
+ * Mindy Day annual promo (src/lib/billing/mindy-day-annual-promo.ts): an annual Pro/Team
+ * plan bought Nov 28 – Dec 5 2026 gets 2x its allowance every month of its first paid year.
+ * Same key, so a month already granted at 1x is never topped up or granted again.
+ *
  * RUNS DAILY, not just on the 1st. On the 1st it is the scheduled monthly grant;
  * every other day it is a SELF-HEAL pass that costs nothing when healthy (the
  * idempotency key makes it a no-op) and catches anyone the purchase-time grant
@@ -23,6 +27,7 @@
  * because a heal means the purchase path missed someone.
  */
 import { teamSeatPlanForPriceId } from '@/lib/billing/team-seat-plans';
+import { promoMultiplier, type PromoSubscription } from '@/lib/billing/mindy-day-annual-promo';
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { applyCreditOnce } from '@/lib/mcp/credits';
@@ -35,7 +40,7 @@ import { ADVOCATE_ACCOUNTS } from '@/lib/mindy/advocate-accounts';
 import { proAllowanceDecision } from '@/lib/mcp/pro-allowance';
 import { sendOpsAlert } from '@/lib/ops-alert';
 import {
-  listPooledOrgsBySubscription, replenishPool, routeSubscriptionGrants, isPoolSchemaMissing,
+  listPooledOrgsBySubscription, replenishPool, routeSubscriptionGrants, isPoolSchemaMissing, promoPoolCeiling,
   type PooledOrg,
 } from '@/lib/mcp/team-pools';
 import { hasValidCronSecret } from '@/lib/cron/cron-request-auth';
@@ -70,10 +75,15 @@ type Candidate = { email: string; amount: number; group: Group; subscriptionId?:
 
 /** Enumerate ACTIVE Stripe subscriptions → paying Pro/Team subscribers. Surfaces (never swallows)
  *  a Stripe failure so a monthly run that couldn't read subs is flagged, not silently a no-op. */
-async function activeSubscribers(): Promise<{ subs: Candidate[]; activeIds: Set<string>; error: string | null }> {
+async function activeSubscribers(): Promise<{
+  subs: Candidate[]; activeIds: Set<string>; promoBySub: Map<string, number>; error: string | null;
+}> {
   const key = process.env.STRIPE_SECRET_KEY;
   const activeIds = new Set<string>();
-  if (!key) return { subs: [], activeIds, error: 'STRIPE_SECRET_KEY missing' };
+  // Mindy Day annual promo multiplier per subscription (only entries > 1). Read by the pool
+  // loop, which only has the PooledOrg, not the subscription.
+  const promoBySub = new Map<string, number>();
+  if (!key) return { subs: [], activeIds, promoBySub, error: 'STRIPE_SECRET_KEY missing' };
   const stripe = new Stripe(key);
   const subs: Candidate[] = [];
   try {
@@ -81,23 +91,28 @@ async function activeSubscribers(): Promise<{ subs: Candidate[]; activeIds: Set<
       // EVERY active subscription id is recorded: a pooled org can sit on ANY plan
       // (Team, or a multi-seat MCP plan like Growth), not only the app tiers below.
       activeIds.add(s.id);
+      // Mindy Day annual promo (src/lib/billing/mindy-day-annual-promo.ts): an annual plan
+      // bought Nov 28 – Dec 5 2026 gets 2x its allowance for its first paid year. It only
+      // multiplies the amount below; the audience and the monthly key are unchanged.
+      const mult = promoMultiplier(s as unknown as PromoSubscription);
+      if (mult > 1) promoBySub.set(s.id, mult);
       const amt = s.items.data[0]?.price?.unit_amount ?? 0;
       // Team by seats: matched by price id (its amounts collide with credit plans), seats x 1,500.
       const seat = s.items.data.map((i) => teamSeatPlanForPriceId(i.price?.id)).find(Boolean) ?? null;
       const cust = s.customer;
       const email = (cust && typeof cust !== 'string' && !cust.deleted ? cust.email : null)?.toLowerCase();
       if (!email) continue;
-      if (seat) subs.push({ email, amount: seat.plan.credits, group: 'team-sub', subscriptionId: s.id });
-      else if (PRO_AMOUNTS.has(amt)) subs.push({ email, amount: PRO_MONTHLY_CREDITS, group: 'pro-sub', subscriptionId: s.id });
+      if (seat) subs.push({ email, amount: seat.plan.credits * mult, group: 'team-sub', subscriptionId: s.id });
+      else if (PRO_AMOUNTS.has(amt)) subs.push({ email, amount: PRO_MONTHLY_CREDITS * mult, group: 'pro-sub', subscriptionId: s.id });
       // A Team subscription whose organization is provisioned for pooling replenishes
       // its POOL instead (routeSubscriptionGrants below). Until it is provisioned, the
       // allowance still lands on the billing contact's personal balance, as before.
-      else if (TEAM_AMOUNTS.has(amt)) subs.push({ email, amount: TEAM_MONTHLY_CREDITS, group: 'team-sub', subscriptionId: s.id });
+      else if (TEAM_AMOUNTS.has(amt)) subs.push({ email, amount: TEAM_MONTHLY_CREDITS * mult, group: 'team-sub', subscriptionId: s.id });
     }
   } catch (e) {
-    return { subs, activeIds, error: (e as Error).message || 'stripe subscription enumeration failed' };
+    return { subs, activeIds, promoBySub, error: (e as Error).message || 'stripe subscription enumeration failed' };
   }
-  return { subs, activeIds, error: null };
+  return { subs, activeIds, promoBySub, error: null };
 }
 
 /**
@@ -118,7 +133,7 @@ async function pooledOrgs(): Promise<{ bySub: Map<string, PooledOrg>; poolMode: 
 
 /** Resolve final per-email targets (dedupe; keep the highest amount when an email matches twice). */
 async function buildTargets(month: string): Promise<{
-  targets: Target[]; pools: PooledOrg[]; subError: string | null; sponsorError: string | null;
+  targets: Target[]; pools: PooledOrg[]; promoBySub: Map<string, number>; subError: string | null; sponsorError: string | null;
   poolError: string | null; poolMode: 'active' | 'legacy';
   proSuppressed: { email: string; reason: string; detail: string }[];
   prepaid: PrepaidEntitlement[]; prepaidError: string | null;
@@ -136,7 +151,7 @@ async function buildTargets(month: string): Promise<{
   };
   for (const email of INTERNAL_TEAM) consider(email, INTERNAL_MONTHLY_CREDITS, 'internal');
   for (const email of ADVOCATES) consider(email, PRO_MONTHLY_CREDITS, 'advocate');
-  const { subs, activeIds, error } = await activeSubscribers();
+  const { subs, activeIds, promoBySub, error } = await activeSubscribers();
   const { bySub, poolMode, poolError } = await pooledOrgs();
   const routed = routeSubscriptionGrants(
     subs.map((s) => ({ email: s.email, amount: s.amount, group: s.group, subscriptionId: s.subscriptionId ?? '' })),
@@ -172,7 +187,7 @@ async function buildTargets(month: string): Promise<{
     prepaid.push(ent);
     if (dueMonths(ent, month).includes(month) && accessIsLive(ent, accessDate())) consider(ent.userEmail, ent.monthlyCredits, 'prepaid');
   }
-  return { targets: [...byEmail.values()], pools: routed.pools, subError: error, sponsorError, poolError, poolMode, proSuppressed, prepaid, prepaidError };
+  return { targets: [...byEmail.values()], pools: routed.pools, promoBySub, subError: error, sponsorError, poolError, poolMode, proSuppressed, prepaid, prepaidError };
 }
 
 export async function GET(request: NextRequest) {
@@ -190,7 +205,7 @@ export async function GET(request: NextRequest) {
   // granted). On any other day it is the DAILY SELF-HEAL pass: idempotent by the
   // same pro:<email>:<YYYY-MM> key, so it grants only whoever upstream missed.
   const isMonthStart = now.getUTCDate() === 1;
-  const { targets, pools, subError, sponsorError, poolError, poolMode, proSuppressed, prepaid, prepaidError } = await buildTargets(month);
+  const { targets, pools, promoBySub, subError, sponsorError, poolError, poolMode, proSuppressed, prepaid, prepaidError } = await buildTargets(month);
   // An account whose billing context could not be established got NO Pro grant this run.
   // That is a deferral (the daily self-heal retries), but it must be loud, never silent.
   const proDeferred = proSuppressed.filter((p) => p.reason === 'payer_unresolved');
@@ -202,6 +217,7 @@ export async function GET(request: NextRequest) {
       proSuppressed,
       pools: pools.map((p) => ({ orgId: p.orgId, name: p.name, seatLimit: p.seatLimit, monthlyCredits: p.monthlyCredits })),
       rates: { pro: PRO_MONTHLY_CREDITS, team: TEAM_MONTHLY_CREDITS, internal: INTERNAL_MONTHLY_CREDITS },
+      mindyDayPromoSubscriptions: [...promoBySub.keys()],
       prepaidError,
       prepaid: prepaid.map((p) => ({
         email: p.userEmail, monthlyCredits: p.monthlyCredits, firstMonth: p.firstMonth, lastMonth: p.lastMonth,
@@ -261,7 +277,11 @@ export async function GET(request: NextRequest) {
   let poolsReplenished = 0, poolsAlreadyFull = 0, poolCreditsGranted = 0;
   for (const org of pools) {
     try {
-      const r = await replenishPool(org, month);
+      // Mindy Day promo: double the pool's allowance, but never top up a month already
+      // replenished at the normal allowance (promoPoolCeiling explains why).
+      const mult = promoBySub.get(org.subscriptionId) ?? 1;
+      const ceiling = mult > 1 ? await promoPoolCeiling(org, month, mult) : org.monthlyCredits;
+      const r = await replenishPool(ceiling === org.monthlyCredits ? org : { ...org, monthlyCredits: ceiling }, month);
       if (r.applied && r.granted > 0) { poolsReplenished++; poolCreditsGranted += r.granted; }
       else poolsAlreadyFull++;
     } catch (err) {
@@ -287,6 +307,7 @@ export async function GET(request: NextRequest) {
     prepaidError, prepaidEntitlements: prepaid.length,
     prepaidCatchUp: { granted: prepaidCatchUp.granted, alreadyClaimed: prepaidCatchUp.alreadyClaimed, forfeited: prepaidCatchUp.forfeited },
     poolMode, poolError, pools: pools.length, poolsReplenished, poolsAlreadyFull, poolCreditsGranted,
+    mindyDayPromoSubscriptions: promoBySub.size,
     proSuppressed,
     errors: errors.slice(0, 10),
     mode: isMonthStart ? 'monthly-grant' : 'daily-self-heal',
