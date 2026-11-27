@@ -1,0 +1,40 @@
+{
+  "_doc": "State/regional matchmakers and APEX Accelerator events. Official organizer pages only, no AI-discovered rows. A row carries next_occurrence ONLY when the organizer's own page states the date; otherwise readers say 'check the organizer page'. verified_at is internal (never rendered). Maintained by hand; covered_states lists every state with rows.",
+  "covered_states": ["CT"],
+  "fallback": {
+    "name": "APEX Accelerators directory (find the center for any state)",
+    "url": "https://www.apexaccelerators.us/"
+  },
+  "rows": [
+    {
+      "id": "ct-business-matchmaker",
+      "name": "CT Business Matchmaker",
+      "organizer": "U.S. Small Business Administration Connecticut District Office and partners",
+      "url": "https://www.ctbusinessmatchmaker.com/",
+      "state": "CT",
+      "city": "Hartford",
+      "kind": "matchmaker",
+      "description": "Pre-scheduled one-on-one meetings between small businesses and federal, state and prime-contractor buyers.",
+      "next_occurrence": null,
+      "verification": { "verified_at": "2026-11-27", "source_url": "https://www.ctbusinessmatchmaker.com/", "note": "Page states the March 5, 2026 event (Connecticut Convention Center), which has passed; no later date stated." }
+    },
+    {
+      "id": "ct-apex-events",
+      "name": "CT APEX Accelerator training and events",
+      "organizer": "CT APEX Accelerator (hosted by seCTer)",
+      "url": "https://ctapex.org/events",
+      "state": "CT",
+      "city": null,
+      "kind": "apex",
+      "description": "Free government-contracting training, certification and SAM clinics, and matchmaking events for Connecticut businesses.",
+      "next_occurrence": {
+        "title": "2026 Hands-On Certification Clinics for Small Business Certification & SAM",
+        "start": "2026-12-02",
+        "end": "2026-12-02",
+        "url": "https://ctapex.org/event/2026-hands-on-certification-clinics-for-small-business-certification-sam-6/",
+        "location": null
+      },
+      "verification": { "verified_at": "2026-11-27", "source_url": "https://ctapex.org/wp-json/tribe/events/v1/events?start_date=2026-11-27", "note": "The organizer's own events calendar (The Events Calendar REST feed); 1 upcoming event listed." }
+    }
+  ]
+}

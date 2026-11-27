@@ -595,6 +595,7 @@
         "start": "2026-12-08",
         "end": "2026-12-09",
         "location": "Huntington Convention Center, Cleveland, OH",
+        "state": "OH",
         "registration_url": "https://portal.vetbiz.va.gov/nvsbe/2026/reg-fees/",
         "verified_at": "2026-11-07",
         "source_url": "https://www.va.gov/osdbu/nvsbe/"
@@ -618,6 +619,7 @@
         "start": "2027-05-11",
         "end": "2027-05-13",
         "location": "Baltimore Convention Center, Baltimore, MD",
+        "state": "MD",
         "registration_url": "https://events.afcea.org/afceacyber27/",
         "verified_at": "2026-11-09",
         "source_url": "https://events.afcea.org/afceacyber27/public/Content.aspx?ID=125260&sortMenu=101001"
@@ -641,6 +643,7 @@
         "start": "2027-02-16",
         "end": "2027-02-18",
         "location": "San Diego Convention Center, San Diego, CA",
+        "state": "CA",
         "registration_url": "https://www.westconference.org/WEST27/",
         "verified_at": "2026-11-09",
         "source_url": "https://www.westconference.org/West27/Public/Content.aspx?ID=123773&sortMenu=101001"
@@ -724,6 +727,7 @@
         "start": "2026-12-08",
         "end": "2026-12-09",
         "location": "Hyatt Regency Crystal City, Arlington, VA (also virtual)",
+        "state": "VA",
         "registration_url": "https://www.pscouncil.org/Shared_Content/Events/Event_Display_with_Program_Items?EventKey=26VISION",
         "verified_at": "2026-11-09",
         "source_url": "https://www.pscouncil.org/Shared_Content/Events/Event_Display_with_Program_Items?EventKey=26VISION"
@@ -762,6 +766,7 @@
         "start": "2026-12-10",
         "end": "2026-12-11",
         "location": "Gaylord National Resort & Convention Center, Oxon Hill, MD",
+        "state": "MD",
         "registration_url": null,
         "verified_at": "2026-11-09",
         "source_url": "https://www.actiac.org/upcoming-major-events"
@@ -785,6 +790,7 @@
         "start": "2027-07-25",
         "end": "2027-07-28",
         "location": "Gaylord Rockies, Aurora, CO",
+        "state": "CO",
         "registration_url": null,
         "verified_at": "2026-11-09",
         "source_url": "https://www.ncmahq.org/events"
@@ -822,6 +828,7 @@
         "start": "2027-06-14",
         "end": "2027-06-17",
         "location": "Gaylord Palms Resort, FL",
+        "state": "FL",
         "registration_url": null,
         "verified_at": "2026-11-09",
         "source_url": "https://www.wbenc.org/conference/"
@@ -846,6 +853,7 @@
         "start": "2026-12-15",
         "end": "2026-12-15",
         "location": "Online (1:00-1:45 PM ET)",
+        "state": null,
         "registration_url": "https://www.gsa.gov/events/how-to-get-a-cloud-small-business-on-the-gsa-multiple-award-schedule",
         "verified_at": "2026-11-09",
         "source_url": "https://www.gsa.gov/about-gsa/gsa-events"
@@ -900,6 +908,7 @@
         "start": "2026-11-30",
         "end": "2026-12-03",
         "location": "Orange County Convention Center (South Concourse), Orlando, FL",
+        "state": "FL",
         "registration_url": "https://www.iitsec.org/",
         "verified_at": "2026-11-09",
         "source_url": "https://www.iitsec.org/-/media/sites/iitsec/agenda/2026/iitsec2026program102826.pdf"
@@ -923,6 +932,7 @@
         "start": "2027-02-08",
         "end": "2027-02-11",
         "location": "The Broadmoor Hotel, Colorado Springs, CO",
+        "state": "CO",
         "registration_url": "https://events.afcea.org/RMCS27/",
         "verified_at": "2026-11-09",
         "source_url": "https://www.afcea.org/events"
@@ -945,6 +955,7 @@
         "start": "2027-02-21",
         "end": "2027-02-23",
         "location": "Grand Hyatt San Antonio River Walk, San Antonio, TX",
+        "state": "TX",
         "registration_url": null,
         "verified_at": "2026-11-09",
         "source_url": "https://www.ncmahq.org/events"

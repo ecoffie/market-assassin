@@ -1151,7 +1151,9 @@ server.registerTool(
       'before attending). Attendable events first; event_type="rfi" is a notice, not an event. grounded=false when none match. ' +
       'include_ics also returns a base64 .ics calendar of the dated events.',
     inputSchema: {
-      agency: z.string().describe('Agency name, e.g. "Department of Defense", "Navy", "GSA".'),
+      agency: z.string().optional().describe('Agency name, e.g. "Department of Defense", "Navy", "GSA". Optional when state or near is given.'),
+      state: z.union([z.string(), z.array(z.string())]).optional().describe('Optional location filter: state code(s)/name(s), e.g. "CT". Matches the notice place of performance, else the buying office state; no-location events are counted, never shown as matches. Adds regional_events (state matchmakers, APEX events).'),
+      near: z.string().optional().describe('Optional "City, ST" (e.g. "Hartford, CT").'),
       months_ahead: z.number().int().min(1).max(12).optional().describe('Look-ahead window in months (default 4).'),
       include_ai_discovery: z.boolean().optional().describe('Also web-search for association conferences not in SAM (slower). Default false.'),
       limit: z.number().int().min(1).max(100).optional().describe('Max SAM events (default 25).'),
@@ -1161,8 +1163,8 @@ server.registerTool(
         .describe('Return `ics`: base64 .ics of the matching events for one-shot calendar import. Dated events only. Default false.'),
     },
   },
-  async ({ agency, months_ahead, include_ai_discovery, limit, include_ics }) => {
-    const result = await searchFederalEvents({ agency, months_ahead, include_ai_discovery, limit, include_ics });
+  async ({ agency, state, near, months_ahead, include_ai_discovery, limit, include_ics }) => {
+    const result = await searchFederalEvents({ agency, state, near, months_ahead, include_ai_discovery, limit, include_ics });
     return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }], structuredContent: result as unknown as Record<string, unknown> };
   },
 );
