@@ -26,6 +26,9 @@ import ShareButton from '@/components/briefings/ShareButton';
 import SamAttachmentLinks from '@/components/app/SamAttachmentLinks';
 import { mapLinkForOpportunity } from '@/lib/maps/map-links';
 import { samNoticeIdFrom } from '../mapRecordIds';
+import TabAskBox from '@/components/app/TabAskBox';
+import { isTabAskEnabled, type TabAskCount } from '@/lib/app/tab-ask';
+import { dashboardAskAdapter, type DashboardAskParams } from '@/lib/app/tab-ask-adapters/dashboard';
 
 interface DashboardPanelProps {
   email: string | null;
@@ -989,8 +992,10 @@ export default function DashboardPanel({ email, tier, onPanelChange }: Dashboard
     amount: item.amount,
   })), [latestItems, liveBuyers, liveNoticeTypes, liveSetAside, liveNaics]);
 
-  const filteredItems = useMemo(() => {
-    const query = searchTerm.toLowerCase().trim();
+  // The tab's ONE list filter (Search box + chip). The rendered list and Ask Mindy both go through it.
+  const filterBriefingItems = useCallback((term: string, filter: BriefingFilter) => {
+    const query = term.toLowerCase().trim();
+    const activeFilter = filter;
     return briefingItems.filter(item => {
       if (dismissedItems.has(item.id)) return false;
       const matchesSearch = !query || [
@@ -1015,7 +1020,32 @@ export default function DashboardPanel({ email, tier, onPanelChange }: Dashboard
 
       return matchesSearch && matchesFilter;
     });
-  }, [activeFilter, briefingItems, dismissedItems, liveBuyers, liveDescriptions, liveLocations, liveNoticeTypes, searchTerm]);
+  }, [briefingItems, dismissedItems, liveBuyers, liveDescriptions, liveLocations, liveNoticeTypes]);
+
+  const filteredItems = useMemo(
+    () => filterBriefingItems(searchTerm, activeFilter),
+    [filterBriefingItems, searchTerm, activeFilter],
+  );
+
+  // ── Ask Mindy on this tab (OFF unless NEXT_PUBLIC_TAB_ASK=on) ────────────────────────────────
+  // The question becomes THIS tab's Search box text + filter chip, so the answer is exactly the rows
+  // those filters show. Clear puts back the Search text and chip from before the first question.
+  const tabAskOn = isTabAskEnabled();
+  const [askSnapshot, setAskSnapshot] = useState<null | { search: string; filter: BriefingFilter }>(null);
+
+  const handleTabAsk = async (p: DashboardAskParams): Promise<TabAskCount> => {
+    if (!askSnapshot) setAskSnapshot({ search: searchTerm, filter: activeFilter });
+    setSearchTerm(p.search);
+    setActiveFilter(p.filter);
+    return { shown: filterBriefingItems(p.search, p.filter).length, more: false };
+  };
+
+  const clearTabAsk = () => {
+    if (!askSnapshot) return;
+    setSearchTerm(askSnapshot.search);
+    setActiveFilter(askSnapshot.filter);
+    setAskSnapshot(null);
+  };
 
 
   // ── BEST-FIT IMPRESSIONS ────────────────────────────────────────────────────
@@ -1452,6 +1482,9 @@ export default function DashboardPanel({ email, tier, onPanelChange }: Dashboard
             </div>
 
             <div className="mb-6 space-y-3">
+              {tabAskOn && (
+                <TabAskBox adapter={dashboardAskAdapter} onAsk={handleTabAsk} onClear={clearTabAsk} />
+              )}
               <input
                 type="text"
                 value={searchTerm}

@@ -1,6 +1,9 @@
 'use client';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { authedFetch } from '../authHeaders';
+import TabAskBox from '@/components/app/TabAskBox';
+import { isTabAskEnabled, type TabAskCount } from '@/lib/app/tab-ask';
+import { knowledgeBaseAskAdapter, type KnowledgeBaseAskParams } from '@/lib/app/tab-ask-adapters/knowledge-base';
 
 /**
  * Knowledge Base — searchable repository over Mindy's source corpus
@@ -35,12 +38,15 @@ export default function KnowledgeBasePanel({ email, initialDocId }: { email: str
   // title showing an 82k-word book's text). Only the LATEST openDoc call may write.
   const reqSeq = useRef(0);
 
-  const load = useCallback(async () => {
-    if (!email) return;
+  // The tab's ONE list load (GET /api/app/knowledge-base). Resolves to the rows it showed, or null when
+  // the load failed (unknown — never reported as 0). The search box and Ask Mindy both go through it.
+  const fetchList = async (qv: string, dt: string): Promise<TabAskCount> => {
+    if (!email) return null;
     setLoading(true);
     const p = new URLSearchParams({ email });
-    if (q.trim()) p.set('q', q.trim());
-    if (docType) p.set('docType', docType);
+    if (qv.trim()) p.set('q', qv.trim());
+    if (dt) p.set('docType', dt);
+    let count: TabAskCount = null;
     try {
       const res = await authedFetch(`/api/app/knowledge-base?${p}`, email);
       const d = await res.json();
@@ -52,9 +58,16 @@ export default function KnowledgeBasePanel({ email, initialDocId }: { email: str
         // ?doc=<id> deep-link is loading (else the auto-preview races the deep-link
         // and the two can land title-of-one over body-of-the-other).
         if (!selected && !initialDocId && d.docs?.[0]) openDoc(d.docs[0]);
+        const shown = (d.docs || []).length;
+        count = { shown, more: (d.total || 0) > shown };
       }
     } catch { /* ignore */ }
     setLoading(false);
+    return count;
+  };
+
+  const load = useCallback(async () => {
+    await fetchList(q, docType);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [email, q, docType]);
 
@@ -95,6 +108,27 @@ export default function KnowledgeBasePanel({ email, initialDocId }: { email: str
     })();
   }, [initialDocId, email]);
 
+  // ── Ask Mindy on this tab (OFF unless NEXT_PUBLIC_TAB_ASK=on) ────────────────────────────────
+  // The question becomes THIS tab's search phrase (within the type pill the user picked) and reloads
+  // THIS tab's list; Clear puts back exactly what was on screen before the first question, no request.
+  const tabAskOn = isTabAskEnabled();
+  const [askSnapshot, setAskSnapshot] = useState<null | { q: string; docs: KbDoc[]; facets: Facet[]; total: number }>(null);
+
+  const handleTabAsk = async (p: KnowledgeBaseAskParams): Promise<TabAskCount> => {
+    if (!askSnapshot) setAskSnapshot({ q, docs, facets, total });
+    setQ(p.q);
+    return fetchList(p.q, docType);
+  };
+
+  const clearTabAsk = () => {
+    if (!askSnapshot) return;
+    setQ(askSnapshot.q);
+    setDocs(askSnapshot.docs);
+    setFacets(askSnapshot.facets);
+    setTotal(askSnapshot.total);
+    setAskSnapshot(null);
+  };
+
   return (
     <div className="p-6">
       <div className="mb-4">
@@ -103,6 +137,12 @@ export default function KnowledgeBasePanel({ email, initialDocId }: { email: str
           Mindy&apos;s source library — winning proposals, templates, capability statements, training, and podcast insights. The documents behind every answer.
         </p>
       </div>
+
+      {tabAskOn && (
+        <div className="mb-4">
+          <TabAskBox adapter={knowledgeBaseAskAdapter} onAsk={handleTabAsk} onClear={clearTabAsk} />
+        </div>
+      )}
 
       {/* Search + type filter */}
       <div className="flex flex-wrap gap-3 mb-4">

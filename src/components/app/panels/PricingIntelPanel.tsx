@@ -25,6 +25,9 @@ import type { AppTier } from '../UnifiedSidebar';
 import { useAppTracker } from '../track';
 import { useToast } from '../Toast';
 import { authedFetch } from '../authHeaders';
+import TabAskBox from '@/components/app/TabAskBox';
+import { isTabAskEnabled, type TabAskCount } from '@/lib/app/tab-ask';
+import { pricingAskAdapter, type PricingAskParams } from '@/lib/app/tab-ask-adapters/pricing';
 
 interface LaborCategory {
   category: string;
@@ -100,18 +103,12 @@ export default function PricingIntelPanel({ email, tier }: Props) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [email]);
 
-  const runQuery = useCallback(async () => {
-    if (!email) {
-      showToast({ message: 'Sign in before running pricing intel', variant: 'error' });
-      return;
-    }
+  // The tab's ONE report load (GET /api/app/pricing-intel). Resolves to the labor categories it showed,
+  // or null when it could not show any (failed, upgrade teaser — unknown, never reported as 0).
+  // The Run button and Ask Mindy both go through it.
+  const loadPricing = useCallback(async (mode: 'naics' | 'role', value: string): Promise<TabAskCount> => {
+    if (!email) return null;
     const isRole = mode === 'role';
-    const value = (isRole ? roleInput : naicsInput).trim();
-    if (!value) {
-      showToast({ message: isRole ? 'Enter a role / labor category' : 'Enter a NAICS code', variant: 'error' });
-      return;
-    }
-
     setLoading(true);
     setError(null);
     setUpgradeTeaser(null);
@@ -127,11 +124,11 @@ export default function PricingIntelPanel({ email, tier }: Props) {
 
       if (res.status === 402 && payload?.upgrade_required) {
         setUpgradeTeaser(payload.teaser);
-        return;
+        return null;
       }
       if (!res.ok || !payload?.success) {
         setError(payload?.message || payload?.error || 'Could not load pricing intel');
-        return;
+        return null;
       }
 
       setData(payload.data as PricingData);
@@ -141,13 +138,61 @@ export default function PricingIntelPanel({ email, tier }: Props) {
         query: value,
         categories_returned: payload.data?.laborCategories?.length || 0,
       });
+      const cats = (payload.data as PricingData | undefined)?.laborCategories;
+      return Array.isArray(cats) ? { shown: cats.length, more: false } : null;
     } catch (err) {
       console.error('[PricingIntelPanel] error:', err);
       setError('Network error — could not load pricing intel');
     } finally {
       setLoading(false);
     }
-  }, [email, mode, naicsInput, roleInput, showToast, track]);
+    return null;
+  }, [email, track]);
+
+  const runQuery = useCallback(async () => {
+    if (!email) {
+      showToast({ message: 'Sign in before running pricing intel', variant: 'error' });
+      return;
+    }
+    const isRole = mode === 'role';
+    const value = (isRole ? roleInput : naicsInput).trim();
+    if (!value) {
+      showToast({ message: isRole ? 'Enter a role / labor category' : 'Enter a NAICS code', variant: 'error' });
+      return;
+    }
+    await loadPricing(mode, value);
+  }, [email, mode, naicsInput, roleInput, showToast, loadPricing]);
+
+  // ── Ask Mindy on this tab (OFF unless NEXT_PUBLIC_TAB_ASK=on) ────────────────────────────────
+  // The question becomes THIS tab's NAICS or Labor Category input and reruns THIS tab's report;
+  // Clear puts back exactly what was on screen before the first question, without another request.
+  const tabAskOn = isTabAskEnabled();
+  const [askSnapshot, setAskSnapshot] = useState<null | {
+    mode: 'naics' | 'role'; naicsInput: string; roleInput: string; data: PricingData | null;
+    error: string | null; upgradeTeaser: { note: string; sample_categories: string[] } | null;
+  }>(null);
+
+  const handleTabAsk = async (p: PricingAskParams): Promise<TabAskCount> => {
+    if (!email) {
+      showToast({ message: 'Sign in before running pricing intel', variant: 'error' });
+      return null;
+    }
+    if (!askSnapshot) setAskSnapshot({ mode, naicsInput, roleInput, data, error, upgradeTeaser });
+    setMode(p.mode);
+    if (p.mode === 'naics') setNaicsInput(p.value); else setRoleInput(p.value);
+    return loadPricing(p.mode, p.value);
+  };
+
+  const clearTabAsk = () => {
+    if (!askSnapshot) return;
+    setMode(askSnapshot.mode);
+    setNaicsInput(askSnapshot.naicsInput);
+    setRoleInput(askSnapshot.roleInput);
+    setData(askSnapshot.data);
+    setError(askSnapshot.error);
+    setUpgradeTeaser(askSnapshot.upgradeTeaser);
+    setAskSnapshot(null);
+  };
 
   return (
     <div className="p-6 space-y-6">
@@ -178,6 +223,10 @@ export default function PricingIntelPanel({ email, tier }: Props) {
           <li><span className="text-purple-300 font-medium">Premium</span> — charge more when you bring differentiated value.</li>
         </ul>
       </div>
+
+      {tabAskOn && (
+        <TabAskBox adapter={pricingAskAdapter} onAsk={handleTabAsk} onClear={clearTabAsk} />
+      )}
 
       {/* Query bar — NAICS in, "Run" out. Defaults to user's primary
           NAICS from their profile (fetched on mount). */}

@@ -1,7 +1,7 @@
 'use client';
 
 import MindyLoader from '@/components/app/MindyLoader';
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Target, RefreshCw, Check, Lock, Flame, Zap, Star, Users, MapPin, Landmark, Plus, ClipboardList, AlertTriangle, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 import type { AppTier, AppPanel } from '../UnifiedSidebar';
@@ -22,6 +22,9 @@ import { computeNextAction, nextActionButton } from '@/lib/pipeline/next-action'
 import { computeWhyFit } from '@/lib/opportunities/why-fit';
 import { mapLinkForOpportunity } from '@/lib/maps/map-links';
 import { samNoticeIdFrom } from '../mapRecordIds';
+import TabAskBox from '@/components/app/TabAskBox';
+import { isTabAskEnabled, type TabAskCount } from '@/lib/app/tab-ask';
+import { alertsAskAdapter, type AlertsAskParams } from '@/lib/app/tab-ask-adapters/alerts';
 
 interface AlertsPanelProps {
   email: string | null;
@@ -132,6 +135,53 @@ function getAlertBuyer(alert: Alert) {
   });
 }
 
+/** The request limit the feed sends to /api/app/opportunities (a full page may mean more rows exist). */
+const FEED_LIMIT = 1000;
+
+function matchesFilter(alert: Alert, alertFilter: AlertFilter) {
+  if (alertFilter === 'all') return true;
+  if (alertFilter === 'solicitation') return alert.noticeType?.toLowerCase().includes('solicitation');
+  if (alertFilter === 'sources') {
+    const noticeType = alert.noticeType?.toLowerCase() || '';
+    return noticeType.includes('sources') || noticeType.includes('request for information');
+  }
+  if (alertFilter === 'setaside') return !!alert.setAside;
+  if (alertFilter === 'urgent') return alert.isUrgent || alert.isClosingSoon;
+  return true;
+}
+
+/** The rows the list shows for these controls (before sorting). The list and Ask Mindy's count share it. */
+function visibleAlerts(
+  alerts: Alert[],
+  opts: { dismissed: Set<string>; filter: AlertFilter; search: string; state: string },
+): Alert[] {
+  const normalizedSearch = opts.search.trim().toLowerCase();
+  return alerts
+    .filter(alert => !opts.dismissed.has(alert.id))
+    .filter(alert => matchesFilter(alert, opts.filter))
+    .filter(alert => !opts.state || alert.popState === opts.state)
+    .filter(alert => {
+      if (!normalizedSearch) return true;
+      return [
+        alert.title,
+        alert.department,
+        alert.office,
+        alert.noticeType,
+        alert.naicsCode,
+        alert.solicitationNumber,
+        alert.popCity,
+        alert.popState,
+        alert.popZip,
+        alert.popCountry,
+      ].some(value => value?.toLowerCase().includes(normalizedSearch));
+    });
+}
+
+/** Identity of the inputs the auto-load effect re-runs on (loadAlerts' dependencies). */
+function feedLoadKey(email: string | null, q: string, filter: AlertFilter, cta: string[]): string {
+  return JSON.stringify([email, q, filter, cta]);
+}
+
 export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelProps) {
   const dodaacNames = useDodaacNames();
   const [alerts, setAlerts] = useState<Alert[]>([]);
@@ -236,7 +286,9 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
     }).catch(() => {});
   }, [email, getAuthHeaders, isFreeTier]);
 
-  const loadAlerts = useCallback(async () => {
+  // The feed's ONE server load (GET /api/app/opportunities). Resolves to the rows it loaded, or null
+  // when the load failed (unknown — never reported as 0). The auto-load effect and Ask Mindy share it.
+  const fetchAlerts = useCallback(async (searchQuery: string, filter: AlertFilter, selectedCtaIds: string[]): Promise<Alert[] | null> => {
     setIsLoading(true);
     setError(null);
     try {
@@ -246,7 +298,7 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
       // marketing promise is "never go to SAM.gov again" — capping the
       // feed contradicts that. The API itself protects against runaway
       // queries via its internal fetchLimit (2000).
-      params.set('limit', '1000');
+      params.set('limit', String(FEED_LIMIT));
       if (selectedCtaIds.length > 0) {
         params.set('cta', selectedCtaIds.join(','));
       }
@@ -268,7 +320,8 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
       const data = await res.json();
 
       if (data.success) {
-        setAlerts(data.opportunities || []);
+        const rows: Alert[] = data.opportunities || [];
+        setAlerts(rows);
         setTotalCount(data.count || 0);
         setCtaNeedsBackfill(Boolean(data.ctaFilter?.needsBackfill));
         if (data.searchCriteria) {
@@ -281,6 +334,7 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
             locationStates: data.searchCriteria.locationStates || [],
           });
         }
+        return rows;
       } else {
         setError(data.error || 'Failed to load opportunities');
         setAlerts([]);
@@ -292,7 +346,17 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
     } finally {
       setIsLoading(false);
     }
-  }, [email, selectedCtaIds, searchQuery, filter]);
+    return null;
+  }, [email]);
+
+  const loadAlerts = useCallback(async () => {
+    await fetchAlerts(searchQuery, filter, selectedCtaIds);
+  }, [fetchAlerts, selectedCtaIds, searchQuery, filter]);
+
+  // Ask Mindy loads the feed itself (to count what it shows), then sets the tab's controls; this key
+  // tells the auto-load effect that exact load already happened, so it does not fire a duplicate.
+  // Never set while Ask Mindy is OFF.
+  const skipAutoLoadKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
     fetch('/api/cta/codes')
@@ -312,9 +376,16 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
   };
 
   useEffect(() => {
+    if (skipAutoLoadKeyRef.current !== null) {
+      const already = skipAutoLoadKeyRef.current === feedLoadKey(email, searchQuery, filter, selectedCtaIds);
+      skipAutoLoadKeyRef.current = null;
+      if (already) return;
+    }
     // Debounce so typing in the search box doesn't fire a query per keystroke.
     const t = setTimeout(() => { loadAlerts(); }, 350);
     return () => clearTimeout(t);
+    // The key inputs are loadAlerts' own dependencies, so loadAlerts alone decides when this runs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadAlerts]);
 
   // Collaboration signal: how many OTHER users track each shown opp (anonymous,
@@ -764,18 +835,6 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
     }
   };
 
-  const matchesFilter = (alert: Alert, alertFilter: AlertFilter) => {
-    if (alertFilter === 'all') return true;
-    if (alertFilter === 'solicitation') return alert.noticeType?.toLowerCase().includes('solicitation');
-    if (alertFilter === 'sources') {
-      const noticeType = alert.noticeType?.toLowerCase() || '';
-      return noticeType.includes('sources') || noticeType.includes('request for information');
-    }
-    if (alertFilter === 'setaside') return !!alert.setAside;
-    if (alertFilter === 'urgent') return alert.isUrgent || alert.isClosingSoon;
-    return true;
-  };
-
   const filterCounts = useMemo<Record<AlertFilter, number>>(() => ({
     all: alerts.length,
     solicitation: alerts.filter(alert => matchesFilter(alert, 'solicitation')).length,
@@ -785,27 +844,7 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
   }), [alerts]);
 
   const filteredAlerts = useMemo(() => {
-    const normalizedSearch = searchQuery.trim().toLowerCase();
-
-    return alerts
-      .filter(alert => !dismissedAlertIds.has(alert.id))
-      .filter(alert => matchesFilter(alert, filter))
-      .filter(alert => !stateFilter || alert.popState === stateFilter)
-      .filter(alert => {
-        if (!normalizedSearch) return true;
-        return [
-          alert.title,
-          alert.department,
-          alert.office,
-          alert.noticeType,
-          alert.naicsCode,
-          alert.solicitationNumber,
-          alert.popCity,
-          alert.popState,
-          alert.popZip,
-          alert.popCountry,
-        ].some(value => value?.toLowerCase().includes(normalizedSearch));
-      })
+    return visibleAlerts(alerts, { dismissed: dismissedAlertIds, filter, search: searchQuery, state: stateFilter })
       .sort((a, b) => {
         if (sortMode === 'recommendation') {
           // Server already sorted by recommendationScore (set-aside fit +
@@ -830,6 +869,55 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
     }
     return Array.from(set).sort();
   }, [alerts]);
+
+  // ── Ask Mindy on this tab (OFF unless NEXT_PUBLIC_TAB_ASK=on) ────────────────────────────────
+  // The question becomes THIS tab's search box + state dropdown and reloads THIS tab's feed through
+  // its own load; Clear puts back exactly what was on screen before the first question (controls +
+  // rows), without another request.
+  const tabAskOn = isTabAskEnabled();
+  const [askSnapshot, setAskSnapshot] = useState<null | {
+    filter: AlertFilter; search: string; state: string; cta: string[];
+    rows: Alert[]; total: number; ctaNeedsBackfill: boolean;
+  }>(null);
+
+  const sameList = (a: string[], b: string[]) => a.length === b.length && a.every((v, i) => v === b[i]);
+
+  /** Set the controls the auto-load effect watches, telling it a load for them already happened. */
+  const setFeedControls = (next: { filter: AlertFilter; search: string; cta: string[] }) => {
+    const nextCta = sameList(next.cta, selectedCtaIds) ? selectedCtaIds : next.cta;
+    const nowKey = feedLoadKey(email, searchQuery, filter, selectedCtaIds);
+    const nextKey = feedLoadKey(email, next.search, next.filter, nextCta);
+    skipAutoLoadKeyRef.current = nextKey === nowKey ? null : nextKey;
+    setFilter(next.filter);
+    setSearchQuery(next.search);
+    if (nextCta !== selectedCtaIds) setSelectedCtaIds(nextCta);
+  };
+
+  const handleTabAsk = async (p: AlertsAskParams): Promise<TabAskCount> => {
+    if (!askSnapshot) {
+      setAskSnapshot({
+        filter, search: searchQuery, state: stateFilter, cta: selectedCtaIds,
+        rows: alerts, total: totalCount, ctaNeedsBackfill,
+      });
+    }
+    setFeedControls({ filter: 'all', search: p.search, cta: [] });
+    setStateFilter(p.state);
+    const rows = await fetchAlerts(p.search, 'all', []);
+    if (rows === null) return null;
+    const shown = visibleAlerts(rows, { dismissed: dismissedAlertIds, filter: 'all', search: p.search, state: p.state }).length;
+    return { shown, more: rows.length >= FEED_LIMIT };
+  };
+
+  const clearTabAsk = () => {
+    if (!askSnapshot) return;
+    setFeedControls({ filter: askSnapshot.filter, search: askSnapshot.search, cta: askSnapshot.cta });
+    setStateFilter(askSnapshot.state);
+    setAlerts(askSnapshot.rows);
+    setTotalCount(askSnapshot.total);
+    setCtaNeedsBackfill(askSnapshot.ctaNeedsBackfill);
+    setError(null);
+    setAskSnapshot(null);
+  };
 
   // Mirror the daily-alert email's visual rhythm by chunking results into
   // sections instead of one flat list. Each alert lands in the FIRST
@@ -1262,6 +1350,10 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
             </div>
           )}
         </div>
+      )}
+
+      {tabAskOn && (
+        <TabAskBox adapter={alertsAskAdapter} onAsk={handleTabAsk} onClear={clearTabAsk} />
       )}
 
       {/* Filters */}
