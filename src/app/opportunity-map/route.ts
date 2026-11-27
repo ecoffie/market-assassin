@@ -7658,7 +7658,7 @@ const DRAWER_JS = `<script>
     var isPred=vr.source==='predecessor';
     var howBody=isPred
       ? 'This estimate is anchored on the prior contract for this same requirement \\u2014 the strongest real-world comparison available. It is Mindy\\u2019s own estimate, built with our proprietary model, and updates as new award data comes in. It is NOT the government\\u2019s estimate (IGCE) or a solicited value.'
-      : 'M-Estimate\\u2122 is Mindy\\u2019s own estimate \\u2014 built from thousands of real, comparable federal awards for similar work, using our proprietary model. It reflects the typical contract size for this kind of requirement, grounded in public USASpending award history, and updates as new awards data comes in. It is NOT the government\\u2019s estimate (IGCE) or a solicited value.';
+      : 'M-Estimate\\u2122 is Mindy\\u2019s own estimate \\u2014 built from real, comparable federal awards for similar work, using our proprietary model. It reflects the typical contract size for this kind of requirement, grounded in public USASpending award history, and updates as new awards data comes in. It is NOT the government\\u2019s estimate (IGCE) or a solicited value.';
     // The number is REPRINTED here (Eric 2026-08-04: "put M-estimate detail info with number back down
     // there") — the hero has the headline; this is the detailed market context. Band + N comps beside it.
     var comps=(vr.n?(vr.n+' comparable award'+(vr.n===1?'':'s')):'');

@@ -433,21 +433,21 @@ export default function SbirPanel({ email }: SbirPanelProps) {
               <p className="text-blue-400 font-medium mb-1">SBIR (Small Business Innovation Research)</p>
               <p className="text-gray-400">
                 Competitive awards for small businesses to conduct federal R&D with commercialization potential.
-                11 federal agencies participate with ~$3.5B annual funding.
+                Several federal agencies run SBIR programs; SBIR.gov lists them.
               </p>
             </div>
             <div>
               <p className="text-cyan-400 font-medium mb-1">STTR (Small Business Technology Transfer)</p>
               <p className="text-gray-400">
                 Similar to SBIR but requires partnership with a research institution (university, federal lab).
-                At least 40% of work done by small business, 30% by research partner.
+                The small business and the research partner each must do a minimum share of the work; SBIR.gov has the current rules.
               </p>
             </div>
           </div>
           <div className="mt-4 pt-4 border-t border-blue-500/20">
             <p className="text-gray-400 text-sm">
-              <strong className="text-white">Pro Tip:</strong> Phase I is proof-of-concept (~$275K, 6-12 months).
-              Phase II is full development (~$1.1M, 2 years). Phase III is commercialization (no set funding).
+              <strong className="text-white">Pro Tip:</strong> Phase I is proof of concept, Phase II is full development,
+              and Phase III is commercialization. Award sizes and lengths vary by agency: check the solicitation and SBIR.gov.
             </p>
           </div>
         </div>

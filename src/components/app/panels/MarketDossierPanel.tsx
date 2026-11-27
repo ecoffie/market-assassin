@@ -124,7 +124,7 @@ export default function MarketDossierPanel({ email, onNavigate }: { email: strin
       <div>
         <h1 className="text-2xl font-bold text-white">Your Market Dossier</h1>
         <p className="mt-0.5 flex items-center gap-2 text-xs text-muted">
-          <Satellite className="h-3.5 w-3.5 shrink-0 text-muted" strokeWidth={2} /> Mindy ran 28 sources across 300+ agencies — your whole market, assembled.
+          <Satellite className="h-3.5 w-3.5 shrink-0 text-muted" strokeWidth={2} /> Mindy ran its federal sources across your market — assembled in one place.
           {data?.generatedAt && <span className="text-slate-600">· updated {timeAgo(data.generatedAt)}</span>}
         </p>
       </div>

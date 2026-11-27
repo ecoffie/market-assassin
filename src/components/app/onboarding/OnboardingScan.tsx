@@ -43,12 +43,12 @@ interface Props {
 // build: opportunities → who buys → who already holds it → what's coming → how to win.
 const SCAN_STEPS: { icon: string; label: string }[] = [
   { icon: '📡', label: 'Scanning SAM.gov active solicitations' },
-  { icon: '📊', label: 'Cross-referencing 5 years of USASpending awards' },
+  { icon: '📊', label: 'Cross-referencing USASpending award history' },
   { icon: '🏛️', label: 'Mapping your buying agencies & sub-agencies' },
   { icon: '📇', label: 'Decoding small-business offices & liaisons' },
   { icon: '🔁', label: 'Finding expiring contracts to recompete' },
-  { icon: '🏢', label: 'Matching 3,500+ prime contractors' },
-  { icon: '📋', label: 'Loading agency forecasts 12–18 months out' },
+  { icon: '🏢', label: 'Matching prime contractors' },
+  { icon: '📋', label: 'Loading agency forecasts' },
   { icon: '💰', label: 'Checking Grants.gov funding programs' },
   { icon: '🎯', label: 'Scoring your set-aside eligibility' },
   { icon: '🔀', label: 'Crosswalking NAICS ↔ PSC codes' },
@@ -113,7 +113,7 @@ export default function OnboardingScan({ reveal, onContinue }: Props) {
         </div>
         <h3 className="mt-3 text-lg font-bold text-white">Building your Mindy…</h3>
         <p className="mt-1 text-xs text-muted">
-          Cross-referencing <span className="font-semibold text-emerald-300">28 federal data sources</span> into one market
+          Cross-referencing <span className="font-semibold text-emerald-300">federal data sources</span> into one market
         </p>
       </div>
 

@@ -1301,9 +1301,9 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
             className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left hover:bg-violet-500/5 transition-colors"
           >
             <div>
-              <p className="text-sm font-semibold text-violet-100">Critical Tech Areas (DoD 14 CTAs)</p>
+              <p className="text-sm font-semibold text-violet-100">Critical Technology Areas (DoD)</p>
               <p className="text-xs text-violet-200/70 mt-0.5">
-                Filter to opportunities aligned with the 35% APEX reporting mandate
+                Filter to opportunities in DoD&apos;s critical technology areas
                 {selectedCtaIds.length > 0 && (
                   <span className="text-violet-300"> · {selectedCtaIds.length} selected</span>
                 )}

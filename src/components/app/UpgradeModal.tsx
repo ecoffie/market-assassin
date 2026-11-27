@@ -1,5 +1,6 @@
 'use client';
 
+import { forecastsLabel, contractorsLabel } from '@/lib/marketing-stats';
 import NoRefundNote from '@/components/NoRefundNote';
 import { useEffect } from 'react';
 import Link from 'next/link';
@@ -23,10 +24,10 @@ const FEATURE_PITCH: Record<string, { title: string; line: string }> = {
   dashboard: { title: "Today's Intel", line: 'Your AI-prioritized daily brief — the opportunities that actually fit, ranked and explained.' },
   chat: { title: 'Mindy Chat', line: 'Ask Mindy anything about opportunities, agencies, or competitors and get a straight answer.' },
   pipeline: { title: 'My Pursuits', line: 'Track every opportunity you’re chasing, with amendment alerts so you never miss a change.' },
-  forecasts: { title: 'Upcoming Buys', line: '7,800+ agency forecasts — see what’s coming 6–18 months before it hits SAM.gov.' },
+  forecasts: { title: 'Upcoming Buys', line: `${forecastsLabel} agency forecasts — see what’s coming 6–18 months before it hits SAM.gov.` },
   recompetes: { title: 'Expiring Contracts', line: 'Find contracts about to re-compete so you can position before the RFP drops.' },
-  grants: { title: 'Federal Grants', line: '$700B+ in federal grant funding, searchable by your profile.' },
-  contractors: { title: 'Contractors Database', line: 'Look up any of 290K+ contractors — their awards, agencies, and teaming fit.' },
+  grants: { title: 'Federal Grants', line: 'Federal grant funding, searchable by your profile.' },
+  contractors: { title: 'Contractors Database', line: `Look up any of ${contractorsLabel} contractors — their awards, agencies, and teaming fit.` },
   'decision-makers': { title: 'Decision Makers', line: 'The buying-office contacts who actually award the work in your space.' },
   pricing: { title: 'Pricing Intel', line: 'What the government actually paid — so you bid to win, not to guess.' },
   proposals: { title: 'Proposal Assist', line: 'Turn an RFP into a compliance matrix and drafted sections in minutes.' },
