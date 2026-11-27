@@ -124,7 +124,7 @@ import { intelligenceGateEnabledFor, runIntelligenceGate, type GateResult } from
 import Anthropic from '@anthropic-ai/sdk';
 import {
   researchModeEnabledFor, researchModel, researchSystemPrompt, toAnthropicTools, runResearchLoop, groundAnswer, progressLine,
-  RESEARCH_TURN_MS, RESEARCH_DEADLINE_MS, RESEARCH_NO_ANSWER, researchToolDefs, type ResearchCall,
+  RESEARCH_TURN_MS, RESEARCH_DEADLINE_MS, RESEARCH_NO_ANSWER, RESEARCH_BETA_LABEL, researchToolDefs, type ResearchCall,
 } from '@/lib/ask-mindy/research-mode';
 import { toolLabel } from '@/lib/chat/context-sources';
 import { researchCapDecision } from '@/lib/ask-mindy/research-caps';
@@ -1265,9 +1265,11 @@ export async function POST(request: NextRequest) {
           // ── RESEARCH MODE: Claude runs its own loop over the same catalog (src/lib/ask-mindy/research-mode.ts). ──
           if (researchTurn) {
             const rmStarted = Date.now();
+            // Beta label: the chat tags this answer and its progress line (only research turns carry it).
+            send({ type: 'mode', mode: 'research', beta: true, label: RESEARCH_BETA_LABEL });
             const model = researchModel();
             const rmTrace: Record<string, unknown> = {
-              engine: 'research_mode', model,
+              engine: 'research_mode', model, beta: true, label: RESEARCH_BETA_LABEL,
               ...(turnImages.length ? { screenshots: turnImages.length } : {}),
               ...(researchCap ? { research_cap: { plan: researchCap.plan, cap: researchCap.cap, used: researchCap.used, ...(researchCap.countUnknown ? { count_unknown: true } : {}) } } : {}),
             };
