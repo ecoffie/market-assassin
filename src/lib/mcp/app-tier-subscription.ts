@@ -30,16 +30,20 @@
 import type Stripe from 'stripe';
 import {
   findPooledOrgBySubscription, provisionPooledOrg, replenishPool, isPoolSchemaMissing, subscriptionIdFromInvoice,
+  promoPoolCeiling,
 } from './team-pools';
 import { applyCreditOnce } from './credits';
 import { proAllowanceDecision } from './pro-allowance';
 import { PRO_MONTHLY_CREDITS, TEAM_MONTHLY_CREDITS } from './packages';
 import { getStripe } from '@/lib/stripe';
 import { teamSeatPlanForPriceId } from '@/lib/billing/team-seat-plans';
+import { mindyDayPromoHasStarted, promoMultiplier, type PromoSubscription } from '@/lib/billing/mindy-day-annual-promo';
 
 /** App-tier price amounts (cents). Mirrors grant-mcp-pro-credits so the two agree. */
 const PRO_AMOUNTS = new Set([14900, 149000, 4900]);   // Pro $149/mo · $1,490/yr · $49 grandfathered
 const TEAM_AMOUNTS = new Set([49900, 499000, 402700]);        // Team $499/mo · $4,990/yr · $4,027/yr (current annual)
+/** The yearly amounts above — used only when an invoice line carries no billing interval. */
+const ANNUAL_AMOUNTS = new Set([149000, 499000, 402700]);
 
 export interface AppTierInvoiceOutcome {
   handled: boolean;   // false => not an app-tier subscription invoice
@@ -97,7 +101,7 @@ export async function handleAppTierSubscriptionInvoice(
   // stripe-subscription.ts does, so a future rename can't break the build.
   // Falls back to amount_paid, which is what the cron effectively matches on.
   const line = invoice.lines?.data?.[0] as unknown as
-    { price?: { unit_amount?: number | null } } | undefined;
+    { price?: { unit_amount?: number | null; recurring?: { interval?: string | null } | null }; plan?: { interval?: string | null } } | undefined;
   const amount = line?.price?.unit_amount ?? invoice.amount_paid ?? 0;
   let tier: 'pro' | 'team' | null = null;
   let credits = 0;
@@ -118,6 +122,29 @@ export async function handleAppTierSubscriptionInvoice(
 
   const month = new Date().toISOString().slice(0, 7); // YYYY-MM
 
+  // MINDY DAY ANNUAL PROMO (src/lib/billing/mindy-day-annual-promo.ts): an annual plan bought
+  // Nov 28 – Dec 5 2026 gets double the allowance every month of its first paid year. The rule
+  // reads the SUBSCRIPTION (interval, current period, trial), so it is re-read from Stripe —
+  // only for an annual line, and only once the window has opened. A failed read grants nothing
+  // here: granting 1x would claim the month at the normal amount and lose the doubling for it;
+  // the daily cron evaluates the same rule and self-heals within a day.
+  let multiplier = 1;
+  const interval = line?.price?.recurring?.interval ?? line?.plan?.interval ?? null;
+  const annualLine = interval === 'year' || (interval == null && (ANNUAL_AMOUNTS.has(amount) || seat?.interval === 'year'));
+  if (annualLine && mindyDayPromoHasStarted()) {
+    const subscriptionId = subscriptionIdFromInvoice(invoice);
+    if (subscriptionId) {
+      try {
+        const sub = await getStripe().subscriptions.retrieve(subscriptionId);
+        multiplier = promoMultiplier(sub as unknown as PromoSubscription);
+      } catch (e) {
+        console.error('[app-tier:sub] Mindy Day promo check failed, deferring to cron:', (e as Error).message);
+        return { handled: true, tier, email, error: 'promo_check_failed' };
+      }
+    }
+  }
+  credits *= multiplier;
+
   // TEAM → the organization's POOL (tasks/PRD-pooled-team-credits.md). Provision the
   // pooled org here (idempotent) rather than waiting for checkout provisioning: if this
   // invoice arrived first and granted personally, the pool would be granted again later
@@ -137,7 +164,10 @@ export async function handleAppTierSubscriptionInvoice(
           org = await findPooledOrgBySubscription(subscriptionId);
         }
         if (org) {
-          const r = await replenishPool(org, month);
+          // The promo doubles the pool's own allowance, but never tops up a month already
+          // replenished at the normal allowance (promoPoolCeiling).
+          const ceiling = multiplier > 1 ? await promoPoolCeiling(org, month, multiplier) : org.monthlyCredits;
+          const r = await replenishPool(ceiling === org.monthlyCredits ? org : { ...org, monthlyCredits: ceiling }, month);
           console.log(`[app-tier:sub] pool ${org.orgId} +${r.granted} (team, ${reason}, applied=${r.applied}) invoice ${invoice.id}`);
           return { handled: true, applied: r.applied, credits: r.granted, email, tier, newBalance: r.newBalance };
         }
@@ -166,7 +196,8 @@ export async function handleAppTierSubscriptionInvoice(
   }
 
   // SAME key shape as the monthly cron — this is what makes the two paths safe
-  // together. See the header note.
+  // together. See the header note. A promo grant uses the same key: a month already claimed
+  // (at any amount) stays claimed, so doubling can never stack on, or top up, a 1x grant.
   const key = `pro:${email}:${month}`;
   const { applied, newBalance } = await applyCreditOnce(key, email, credits, `app_tier_${tier}`);
   console.log(
