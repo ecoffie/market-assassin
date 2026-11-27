@@ -5,6 +5,7 @@
  * Includes API key rotation for rate limit management
  */
 
+import { withoutRejected } from '@/lib/sam/key-health';
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
 
@@ -35,7 +36,8 @@ export function getAvailableSAMKeys(): string[] {
     }
   }
 
-  return keys;
+  // A key SAM rejected (401/403) in this process is skipped (key-health.ts, 2026-11-25 outage).
+  return withoutRejected(keys);
 }
 
 /**
@@ -55,8 +57,8 @@ export function getAllDistinctSAMKeys(): string[] {
   if (base && base.trim()) raw.push(base.trim());
   const backup = process.env.SAM_API_KEY_BACKUP;
   if (backup && backup.trim()) raw.push(backup.trim());
-  // Dedupe, preserve order.
-  return [...new Set(raw)];
+  // Dedupe, preserve order; drop keys SAM rejected (401/403) in this process (key-health.ts).
+  return withoutRejected([...new Set(raw)]);
 }
 
 /**
@@ -620,15 +622,15 @@ export async function cleanExpiredCache(): Promise<number> {
   if (!supabase) return 0;
 
   try {
-    const { data, error } = await supabase
+    // count: 'exact' — a RETURNING payload is capped at 1,000 rows and would under-report a large cleanup (INT-005).
+    const { count: deleted, error } = await supabase
       .from('sam_api_cache')
-      .delete()
-      .lt('expires_at', new Date().toISOString())
-      .select('id');
+      .delete({ count: 'exact' })
+      .lt('expires_at', new Date().toISOString());
 
     if (error) throw error;
 
-    const count = data?.length || 0;
+    const count = deleted ?? 0;
     console.log(`[SAM Cache Cleanup] Removed ${count} expired entries`);
     return count;
   } catch (err) {
