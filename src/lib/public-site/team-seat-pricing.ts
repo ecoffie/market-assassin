@@ -10,8 +10,7 @@
  *    - the prices here are LABELS on the page; Stripe, the webhook and POOLED_PLAN_DEFAULTS are
  *      untouched (src/lib/billing/team-seat-plans.ts holds the held billing proposal from #2430,
  *      and a test keeps these labels equal to it so the two cannot drift);
- *    - credits per seat are NOT shown: no allowance has been approved, and an unknown number is
- *      never rendered as one (CLAUDE.md rule 5);
+ *    - credits are shown as seats x TEAM_SEAT_CREDITS_PER_USER (1,500), the same number the grant uses;
  *    - `checkoutUrl` is EMPTY. There are no Stripe prices for 2 seats / $249 or 5 seats / $599 yet,
  *      so an empty URL sends the button to contact sales, never to today's $499 Team checkout.
  *      Eric creates the two prices, then fills `checkoutUrl` (e.g. the existing

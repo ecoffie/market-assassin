@@ -141,13 +141,12 @@ describe('/pricing with the seat switch ON (server render)', () => {
     expect(t.textContent).toContain('Add up to 5 as the team grows, at any time.');
   });
 
-  it('never shows a credit number for Team (unknown is never zero)', () => {
+  it('shows the seat credits the grant uses (2 seats x 1,500 = 3,000, shared)', () => {
     const t = teamCard(doc);
-    expect(t.querySelector('.usage')).toBeNull();
-    expect(t.textContent).not.toMatch(/credit/i);
+    expect(t.querySelector('.usage')?.textContent).toBe('Monthly usage included3,000 credits / month, shared by the team');
     const table = doc.querySelector('section.cmp table')!;
     const row = [...table.querySelectorAll('tr')].find((r) => r.querySelector('th')?.textContent === 'Monthly credits')!;
-    expect([...row.querySelectorAll('td')].map((c) => c.textContent)).toEqual(['1,500', 'To be confirmed', 'Custom']);
+    expect([...row.querySelectorAll('td')].map((c) => c.textContent)).toEqual(['1,500', '1,500 per user, shared', 'Custom']);
   });
 
   it('keeps Pro and Enterprise copy as live', () => {
