@@ -31,7 +31,7 @@ Wrapping a public API is the price of entry. The moat is the intelligence that t
 
 ---
 
-## What Mindy MCP gives an agent — 54 tools across four layers
+## What Mindy MCP gives an agent — 55 tools across four layers
 Among them: `get_current_acquisition_intelligence` (8 credits) — what changed about how a buyer is buying for a capability, and what to do differently (LIVE compose only). `match_company_to_pathways` (8 credits) — which of those doors a company’s public record can support (two-sided PATHWAY FIT; `no_proven_door` is success).
 
 
@@ -76,6 +76,7 @@ The hosted server exposes **40 credit-metered tools** (plus a free `get_balance`
 | `get_agency_intel` | Agency identity, pain points, live obligations, and the NDAA legislative record (stage + law status per version) |
 | `get_agency_spending_detail` | Sub-agency (component) breakdown + set-aside distribution |
 | `get_sba_goaling_share` | Statutory small-business goals vs. the agency's actual set-aside obligations — "is this a good small-business market?" |
+| `get_naics_spending_by_year` | An industry's (NAICS) spending per fiscal year, with what small businesses won and what went through set-asides |
 | `get_award_detail` | Obligated-to-ceiling, parent IDV, period of performance, recipient |
 | `find_predecessor_award` | The likely incumbent for an open opportunity |
 | `get_legislation_status` | Where a bill stands in Congress — NDAA / H.R. / S. / public law: each version's stage and law status, latest stored action, congress.gov links (status only — bill text not held) |
@@ -186,7 +187,7 @@ Public data is labeled public; curated intelligence is labeled curated; an hones
 
 ## The bottom line
 
-Mindy MCP is not "an API wrapper for federal contracting." It's a grounded intelligence layer for AI agents — **54 tools** spanning the public data any agent needs, a full proposal pipeline, and the proprietary intelligence no competitor can copy, all under a contract that returns real data or honestly returns nothing.
+Mindy MCP is not "an API wrapper for federal contracting." It's a grounded intelligence layer for AI agents — **55 tools** spanning the public data any agent needs, a full proposal pipeline, and the proprietary intelligence no competitor can copy, all under a contract that returns real data or honestly returns nothing.
 
 - **Commodity done right** — the public-data tools are fast, cached, and useful on call one.
 - **Moat where it counts** — winning playbooks, office-level buying contacts, SBLO teaming, and podcast lessons that took eight years to build.

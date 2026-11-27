@@ -7,9 +7,26 @@ accurately from this file.
 
 Authoritative counts (never trust a grep — tools register via two paths: explicit
 `*_TOOL_DEF` consts in `src/lib/mcp/tool-registry.ts` AND the TIER1/TIER2 chat defs):
-- **Internal registry, `listMcpTools()` = 65.** Mindy Chat and tool-to-tool composition use it.
-- **Public catalog, `listPublicMcpTools()` = 54.** What the hosted HTTP edge lists and accepts.
+- **Internal registry, `listMcpTools()` = 66.** Mindy Chat and tool-to-tool composition use it.
+- **Public catalog, `listPublicMcpTools()` = 55.** What the hosted HTTP edge lists and accepts.
   The difference is the hidden set in `src/lib/mcp/public-catalog-config.ts`.
+
+---
+
+## November 2026 — get_naics_spending_by_year (public 54 → 55, internal 65 → 66)
+
+**`get_naics_spending_by_year`** (5 credits) — an industry's (NAICS) federal contract spending PER
+FISCAL YEAR, with the dollars and % small businesses won and the dollars and % that went through
+small-business set-asides (SB, 8(a), SDVOSB, WOSB/EDWOSB, HUBZone). Fills the gap where hosts could
+only give small-business share per agency, so "rank these industries by spending and small-business
+wins by year" came back as rough, directional numbers. Live USASpending `spending_over_time`
+(contracts A/B/C/D), 6-digit NAICS exact, optional place-of-performance state, default last 5
+complete FYs (max 10), 12h cache. A failed series is null with `degraded=true`, never $0.
+Small-business share is the closest public proxy to SBA goaling, not the official Scorecard figure.
+
+### Docs kept in sync
+
+- Capabilities artifact (`31ec6de1-1dcf-4a04-aa43-30289bfc6c7c`) — 55 tools.
 
 ---
 
@@ -25,7 +42,7 @@ getmindy.ai/jobs.
 
 ### Docs kept in sync
 
-- Capabilities artifact (`31ec6de1-1dcf-4a04-aa43-30289bfc6c7c`) — 54 tools.
+- Capabilities artifact (`31ec6de1-1dcf-4a04-aa43-30289bfc6c7c`) — 55 tools.
 
 ---
 
@@ -53,7 +70,7 @@ Source: `tasks/mcp-tool-portfolio-audit-2026-10-02.md` (Phase 0 + Phase 1).
 
 ### Docs kept in sync
 
-- Capabilities artifact (`31ec6de1-1dcf-4a04-aa43-30289bfc6c7c`) — 54 tools.
+- Capabilities artifact (`31ec6de1-1dcf-4a04-aa43-30289bfc6c7c`) — 55 tools.
 
 ---
 

@@ -1,7 +1,7 @@
 {
   "_comment": "Mirror of the claude.ai Tool Map artifact. Update the artifact FIRST, then run: node scripts/audit-tool-catalog-drift.mjs --update. The gate fails if this disagrees with listPublicMcpTools() (the PUBLIC catalog).",
   "artifact_url": "https://claude.ai/code/artifact/31ec6de1-1dcf-4a04-aa43-30289bfc6c7c",
-  "count": 54,
+  "count": 55,
   "tools": [
     "assess_market_depth",
     "build_pursuit_dossier",
@@ -29,6 +29,7 @@
     "get_keyword_coverage",
     "get_legislation_status",
     "get_market_vocabulary",
+    "get_naics_spending_by_year",
     "get_pricing_intel",
     "get_recipient_annual_obligations",
     "get_sba_goaling_share",
