@@ -35,6 +35,20 @@ const at = (iso: string) => { vi.useFakeTimers({ toFake: ['Date'] }); vi.setSyst
 const promo = (el: HTMLElement) => el.querySelector('[data-mindy-day-promo]');
 
 describe('/pricing Mindy Day line', () => {
+  it('with the monthly-only Team seat card on, offers Pro annual only (no Team annual claim)', async () => {
+    vi.stubEnv('NEXT_PUBLIC_TEAM_SEAT_PRICING', 'on');
+    try {
+      at('2026-11-29T15:00:00Z');
+      const p = promo(await render(PricingPage()));
+      expect(p).not.toBeNull();
+      expect(p!.textContent).toContain('Pro');
+      expect(p!.textContent).toContain((PRO_MONTHLY_CREDITS * 2).toLocaleString('en-US'));
+      expect(p!.textContent).not.toContain((TEAM_MONTHLY_CREDITS * 2).toLocaleString('en-US'));
+      expect(p!.textContent).not.toMatch(/Team/);
+      expect(p!.querySelector('a[data-mindy-day-cta]')?.textContent).toBe('Start Pro annual');
+    } finally { vi.unstubAllEnvs(); }
+  });
+
   it('shows inside the window, with doubled numbers from the constants, next to the Monthly/Annual toggle', async () => {
     at('2026-12-01T15:00:00Z');
     const el = await render(PricingPage());

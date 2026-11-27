@@ -403,9 +403,16 @@ export default function SimplePricing({ proCredits, teamCredits, forecastsLabel,
           style={{ maxWidth: 720, margin: '-12px auto 32px', padding: '18px 22px', textAlign: 'center', background: 'var(--mp-surface)', border: '2px solid var(--mp-navy)', borderRadius: 14, boxShadow: '0 6px 20px rgba(15,23,42,.08)' }}
         >
           <p style={{ margin: '0 0 6px', font: '600 12px var(--mp-font-sans)', letterSpacing: '.08em', textTransform: 'uppercase', color: 'var(--mp-navy)' }}>Mindy Day deal · ends Dec 5</p>
-          <p style={{ margin: '0 0 6px', font: '700 22px/1.25 var(--mp-font-serif)', color: 'var(--mp-ink)' }}>Double credits for a full year on annual plans</p>
-          <p style={{ margin: 0, font: '400 15px/1.5 var(--mp-font-sans)', color: 'var(--mp-muted)' }}>{promoLine}</p>
-          {!seatOn && !annual && (
+          <p style={{ margin: '0 0 6px', font: '700 22px/1.25 var(--mp-font-serif)', color: 'var(--mp-ink)' }}>{seatOn ? 'Double credits for a full year on Pro annual' : 'Double credits for a full year on annual plans'}</p>
+          {/* The seat-based Team card is monthly only, so with it on the deal is Pro annual only. */}
+          <p style={{ margin: 0, font: '400 15px/1.5 var(--mp-font-sans)', color: 'var(--mp-muted)' }}>
+            {seatOn ? `Start Pro on the annual plan by Dec 5 and get ${fmt(proCredits * 2)} credits a month (instead of ${fmt(proCredits)}) for your first paid year.` : promoLine}
+          </p>
+          {seatOn ? (
+            <a data-mindy-day-cta href={PRO_TRIAL_ANNUAL} onClick={() => trackTrialClick('pro', 'annual', 'mindy-day')}
+              style={{ display: 'inline-block', marginTop: 12, borderRadius: 10, padding: '10px 18px', background: 'var(--mp-navy)', color: 'var(--mp-surface)', font: '600 14px var(--mp-font-sans)', textDecoration: 'none' }}
+            >Start Pro annual</a>
+          ) : !annual && (
             <button type="button" data-mindy-day-cta onClick={() => setAnnual(true)}
               style={{ marginTop: 12, border: 0, borderRadius: 10, padding: '10px 18px', background: 'var(--mp-navy)', color: 'var(--mp-surface)', font: '600 14px var(--mp-font-sans)', cursor: 'pointer' }}
             >See annual prices</button>
