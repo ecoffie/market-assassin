@@ -367,7 +367,8 @@ export function citationsFromSources(sources: ContextSource[]): Array<{ title: s
     if (seen.has(dedupe)) continue;
     seen.add(dedupe);
     out.push({
-      title: s.asOf ? `${s.label} · ${labelledSourceDate(s.asOf)}` : s.label,
+      // Source name only (Eric, 2026-11-27: no data-freshness dates in front of the customer); asOf stays in the ledger.
+      title: s.label,
       url: s.ref?.url ?? null,
       doc_type: s.kind === 'account_record' ? 'mindy_account_data' : 'mindy_federal_data',
       source_path: s.id,

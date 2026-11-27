@@ -144,6 +144,7 @@ import { getNaics } from '@/lib/codes/lookup';
 import { capabilityPlannerNote, interpretCapabilityNaics } from '@/lib/market/capability-naics';
 import { guardUnstatedStates, guardUnstatedCities } from '@/lib/chat/stated-filters';
 import { parseDisplayHint, displayHintNote } from '@/lib/chat/display-hint';
+import { QUESTION_OVER_PROFILE, OUTREACH_AND_PLAN_RULES } from '@/lib/ask-mindy/outreach-rules';
 import { compileIntent, enforceIntent, dedupeToolCalls, isMapScopeNote, splitViewPreamble } from '@/lib/chat/intent-compiler';
 import { sessionTitleFrom } from '@/lib/chat/view-preamble';
 import { prepareChatToolArgs, renderExpiringRecords, renderStatusChecks, renderBuyingOffices, renderPricing, renderKeywords, renderVehicleMix, renderSbloContact, lintAnalysis, deterministicNextSteps, crossCheckOffices, checkSummaryAgainstRecords, EXPIRING_TOOL, PAST_CONTRACTS_TOOL, BUYING_OFFICES_TOOL, PRICING_TOOL, KEYWORDS_TOOL, VEHICLE_MIX_TOOL, SBLO_TOOL, type RenderedRecords } from '@/lib/chat/record-render';
@@ -377,7 +378,9 @@ WRITING STYLE:
 - Default to second person ("you / your") — you're talking TO the user, not ABOUT a hypothetical bidder.
 - NEVER mention tool names, internal mechanics, or "the [X] tool" to the user. Just answer with what you found, or — if you need one more detail to search (e.g. which agency) — ask for it naturally ("Which agency did you have in mind?"). The user never sees the plumbing.
 
-USER PROFILE (use to personalize answers when relevant; if blank, write generically using "your company"):
+${OUTREACH_AND_PLAN_RULES}
+
+USER PROFILE (use to personalize answers when relevant; if blank, write generically using "your company"; the customer's own words in this conversation override it):
 {userProfile}`;
 
 // (buildContextBlock / chunksToCitations / buildCitationChips removed 2026-08-02 — the entire RAG
@@ -819,7 +822,8 @@ export async function POST(request: NextRequest) {
         const profile: BidderProfile = profileResult?.profile ?? {};
         const { rec: noticeRecord, origin: noticeOrigin, mention: mentionedNotice, facts: noticeFacts } = await noticeP;
         cardRecord = noticeRecord;
-        const userProfileBlock = formatProfileForPrompt(profile) + (
+        const profileText = formatProfileForPrompt(profile);
+        const userProfileBlock = profileText + (profileText.trim() ? `\n\n${QUESTION_OVER_PROFILE}` : '') + (
           !profileEmail
             ? '\n\nCOMPANY PROFILE NOT USED this turn: the acting workspace could not be confirmed, so no saved company profile applies. Say so if fit matters; use only what the customer has said in this conversation, and do not ask again for details they already gave.'
             : profileResult?.status === 'unavailable'
@@ -1301,7 +1305,9 @@ export async function POST(request: NextRequest) {
             const callLog: Array<{ tool: string; status: string; ms: number; args: unknown }> = [];
             let rmReport: { report_id: string | null; url: string | null; title: string; html: string } | null = null;
             const rmDeliverables: Array<{ format: string; document_id: string; file_name?: string; version?: number | null }> = [];
-            const rmSources: typeof turnSources = [];
+            // The SAME array create_document's provenance reads (provenanceRecords(turnSources, …)): research results land
+            // here, so a research report's sources get their record links, ids and read dates (the standard path never runs).
+            const rmSources: typeof turnSources = turnSources;
             const planner = { model, provider: 'anthropic' };
             const isWrite = (n: string) => executor.policyFor(n).decision === 'allowed_write';
             const execOne = async (c: ResearchCall) => {

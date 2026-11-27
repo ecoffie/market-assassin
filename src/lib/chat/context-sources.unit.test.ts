@@ -194,15 +194,14 @@ describe('source dates say what they mean (never a bare "as of")', () => {
     expect(sourceDateLabel('get_agency_intel', { _meta: { as_of: '2026-09-30' } })).toBe('source dated 2026-09-30');
     expect(sourceDateLabel('get_agency_intel', { _meta: {} })).toBeNull();
   });
-  it('the citation chip carries the label, and an older saved bare date is labelled too', () => {
+  it('the citation chip shows the source name only (no data-freshness date, Eric 2026-11-27); the ledger keeps the date', () => {
     const mk = (tool: string, content: string) => sourceFromToolResult({ tool, toolCallId: 'x', status: 'success', content, owner, retrievedAt: at });
     const chips = citationsFromSources([
       mk('get_buying_offices', JSON.stringify({ ok: true, _meta: { as_of: '2026-09-30', data_current_through: '2026-11-20', window: 'FY2024–FY2026' } })),
       mk('lookup_sam_entity', JSON.stringify({ ok: true, _meta: { as_of: '2026-08-25' } })),
     ]);
-    expect(chips[0].title).toMatch(/· FY2024–FY2026 · data through 2026-11-20$/);
-    expect(chips[1].title).toMatch(/· SAM registration record from 2026-08-25$/);
-    for (const c of chips) expect(c.title).not.toMatch(/as of/);
+    for (const c of chips) expect(c.title).not.toMatch(/as of|data through|record from|dated|\d{4}-\d{2}-\d{2}/);
+    expect(chips[1].title).toBe(mk('lookup_sam_entity', '{"ok":true}').label);
     expect(labelledSourceDate('2026-11-20')).toBe('source dated 2026-11-20');
     expect(labelledSourceDate('data through 2026-11-20')).toBe('data through 2026-11-20');
   });
