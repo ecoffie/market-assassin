@@ -1,8 +1,10 @@
 # Market Report Section: How They Buy Now (template)
 
 Owner: Eric (standard, 2026-11-27). Encoded for Ask Mindy in `src/lib/ask-mindy/how-they-buy-now.ts` (research mode and
-`create_document` guidance). `[KB n]` = entry n of `docs/knowledge/how-government-buys-now-2026-11-27.md` (the rules
-knowledge base, maintained by Data Core). Client examples are described generically here; this repository is public.
+`create_document` guidance). `[KB n]` = claim id `KB-n` in the rules register (`kb_rule_claims`, Data Core #2518), read
+through its lookup (`searchRuleClaims` / `checkClaims`). A report cites a rule claim only when the register returns it as
+current; when the register is unavailable or the claim is not current, the claim is left out. Never cite a rule from a
+doc file or from memory. Client examples are described generically here; this repository is public.
 
 It goes into every Mindy market or company report and leave-behind. Arc: the old way is closing, what this firm holds,
 the eight pathways, talent, attention, Monday actions.

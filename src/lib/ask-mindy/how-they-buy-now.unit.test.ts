@@ -75,3 +75,19 @@ describe('wired into research mode', () => {
     expect(RESEARCH_INSTRUCTIONS).toMatch(/A written market or company report follows the HOW THEY BUY NOW order below/);
   });
 });
+
+describe('rule claims come from the rules register (#2518), never from memory or a doc file', () => {
+  it('cite only a current register claim; otherwise leave it out', () => {
+    expect(HOW_THEY_BUY_NOW).toMatch(/Cite a rule claim only when the register lookup returns it as current, with its official source/);
+    expect(HOW_THEY_BUY_NOW).toMatch(/when the lookup is not available to you or the claim is not current, leave that claim out/);
+    expect(HOW_THEY_BUY_NOW).not.toMatch(/docs\/knowledge/);
+  });
+  it('the template points at the register, not at the rules file', () => {
+    const doc = readFileSync(join(process.cwd(), 'docs/knowledge/market-report-section-how-they-buy-now-template.md'), 'utf8');
+    expect(doc).toMatch(/claim id `KB-n` in the rules register \(`kb_rule_claims`/);
+    expect(doc).not.toMatch(/entry n of `docs\/knowledge\/how-government-buys-now/);
+  });
+  it('no freshness dates anywhere in the section guidance (Eric: "apply the no date rules everywhere")', () => {
+    expect(HOW_THEY_BUY_NOW_RULES).not.toMatch(/\bas of\b|retrieved|verified on|last updated|data through|last seen/i);
+  });
+});
