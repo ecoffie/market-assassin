@@ -8,6 +8,7 @@
  * an outside-industry result.
  */
 
+import { reportedOffers, offersCompetitionLevel } from '@/lib/opportunities/offers';
 import { filterMarketToSavedIndustry, naicsInSavedMarket } from '@/lib/alerts/open-contract-d';
 import { parseVerifiedDateIso } from './calendar-sanitize';
 
@@ -237,7 +238,8 @@ async function fetchUSASpendingContracts(params: {
           const periodPerf = detail.period_of_performance || {};
           const endDate = periodPerf.end_date || award['End Date'] || '';
           const daysUntil = daysUntilIso(endDate);
-          const numberOfBids = parseInt(contractData.number_of_offers_received || '0', 10) || 0;
+          // Not reported → undefined + 'unknown' — never "0 bids" (offers.ts).
+          const numberOfBids = reportedOffers(contractData.number_of_offers_received) ?? undefined;
 
           contracts.push({
             contractNumber: detail.piid || award['Award ID'],
@@ -248,10 +250,10 @@ async function fetchUSASpendingContracts(params: {
             naicsCode: detail.latest_transaction_contract_data?.naics || params.naics_code || '',
             expirationDate: endDate || '',
             daysUntilExpiration: daysUntil ?? Number.POSITIVE_INFINITY,
-            setAside: contractData.extent_competed_description || 'Full & Open',
+            setAside: contractData.type_set_aside_description || 'Not reported',
             description: detail.description || '',
             numberOfBids,
-            competitionLevel: numberOfBids <= 2 ? 'low' : numberOfBids <= 5 ? 'medium' : 'high',
+            competitionLevel: offersCompetitionLevel(numberOfBids ?? null),
           });
         }
       } catch {

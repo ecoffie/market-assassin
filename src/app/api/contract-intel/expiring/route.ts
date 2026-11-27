@@ -55,9 +55,9 @@ export async function GET(request: NextRequest) {
 
     // Calculate summary stats
     const totalValue = contracts.reduce((sum, c) => sum + c.currentTotalValueOfAward, 0);
-    const avgBids = contracts.length > 0
-      ? contracts.reduce((sum, c) => sum + c.numberOfOffersReceived, 0) / contracts.length
-      : 0;
+    // Average over contracts that REPORT an offer count; null when none do (unknown, never 0).
+    const reported = contracts.map((c) => c.numberOfOffersReceived).filter((n): n is number => n !== null);
+    const avgBids = reported.length > 0 ? reported.reduce((sum, n) => sum + n, 0) / reported.length : null;
     const soleSourceCount = contracts.filter(c => c.competitionLevel === 'sole_source').length;
     const lowCompCount = contracts.filter(c => c.competitionLevel === 'low').length;
     const urgentCount = contracts.filter(c => c.daysUntilExpiration && c.daysUntilExpiration <= 90).length;
@@ -68,7 +68,8 @@ export async function GET(request: NextRequest) {
       summary: {
         totalContracts: contracts.length,
         totalValue,
-        avgBidsPerContract: Math.round(avgBids * 10) / 10,
+        avgBidsPerContract: avgBids === null ? null : Math.round(avgBids * 10) / 10,
+        contractsReportingBids: reported.length,
         soleSourceContracts: soleSourceCount,
         lowCompetitionContracts: lowCompCount,
         urgentContracts: urgentCount
