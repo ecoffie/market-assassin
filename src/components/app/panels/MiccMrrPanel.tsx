@@ -75,7 +75,7 @@ export default function MiccMrrPanel({ email }: Props) {
       </div>
 
       <div className="bg-ground border border-surface rounded-xl p-5 space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div data-tip="micc-mrr-fields" className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-xs text-faint mb-1">Requirement title</label>
             <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Engineering & Technical Support at Fort X"
@@ -97,7 +97,7 @@ export default function MiccMrrPanel({ email }: Props) {
               className="w-full px-3 py-2 bg-surface border border-hairline rounded-lg text-white text-sm placeholder-faint focus:border-blue-500 focus:outline-none" />
           </div>
         </div>
-        <button onClick={generate} disabled={loading}
+        <button data-tip="micc-mrr-generate" onClick={generate} disabled={loading}
           className="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 disabled:bg-input text-white font-medium rounded-lg transition-colors">
           {loading ? 'Researching…' : 'Generate MRR draft'}
         </button>
@@ -112,7 +112,7 @@ export default function MiccMrrPanel({ email }: Props) {
               <h3 className="text-sm font-semibold text-white">MRR draft ready</h3>
               <p className="text-xs text-faint mt-1">Data sections auto-filled from USASpending. Download the official Army template and complete the bracketed sections.</p>
             </div>
-            <button onClick={downloadDocx} className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded-lg"><Download className="h-4 w-4 shrink-0" strokeWidth={2} /> Download MRR (.docx)</button>
+            <button data-tip="micc-mrr-download" onClick={downloadDocx} className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded-lg"><Download className="h-4 w-4 shrink-0" strokeWidth={2} /> Download MRR (.docx)</button>
           </div>
 
           {/* Quick stats */}

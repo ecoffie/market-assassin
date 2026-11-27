@@ -195,7 +195,7 @@ export default function GrantsPanel({ email, tier }: GrantsPanelProps) {
       {/* Search & Filters */}
       <div className="space-y-4">
         {/* Search Row */}
-        <div className="flex gap-3">
+        <div data-tip="grants-search" className="flex gap-3">
           <input
             type="text"
             value={searchKeyword}
@@ -214,7 +214,7 @@ export default function GrantsPanel({ email, tier }: GrantsPanelProps) {
         </div>
 
         {/* Filters Row */}
-        <div className="flex flex-wrap gap-3">
+        <div data-tip="grants-filters" className="flex flex-wrap gap-3">
           {/* Agency Filter */}
           <select
             value={selectedAgency}
@@ -274,6 +274,7 @@ export default function GrantsPanel({ email, tier }: GrantsPanelProps) {
 
             return (
               <a
+                data-tip="grants-result"
                 key={grant.id}
                 href={grant.url}
                 target="_blank"
