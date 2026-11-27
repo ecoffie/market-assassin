@@ -546,7 +546,7 @@ const GRANTS_TOOL_DEF = {
         keyword: { type: 'string', description: 'Search term, e.g. "broadband" or "veteran health".' },
         agency: { type: 'string', description: 'Top-level agency code, e.g. "DOD" / "HHS" (client-side prefix filter).' },
         category: { type: 'string', description: 'Grants.gov funding category code, e.g. "HL" (health), "ST" (science).' },
-        status: { type: 'string', enum: ['posted', 'forecasted', 'closed', 'archived'], description: 'Opportunity status (default posted).' },
+        status: { type: 'string', enum: ['posted', 'forecasted', 'closed', 'archived'], description: 'Opportunity status. Omit to search posted AND forecasted (forecasted = a planned program, not yet open).' },
         limit: { type: 'number', description: 'Max results (default 25, max 100).' },
       },
     },

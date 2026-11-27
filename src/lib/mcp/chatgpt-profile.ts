@@ -112,7 +112,7 @@ export const CHATGPT_TOOL_COPY: Readonly<Record<ChatgptToolName, ChatgptToolCopy
   search_grants: {
     title: 'Search Grants',
     description:
-      'Search federal grant opportunities on Grants.gov by keyword, agency or funding category, for example "rural broadband" or "veteran health". Returns title, agency, status, close date, award ceiling, assistance listing number and a Grants.gov link. Defaults to posted opportunities; forecasted, closed and archived ones are also available. Grants are financial assistance with a different application path from contracts; for contract opportunities, use find_opportunities.',
+      'Search federal grant opportunities on Grants.gov by keyword, agency or funding category, for example "rural broadband" or "veteran health". Returns title, agency, status, close date, award ceiling, assistance listing number and a Grants.gov link. Without a status it searches posted and forecasted programs together, ranked with title matches first; a forecasted program is planned, not yet open. Closed and archived ones are also available. Grants are financial assistance with a different application path from contracts; for contract opportunities, use find_opportunities.',
     openWorldHint: true,
   },
   find_capable_contractors: {

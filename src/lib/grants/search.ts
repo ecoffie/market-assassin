@@ -55,6 +55,45 @@ export interface GrantResult {
   status: string | null;
   cfdaList: string[];
   url: string;
+  /**
+   * Why this grant matched the keyword, strongest first: every keyword term in the title; some terms in
+   * the title; the keyword is one of its Assistance Listing numbers; or only the synopsis matched.
+   * Absent when no keyword was searched.
+   */
+  match?: 'title' | 'title_partial' | 'assistance_listing' | 'description';
+}
+
+const GRANT_STOPWORDS = new Set(['and', 'for', 'the', 'with', 'from', 'into', 'program', 'programs', 'grant', 'grants', 'federal', 'funding', 'services']);
+const ALN = /^\d{2}\.\d{3}$/;
+
+/** Keyword terms that can carry meaning in a title (3+ letters, not filler). */
+export function grantKeywordTerms(keyword: string): string[] {
+  return [...new Set(keyword.toLowerCase().split(/[^a-z0-9.]+/).filter((t) => t.length >= 3 && !GRANT_STOPWORDS.has(t)))];
+}
+
+/**
+ * Rank grants by what the keyword actually names (Ask Mindy Backend Spec: "rank by grant title and assistance
+ * listing"). Grants.gov's search endpoint accepts only date sorts, so a grant whose synopsis merely mentions
+ * the word outranked one titled for it. Tiers: all terms in title → assistance listing number → some terms
+ * in title → synopsis only. Within a tier the upstream (newest-first) order is kept. Pure.
+ */
+export function rankGrantsByRelevance(grants: GrantResult[], keyword: string): GrantResult[] {
+  const k = keyword.trim();
+  if (!k) return grants;
+  const terms = grantKeywordTerms(k);
+  const aln = ALN.test(k) ? k : null;
+  const tier = (g: GrantResult): { match: NonNullable<GrantResult['match']>; rank: number } => {
+    const title = (g.title || '').toLowerCase();
+    const hits = terms.filter((t) => new RegExp(`\\b${t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`).test(title)).length;
+    if (aln && g.cfdaList.includes(aln)) return { match: 'assistance_listing', rank: 0 };
+    if (terms.length && hits === terms.length) return { match: 'title', rank: 0 };
+    if (hits > 0) return { match: 'title_partial', rank: 1 };
+    return { match: 'description', rank: 2 };
+  };
+  return grants
+    .map((g, i) => ({ g, i, t: tier(g) }))
+    .sort((a, b) => a.t.rank - b.t.rank || a.i - b.i)
+    .map(({ g, t }) => ({ ...g, match: t.match }));
 }
 
 export interface GrantSearchResult {
@@ -75,7 +114,9 @@ export async function searchGrants(input: GrantSearchInput): Promise<GrantSearch
   // Grants.gov's agency facet filters unreliably for top-level codes, so we fetch
   // broadly and prefix-filter client-side (a hit's agencyCode is like "DOD-AMRAA").
   // Fetch extra rows when an agency filter is active so the page still fills.
-  const fetchRows = agencyFilter ? Math.min(limit * 4, 100) : limit;
+  // A keyword search fetches a wider newest-first window so title matches can be ranked ahead of
+  // synopsis-only matches (rankGrantsByRelevance) before the page is cut.
+  const fetchRows = agencyFilter ? Math.min(limit * 4, 100) : keyword ? Math.min(Math.max(limit * 3, 50), 100) : limit;
   const payload: Record<string, unknown> = {
     keyword: keyword || undefined,
     oppStatuses: status,
@@ -131,9 +172,10 @@ export async function searchGrants(input: GrantSearchInput): Promise<GrantSearch
 
   let agencyFiltered = false;
   if (agencyFilter) {
-    grants = grants.filter((g) => (g.agencyCode || '').toUpperCase().startsWith(agencyFilter)).slice(0, limit);
+    grants = grants.filter((g) => (g.agencyCode || '').toUpperCase().startsWith(agencyFilter));
     agencyFiltered = true;
   }
+  grants = rankGrantsByRelevance(grants, keyword).slice(0, limit);
 
   // When agency-filtered the upstream hitCount is the UNfiltered total, so report
   // the honest post-filter count for this page instead of an inflated number.
