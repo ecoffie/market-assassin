@@ -5,14 +5,14 @@
  * exactly as before. Content lives in the content-*.ts group files listed in TAB_TIPS_SOURCES; each
  * exports `TAB_TIPS: TabTipsRegistry`. Writers add entries to those files and never edit this one.
  */
-import type { TabTips, TabTipsRegistry } from './types';
+import type { TabTips, TabTipsRegistry, TabTipStep, TabTipStepNormalized } from './types';
 import { TAB_TIPS as example } from './content-example';
 import { TAB_TIPS as research } from './content-research';
 import { TAB_TIPS as people } from './content-people';
 import { TAB_TIPS as work } from './content-work';
 import { TAB_TIPS as more } from './content-more';
 
-export type { TabTips, TabTipsRegistry } from './types';
+export type { TabTips, TabTipsRegistry, TabTipStep, TabTipStepNormalized } from './types';
 
 /** Every content group, in merge order. A panel id may appear in only ONE group (test-enforced). */
 export const TAB_TIPS_SOURCES: ReadonlyArray<{ file: string; tips: TabTipsRegistry }> = [
@@ -39,7 +39,24 @@ export function getTabTips(panelId: string | null | undefined): TabTips | null {
 
 export const TAB_TIPS_DEFAULT_TITLE = 'How to use this tab';
 
-/** localStorage key that remembers "hidden" for one tab. */
+/** One step as `{ text, anchor? }` — plain-string steps keep working (no highlight). */
+export function normalizeTabTipStep(step: TabTipStep): TabTipStepNormalized {
+  if (typeof step === 'string') return { text: step };
+  const anchor = typeof step.anchor === 'string' && step.anchor.trim() ? step.anchor.trim() : undefined;
+  return anchor ? { text: step.text, anchor } : { text: step.text };
+}
+
+export function normalizeTabTipSteps(tips: Pick<TabTips, 'steps'>): TabTipStepNormalized[] {
+  return tips.steps.map(normalizeTabTipStep);
+}
+
+/**
+ * Panels rendered as a same-origin iframe (MapShellPanel). Their buttons live inside the frame, so the
+ * coach never highlights there — hints only.
+ */
+export const TAB_TIPS_IFRAME_PANELS: ReadonlySet<string> = new Set(['map', 'watchlist', 'saved']);
+
+/** localStorage key that remembers "finished or skipped" for one tab (the coach does not auto-replay). */
 export function tabTipsStorageKey(panelId: string): string {
   return `mindy_tab_tips_hidden:${panelId}`;
 }

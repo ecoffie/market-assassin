@@ -40,15 +40,18 @@ afterEach(() => {
 });
 
 describe('PanelContainer tab tips', () => {
-  it('ON: shows the box above the Forecasts panel', async () => {
+  it('ON: shows the coach and its "?" button above the Forecasts panel', async () => {
     vi.stubEnv('NEXT_PUBLIC_TAB_TIPS', 'on');
     await render();
-    const boxEl = host.querySelector('[data-testid="tab-tips-box"]');
+    // The hint box is portalled to <body>; the "?" row sits inline above the panel.
+    const boxEl = document.querySelector('[data-testid="tab-coach"]');
+    const replayRow = host.querySelector('[data-testid="tab-coach-replay-row"]');
     const panelEl = host.querySelector('[data-testid="forecasts-panel"]');
     expect(boxEl?.textContent).toContain('How to use this tab');
+    expect(boxEl?.textContent).toContain('1 of 3');
     expect(panelEl).not.toBeNull();
-    expect(boxEl!.compareDocumentPosition(panelEl!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(host.querySelectorAll('[data-testid="tab-tips-box"]')).toHaveLength(1);
+    expect(replayRow!.compareDocumentPosition(panelEl!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(document.querySelectorAll('[data-testid="tab-coach"]')).toHaveLength(1);
   });
 
   it('OFF (unset or any value but "on"): renders exactly the panel, as before', async () => {
@@ -57,6 +60,8 @@ describe('PanelContainer tab tips', () => {
     expect(off).toBe('<div data-testid="forecasts-panel">Upcoming Buys</div>');
     vi.stubEnv('NEXT_PUBLIC_TAB_TIPS', 'true');
     expect(await render()).toBe(off);
+    // Nothing portalled either: no hint box, no ring, no dim layer anywhere in the document.
+    expect(document.body.innerHTML).toBe(`<div>${off}</div>`);
   });
 
   it('ON but the tab has no entry: no box', async () => {

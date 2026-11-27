@@ -5,7 +5,7 @@ import type { AppPanel, AppTier } from '../UnifiedSidebar';
 import { parseSettingsSection, parseVaultSection } from '@/lib/app/deep-link-params';
 import { isTodayHomeEnabled } from '@/lib/app/today-home';
 import { getTabTips, isTabTipsEnabled } from '@/lib/app/tab-tips';
-import TabTipsBox from '../TabTipsBox';
+import TabCoach from '../TabCoach';
 
 // Lazy load panels for better performance
 const MindyChatPanel = lazy(() => import('./MindyChatPanel'));
@@ -180,7 +180,7 @@ export default function PanelContainer({ activePanel, email, tier, onPanelChange
     </Suspense>
   );
 
-  // "How to use this tab" (NEXT_PUBLIC_TAB_TIPS, default OFF). Mounted once here, above the active
+  // "How to use this tab" coach (NEXT_PUBLIC_TAB_TIPS, default OFF). Mounted once here, above the active
   // panel, keyed by panel id — never inside a panel. OFF (or no entry) = exactly the panel, as before.
   if (!isTabTipsEnabled()) return panel;
   const tipsId = tabTipsPanelId(activePanel, email, tier);
@@ -188,7 +188,7 @@ export default function PanelContainer({ activePanel, email, tier, onPanelChange
   if (!tipsId || !tips) return panel;
   return (
     <>
-      <TabTipsBox key={tipsId} panelId={tipsId} tips={tips} />
+      <TabCoach key={tipsId} panelId={tipsId} tips={tips} />
       {panel}
     </>
   );

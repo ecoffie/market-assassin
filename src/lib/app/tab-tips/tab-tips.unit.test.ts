@@ -1,9 +1,9 @@
 /** "How to use this tab" content contract (owner request, 2026-11-27). */
 import { describe, expect, it } from 'vitest';
-import { readdirSync } from 'node:fs';
+import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { dirname } from 'node:path';
-import { TAB_TIPS, TAB_TIPS_SOURCES, getTabTips, isTabTipsEnabled, tabTipsStorageKey } from './index';
+import { dirname, join } from 'node:path';
+import { TAB_TIPS, TAB_TIPS_SOURCES, getTabTips, isTabTipsEnabled, normalizeTabTipStep, normalizeTabTipSteps, tabTipsStorageKey } from './index';
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -20,7 +20,7 @@ const BANNED: Array<[RegExp, string]> = [
 function allText(): Array<{ id: string; field: string; text: string }> {
   return Object.entries(TAB_TIPS).flatMap(([id, t]) => [
     ...(t!.title ? [{ id, field: 'title', text: t!.title }] : []),
-    ...t!.steps.map((s, i) => ({ id, field: `steps[${i}]`, text: s })),
+    ...normalizeTabTipSteps(t!).map((s, i) => ({ id, field: `steps[${i}]`, text: s.text })),
     { id, field: 'tip', text: t!.tip },
   ]);
 }
@@ -46,7 +46,7 @@ describe('tab tips content contract', () => {
     for (const [id, t] of Object.entries(TAB_TIPS)) {
       expect(t!.steps.length, id).toBeGreaterThanOrEqual(2);
       expect(t!.steps.length, id).toBeLessThanOrEqual(3);
-      for (const s of t!.steps) {
+      for (const { text: s } of normalizeTabTipSteps(t!)) {
         expect(s.trim().length, id).toBeGreaterThan(0);
         expect(s.length, `${id} step too long: ${s}`).toBeLessThanOrEqual(240);
       }
@@ -82,5 +82,31 @@ describe('tab tips content contract', () => {
   it('remembers hide per tab', () => {
     expect(tabTipsStorageKey('forecasts')).toBe('mindy_tab_tips_hidden:forecasts');
     expect(tabTipsStorageKey('forecasts')).not.toBe(tabTipsStorageKey('recompetes'));
+  });
+
+  it('steps may be a string or { text, anchor }; strings normalise to text only', () => {
+    expect(normalizeTabTipStep('Plain.')).toEqual({ text: 'Plain.' });
+    expect(normalizeTabTipStep({ text: 'A.', anchor: ' [data-tip="x"] ' })).toEqual({ text: 'A.', anchor: '[data-tip="x"]' });
+    expect(normalizeTabTipStep({ text: 'B.', anchor: '  ' })).toEqual({ text: 'B.' });
+  });
+
+  it('every [data-tip="..."] anchor exists as a data-tip attribute in a src/components file', () => {
+    const files: string[] = [];
+    const walk = (dir: string) => {
+      for (const f of readdirSync(dir)) {
+        const p = join(dir, f);
+        if (statSync(p).isDirectory()) walk(p);
+        else if (f.endsWith('.tsx') && !f.endsWith('.test.tsx')) files.push(p);
+      }
+    };
+    walk(join(here, '../../../components'));
+    const source = files.map(f => readFileSync(f, 'utf8')).join('\n');
+    const anchors = Object.values(TAB_TIPS).flatMap(t => normalizeTabTipSteps(t!).flatMap(s => (s.anchor ? [s.anchor] : [])));
+    expect(anchors.length).toBeGreaterThan(0);
+    for (const a of anchors) {
+      for (const [, name] of a.matchAll(/\[data-tip="([^"]+)"\]/g)) {
+        expect(source.includes(`data-tip="${name}"`), `anchor ${a}: no element has data-tip="${name}"`).toBe(true);
+      }
+    }
   });
 });
