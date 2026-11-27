@@ -8,8 +8,8 @@ import { knowledgeBaseAskAdapter, type KnowledgeBaseAskParams } from '@/lib/app/
 /**
  * Knowledge Base — searchable repository over Mindy's source corpus
  * (mindy_rag_documents). The browsable home for the docs Mindy Chat cites:
- * search/browse winning proposals, templates, cap statements, training, podcast
- * insights; read the full text. Split-pane (list left, preview right) mirroring
+ * search/browse winning proposals, templates, cap statements and training; read the full text. Podcast insights
+ * are hidden (src/lib/knowledge-base/hidden-types.ts). Split-pane (list left, preview right) mirroring
  * the redesigned Library. Chat source chips deep-link here via ?doc=<id>.
  * PRD-knowledge-base-repository.
  */
@@ -134,7 +134,7 @@ export default function KnowledgeBasePanel({ email, initialDocId }: { email: str
       <div className="mb-4">
         <h1 className="text-2xl font-bold text-white">Knowledge Base</h1>
         <p className="text-muted mt-1 text-sm">
-          Mindy&apos;s source library — winning proposals, templates, capability statements, training, and podcast insights. The documents behind every answer.
+          Mindy&apos;s source library: winning proposals, templates, capability statements and training.
         </p>
       </div>
 

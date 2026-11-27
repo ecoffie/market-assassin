@@ -181,9 +181,7 @@ export function MindyInsightCard({ email }: MindyInsightCardProps) {
           <span>
             💡 Mindy Insight ·{' '}
             <span className="text-faint">
-              {insight.mode === 'lesson' || insight.source === 'podcast_guest'
-                ? 'guest lesson'
-                : insight.mode === 'pulse' || insight.source === 'ai_briefing'
+              {insight.mode === 'pulse' || insight.source === 'ai_briefing'
                   ? 'today\'s market'
                   : insight.source === 'deterministic_data'
                     ? 'your data today'

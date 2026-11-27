@@ -9,8 +9,9 @@
  * Strategy (pulse vs lesson):
  *   1. Check cache — return immediately if today's row exists
  *   2. Build pulse candidate (briefing AI, else deterministic stats)
- *   3. Build lesson candidate (podcast guest, NAICS-fit + quality gate)
- *   4. selectPulseOrLesson() — urgent opp → pulse; strong guest fit → lesson
+ *   3. (Removed 2026-11-27, Eric: "remove podcast quotes from dashboard insight too".) No podcast-guest lesson is
+ *      built, selected or served; a cached or snapshotted podcast insight from before is replaced, never shown.
+ *   4. selectPulseOrLesson() with pulse candidates only
  *   5. Last resort: static fallback quote
  *
  * Content Reaper pattern #1 (visual quote cards) applied to in-app
@@ -25,8 +26,7 @@ import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/works
 import { saveSnapshot, readSnapshot, freshMeta, degradedMeta, isUpstreamOutage } from '@/lib/resilience/last-good';
 import { safeParseJSON } from '@/lib/utils/safe-parse-json';
 import { recordLlmUsage } from '@/lib/llm/usage-cost';
-import { dateSeed, isSimilarToRecent, selectInsightOpportunities } from '@/lib/dashboard/insight-selection';
-import { getPodcastInsightForProfile, podcastInsightFeatureEnabled } from '@/lib/rag/podcast-insights';
+import { dateSeed, isPodcastSource, isSimilarToRecent, PROFILE_LESS_QUOTES, selectInsightOpportunities, STATIC_FALLBACK_QUOTE } from '@/lib/dashboard/insight-selection';
 import {
   briefingHasUrgentOpportunity,
   selectPulseOrLesson,
@@ -128,7 +128,8 @@ export async function GET(request: NextRequest) {
         .eq('insight_date', today)
         .maybeSingle();
 
-  if (cached) {
+  // A podcast-guest insight cached before podcast quotes were removed is replaced, never served.
+  if (cached && !isPodcastSource(cached.source)) {
     const cachedPayload = {
       success: true,
       insight: {
@@ -159,48 +160,14 @@ export async function GET(request: NextRequest) {
     if (prev?.source) excludeSource = prev.source as DailyInsightSource;
   }
 
-  const { data: profileSettings, error: profileSettingsErr } = await supabase
-    .from('user_notification_settings')
-    .select('naics_codes, agencies')
-    .eq('user_email', userEmail)
-    .maybeSingle();
-  if (profileSettingsErr) console.error('[dashboard/insight] profile query error:', profileSettingsErr.message);
-  const profileNaics = (profileSettings?.naics_codes || []) as string[];
-  const profileAgencies = (profileSettings?.agencies || []) as string[];
+  // (The profile NAICS/agency read fed only the podcast lesson candidate; removed with it.)
 
-  const podcastLive = podcastInsightFeatureEnabled(userEmail);
   const briefingCtx = await loadUserBriefing(userEmail);
   const hasUrgency = briefingHasUrgentOpportunity(briefingCtx?.briefing);
 
-  let lesson: LessonCandidate | null = null;
+  // No lesson candidate: podcast-guest quotes are no longer selected (Eric, 2026-11-27).
+  const lesson: LessonCandidate | null = null;
   let pulse: InsightResponse | null = null;
-
-  if (podcastLive && profileNaics.length > 0) {
-    for (let attempt = 0; attempt < MAX_GENERATION_ATTEMPTS && !lesson; attempt++) {
-      try {
-        const guest = await getPodcastInsightForProfile({
-          naicsCodes: profileNaics,
-          agencies: profileAgencies,
-          today,
-          rotateSeed: refreshSeed + attempt,
-          recentQuotes,
-          qualityGate: true,
-        });
-        if (guest && !isSimilarToRecent(guest.quote, recentQuotes)) {
-          lesson = {
-            quote: guest.quote,
-            format: guest.format,
-            source: 'podcast_guest',
-            attribution: guest.attribution,
-            relevanceScore: guest.relevanceScore,
-            matchTier: guest.matchTier,
-          };
-        }
-      } catch (err) {
-        console.warn('[dashboard/insight] podcast lesson candidate failed:', err);
-      }
-    }
-  }
 
   for (let attempt = 0; attempt < MAX_GENERATION_ATTEMPTS && !pulse; attempt++) {
     try {
@@ -242,7 +209,7 @@ export async function GET(request: NextRequest) {
     pulse,
     lesson,
     briefingHasUrgency: hasUrgency,
-    podcastEnabled: podcastLive,
+    podcastEnabled: false,
     excludeSource,
     recentSources,
   });
@@ -260,11 +227,12 @@ export async function GET(request: NextRequest) {
       }
     : null;
 
-  // 4. Static last-resort fallback (every user always sees something)
+  // 4. Static last-resort fallback (every user always sees something). A true, non-numeric line: the old
+  // figure it used to show had no source, and a displayed number needs provenance (data-integrity rule).
   if (!insight) {
     insight = {
-      quote: 'Federal contracts close 67% faster when you respond in Week 1.',
-      format: 'stat',
+      quote: STATIC_FALLBACK_QUOTE,
+      format: 'sentence',
       source: 'fallback',
       themeIndex,
       insightDate: today,
@@ -299,7 +267,8 @@ export async function GET(request: NextRequest) {
     // insight with an "as of {time}" banner instead of a dead hero card.
     if (isUpstreamOutage(error)) {
       const snap = await readSnapshot<Record<string, unknown>>(snapshotKey);
-      if (snap) {
+      // Never serve a podcast-guest insight snapshotted before podcast quotes were removed.
+      if (snap && !isPodcastSource((snap.data as { insight?: { source?: unknown } })?.insight?.source)) {
         return NextResponse.json({ ...snap.data, ...degradedMeta(snap.savedAt) });
       }
     }
@@ -472,17 +441,8 @@ async function deterministicFallback(
     }
   }
 
-  // Profile-less or empty: a NAICS-agnostic federal fact rotating by date
-  // (deterministic across users so we don't burn the surprise of fresh AI)
-  const PROFILE_LESS_QUOTES: Array<{ quote: string; format: string }> = [
-    { quote: 'Federal SAM.gov posts 3,000+ new opportunities every week.', format: 'stat' },
-    { quote: 'Small business set-asides hit $183B in FY25.', format: 'stat' },
-    { quote: 'Why do most small businesses miss their first federal bid?', format: 'question' },
-    { quote: 'The agency wants you. They just don\'t know your name yet.', format: 'contrarian' },
-    { quote: 'Sources Sought windows decide who gets shortlisted.', format: 'sentence' },
-    { quote: '40% of FY26 spending goes to small business — if they apply.', format: 'stat' },
-    { quote: 'Your NAICS profile is your federal calling card.', format: 'fragment' },
-  ];
+  // Profile-less or empty: a NAICS-agnostic line rotating by date (deterministic across users). These are general
+  // lines, not the customer's data, so they are labelled 'fallback', and none states a figure (no source behind one).
   const dayIdx = dateSeed(today);
   let pick = PROFILE_LESS_QUOTES[(dayIdx + rotateSeed) % PROFILE_LESS_QUOTES.length];
   for (let offset = 1; offset < PROFILE_LESS_QUOTES.length && isSimilarToRecent(pick.quote, recentQuotes); offset++) {
@@ -491,7 +451,7 @@ async function deterministicFallback(
   return {
     quote: pick.quote,
     format: pick.format,
-    source: 'deterministic_data',
+    source: 'fallback',
     themeIndex,
     insightDate: today,
   };
