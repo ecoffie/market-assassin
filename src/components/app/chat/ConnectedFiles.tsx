@@ -17,7 +17,7 @@ import { HardDrive, Loader2, X } from 'lucide-react';
 import { authedFetch } from '../authHeaders';
 import { OneDriveChooser } from './OneDriveChooser';
 import { parseResultCookie, RESULT_COOKIE } from '@/lib/connected-apps/result-cookie';
-import { hasCapability, type Capability } from '@/lib/connected-apps/config';
+import { hasCapability, lacksCapability, type Capability } from '@/lib/connected-apps/config';
 
 export interface ConnectedFile {
   handle: string;
@@ -43,6 +43,9 @@ const PICK_ERROR: Record<string, string> = {
   too_large: 'That file is larger than 15 MB.',
   reauth_needed: 'Please reconnect this account, then pick the file again.',
   picker_not_configured: 'The Google file picker is not set up yet.',
+  // The grant cannot read files (no drive.file / Files.Read): never send the customer to a raw provider 403 page.
+  file_permission_needed: 'Mindy does not have permission to open files in this account. Choose "Reconnect to allow file access" in this menu.',
+  no_access: 'Mindy does not have permission to open files in this account. Choose "Reconnect to allow file access" in this menu.',
 };
 
 declare global {
@@ -90,6 +93,9 @@ export function ConnectedFiles({ email, files, onChange, disabled }: {
   const [providers, setProviders] = useState<Array<{ provider: 'google' | 'microsoft'; available: boolean }>>([]);
   // Email drafts have their own allowlist (the list endpoint says whether this caller is on it).
   const [draftsAllowed, setDraftsAllowed] = useState(false);
+  // Connections whose provider refused a file call (403) even though the scopes looked fine: offer the reconnect.
+  const [noFileAccess, setNoFileAccess] = useState<Set<string>>(new Set());
+  const markNoFileAccess = useCallback((id: string) => setNoFileAccess((s) => new Set(s).add(id)), []);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -163,7 +169,11 @@ export function ConnectedFiles({ email, files, onChange, disabled }: {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, connection_id: c.id }),
       });
       const t = await res.json().catch(() => ({}));
-      if (!res.ok) { setMessage(PICK_ERROR[t.error] || 'The file picker could not open.'); return; }
+      if (!res.ok) {
+        if (t.error === 'file_permission_needed') markNoFileAccess(c.id);
+        setMessage(PICK_ERROR[t.error] || 'The file picker could not open.');
+        return;
+      }
       await loadGooglePicker();
       const g = window.google.picker;
       const view = new g.DocsView(g.ViewId.DOCS).setIncludeFolders(false).setMimeTypes(PICKABLE_MIME);
@@ -185,7 +195,11 @@ export function ConnectedFiles({ email, files, onChange, disabled }: {
               body: JSON.stringify({ email, connection_id: c.id, file_id: doc[g.Document.ID] }),
             });
             const s = await sel.json().catch(() => ({}));
-            if (!sel.ok || !s.file_handle) { setMessage(PICK_ERROR[s.error] || 'That file could not be used.'); return; }
+            if (!sel.ok || !s.file_handle) {
+              if (s.error === 'file_permission_needed' || s.error === 'no_access') markNoFileAccess(c.id);
+              setMessage(PICK_ERROR[s.error] || 'That file could not be used.');
+              return;
+            }
             if (!files.some((f) => f.handle === s.file_handle)) onChange([...files, { handle: s.file_handle, name: s.file?.name || 'file', provider: 'google' as const }].slice(-5));
           } finally { setBusy(false); }
         })
@@ -194,7 +208,7 @@ export function ConnectedFiles({ email, files, onChange, disabled }: {
     } catch {
       setMessage('The file picker could not open.');
     } finally { setBusy(false); }
-  }, [email, files, onChange]);
+  }, [email, files, onChange, markNoFileAccess]);
 
   // Disconnect: the server revokes when the provider supports it and discards the tokens. Picks from that account
   // stop working, so their chips are removed here too.
@@ -264,6 +278,10 @@ export function ConnectedFiles({ email, files, onChange, disabled }: {
                   <button key={c.id} type="button" className="block w-full rounded px-2 py-1.5 text-left text-white hover:bg-white/5" onClick={() => startConnect(c.provider)}>
                     Reconnect {PROVIDER_LABEL[c.provider]} ({c.connected_email})
                   </button>
+                ) : (noFileAccess.has(c.id) || lacksCapability(c.provider, c.granted_scopes, 'file')) ? (
+                  <button key={c.id} type="button" data-testid="reconnect-file-access" className="block w-full rounded px-2 py-1.5 text-left text-white hover:bg-white/5" onClick={() => { setOpen(false); void startConnect(c.provider, ['file']); }}>
+                    Reconnect {PROVIDER_LABEL[c.provider]} to allow file access ({c.connected_email})
+                  </button>
                 ) : c.provider === 'google' ? (
                   <button key={c.id} type="button" className="block w-full rounded px-2 py-1.5 text-left text-white hover:bg-white/5" onClick={() => pickGoogle(c)}>
                     Pick from Google Drive ({c.connected_email})
@@ -305,6 +323,7 @@ export function ConnectedFiles({ email, files, onChange, disabled }: {
           account={browsing.connected_email}
           onPicked={(f) => { if (!files.some((x) => x.handle === f.handle)) onChange([...files, f].slice(-5)); }}
           onClose={() => setBrowsing(null)}
+          onNoFileAccess={() => { markNoFileAccess(browsing.id); setBrowsing(null); setMessage(PICK_ERROR.file_permission_needed); }}
         />
       )}
       {message && <p className="mt-1 text-faint" role="status">{message}</p>}

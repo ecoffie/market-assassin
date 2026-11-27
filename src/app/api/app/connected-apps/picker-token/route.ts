@@ -10,7 +10,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectedAppsGate } from '@/lib/connected-apps/route-gate';
 import { accessTokenFor, restrictedAccessTokenFor } from '@/lib/connected-apps/store';
-import { SCOPES } from '@/lib/connected-apps/config';
+import { lacksCapability, SCOPES } from '@/lib/connected-apps/config';
 
 /** What a browser-side Picker token may carry: identity and drive.file. Never mail. */
 const PICKER_SCOPES = [...SCOPES.google.identity, ...SCOPES.google.file];
@@ -28,6 +28,9 @@ export async function POST(request: NextRequest) {
   let tok: Awaited<ReturnType<typeof restrictedAccessTokenFor>> = await accessTokenFor(g.scopeKey, g.email, connectionId);
   if (!tok.ok) return NextResponse.json({ error: tok.reason }, { status: tok.reason === 'not_found' ? 404 : tok.reason === 'refresh_failed' ? 502 : 409 });
   if (tok.provider !== 'google') return NextResponse.json({ error: 'not_supported' }, { status: 400 });
+  // Without the file permission the provider answers 403 (for Google, a raw Google error page inside the picker).
+  // Say what to do instead: reconnect and allow file access.
+  if (lacksCapability(tok.provider, tok.connection.granted_scopes, 'file')) return NextResponse.json({ error: 'file_permission_needed' }, { status: 403 });
   // This token goes to the browser. A connection that also allows email drafts holds a stored token carrying
   // gmail.compose (include_granted_scopes), so mint a fresh one limited to the file scopes instead; refuse if the
   // provider will not limit it.
