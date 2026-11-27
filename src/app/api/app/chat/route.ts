@@ -1296,7 +1296,9 @@ export async function POST(request: NextRequest) {
             const callLog: Array<{ tool: string; status: string; ms: number; args: unknown }> = [];
             let rmReport: { report_id: string | null; url: string | null; title: string; html: string } | null = null;
             const rmDeliverables: Array<{ format: string; document_id: string; file_name?: string; version?: number | null }> = [];
-            const rmSources: typeof turnSources = [];
+            // The SAME array create_document's provenance reads (provenanceRecords(turnSources, …)): research results land
+            // here, so a research report's sources get their record links, ids and read dates (the standard path never runs).
+            const rmSources: typeof turnSources = turnSources;
             const planner = { model, provider: 'anthropic' };
             const isWrite = (n: string) => executor.policyFor(n).decision === 'allowed_write';
             const execOne = async (c: ResearchCall) => {
