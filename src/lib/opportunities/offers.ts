@@ -11,10 +11,12 @@ export function reportedOffers(v: unknown): number | null {
   return Number.isFinite(n) && n >= 1 ? Math.floor(n) : null;
 }
 
-/** Bucket for briefing copy. 'unknown' when the count is not reported. */
-export function offersCompetitionLevel(offers: number | null): 'sole_source' | 'low' | 'medium' | 'high' | 'unknown' {
+/**
+ * Bucket for briefing copy, from the offer count alone. 'unknown' when not reported. One offer on a competed award is
+ * 'low', not sole source — sole source is an extent-competed fact, not a count.
+ */
+export function offersCompetitionLevel(offers: number | null): 'low' | 'medium' | 'high' | 'unknown' {
   if (offers === null) return 'unknown';
-  if (offers === 1) return 'sole_source';
   if (offers <= 2) return 'low';
   if (offers <= 5) return 'medium';
   return 'high';
