@@ -79,7 +79,9 @@ export async function saveConnection(
   const { data, error } = await db
     .from(TABLE)
     // truncation-ok: one row upserted on a unique key; the payload is that row (the saved connection), never a write count.
-    .upsert(row, { onConflict: 'scope_key,provider,provider_account_id' })
+    // Keyed per Mindy user too: a colleague connecting the same provider account gets their own row and never
+    // takes over another person's connection.
+    .upsert(row, { onConflict: 'scope_key,provider,provider_account_id,owner_email' })
     .select(VIEW_COLS)
     .single();
   if (error || !data) throw new Error(`connected-apps: save failed (${error?.code || 'no_row'})`);
@@ -119,40 +121,47 @@ export async function accessTokenFor(
   if (!row) return { ok: false, reason: 'not_found' };
   if (row.status === 'revoked') return { ok: false, reason: 'revoked' };
   if (row.status === 'reauth_needed') return { ok: false, reason: 'reauth_needed' };
+  const markReauth = () => db.from(TABLE).update({ status: 'reauth_needed', updated_at: new Date(now).toISOString() }).eq('id', row.id).eq('scope_key', scopeKey).eq('owner_email', row.owner_email);
   const exp = row.access_expires_at ? Date.parse(row.access_expires_at) : 0;
+  // A stored token that no longer decrypts (key rotated or data damaged) is a dead grant: ask to reconnect.
+  const tryDec = (v: string): string | null => { try { return dec(v); } catch { return null; } };
   if (row.access_token_enc && exp - now > 60_000) {
-    return { ok: true, token: dec(row.access_token_enc), provider: row.provider, connection: view(row) };
+    const token = tryDec(row.access_token_enc);
+    if (token) return { ok: true, token, provider: row.provider, connection: view(row) };
   }
-  if (!row.refresh_token_enc) {
-    await db.from(TABLE).update({ status: 'reauth_needed', updated_at: new Date(now).toISOString() }).eq('id', row.id).eq('scope_key', scopeKey).eq('owner_email', row.owner_email);
+  const refresh = row.refresh_token_enc ? tryDec(row.refresh_token_enc) : null;
+  if (!refresh) {
+    await markReauth();
     return { ok: false, reason: 'reauth_needed' };
   }
   try {
-    const t = await (deps.refresh ?? refreshTokens)(row.provider, dec(row.refresh_token_enc));
+    const t = await (deps.refresh ?? refreshTokens)(row.provider, refresh);
     const patch: Record<string, unknown> = { access_token_enc: enc(t.accessToken), access_expires_at: new Date(t.expiresAt).toISOString(), updated_at: new Date(now).toISOString() };
     if (t.refreshToken) patch.refresh_token_enc = enc(t.refreshToken);
     await db.from(TABLE).update(patch).eq('id', row.id).eq('scope_key', scopeKey).eq('owner_email', row.owner_email);
     return { ok: true, token: t.accessToken, provider: row.provider, connection: view(row) };
   } catch (err) {
     if (err instanceof OAuthError && err.needsReauth) {
-      await db.from(TABLE).update({ status: 'reauth_needed', updated_at: new Date(now).toISOString() }).eq('id', row.id).eq('scope_key', scopeKey).eq('owner_email', row.owner_email);
+      await markReauth();
       return { ok: false, reason: 'reauth_needed' };
     }
     return { ok: false, reason: 'refresh_failed' };
   }
 }
 
-/** Disconnect: revoke at the provider when it supports it, then discard our tokens. No further provider calls. */
+/**
+ * Disconnect: revoke at the provider when it supports it, then DELETE the row (tokens and all). A reconnect creates
+ * a new row with a new id, so file handles issued before the disconnect (bound to the old connection id) never work
+ * again. No further provider calls.
+ */
 export async function disconnect(scopeKey: string, ownerEmail: string, id: string, deps: { db?: SupabaseClient; revoke?: typeof revokeAtProvider } = {}): Promise<'disconnected' | 'not_found'> {
   const db = deps.db ?? getWriteClient();
   const row = await loadRow(scopeKey, ownerEmail, id, db);
   if (!row) return 'not_found';
-  const token = row.refresh_token_enc ? dec(row.refresh_token_enc) : row.access_token_enc ? dec(row.access_token_enc) : null;
+  let token: string | null = null;
+  try { token = row.refresh_token_enc ? dec(row.refresh_token_enc) : row.access_token_enc ? dec(row.access_token_enc) : null; } catch { token = null; }
   if (token) await (deps.revoke ?? revokeAtProvider)(row.provider, token).catch(() => 'failed');
-  await db
-    .from(TABLE)
-    .update({ status: 'revoked', refresh_token_enc: null, access_token_enc: null, access_expires_at: null, updated_at: new Date().toISOString() })
-    .eq('id', row.id)
-    .eq('scope_key', scopeKey);
+  const { error } = await db.from(TABLE).delete().eq('id', row.id).eq('scope_key', scopeKey).eq('owner_email', row.owner_email);
+  if (error) throw new Error(`connected-apps: disconnect failed (${error.code})`);
   return 'disconnected';
 }
