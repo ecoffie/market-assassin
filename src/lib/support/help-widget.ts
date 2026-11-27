@@ -8,6 +8,8 @@
  *
  * Rules:
  *  - never on /admin, /support (that page IS the form), embeds (?embed=) or the OAuth screens
+ *  - never on the signed-in app page (/app): there the floating button is Ask Mindy (AskMindyFab),
+ *    and support is the account menu's "Contact support" row (owner, 2026-11-27)
  *  - the email is prefilled from the signed-in Mindy email when the browser has one
  *  - it sends the page PATH only (no query string)
  *  - success is shown only when the server says it was delivered; otherwise the email fallback
@@ -71,7 +73,7 @@ export function helpWidgetScript(): string {
 
   return '(function(){try{'
     + 'if(window.__mindyHelp)return;window.__mindyHelp=1;'
-    + 'function excluded(){var p=location.pathname;return /^\\/(admin|support|oauth)(\\/|$)/.test(p)||/[?&]embed=/.test(location.search);}'
+    + 'function excluded(){var p=location.pathname;return /^\\/(admin|support|oauth)(\\/|$)/.test(p)||/^\\/app\\/?$/.test(p)||/[?&]embed=/.test(location.search);}'
     + 'if(excluded())return;'
     + 'function start(){if(document.querySelector(".mhw-btn"))return;'
     + 'var st=document.createElement("style");st.textContent=' + js(css) + ';document.head.appendChild(st);'
