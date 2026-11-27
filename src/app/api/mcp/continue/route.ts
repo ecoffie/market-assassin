@@ -16,6 +16,7 @@ import { runMeteredTool } from '@/lib/mcp/metered';
 import { stampAttempt, markOfferPageOpened } from '@/lib/mcp/paywall';
 import { getBalance } from '@/lib/mcp/credits';
 import { resolveMcpEmail } from '@/lib/mcp/session-identity';
+import { isPublicMcpTool } from '@/lib/mcp/public-catalog-config';
 
 export const dynamic = 'force-dynamic';
 
@@ -82,6 +83,12 @@ export async function POST(req: NextRequest) {
   }
   if (attempt.consumed_at) {
     return NextResponse.json({ error: 'already run', alreadyRun: true }, { status: 409 });
+  }
+
+  // A tool taken out of the public catalog since the attempt was saved is not run and not charged (Eric,
+  // 2026-11-27: search_podcast_lessons unlisted). Same answer a host gets when it names an unlisted tool.
+  if (!isPublicMcpTool(String(attempt.tool_name))) {
+    return NextResponse.json({ ok: false, error: 'not_available', message: 'That tool is no longer available. Nothing was charged.' }, { status: 410 });
   }
 
   await stampAttempt(id, 'resumed');

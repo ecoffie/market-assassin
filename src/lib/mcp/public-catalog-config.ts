@@ -63,7 +63,6 @@ export const PUBLIC_MCP_TOOLS: readonly string[] = [
   'search_govcon_jobs',
   'search_idv_contracts',
   'search_past_contracts',
-  'search_podcast_lessons',
   'search_sam_opportunities',
   'understand_customer',
   'update_market_schedule',
@@ -71,6 +70,10 @@ export const PUBLIC_MCP_TOOLS: readonly string[] = [
 
 /** Registered but not listed to external MCP hosts. Implementation is kept. */
 export const HIDDEN_FROM_PUBLIC_MCP: Readonly<Record<string, HiddenToolEntry>> = {
+  search_podcast_lessons: {
+    decision: 'hide',
+    reason: 'Podcast corpus removed from every customer-facing surface (Eric, 2026-11-27); Ask Mindy already blocks it.',
+  },
   verify_m_scale: {
     decision: 'hide',
     reason: 'QA oracle (npm run verify:m-scale), not a customer job.',
