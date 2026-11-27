@@ -5,6 +5,9 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { PROFILE_LESS_QUOTES, STATIC_FALLBACK_QUOTE } from '@/lib/dashboard/insight-selection';
 
 const h = vi.hoisted(() => ({
   cached: null as Record<string, unknown> | null,
@@ -99,5 +102,21 @@ describe('dashboard insight: no podcast quotes', () => {
     const { status, body } = await get();
     expect(status).toBe(200);
     expect(body.insight?.quote).toBe('Market pulse.');
+  });
+
+  it('no general line on the card states a figure: the static fallback and the profile-less lines carry no number or percentage', async () => {
+    for (const q of [STATIC_FALLBACK_QUOTE, ...PROFILE_LESS_QUOTES.map((x) => x.quote)]) {
+      expect(q).not.toMatch(/\d|%|percent|\$/i);
+      expect(q).not.toMatch(/[\u2013\u2014]/);
+    }
+    const src = readFileSync(join(process.cwd(), 'src/app/api/app/dashboard/insight/route.ts'), 'utf8');
+    expect(src).not.toMatch(/67% faster|\$183B|40% of FY26|3,000\+ new/);
+  });
+
+  it('a general line is labelled as such (fallback), never as the customer\'s own data', async () => {
+    // No briefing and no alert matches in this harness: the card gets a general line.
+    const { body } = await get();
+    expect(body.insight?.source).toBe('fallback');
+    expect([STATIC_FALLBACK_QUOTE, ...PROFILE_LESS_QUOTES.map((x) => x.quote)]).toContain(body.insight?.quote);
   });
 });

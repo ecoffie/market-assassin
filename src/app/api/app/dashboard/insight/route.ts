@@ -26,7 +26,7 @@ import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/works
 import { saveSnapshot, readSnapshot, freshMeta, degradedMeta, isUpstreamOutage } from '@/lib/resilience/last-good';
 import { safeParseJSON } from '@/lib/utils/safe-parse-json';
 import { recordLlmUsage } from '@/lib/llm/usage-cost';
-import { dateSeed, isPodcastSource, isSimilarToRecent, selectInsightOpportunities } from '@/lib/dashboard/insight-selection';
+import { dateSeed, isPodcastSource, isSimilarToRecent, PROFILE_LESS_QUOTES, selectInsightOpportunities, STATIC_FALLBACK_QUOTE } from '@/lib/dashboard/insight-selection';
 import {
   briefingHasUrgentOpportunity,
   selectPulseOrLesson,
@@ -227,11 +227,12 @@ export async function GET(request: NextRequest) {
       }
     : null;
 
-  // 4. Static last-resort fallback (every user always sees something)
+  // 4. Static last-resort fallback (every user always sees something). A true, non-numeric line: the old
+  // figure it used to show had no source, and a displayed number needs provenance (data-integrity rule).
   if (!insight) {
     insight = {
-      quote: 'Federal contracts close 67% faster when you respond in Week 1.',
-      format: 'stat',
+      quote: STATIC_FALLBACK_QUOTE,
+      format: 'sentence',
       source: 'fallback',
       themeIndex,
       insightDate: today,
@@ -440,17 +441,8 @@ async function deterministicFallback(
     }
   }
 
-  // Profile-less or empty: a NAICS-agnostic federal fact rotating by date
-  // (deterministic across users so we don't burn the surprise of fresh AI)
-  const PROFILE_LESS_QUOTES: Array<{ quote: string; format: string }> = [
-    { quote: 'Federal SAM.gov posts 3,000+ new opportunities every week.', format: 'stat' },
-    { quote: 'Small business set-asides hit $183B in FY25.', format: 'stat' },
-    { quote: 'Why do most small businesses miss their first federal bid?', format: 'question' },
-    { quote: 'The agency wants you. They just don\'t know your name yet.', format: 'contrarian' },
-    { quote: 'Sources Sought windows decide who gets shortlisted.', format: 'sentence' },
-    { quote: '40% of FY26 spending goes to small business — if they apply.', format: 'stat' },
-    { quote: 'Your NAICS profile is your federal calling card.', format: 'fragment' },
-  ];
+  // Profile-less or empty: a NAICS-agnostic line rotating by date (deterministic across users). These are general
+  // lines, not the customer's data, so they are labelled 'fallback', and none states a figure (no source behind one).
   const dayIdx = dateSeed(today);
   let pick = PROFILE_LESS_QUOTES[(dayIdx + rotateSeed) % PROFILE_LESS_QUOTES.length];
   for (let offset = 1; offset < PROFILE_LESS_QUOTES.length && isSimilarToRecent(pick.quote, recentQuotes); offset++) {
@@ -459,7 +451,7 @@ async function deterministicFallback(
   return {
     quote: pick.quote,
     format: pick.format,
-    source: 'deterministic_data',
+    source: 'fallback',
     themeIndex,
     insightDate: today,
   };
