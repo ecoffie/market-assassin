@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { accessTokenFor, disconnect, listConnections, saveConnection, scopeKeyFor } from './store';
+import { accessTokenFor, disconnect, listConnections, restrictedAccessTokenFor, saveConnection, scopeKeyFor } from './store';
 import { OAuthError } from './oauth';
 import { decryptSecret as decrypt } from '@/lib/crypto/secretbox';
 
@@ -173,5 +173,28 @@ describe('connected accounts store', () => {
     rows[0].refresh_token_enc = 'v2:other-key:x:y:z';
     expect(await accessTokenFor('own:a@b.com', 'a@b.com', v.id, { db })).toEqual({ ok: false, reason: 'reauth_needed' });
     expect(rows[0].status).toBe('reauth_needed');
+  });
+});
+
+describe('restrictedAccessTokenFor (browser-bound tokens)', () => {
+  const FILE = ['openid', 'email', 'profile', 'https://www.googleapis.com/auth/drive.file'];
+  it('requests only the given scopes and returns the token when the provider limited it', async () => {
+    const { db } = fakeDb();
+    const v = await saveConnection(conn('own:a@b.com'), db);
+    let asked: string[] | undefined;
+    const r = await restrictedAccessTokenFor('own:a@b.com', 'a@b.com', v.id, FILE, {
+      db, acceptAlso: ['https://www.googleapis.com/auth/userinfo.email'],
+      refresh: async (_p, _rt, _f, scopes) => { asked = scopes; return tokens({ accessToken: 'files-only', grantedScopes: ['openid', 'https://www.googleapis.com/auth/userinfo.email', 'https://www.googleapis.com/auth/drive.file'] } as never); },
+    });
+    expect(asked).toEqual(FILE);
+    expect(r).toMatchObject({ ok: true, token: 'files-only' });
+  });
+  it('fails closed when the provider returns a scope outside the list, or does not say', async () => {
+    const { db } = fakeDb();
+    const v = await saveConnection(conn('own:a@b.com'), db);
+    const withGmail = await restrictedAccessTokenFor('own:a@b.com', 'a@b.com', v.id, FILE, { db, refresh: async () => tokens({ grantedScopes: [...FILE, 'https://www.googleapis.com/auth/gmail.compose'] } as never) });
+    expect(withGmail).toEqual({ ok: false, reason: 'scope_not_restricted' });
+    const silent = await restrictedAccessTokenFor('own:a@b.com', 'a@b.com', v.id, FILE, { db, refresh: async () => tokens({ grantedScopes: [] } as never) });
+    expect(silent).toEqual({ ok: false, reason: 'scope_not_restricted' });
   });
 });

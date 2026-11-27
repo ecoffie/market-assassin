@@ -20,6 +20,7 @@
  */
 import { createHash } from 'node:crypto';
 import type { ChatActingScope } from '@/lib/chat/chat-acting-scope';
+import { OUTREACH_RULES } from '@/lib/ask-mindy/outreach-rules';
 import { hasCapability, type Provider } from './config';
 import { accessTokenFor, listConnections, scopeKeyFor, type ConnectionView } from './store';
 
@@ -168,6 +169,9 @@ export const EMAIL_DRAFT_TOOL_DEF = {
       'Save an email as a DRAFT in the customer\'s own connected Gmail or Outlook. It NEVER sends: the customer opens the draft, reviews it and sends it themselves.',
       'Call it only when the customer asks to put an email in their drafts, Gmail or Outlook.',
       'Write it the way outreach is written: the first sentence is about the buyer and their own buy; under 150 words; no em dashes; certifications only in the credentials block under the signature, after a line containing only "--"; no dates except opportunity dates (deadlines, contract end dates).',
+      // One source for outreach (#2515): the same rules standard Ask Mindy, research mode and create_document use.
+      OUTREACH_RULES,
+      'In the draft itself follow rules 1 to 6 only. The "Before you send" list and the closing line belong in your chat answer, never in the email.',
       '`to` must be an email address published in this conversation\'s records (a notice point of contact, a federal record, or an official agency page). Never infer one from a name; if none is published, leave `to` empty and name the office instead.',
       'If no account is connected, or it lacks draft permission, the result says so: give the email as copy-paste text and tell the customer how to connect or allow drafts.',
     ].join(' '),

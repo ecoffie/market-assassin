@@ -10,6 +10,7 @@ import {
   EMAIL_DRAFT_TOOL_DEF, type EmailDraftToolDeps, type VerifiedSource,
 } from './email-draft';
 import type { ConnectionView } from './store';
+import { OUTREACH_RULES } from '@/lib/ask-mindy/outreach-rules';
 import type { ChatActingScope } from '@/lib/chat/chat-acting-scope';
 
 const GMAIL_COMPOSE = 'https://www.googleapis.com/auth/gmail.compose';
@@ -115,6 +116,9 @@ describe('content rules (outreach)', () => {
     expect(d).toMatch(/certifications only in the credentials block/);
     expect(d).toMatch(/Never infer one from a name/);
     expect(EMAIL_DRAFT_TOOL_DEF.function.parameters.required).toEqual(['subject', 'body']);
+    // The shared outreach rules (#2515) are in the tool description verbatim, so the draft cannot drift from them.
+    expect(d).toContain(OUTREACH_RULES);
+    expect(d).toMatch(/"Before you send" list and the closing line belong in your chat answer, never in the email/);
   });
 });
 

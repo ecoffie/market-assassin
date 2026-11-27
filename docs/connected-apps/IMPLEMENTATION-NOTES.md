@@ -141,12 +141,14 @@ Save an email DRAFT in the customer's own Gmail or Outlook. Mindy never sends: t
   - no em or en dashes;
   - certifications only in the credentials block under the signature;
   - one-line subject, no header injection.
-  - Buyer-first wording and "no dates beyond opportunity dates" are in the tool description. `OUTREACH_RULES` (#2515) is not on this branch's base yet; wire it in once it merges.
+  - The tool description carries the shared `OUTREACH_RULES` (#2515) verbatim. The draft follows rules 1 to 6; "Before you send" and the closing line stay in the chat answer.
 - **Logging**: one structured event per attempt (`connected_apps.email_draft`): who, provider, connected account, connection id, the recipient's domain, recipient status and outcome. Never the subject, body or full recipient. The chat execution log redacts free-text arguments as before.
 - **Idempotency**: the same payload retried in the same turn returns the first result. A `connected_actions` table (spec §4) for cross-turn dedupe is deferred, because it needs a migration.
 - **Admin, before live testing** (§3):
   - Google Cloud: add `gmail.compose` to the consent screen. **It is a RESTRICTED scope**: test users work now; public use needs Google app verification (and possibly a security assessment).
   - Entra: add the delegated `Mail.ReadWrite`. Still no `Mail.Send`.
+- **The Picker token never carries mail scopes.** Google's `include_granted_scopes` puts `gmail.compose` on the stored access token once drafts are allowed, and the Picker token reaches the browser. For a connection with a mail scope, `/picker-token` mints a fresh token from the refresh token limited to identity + `drive.file` (`restrictedAccessTokenFor`, not stored). It refuses (`picker_scope_unavailable`) if Google returns any other scope or does not say which. Files-only connections are unchanged.
+- **Rollout**: after Mindy Day, except Eric's own account (allowlist).
 - **Testing rule**: no customer contact. Drafts go only to the eric@ / erika@ test accounts.
 
 ## 3c. Live acceptance (Slice A), each provider independently

@@ -5,6 +5,7 @@ const h = vi.hoisted(() => ({
   authed: true,
   scope: { kind: 'own', email: 'owner@acme.com' } as Record<string, unknown>,
   token: vi.fn(),
+  restricted: vi.fn(),
   rlAllowed: true,
   rlKeys: [] as string[],
 }));
@@ -12,7 +13,7 @@ const h = vi.hoisted(() => ({
 vi.mock('@/lib/api-auth', () => ({ verifyUserOwnsEmail: vi.fn(async (_r: unknown, email: string) => (h.authed ? { authenticated: true, email } : { authenticated: false })) }));
 vi.mock('@/lib/rate-limit', () => ({ checkRateLimit: vi.fn(async (key: string, limit: number) => { h.rlKeys.push(key); return { allowed: h.rlAllowed, remaining: 0, limit, resetAt: Math.floor(Date.now() / 1000) + 60 }; }) }));
 vi.mock('@/lib/chat/chat-acting-scope', () => ({ resolveChatActingScope: vi.fn(async () => h.scope) }));
-vi.mock('@/lib/connected-apps/store', async (orig) => ({ ...(await orig<typeof import('@/lib/connected-apps/store')>()), accessTokenFor: h.token }));
+vi.mock('@/lib/connected-apps/store', async (orig) => ({ ...(await orig<typeof import('@/lib/connected-apps/store')>()), accessTokenFor: h.token, restrictedAccessTokenFor: h.restricted }));
 
 const ENV = ['CONNECTED_APPS', 'CONNECTED_APPS_ALLOWLIST', 'CONNECTED_APPS_STATE_SECRET', 'CONNECTED_APPS_TOKEN_ENC_KEY', 'NEXT_PUBLIC_CONNECTED_APPS_GOOGLE_PICKER_KEY', 'NEXT_PUBLIC_CONNECTED_APPS_GOOGLE_APP_ID'] as const;
 const saved: Record<string, string | undefined> = {};
@@ -154,5 +155,39 @@ describe('per-user rate limits on the file routes (Agent 4 review, 2026-11-27)',
     expect(Number(r.headers.get('Retry-After'))).toBeGreaterThan(0);
     expect(h.rlKeys.at(-1)).toBe(key);
     expect(h.token).not.toHaveBeenCalled();
+  });
+});
+
+describe('picker token never carries mail scopes (Slice B prerequisite, Agent 4 review)', () => {
+  const GMAIL = 'https://www.googleapis.com/auth/gmail.compose';
+  it('a files-only connection: the stored token, no extra mint', async () => {
+    h.restricted.mockReset();
+    h.token.mockResolvedValueOnce({ ok: true, token: 'stored-at', provider: 'google', connection: { ...connection, granted_scopes: ['openid', 'https://www.googleapis.com/auth/drive.file'] } });
+    const { POST } = await import('./picker-token/route');
+    const j = await (await POST(post('picker-token', { email: 'owner@acme.com', connection_id: 'conn-1' }))).json();
+    expect(j.access_token).toBe('stored-at');
+    expect(h.restricted).not.toHaveBeenCalled();
+  });
+
+  it('a connection that allows email drafts: a fresh token limited to identity + drive.file, never the stored one', async () => {
+    h.token.mockResolvedValueOnce({ ok: true, token: 'stored-with-gmail', provider: 'google', connection: { ...connection, granted_scopes: ['openid', 'https://www.googleapis.com/auth/drive.file', GMAIL] } });
+    h.restricted.mockReset().mockResolvedValueOnce({ ok: true, token: 'files-only-at', provider: 'google', connection });
+    const { POST } = await import('./picker-token/route');
+    const j = await (await POST(post('picker-token', { email: 'owner@acme.com', connection_id: 'conn-1' }))).json();
+    expect(j.access_token).toBe('files-only-at');
+    expect(JSON.stringify(j)).not.toContain('stored-with-gmail');
+    const scopes = h.restricted.mock.calls[0][3] as string[];
+    expect(scopes).toContain('https://www.googleapis.com/auth/drive.file');
+    expect(scopes.some((x) => /gmail|mail\.google\.com|Mail\./.test(x))).toBe(false);
+  });
+
+  it('if the provider will not limit the token, no token is returned', async () => {
+    h.token.mockResolvedValueOnce({ ok: true, token: 'stored-with-gmail', provider: 'google', connection: { ...connection, granted_scopes: [GMAIL] } });
+    h.restricted.mockReset().mockResolvedValueOnce({ ok: false, reason: 'scope_not_restricted' });
+    const { POST } = await import('./picker-token/route');
+    const r = await POST(post('picker-token', { email: 'owner@acme.com', connection_id: 'conn-1' }));
+    expect(r.status).toBe(502);
+    const j = await r.json();
+    expect(j).toEqual({ error: 'picker_scope_unavailable' });
   });
 });

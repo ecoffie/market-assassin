@@ -189,8 +189,12 @@ export function exchangeCode(provider: Provider, code: string, verifier: string,
   return tokenRequest(provider, { grant_type: 'authorization_code', code, redirect_uri: redirectUri(), code_verifier: verifier }, f);
 }
 
-export function refreshTokens(provider: Provider, refreshToken: string, f: Fetch = fetch): Promise<TokenSet> {
-  return tokenRequest(provider, { grant_type: 'refresh_token', refresh_token: refreshToken }, f);
+/**
+ * `scopes` (optional): ask for an access token limited to these scopes (a subset of the grant). Used for the Google
+ * Picker token, which reaches the browser and must never carry mail scopes. The caller checks what came back.
+ */
+export function refreshTokens(provider: Provider, refreshToken: string, f: Fetch = fetch, scopes?: string[]): Promise<TokenSet> {
+  return tokenRequest(provider, { grant_type: 'refresh_token', refresh_token: refreshToken, ...(scopes?.length ? { scope: scopes.join(' ') } : {}) }, f);
 }
 
 /** The provider's immutable account id and email for the grant (what we show and key on). */
