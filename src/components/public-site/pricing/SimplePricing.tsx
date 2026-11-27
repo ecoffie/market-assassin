@@ -11,6 +11,7 @@
  * says "$0 today" (the charge only comes after 14 days).
  * The credit-only MCP plans keep their own page at /mcp/pricing.
  */
+import { TEAM_SEAT_CREDITS_PER_USER } from '@/lib/billing/team-seat-plans';
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import MemberProof from '@/components/public-site/MemberProof';
@@ -304,7 +305,8 @@ export default function SimplePricing({ proCredits, teamCredits, forecastsLabel,
     lead: TEAM_SEAT_PRICING.lead,
     base: TEAM_SEAT_PRICING.base,
     features: [seatOpt.firstFeature, ...TEAM_SEAT_PRICING.features],
-    usage: undefined,
+    // Same number the grant uses (team-seat-plans.ts: seats x TEAM_SEAT_CREDITS_PER_USER).
+    usage: ['Monthly usage included', `${fmt(seatOpt.seats * TEAM_SEAT_CREDITS_PER_USER)} credits / month, shared by the team`],
     footer: undefined,
   });
   const plans = applyCurrentPlan(basePlans.map(withSeats), me);
@@ -331,7 +333,7 @@ export default function SimplePricing({ proCredits, teamCredits, forecastsLabel,
       ['Use Mindy in Claude, ChatGPT or Cursor', true, true, true],
       // Seat variant: today's Team allowance belongs to today's $499 plan, and no per-seat allowance
       // is approved, so the Team cell says so instead of showing a number (unknown is never zero).
-      ['Monthly credits', `${fmt(proCredits)}`, seatOn ? 'To be confirmed' : `${fmt(teamCredits)}, shared`, 'Custom'],
+      ['Monthly credits', `${fmt(proCredits)}`, seatOn ? `${fmt(TEAM_SEAT_CREDITS_PER_USER)} per user, shared` : `${fmt(teamCredits)}, shared`, 'Custom'],
       ['High-volume API and data feeds', false, false, true],
     ]],
     ['Team', [
