@@ -62,6 +62,10 @@ const ALL_NAICS = process.argv.includes('--all-naics');
 // the local ZIP and a pre-existence probe per batch, so the would-update vs would-insert split is real.
 const DRY = process.argv.includes('--dry');
 const DRY_SAMPLE_ROWS = 3;
+// PUBLIC CI (GitHub Actions on a public repo): logs are world-readable. Print only counts — no sample rows, no
+// database error text (it can name internal tables/columns). Local runs keep the full detail.
+const PUBLIC_LOG = process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true';
+const logErr = (m) => (PUBLIC_LOG ? '(error detail withheld in CI — see the local dead-letter file)' : m);
 /**
  * Payload columns the extract can leave BLANK (null / 'Unknown') while another writer holds a value. A blank never
  * overwrites: the existing value is kept (flush). Every other payload column is always populated by the parser.
@@ -377,7 +381,7 @@ async function main() {
       .from('sam_entities').select(['uei', ...PRESERVE_IF_BLANK].join(', ')).in('uei', ueis).range(0, Math.max(ueis.length - 1, 0));
     if (exErr) {
       // Without the existing values a blank extract field would ERASE another writer's value. Never write blind.
-      console.warn('  [warn] pre-existence probe failed — batch NOT written:', exErr.message);
+      console.warn('  [warn] pre-existence probe failed — batch NOT written:', logErr(exErr.message));
       failed += rows.length;
       if (!DRY) appendFileSync(DEADLETTER, rows.map(r => JSON.stringify({ uei: r.uei, line: lineNo, err: `probe: ${exErr.message}` })).join('\n') + '\n');
       batch = [];
@@ -414,7 +418,7 @@ async function main() {
     if (error) {
       // Dead-letter the whole batch for a second pass. Counted, not swallowed.
       failed += rows.length;
-      console.error(`  [fail] batch of ${rows.length} at line ${lineNo}: ${error.message}`);
+      console.error(`  [fail] batch of ${rows.length} at line ${lineNo}: ${logErr(error.message)}`);
       appendFileSync(DEADLETTER, rows.map(r => JSON.stringify({ uei: r.uei, line: lineNo, err: error.message })).join('\n') + '\n');
     } else {
       upserted += rows.length;
@@ -477,7 +481,7 @@ REGISTRY CHANGE${DRY ? ' (DRY RUN — nothing written; "upserted" = would upsert
   ${DRY ? 'would insert' : 'newly inserted'}        ${inserted.toLocaleString()}
   sam_entities total    ${count?.toLocaleString?.() ?? count}${DRY ? ' (unchanged)' : ''}
 ${failed ? `\n  ${failed} rows dead-lettered to ${DEADLETTER} — re-run with --resume after investigating.` : ''}`);
-  if (DRY) {
+  if (DRY && !PUBLIC_LOG) {
     console.log(`\n=== SAMPLE ROWS (first ${samples.length} kept, as they WOULD be written) ===`);
     for (const r of samples) console.log(JSON.stringify(r, null, 2));
   }
