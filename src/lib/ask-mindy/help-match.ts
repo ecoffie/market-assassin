@@ -14,6 +14,19 @@ export type HelpIntentId =
 /** The question is asking how to do something, what something means, or for help writing. */
 const HOW_TO = /\b(how (do|can|should|would) (i|we|you)|how to|how does|where (do|can) (i|we)|what (does|do) .{1,60}\bmean|what('s| is| are) (a|an|the)?\s*(set[- ]?aside|8\s*\(?a\)?|capability statement|sdb|hubzone|wosb|sdvosb|vosb)|is (this|it|that) (a )?set[- ]?aside|can you (help|show|walk|teach|tell)|help me (write|draft|create|make|find|get|understand|pursue|bid|cancel|connect|upload)|walk me through|i want to (cancel|connect|upload)|teach me)\b/i;
 
+/**
+ * Matched WITHOUT a how-to form, because the bare phrase has one meaning.
+ *   - Cancel (Eric, 2026-11-27: cancelling must be easy): "cancel my subscription", "unsubscribe", "stop billing me".
+ *     Unsubscribing from EMAILS or alerts is not cancelling, so it is left to the normal path.
+ *   - Capability statement questions (one customer asked five ways in eleven minutes and got five different answers):
+ *     "I need a capability statement", "do you have a capability statement template". An imperative ("write my
+ *     capability statement", "draft a capability statement from my upload") is NOT matched: it goes straight to drafting.
+ */
+const DIRECT: Array<{ id: HelpIntentId; re: RegExp; unless?: RegExp }> = [
+  { id: 'cancel_subscription', re: /\b(cancel(l?ing)? (my |the |our )?(mindy )?(subscription|plan|membership|account|pro|team|trial)|unsubscribe|stop (billing|charging)|cancel mindy)\b/i, unless: /\b(e-?mails?|alerts?|newsletter|notifications?|briefings?)\b/i },
+  { id: 'write_capability_statement', re: /\b(need|want|looking for|template|example|sample|format)\b.{0,40}\b(capabilit(y|ies) statement|cap statement)\b|\b(capabilit(y|ies) statement|cap statement)\b.{0,30}\b(template|example|sample|format)\b|\bwhat should (my|a) (capabilit(y|ies) statement|cap statement) (include|say|have|look like)\b/i },
+];
+
 const RULES: Array<{ id: HelpIntentId; re: RegExp }> = [
   // GovCon basics first where a phrase could also read as a product question.
   { id: 'write_capability_statement', re: /\b(write|create|make|draft|build|put together|structure)\b.{0,40}\b(capabilit(y|ies) statement|cap statement)\b|\bwhat (should|goes) (go )?in(to)? (a|my) capabilit(y|ies) statement\b|\bwhat('s| is) a capabilit(y|ies) statement\b/i },
@@ -39,6 +52,8 @@ const RULES: Array<{ id: HelpIntentId; re: RegExp }> = [
 export function matchHelpIntent(question: string, opts: { hasAttachedOpportunity?: boolean } = {}): HelpIntentId | null {
   const q = String(question || '').replace(/\s+/g, ' ').trim();
   if (!q || q.length > 400) return null;
+  // Asked without a how-to form, these still mean exactly one thing.
+  for (const d of DIRECT) if (d.re.test(q) && !(d.unless && d.unless.test(q))) return d.id;
   if (!HOW_TO.test(q)) return null;
   for (const r of RULES) {
     if (!r.re.test(q)) continue;

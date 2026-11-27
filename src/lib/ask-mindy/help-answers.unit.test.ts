@@ -92,9 +92,10 @@ describe('help-answers: content rules', () => {
     expect(e.sources?.some((s) => s.startsWith('https://www.sba.gov/'))).toBe(true);
   });
 
-  it.each(ALL.map((e) => [e.id, e] as const))('%s: no em or en dashes, 3 to 6 steps', (_id, e) => {
+  it.each(ALL.map((e) => [e.id, e] as const))('%s: no em or en dashes, 3 to 6 steps (cancel: one step, no maze)', (_id, e) => {
     expect(e.answer).not.toMatch(/[–—]/);
     const n = (e.answer.match(/^\d+\. /gm) || []).length;
+    if (e.id === 'cancel_subscription') { expect(n).toBe(0); expect(e.answer.length).toBeLessThan(400); return; }
     expect(n).toBeGreaterThanOrEqual(3);
     expect(n).toBeLessThanOrEqual(6);
   });
@@ -111,13 +112,14 @@ describe('help-answers: content rules', () => {
   it('the capability statement playbook ends with an offer to draft from the Vault (create_document)', () => {
     const e = HELP_ENTRIES.write_capability_statement;
     expect(e.offer).toEqual({ kind: 'tool', name: 'create_document' });
-    expect(e.answer.trim().split('\n').pop()).toMatch(/draft one from it\. Want me to\?$/);
+    expect(e.answer.trim().split('\n').pop()).toMatch(/Want me to draft it now\?$/);
   });
 
   it('the proposal entry offers draft_proposal; cancel names the real billing control', () => {
     expect(HELP_ENTRIES.write_proposal.offer?.name).toBe('draft_proposal');
     expect(HELP_ENTRIES.cancel_subscription.answer).toContain('**Manage / cancel**');
-    expect(HELP_ENTRIES.cancel_subscription.answer).toContain('Billing & credits');
+    expect(HELP_ENTRIES.cancel_subscription.answer).toContain('(https://getmindy.ai/account/cancel)');
+    expect(HELP_ENTRIES.cancel_subscription.answer).toContain('**Manage or cancel subscription**');
   });
 });
 
@@ -172,5 +174,55 @@ describe('helpAnswerFor + flag', () => {
     expect(helpAnswersEnabledFor('A@example.com', { ASK_MINDY_HELP_ANSWERS: 'true', ASK_MINDY_HELP_ANSWERS_ALLOWLIST: 'a@example.com' })).toBe(true);
     expect(helpAnswersEnabledFor('b@example.com', { ASK_MINDY_HELP_ANSWERS: 'true', ASK_MINDY_HELP_ANSWERS_ALLOWLIST: '*' })).toBe(true);
     expect(helpAnswersEnabledFor(null, { ASK_MINDY_HELP_ANSWERS: 'true', ASK_MINDY_HELP_ANSWERS_ALLOWLIST: '*' })).toBe(false);
+  });
+});
+
+describe('capability statement: one answer, always the draft offer', () => {
+  // Five paraphrased ways of asking the same thing. Each must get the SAME playbook.
+  const VARIANTS = [
+    'How do I write a capability statement?',
+    'What should my capability statement include?',
+    'I need a capability statement',
+    'Do you have a capability statement template?',
+    'Can you help me create a cap statement?',
+  ];
+
+  it.each(VARIANTS)('"%s" routes to the capability statement playbook', (q) => {
+    expect(matchHelpIntent(q)).toBe('write_capability_statement');
+  });
+
+  it('every variant gets the identical answer', () => {
+    const texts = new Set(VARIANTS.map((q) => helpAnswerFor(q)?.text));
+    expect(texts.size).toBe(1);
+  });
+
+  it('never says DUNS (retired; it is the UEI) and names the UEI', () => {
+    expect(HELP_ENTRIES.write_capability_statement.answer).toContain('UEI');
+    for (const e of ALL) expect(e.answer).not.toMatch(/\bduns\b/i);
+  });
+
+  it('always offers to draft it now from what Mindy already has, and never deflects to a solicitation', () => {
+    const a = HELP_ENTRIES.write_capability_statement.answer;
+    expect(a).toMatch(/I can draft yours now/);
+    expect(a).toMatch(/SAM\.gov registration/);
+    expect(a).toMatch(/You do not need a solicitation/);
+    expect(a).not.toMatch(/give me (a|the) solicitation|solicitation (id|number)|I don.t have a (capability.statement )?template/i);
+    expect(HELP_ENTRIES.write_capability_statement.offer?.name).toBe('create_document');
+  });
+
+  it('an imperative request goes straight to drafting, not to the playbook', () => {
+    expect(matchHelpIntent('Write my capability statement')).toBeNull();
+    expect(matchHelpIntent('Draft a capability statement from my uploaded resume')).toBeNull();
+  });
+});
+
+describe('cancel: one step, any phrasing', () => {
+  it.each(['cancel my subscription', 'Unsubscribe', 'Please stop billing me', 'I want to cancel my plan', 'How do I cancel my subscription?'])('"%s" routes to cancel', (q) => {
+    expect(matchHelpIntent(q)).toBe('cancel_subscription');
+  });
+
+  it('unsubscribing from emails or alerts is not cancelling', () => {
+    expect(matchHelpIntent('unsubscribe me from these emails')).not.toBe('cancel_subscription');
+    expect(matchHelpIntent('how do I unsubscribe from alerts')).not.toBe('cancel_subscription');
   });
 });

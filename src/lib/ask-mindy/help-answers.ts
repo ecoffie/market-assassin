@@ -45,19 +45,24 @@ function add(e: HelpEntry) { HELP_ENTRIES[e.id] = e; }
 add({
   id: 'write_capability_statement',
   kind: 'basics',
-  triggers: ['how do I write a capability statement', 'what should go in my capability statement', 'help me create a cap statement'],
+  triggers: [
+    'how do I write a capability statement', 'what should my capability statement include', 'I need a capability statement',
+    'do you have a capability statement template', 'can you help me create a cap statement',
+  ],
   routes: ['/app'],
+  // Draft from what Mindy already has: the company profile, the SAM.gov registration (lookup_sam_entity: UEI, CAGE,
+  // NAICS, certifications) and Vault uploads. Never ask for what can be looked up; never ask for a solicitation first.
   offer: { kind: 'tool', name: 'create_document' },
   answer: [
-    'A capability statement is a one-page summary a buyer can read in a minute. A strong one covers:',
+    'A capability statement is a one-page summary of your company that a buyer can read in a minute. It usually has five parts:',
     steps([
-      '**Core competencies.** What you do, in the buyer\'s words, not a long list of everything.',
+      '**Core competencies.** What you do, in the buyer\'s words, not a list of everything.',
       '**Past performance.** A few relevant jobs: who it was for, what you delivered, and the result.',
       '**Differentiators.** Why you instead of the next firm: a method, a credential, a track record.',
-      '**Company data.** Your UEI, CAGE code, NAICS codes, any certifications you actually hold, and a contact.',
-      '**Tailor it.** Adjust the competencies and past performance for each agency you send it to.',
+      '**Company data.** Your UEI, CAGE code, NAICS codes, any certifications you hold, and a contact.',
+      '**Tailored.** Adjust the competencies and past performance for each agency you send it to.',
     ]),
-    `If you add your existing material (an old capability statement, past performance, a resume) to your ${link('Vault', '/app?panel=vault&section=documents')}, I can draft one from it. Want me to?`,
+    `I can draft yours now from what Mindy already has: your company profile, your SAM.gov registration (UEI, CAGE code, NAICS codes and any certifications listed there) and anything in your ${link('Vault', '/app?panel=vault&section=documents')}. You do not need a solicitation for this. Want me to draft it now?`,
   ].join('\n\n'),
 });
 
@@ -263,15 +268,12 @@ function addProductEntries() {
   add({
     id: 'cancel_subscription',
     kind: 'product',
-    triggers: ['how do I cancel my subscription', 'I want to cancel my plan'],
-    routes: ['/app'],
+    triggers: ['how do I cancel my subscription', 'I want to cancel my plan', 'unsubscribe', 'stop billing me'],
+    routes: ['/account/cancel', '/app'],
+    // One step, no retention maze (Eric, 2026-11-27). /account/cancel opens Settings, Billing (signing in first if needed).
     answer: [
-      'You can cancel from Settings:',
-      steps([
-        `Open ${link('Settings, Billing & credits', '/app?panel=settings&section=credits')} (or click your account picture at the top right, then **Settings**, then **Billing & credits**).`,
-        'In **Your subscriptions**, click **Manage / cancel**.',
-        'That opens the secure billing portal, where you can cancel or change your plan.',
-      ]),
+      `To cancel, open ${link('getmindy.ai/account/cancel', '/account/cancel')} and click **Manage / cancel**. That opens the secure billing portal, where you can cancel or change your plan.`,
+      'You can also get there from the account menu at the top right: **Manage or cancel subscription**.',
     ].join('\n\n'),
   });
 }
