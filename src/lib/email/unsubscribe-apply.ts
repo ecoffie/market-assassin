@@ -19,8 +19,12 @@ export async function applyUnsubscribe(
   db: Db, email: string, ctx: { emailType?: string | null; via: string },
 ): Promise<{ ok: true; settingsRows: number | null } | { ok: false; error: string }> {
   const now = new Date().toISOString();
+  // Remember the cadence the user had, so turning alerts back on restores it instead of leaving 'paused'.
+  const { data: prior } = await db.from('user_notification_settings').select('alert_frequency').eq('user_email', email).maybeSingle();
+  const prev = (prior as { alert_frequency?: string | null } | null)?.alert_frequency;
+  const previous_alert_frequency = prev && prev !== 'paused' ? prev : null;
   const { error: supErr } = await db.from('email_suppressions').upsert(
-    { user_email: email, reason: 'unsubscribe', source: ctx.via, email_type: ctx.emailType ?? null, event_at: now, metadata: { via: ctx.via } },
+    { user_email: email, reason: 'unsubscribe', source: ctx.via, email_type: ctx.emailType ?? null, event_at: now, metadata: { via: ctx.via, previous_alert_frequency } },
     { onConflict: 'user_email', ignoreDuplicates: true },
   );
   if (supErr) return { ok: false, error: `suppression write failed: ${supErr.message}` };
@@ -36,6 +40,23 @@ export async function applyUnsubscribe(
  * so the choice in preferences actually takes effect. Bounce / complaint / provider suppressions are never cleared
  * here — those are facts about the mailbox, not a preference.
  */
+/** Default cadence when alerts are turned back on and no earlier cadence is known. */
+export const RESUBSCRIBE_DEFAULT_FREQUENCY = 'daily';
+
+/**
+ * The cadence to restore when alerts are re-enabled after an unsubscribe: the one stored at unsubscribe time, else
+ * the default. Never 'paused' — re-enabling must actually send.
+ */
+export async function frequencyToRestore(db: Db, email: string): Promise<string> {
+  try {
+    const { data } = await db.from('email_suppressions').select('metadata').eq('user_email', email.trim().toLowerCase()).eq('reason', 'unsubscribe').maybeSingle();
+    const prev = (data as { metadata?: { previous_alert_frequency?: string | null } } | null)?.metadata?.previous_alert_frequency;
+    return prev && prev !== 'paused' ? prev : RESUBSCRIBE_DEFAULT_FREQUENCY;
+  } catch {
+    return RESUBSCRIBE_DEFAULT_FREQUENCY;
+  }
+}
+
 export async function clearUnsubscribeSuppression(db: Db, email: string): Promise<{ ok: boolean; error?: string }> {
   try {
     const { error } = await db.from('email_suppressions').delete().eq('user_email', email.trim().toLowerCase()).eq('reason', 'unsubscribe');
