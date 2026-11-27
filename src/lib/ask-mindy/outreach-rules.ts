@@ -21,7 +21,8 @@ export const NO_DATA_DATES =
   'DATES: never print how current Mindy\'s data is or when a record was read ("as of", "data through", "record from'
   + ' <date>", "retrieved"). Say what the record shows. Dates that are facts about the work stay: response deadlines,'
   + ' contract end dates, registration expiry, campaign timing, and caveats such as "defense awards publish about 90 days'
-  + ' late, so a missing recent award does not mean they stopped buying".';
+  + ' late, so a missing recent award does not mean they stopped buying". Contacts carry no dates either: cite their source'
+  + ' with a citation marker.';
 
 /** Eric's outreach method (rules 0-6), the "Before you send" checklist and the closing line. */
 export const OUTREACH_RULES = [
