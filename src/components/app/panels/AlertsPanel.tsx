@@ -1265,7 +1265,7 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
       )}
 
       {/* Filters */}
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2" data-tip="alerts-filters">
         {filterOptions.map(({ key, label }) => (
           <button
             key={key}
@@ -1282,7 +1282,7 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
       </div>
 
       {/* Search and Sort */}
-      <div className="flex flex-col md:flex-row gap-3">
+      <div className="flex flex-col md:flex-row gap-3" data-tip="alerts-search">
         <input
           type="search"
           value={searchQuery}
@@ -1645,6 +1645,7 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
                           event.stopPropagation();
                           saveToPipeline(alert);
                         }}
+                        data-tip="alerts-save"
                         disabled={savingAlertIds.has(alert.id) || savedAlertIds.has(alert.id)}
                         className="text-xs text-blue-300 hover:text-blue-200 disabled:text-faint disabled:cursor-default px-3 py-2 md:px-2 md:py-1 hover:bg-blue-500/10 rounded min-h-[44px] md:min-h-0 inline-flex items-center"
                       >
@@ -1665,6 +1666,7 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
                           event.stopPropagation();
                           markInterested(alert);
                         }}
+                        data-tip="alerts-save"
                         disabled={interestedAlertIds.has(alert.id)}
                         className="text-xs text-cyan-300 hover:text-cyan-200 disabled:text-cyan-500/60 disabled:cursor-default px-3 py-2 md:px-2 md:py-1 hover:bg-cyan-500/10 rounded min-h-[44px] md:min-h-0 inline-flex items-center"
                       >

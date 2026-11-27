@@ -829,7 +829,7 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
           </span>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+        <div data-tip="recompetes-filters" className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
           <div>
             <label className="block text-xs text-faint mb-1">NAICS Code(s)</label>
             <NaicsAutocompleteInput
@@ -1181,7 +1181,7 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
 
                       {/* Title — the whole card toggles now, so this is just the
                           visual affordance (no nested button inside a clickable card). */}
-                      <div className="group mb-1 flex w-full items-start gap-2">
+                      <div data-tip="recompetes-result" className="group mb-1 flex w-full items-start gap-2">
                         <h4 className="text-white font-medium line-clamp-2 group-hover:text-purple-200">
                           {contract.title || 'Contract'}
                         </h4>
@@ -1291,7 +1291,7 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
                       <div className={`text-xs mt-1 ${urgency.text}`}>
                         {contract.daysUntilExpiration} days left
                       </div>
-                      <div className="mt-3 flex flex-col items-end gap-1" onClick={(e) => e.stopPropagation()}>
+                      <div data-tip="recompetes-track" className="mt-3 flex flex-col items-end gap-1" onClick={(e) => e.stopPropagation()}>
                         <div className="text-[11px] uppercase tracking-wider text-slate-600">Add to My Pursuits</div>
                         <SaveToPipelineButton
                           opportunity={{

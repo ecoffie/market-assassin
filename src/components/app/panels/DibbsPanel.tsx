@@ -132,7 +132,7 @@ export default function DibbsPanel({ email }: Props) {
 
       {/* Search / filters */}
       <form onSubmit={onSubmit} className="bg-ground border border-surface rounded-xl p-4 space-y-3">
-        <div className="flex flex-col md:flex-row gap-3">
+        <div data-tip="dibbs-search" className="flex flex-col md:flex-row gap-3">
           <input
             value={q}
             onChange={e => setQ(e.target.value)}
@@ -158,7 +158,7 @@ export default function DibbsPanel({ email }: Props) {
             Search
           </button>
         </div>
-        <div className="flex flex-wrap items-center gap-4 text-sm">
+        <div data-tip="dibbs-sort" className="flex flex-wrap items-center gap-4 text-sm">
           <label className="flex items-center gap-2 text-ink-soft">
             Sort
             <select
@@ -221,6 +221,7 @@ export default function DibbsPanel({ email }: Props) {
             const isSoon = dl !== null && dl > 3 && dl <= 10;
             return (
               <a
+                data-tip="dibbs-result"
                 key={r.solicitationNumber}
                 href={r.url || r.pdfUrl || '#'}
                 target="_blank"

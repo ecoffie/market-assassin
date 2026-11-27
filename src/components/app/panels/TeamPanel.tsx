@@ -247,7 +247,7 @@ export default function TeamPanel({ email, tier }: TeamPanelProps) {
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-[1fr_380px] gap-6">
-        <div className="bg-ground border border-surface rounded-xl overflow-hidden">
+        <div data-tip="team-members" className="bg-ground border border-surface rounded-xl overflow-hidden">
           <div className="px-5 py-4 border-b border-surface flex items-center justify-between">
             <div>
               <h2 className="font-semibold text-white">Team Members</h2>
@@ -308,7 +308,7 @@ export default function TeamPanel({ email, tier }: TeamPanelProps) {
         <div className="space-y-6">
           <Card>
             <h2 className="font-semibold text-white mb-4">Invite Seat</h2>
-            <div className="space-y-3">
+            <div data-tip="team-invite" className="space-y-3">
               <input
                 type="email"
                 value={inviteEmail}
@@ -343,7 +343,7 @@ export default function TeamPanel({ email, tier }: TeamPanelProps) {
 
           <Card>
             <h2 className="font-semibold text-white mb-4">Due Soon</h2>
-            <div className="space-y-3">
+            <div data-tip="team-due-soon" className="space-y-3">
               {reminders.slice(0, 5).map(reminder => (
                 <div key={reminder.id} className="rounded-lg bg-surface/60 p-3">
                   <div className="text-sm font-medium text-white line-clamp-2">{reminder.next_action || reminder.title}</div>

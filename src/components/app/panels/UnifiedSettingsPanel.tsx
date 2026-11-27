@@ -845,6 +845,7 @@ export default function UnifiedSettingsPanel({ email, tier, initialSection }: Un
                 className="h-10 flex-1 rounded-lg border border-hairline bg-ground px-3 text-sm text-white placeholder-faint focus:border-purple-500 focus:outline-none"
               />
               <button
+                data-tip="settings-suggest-codes"
                 onClick={runDescribeSuggest}
                 disabled={describing || !describeText.trim()}
                 className="h-10 shrink-0 rounded-lg bg-purple-600 px-5 text-sm font-semibold text-white hover:bg-purple-500 disabled:opacity-50"
@@ -1410,6 +1411,7 @@ function SaveBar({
     <div className="flex flex-wrap items-center justify-end gap-3">
       {unsaved && !saving && <span className="text-xs text-amber-300">Unsaved changes</span>}
       <button
+        data-tip="settings-save"
         onClick={onSave}
         disabled={saving}
         className="px-5 py-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-60 text-white rounded-lg font-medium transition-colors"

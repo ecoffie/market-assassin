@@ -154,7 +154,7 @@ export default function DisaVehicleWatchPanel({ email }: Props) {
           CSV with columns for PIID/contract #, incumbent, incumbent email, and expiration date
           (extra columns ignored; we auto-map common header names).
         </p>
-        <label className="inline-flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white text-sm font-medium rounded-lg cursor-pointer transition-colors">
+        <label data-tip="disa-watch-upload" className="inline-flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white text-sm font-medium rounded-lg cursor-pointer transition-colors">
           {uploading ? 'Importing…' : 'Upload CSV'}
           <input type="file" accept=".csv,text/csv" className="hidden" disabled={uploading}
             onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); e.currentTarget.value = ''; }} />
@@ -171,7 +171,7 @@ export default function DisaVehicleWatchPanel({ email }: Props) {
             <h3 className="text-sm font-semibold text-white">Preview notices that would send today</h3>
             <p className="text-xs text-faint mt-1">Dry run — shows the exact email per due incumbent. Nothing is sent.</p>
           </div>
-          <button onClick={runPreview} disabled={previewLoading}
+          <button data-tip="disa-watch-preview" onClick={runPreview} disabled={previewLoading}
             className="px-4 py-2 bg-purple-600 hover:bg-purple-500 disabled:bg-input text-white text-sm font-medium rounded-lg transition-colors">
             {previewLoading ? 'Checking…' : 'Preview notices'}
           </button>
@@ -210,7 +210,7 @@ export default function DisaVehicleWatchPanel({ email }: Props) {
       )}
 
       {/* Watched vehicles table */}
-      <div className="bg-ground border border-surface rounded-xl overflow-hidden">
+      <div data-tip="disa-watch-vehicles" className="bg-ground border border-surface rounded-xl overflow-hidden">
         <div className="px-5 py-4 border-b border-surface">
           <h3 className="text-sm font-semibold text-muted uppercase tracking-wider">
             {loading ? 'Loading…' : `${vehicles.length} Watched Vehicles`}
