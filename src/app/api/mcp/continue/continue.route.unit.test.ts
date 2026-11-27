@@ -28,6 +28,11 @@ describe('POST /api/mcp/continue', () => {
     expect(h.run).not.toHaveBeenCalled();
     expect(h.stamp).not.toHaveBeenCalled();
   });
+  it('a saved get_winning_playbook attempt (unlisted 2026-11-27) is refused the same way', async () => {
+    h.attempt = { id: 'att-1', user_email: 'a@example.com', tool_name: 'get_winning_playbook', args: { topic: 'x' }, consumed_at: null };
+    expect(await post()).toMatchObject({ status: 410, body: { ok: false, error: 'not_available' } });
+    expect(h.run).not.toHaveBeenCalled();
+  });
   it('a public tool still resumes as before', async () => {
     h.attempt = { id: 'att-1', user_email: 'a@example.com', tool_name: 'find_opportunities', args: { query: 'x' }, consumed_at: null };
     expect(await post()).toMatchObject({ status: 200, body: { ok: true, creditsCharged: 5 } });

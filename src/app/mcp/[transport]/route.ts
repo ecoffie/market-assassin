@@ -74,7 +74,7 @@ const SERVER_INFO: Implementation = {
   name: 'Mindy',
   version: '1.0.0',
   description:
-    'Federal contracting intelligence — SAM opportunities, incumbents, pricing, win playbooks, and market watches (schedule / monitor searches).',
+    'Federal contracting intelligence — SAM opportunities, incumbents, pricing and market watches (schedule / monitor searches).',
   websiteUrl: 'https://getmindy.ai/mcp',
   icons: [{ src: 'https://getmindy.ai/icon.png', mimeType: 'image/png', sizes: ['512x512'] }],
 };

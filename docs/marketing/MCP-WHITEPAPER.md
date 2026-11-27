@@ -22,7 +22,6 @@ SAM.gov and USASpending are free, public APIs. Any competitor can wrap them in a
 
 Mindy leads with those public-data tools because they're genuinely useful — but the reason an agent stays on Mindy is the layer competitors **cannot** copy:
 
-- **The winning-playbook corpus** — 8 years of course, proposal-template, and podcast-guest content that answers *"how do I actually win this,"* which no public API contains.
 - **Office-level buying contacts** — the named contracting officers and small-business POCs at a *specific* buying office, not the whole-department firehose.
 - **A curated SBLO teaming roster** — the Small Business Liaison Officer at 200 primes, re-researched and verified, so an agent knows *who to call* to team.
 
@@ -30,7 +29,7 @@ Wrapping a public API is the price of entry. The moat is the intelligence that t
 
 ---
 
-## What Mindy MCP gives an agent — 53 tools across four layers
+## What Mindy MCP gives an agent — 52 tools across four layers
 Among them: `get_current_acquisition_intelligence` (8 credits) — what changed about how a buyer is buying for a capability, and what to do differently (LIVE compose only). `match_company_to_pathways` (8 credits) — which of those doors a company’s public record can support (two-sided PATHWAY FIT; `no_proven_door` is success).
 
 
@@ -87,7 +86,6 @@ The hosted server exposes **40 credit-metered tools** (plus a free `get_balance`
 
 | Tool | What it answers |
 |---|---|
-| `get_winning_playbook` | Grounded "how to win this" coaching — **the moat** |
 | `evaluate_bid_decision` | The 5-gate / 10-factor bid / no-bid framework, scored |
 | `extract_compliance_matrix` | Every shall/must + Section L/M/C requirement, harvested into a structured matrix |
 | `scan_proposal_compliance` | Pre-submit disqualification scan (deadline, page limits, reps/certs) |
@@ -176,7 +174,7 @@ Every figure Mindy returns traces to a real source. That's a rule, not a marketi
 | **Federal Register** | Regulatory-demand leading indicators |
 | **GSA CALC+** | Price-to-win labor rates |
 | **Grants.gov / NIH RePORTER** | Grants + SBIR/STTR |
-| **Curated GovCon corpora** | Winning playbook, SBLO roster, OSBP directory, agency intel |
+| **Curated GovCon corpora** | SBLO roster, OSBP directory, agency intel |
 
 Public data is labeled public; curated intelligence is labeled curated; an honest miss is labeled `grounded: false`. Nothing is dressed up as something it isn't.
 
@@ -184,10 +182,10 @@ Public data is labeled public; curated intelligence is labeled curated; an hones
 
 ## The bottom line
 
-Mindy MCP is not "an API wrapper for federal contracting." It's a grounded intelligence layer for AI agents — **53 tools** spanning the public data any agent needs, a full proposal pipeline, and the proprietary intelligence no competitor can copy, all under a contract that returns real data or honestly returns nothing.
+Mindy MCP is not "an API wrapper for federal contracting." It's a grounded intelligence layer for AI agents — **52 tools** spanning the public data any agent needs, a full proposal pipeline, and the proprietary intelligence no competitor can copy, all under a contract that returns real data or honestly returns nothing.
 
 - **Commodity done right** — the public-data tools are fast, cached, and useful on call one.
-- **Moat where it counts** — winning playbooks, office-level buying contacts and SBLO teaming that took eight years to build.
+- **Moat where it counts** — office-level buying contacts and SBLO teaming that took years to build.
 - **Trustworthy by construction** — `grounded` and `degraded` on every response; `grounded = false` never invents.
 
 Point your agent at `getmindy.ai/mcp/mcp`, sign in, and the first 100 credits are on us.

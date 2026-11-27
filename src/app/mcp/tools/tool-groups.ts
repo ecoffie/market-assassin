@@ -76,7 +76,6 @@ export const TOOL_GROUPS: ToolGroup[] = [
       'derive_company_keywords',
       'get_market_vocabulary',
       'assess_market_depth',
-      'get_winning_playbook',
     ],
   },
   {

@@ -32,7 +32,7 @@ const APPROVED_HIDDEN = [
  */
 const ASK_MINDY_ONLY = ['get_buying_offices', 'get_vehicle_spend_mix'];
 /** Eric, 2026-11-27: the podcast corpus is removed from every customer-facing surface. */
-const REMOVED_CONTENT = ['search_podcast_lessons'];
+const REMOVED_CONTENT = ['get_winning_playbook', 'search_podcast_lessons'];
 const ALL_HIDDEN = [...APPROVED_HIDDEN, ...ASK_MINDY_ONLY, ...REMOVED_CONTENT].sort();
 
 describe('public MCP catalog', () => {
@@ -93,5 +93,12 @@ describe('public MCP catalog', () => {
     expect(listPublicMcpTools().map(name)).not.toContain('search_podcast_lessons');
     expect(mcpRegistrationList().map((t) => t.name)).not.toContain('search_podcast_lessons');
     expect(HIDDEN_FROM_PUBLIC_MCP.search_podcast_lessons.decision).toBe('hide');
+  });
+
+  it('get_winning_playbook is not listed and not registered on the external transport (Eric, 2026-11-27)', () => {
+    expect(isPublicMcpTool('get_winning_playbook')).toBe(false);
+    expect(listPublicMcpTools().map(name)).not.toContain('get_winning_playbook');
+    expect(mcpRegistrationList().map((t) => t.name)).not.toContain('get_winning_playbook');
+    expect(HIDDEN_FROM_PUBLIC_MCP.get_winning_playbook.decision).toBe('hide');
   });
 });

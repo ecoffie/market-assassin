@@ -1,5 +1,11 @@
 # Claude Connectors Directory — submission readiness (2026-07-17)
 
+> **Update 2026-11-27 (Eric):** `get_winning_playbook` and `search_podcast_lessons` are no longer in the public MCP
+> catalog (hidden, still registered). The public catalog is 52 tools. The reviewer notes below that rely on
+> `get_winning_playbook` (the reviewer account running it; the "one LIVE moat tool"; `MCP_ENFORCE_TIERS` existing to let
+> the free reviewer account run it) are historical: there is now no Pro-gated public tool, so the reviewer flow needs no
+> playbook step. Point the reviewer at FIND (`find_opportunities`) instead.
+
 ## TL;DR
 
 **SUBMITTED to the Connectors Directory on 2026-07-17.** Team seat bought, 11-step
