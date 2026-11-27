@@ -1626,7 +1626,7 @@ server.registerTool(
     title: 'SBA Goaling Share (goals vs. actual set-asides)',
     annotations: { readOnlyHint: true, openWorldHint: true },
     description:
-      'The statutory government-wide small-business goals (SB 23% · WOSB 5% · SDB/8(a) 5% · SDVOSB 3% · HUBZone 3%) set ' +
+      'The statutory government-wide small-business goals (SB 23% · WOSB 5% · SDB/8(a) 5% · SDVOSB 3% through FY2024 and 5% from FY2025 per Pub. L. 118-31 §863 · HUBZone 3%) set ' +
       "against an agency's ACTUAL set-aside obligations from USASpending, per category, with the gap and an above/below " +
       'flag. A SET-ASIDE-BASED INDICATOR, not an official SBA goaling scorecard: actuals measure set-aside CODE dollars — ' +
       'a floor on, not identical to, the official SBA Scorecard number.',

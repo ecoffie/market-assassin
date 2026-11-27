@@ -41,7 +41,7 @@ describe('every goaling row says it is a set-aside indicator', () => {
     const prime = r.goals!.find((g) => g.key === 'small_business')!;
     expect(prime.category).toMatch(/combined set-aside-code share/);
     expect(prime.status_label).toBe('Set-aside indicator below the 23% statutory goal (not SBA Scorecard achievement)');
-    expect(r.goals!.find((g) => g.key === 'sdvosb')!.status_label).toBe('Set-aside indicator at or above the 3% statutory goal (not SBA Scorecard achievement)');
+    expect(r.goals!.find((g) => g.key === 'sdvosb')!.status_label).toBe('Set-aside indicator at or above the 5% statutory goal (not SBA Scorecard achievement)'); // FY2026: 5% (Pub. L. 118-31 §863)
     expect(r.goals!.find((g) => g.key === 'wosb')!.status_label).toBe('Set-aside indicator unavailable (unknown, not below the 5% goal)');
   });
 

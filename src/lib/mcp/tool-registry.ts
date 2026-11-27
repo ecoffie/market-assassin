@@ -1897,7 +1897,7 @@ const SBA_GOALING_TOOL_DEF = {
     name: 'get_sba_goaling_share',
     description:
       'The "is this a good small-business market?" read: the STATUTORY government-wide small-business goals (Small ' +
-      'Business 23% · WOSB 5% · SDB/8(a) 5% · SDVOSB 3% · HUBZone 3%) set against an agency\'s ACTUAL set-aside ' +
+      'Business 23% · WOSB 5% · SDB/8(a) 5% · SDVOSB 3% through FY2024 and 5% from FY2025 per Pub. L. 118-31 §863 · HUBZone 3%) set against an agency\'s ACTUAL set-aside ' +
       'obligations from USASpending, per category, with the gap and an above/below flag. It is a SET-ASIDE-BASED ' +
       'INDICATOR, not an official SBA goaling scorecard: every row carries measure "set_aside_code_share". NOTE: actuals measure dollars ' +
       'through set-aside CODES — a floor on, not identical to, the official SBA Scorecard small-business achievement ' +
