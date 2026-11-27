@@ -8,6 +8,7 @@
  * 4) Partnership Signals
  */
 
+import { UNSUBSCRIBE_URL_PLACEHOLDER } from '@/lib/email/unsubscribe';
 import {
   ContractorDBBriefing,
   CondensedContractorDBBriefing,
@@ -191,7 +192,7 @@ function generateFullHtmlBody(briefing: ContractorDBBriefing, dateStr: string): 
       <p>
         <strong>GovCon Giants AI</strong><br>
         <a href="https://getmindy.ai/briefings/settings">Settings</a> •
-        <a href="https://getmindy.ai/briefings/unsubscribe">Unsubscribe</a>
+        <a href="${UNSUBSCRIBE_URL_PLACEHOLDER}">Unsubscribe</a>
       </p>
     </div>
   </div>
@@ -403,7 +404,7 @@ function generateCondensedHtmlBody(briefing: CondensedContractorDBBriefing, date
       <p>
         <strong>GovCon Giants AI</strong><br>
         <a href="https://getmindy.ai/briefings/settings">Settings</a> •
-        <a href="https://getmindy.ai/briefings/unsubscribe">Unsubscribe</a>
+        <a href="${UNSUBSCRIBE_URL_PLACEHOLDER}">Unsubscribe</a>
       </p>
     </div>
   </div>
