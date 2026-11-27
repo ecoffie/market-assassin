@@ -12,6 +12,7 @@ const state = vi.hoisted(() => ({
   failChargeUpsertOn: -1,
   chargeUpsertCalls: 0,
   failWatermark: false,
+  fills: [] as Array<{ id: unknown; email: unknown; source: unknown; onlyIfEmail: unknown }>,
 }));
 
 vi.mock('@/lib/stripe', () => ({
@@ -33,6 +34,17 @@ vi.mock('@/lib/supabase/server-clients', () => ({
           error: null,
         }),
       }),
+      update: (patch: { email: string; metadata: { email_source: string } }) => {
+        const f: Record<string, unknown> = {};
+        const q = {
+          eq: (c: string, v: unknown) => { f[c] = v; return q; },
+          select: async () => {
+            state.fills.push({ id: f.id, email: patch.email, source: patch.metadata.email_source, onlyIfEmail: f.email });
+            return { data: [{ id: f.id }], error: null };
+          },
+        };
+        return q;
+      },
       upsert: async (rows: Record<string, unknown>[], opts: Record<string, unknown>) => {
         if (name === 'stripe_customers') {
           state.customers.push({ rows, opts });
@@ -82,6 +94,7 @@ beforeEach(() => {
   state.failChargeUpsertOn = -1;
   state.chargeUpsertCalls = 0;
   state.failWatermark = false;
+  state.fills = [];
 });
 
 const far = () => Date.now() + 1_000_000;
@@ -196,5 +209,20 @@ describe('syncChargesIncremental', () => {
     expect(refreshed.rows[0].email).toBe('o@x.com');
     const fillOnly = state.customers.find((c) => c.opts.ignoreDuplicates)!;
     expect(fillOnly.rows.map((r) => r.id).sort()).toEqual(['cus_2', 'cus_3']);
+  });
+
+  it('a deleted customer gets its email from the charge (billing_details, else receipt_email), into a blank row only', async () => {
+    seed();
+    servePages([
+      charge(1, { customer: { id: 'cus_d1', deleted: true }, billing_details: { email: 'Bill@Corp.com' }, receipt_email: 'r@corp.com' }),
+      charge(2, { customer: { id: 'cus_d2', deleted: true }, receipt_email: 'only-receipt@corp.com' }),
+      charge(3, { customer: { id: 'cus_d3', deleted: true } }), // no email anywhere → stays blank
+      charge(4, { customer: { id: 'cus_full', email: 'x@y.co', name: null, phone: null, metadata: {}, created: T0, livemode: true }, receipt_email: 'z@z.co' }),
+    ]);
+    await syncChargesIncremental({ deadlineMs: far() });
+    expect(state.fills).toEqual([
+      { id: 'cus_d1', email: 'bill@corp.com', source: 'charge_billing_details', onlyIfEmail: '' },
+      { id: 'cus_d2', email: 'only-receipt@corp.com', source: 'charge_receipt_email', onlyIfEmail: '' },
+    ]);
   });
 });
