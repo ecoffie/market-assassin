@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { classifyCompetition, competitionFactsFor, competitionCounts } from './competition-facts';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { classifyCompetition, competitionFactsFor, competitionCounts, fetchAwardCompetition, awardRecordFacts } from './competition-facts';
 
 // Field values copied from the live USASpending award records (2026-11-16).
 const GULFSTREAM_GOODWILL = { // W912EP22C0005 — the $15.4M row the FL answer called "Full and open"
@@ -69,3 +69,27 @@ describe('orders: the fair-opportunity field when no extent code is recorded', (
     expect(f).toMatchObject({ class: 'competed', set_aside: null, set_aside_reported: 'NO SET ASIDE USED.' });
   });
 });
+
+describe('fetchAwardCompetition reads the fields USASpending actually returns (2026-11-28)', () => {
+  afterEach(() => vi.unstubAllGlobals());
+  // Live shape: CONT_AWD_W91YTZ25FA168_9700_GS10F0311W_4700 (order under GS10F0311W).
+  const LIVE = {
+    latest_transaction_contract_data: { extent_competed: null, number_of_offers_received: '3', fair_opportunity_limited: 'FAIR', fair_opportunity_limited_description: 'FAIR OPPORTUNITY GIVEN' },
+    place_of_performance: { city_name: 'MARIETTA', state_code: 'GA' },
+    period_of_performance: { start_date: '2025-09-01', end_date: '2027-08-31', potential_end_date: '2028-08-31 00:00:00' },
+    recipient: { business_categories: [] },
+  };
+  it('fair_opportunity_limited_description (the real name) reaches classification; place and period are read', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => LIVE })));
+    const f = await fetchAwardCompetition('X');
+    expect(f).toMatchObject({ fair_opportunity_limited_sources_description: 'FAIR OPPORTUNITY GIVEN', place_of_performance_city: 'MARIETTA', place_of_performance_state: 'GA', period_current_end: '2027-08-31', period_potential_end: '2028-08-31 00:00:00' });
+    const c = classifyCompetition(f);
+    expect(c).toMatchObject({ class: 'competed', label: 'Competed (fair opportunity)', offers_received: 3, offers_source: 'usaspending_award' });
+    expect(c.award_record).toEqual({ place_of_performance_city: 'MARIETTA', place_of_performance_state: 'GA', period_current_end: '2027-08-31', period_potential_end: '2028-08-31' });
+  });
+  it('a record with no place or period facts → award_record null (never empty strings)', () => {
+    expect(awardRecordFacts({ extent_competed: 'A' })).toBeNull();
+    expect(classifyCompetition(null).award_record).toBeNull();
+  });
+});
+

@@ -298,7 +298,7 @@ export async function searchPastContracts(input: PastContractsToolInput): Promis
         recipient_state: 'source_or_empty',
         pop_state: 'place_of_performance_not_recipient_hq',
         note:
-          'naicsCode/pscCode/recipientState are USASpending source fields (empty when the API returns null). queriedNaics/queriedPsc are the filter you sent — not award evidence. popState is place of performance only; it does not establish recipient HQ.',
+          'naicsCode/pscCode/recipientState are USASpending source fields (empty when the API returns null). queriedNaics/queriedPsc are the filter you sent — not award evidence. popState / popCity are place of performance only; they do not establish recipient HQ. Empty popCity = not reported.',
       },
     },
   };
@@ -316,7 +316,7 @@ export async function searchPastContracts(input: PastContractsToolInput): Promis
         ? `No published awards matched yet. ${lag.note}`
         : `No awards matched${autoWidened ? ' even after auto-widening to state_scope:"both"' : ''}. Broaden the NAICS/PSC or widen the date range.`,
       how_to_use: grounded
-        ? 'Historical prime awards (already awarded, not open bids). recipientName = who won; popState = where the work is done; use get_award_detail on generatedId for the full record, or get_contractor_award_history on a recipient to size them up.'
+        ? 'Historical prime awards (already awarded, not open bids). recipientName = who won; popState / popCity = where the work is done; use get_award_detail on generatedId for the full record, or get_contractor_award_history on a recipient to size them up.'
         : 'No grounded results; say none matched rather than inventing an award.',
       key_caveats: [
         'Place-of-performance state is well-populated on awards, but a firm can perform in a state it is not HQ’d in — state_scope controls which side you match.',

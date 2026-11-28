@@ -41,3 +41,8 @@ export function awardRecipientState(r: Row): string {
 export function awardPopState(r: Row): string {
   return str(obj(r['Primary Place of Performance'])?.state_code) || str(r['Place of Performance State Code']);
 }
+
+/** Place-of-performance city (never the recipient HQ city). Empty when USASpending reports none. */
+export function awardPopCity(r: Row): string {
+  return str(obj(r['Primary Place of Performance'])?.city_name);
+}
