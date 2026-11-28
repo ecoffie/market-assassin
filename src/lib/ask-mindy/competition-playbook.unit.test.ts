@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { COMPETITION_AND_START_PLAYBOOK } from './competition-playbook';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { COMPETITION_AND_START_PLAYBOOK, COMPETITION_ANSWER_RULES } from './competition-playbook';
+import { DEFENSE_LAG_LINE, NO_DATA_DATES, QUESTION_OVER_PROFILE } from './outreach-rules';
 import { RESEARCH_INSTRUCTIONS } from './research-mode';
 
 describe('least-competition / where-to-start method (Claude + MCP, as written)', () => {
@@ -8,7 +11,7 @@ describe('least-competition / where-to-start method (Claude + MCP, as written)',
     expect(COMPETITION_AND_START_PLAYBOOK).toMatch(/capable_depth, eligible_population and tiers/);
     expect(COMPETITION_AND_START_PLAYBOOK).toMatch(/a smaller order is an easier first win/);
     expect(COMPETITION_AND_START_PLAYBOOK).not.toMatch(/\$\d/); // Eric 2026-11-27: no unsourced numbers
-    expect(COMPETITION_AND_START_PLAYBOOK).toMatch(/number_of_offers and competition_type are EMPTY .* never imply bidders were counted/);
+    expect(COMPETITION_AND_START_PLAYBOOK).toMatch(/a row's number_of_offers \/ competition_type count only when competition_fields_source is set .* never imply bidders were counted/);
     expect(COMPETITION_AND_START_PLAYBOOK).toMatch(/Never call it "no competition" because a search came back empty or a contract is still within its term/);
     expect(COMPETITION_AND_START_PLAYBOOK).toMatch(/only holds a registration is not a competitor/);
   });
@@ -27,5 +30,45 @@ describe('least-competition / where-to-start method (Claude + MCP, as written)',
   });
   it('research mode carries it', () => {
     expect(RESEARCH_INSTRUCTIONS).toContain(COMPETITION_AND_START_PLAYBOOK);
+  });
+});
+
+describe('competition answer rules (production test 2026-11-28: SDVOSB IT, WOSB Virginia, SDVOSB 1-2 bidders)', () => {
+  it('1. coverage: every ranking states "offers reported on X of Y candidates" from the tool counts', () => {
+    // #2583 shape (Agent 3): _meta.competition.coverage_line, row competition_status, competition_fields_source.
+    expect(COMPETITION_ANSWER_RULES).toMatch(/When get_expiring_contracts returns _meta\.competition\.coverage_line \("Competition checked on X of Y contracts; offers reported on N, set-aside reported on M; K not checked"\), quote it VERBATIM/);
+    expect(COMPETITION_ANSWER_RULES).toMatch(/Otherwise count the rows yourself and say "offers reported on X of Y candidates" \(X = rows whose offers are reported, Y = all candidate rows you ranked from\)/);
+    expect(COMPETITION_ANSWER_RULES).toMatch(/Ranking a few contracts without a coverage line is wrong/);
+    expect(COMPETITION_ANSWER_RULES).toMatch(/number_of_offers null means NOT REPORTED, never one bidder and never zero/);
+    expect(COMPETITION_ANSWER_RULES).toMatch(/competition_status "not_checked" means the row was NOT CHECKED \(past the lookup cap\): say "not checked", never "not reported"/);
+    expect(COMPETITION_ANSWER_RULES).toMatch(/usable when competition_fields_source is set \("usaspending_award" = that award's own record; "usaspending_parent_idv" = the parent vehicle's record, so say the count is for the vehicle, not this order\)/);
+  });
+  it('2. set-aside fit: each pick shows its real set-aside; outside the named group is labelled; empty is "not on record", never "full and open"', () => {
+    expect(COMPETITION_ANSWER_RULES).toMatch(/when the question names a set-aside group \(SDVOSB, VOSB, WOSB, EDWOSB, 8\(a\), HUBZone\), every recommended item shows its actual set-aside/);
+    expect(COMPETITION_ANSWER_RULES).toMatch(/"not set aside: open to all firms \(full and open\)"/);
+    expect(COMPETITION_ANSWER_RULES).toMatch(/"set aside for small business generally, not SDVOSB"/);
+    expect(COMPETITION_ANSWER_RULES).toMatch(/An empty set_aside_type means the set-aside is NOT ON RECORD: say "set-aside not on record; confirm on SAM\.gov before relying on it", never "full and open"/);
+    expect(COMPETITION_ANSWER_RULES).toMatch(/Never present an item outside the named group as if it fit it/);
+  });
+  it('3. no invented data limits: a cut-off is stated as what was looked at, never as a fact about the data', () => {
+    expect(COMPETITION_ANSWER_RULES).toMatch(/"I looked at the first N expiring contracts in this window"/);
+    expect(COMPETITION_ANSWER_RULES).toMatch(/Never turn where a list stops into a fact about the data/);
+  });
+  it('4. the Defense lag line is the exact #2549 wording, everywhere it is said', () => {
+    expect(DEFENSE_LAG_LINE).toBe('Defense awards are published on USAspending.gov with a delay of about 90 days (DoD reporting policy)');
+    expect(COMPETITION_ANSWER_RULES).toContain(`use exactly: "${DEFENSE_LAG_LINE}"`);
+    expect(NO_DATA_DATES.replace(/' \+ '/g, '')).toContain('Defense awards are published on USAspending.gov with a delay of about 90 days (DoD reporting policy)');
+    expect(RESEARCH_INSTRUCTIONS).toContain(DEFENSE_LAG_LINE);
+    const route = readFileSync(join(process.cwd(), 'src/app/api/app/chat/route.ts'), 'utf8');
+    expect(route).toContain(DEFENSE_LAG_LINE);
+    for (const t of [COMPETITION_ANSWER_RULES, NO_DATA_DATES, RESEARCH_INSTRUCTIONS, route]) expect(t).not.toMatch(/show up about 90 days late|post about 90 days late|publish about 90 days late/);
+  });
+  it('5. profile: a status with no trade is answered across trades first, then "For your saved profile (<trade>): ..."', () => {
+    expect(QUESTION_OVER_PROFILE).toMatch(/names a status or place but no line of work .* do not narrow the searches to the saved profile's trade: answer across trades first, then add a short "For your saved profile \(<trade>\): \.\.\." part/);
+    expect(QUESTION_OVER_PROFILE).toMatch(/Saying you used the profile is not enough when it would change which results appear/);
+  });
+  it('the rules ride with the playbook into both engines', () => {
+    expect(COMPETITION_AND_START_PLAYBOOK).toContain('COMPETITION ANSWER RULES');
+    expect(RESEARCH_INSTRUCTIONS).toContain('COMPETITION ANSWER RULES');
   });
 });
