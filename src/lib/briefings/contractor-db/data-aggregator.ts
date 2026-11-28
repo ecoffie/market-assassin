@@ -16,6 +16,7 @@ import {
 } from './types';
 import { fetchAllRSSFeeds, filterRSSByKeywords, filterRecentRSS } from '../web-intel/rss';
 import { searchContractors, Contractor } from '@/lib/contractor-database';
+import { statutoryGoalPct, fiscalYearOf } from '@/lib/sba/statutory-goals';
 
 // Partnership keywords for RSS filtering
 const PARTNERSHIP_KEYWORDS = [
@@ -273,7 +274,7 @@ export async function fetchNewSubcontractingPlans(
         goals: {
           smallBusiness: 23, // Default federal goal
           wosb: 5,
-          sdvosb: 3,
+          sdvosb: statutoryGoalPct('sdvosb', fiscalYearOf()), // 5% from FY2025 (Pub. L. 118-31 §863)
           hubzone: 3,
           sdb: 5,
         },

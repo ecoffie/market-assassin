@@ -5,7 +5,8 @@
  * gap and an above/below flag. It is a SET-ASIDE-BASED INDICATOR, not an official SBA goaling scorecard.
  *
  * The statutory goals (15 U.S.C. § 644(g)) are the verified government-wide MINIMUMS:
- *   Small Business 23% · WOSB 5% · SDB/8(a) 5% · SDVOSB 3% · HUBZone 3%.
+ *   Small Business 23% · WOSB 5% · SDB/8(a) 5% · SDVOSB 3% through FY2024, 5% from FY2025 (Pub. L. 118-31 §863) ·
+ *   HUBZone 3%. The goal is chosen by the FISCAL YEAR scored (src/lib/sba/statutory-goals.ts).
  * The actuals come from the same live USASpending aggregates behind get_agency_spending_detail.
  *
  * IMPORTANT honesty line: the actuals measure dollars obligated through the set-aside CODES,
@@ -18,6 +19,7 @@
  */
 import { getAgencySpendingDetail, setAsideIncompleteReason } from '@/lib/usaspending/agency-spending-detail';
 import { mcpFlags } from '@/lib/mcp/flags';
+import { statutoryGoalPct, STATUTORY_GOAL_SOURCE, type StatutoryGoalKey } from '@/lib/sba/statutory-goals';
 
 export interface SbaGoalingInput {
   agency: string;
@@ -32,16 +34,17 @@ export interface SbaGoalingInput {
  *     against the SBA/SBP bucket alone (VA FY2026: 0.6% while set_aside_share was 9.4%).
  *   - { code }: a program row is the bucket that carries that set-aside code.
  */
-export type GoalingKey = 'small_business' | 'sdb_8a' | 'sdvosb' | 'wosb' | 'hubzone';
+export type GoalingKey = StatutoryGoalKey;
 
 // Category text is read by consumers: MRR section 12 keys on `key` (falling back to /prime/i, so "prime"
 // stays in the combined row's text), and every other row keeps its program name.
-const STATUTORY_GOALS: Array<{ key: GoalingKey; category: string; goal_pct: number; source: 'combined' | { code: string } }> = [
-  { key: 'small_business', category: 'Small Business (prime): combined set-aside-code share', goal_pct: 23, source: 'combined' },
-  { key: 'sdb_8a', category: '8(a) / SDB', goal_pct: 5, source: { code: '8A' } },
-  { key: 'sdvosb', category: 'SDVOSB', goal_pct: 3, source: { code: 'SDVOSBC' } },
-  { key: 'wosb', category: 'WOSB / EDWOSB', goal_pct: 5, source: { code: 'WOSB' } },
-  { key: 'hubzone', category: 'HUBZone', goal_pct: 3, source: { code: 'HZC' } },
+// goal_pct comes from statutoryGoalPct(key, fiscal year): SDVOSB is 3% through FY2024 and 5% from FY2025.
+const STATUTORY_GOALS: Array<{ key: GoalingKey; category: string; source: 'combined' | { code: string } }> = [
+  { key: 'small_business', category: 'Small Business (prime): combined set-aside-code share', source: 'combined' },
+  { key: 'sdb_8a', category: '8(a) / SDB', source: { code: '8A' } },
+  { key: 'sdvosb', category: 'SDVOSB', source: { code: 'SDVOSBC' } },
+  { key: 'wosb', category: 'WOSB / EDWOSB', source: { code: 'WOSB' } },
+  { key: 'hubzone', category: 'HUBZone', source: { code: 'HZC' } },
 ];
 
 /** Every row is a set-aside-code share measured against a statutory goal: an indicator, never the SBA Scorecard. */
@@ -90,6 +93,8 @@ export interface SbaGoalingResult {
     /** The combined SET-ASIDE INDICATOR vs 23% — not whether the agency met its SBA goal. null = unknown (FM-U03). */
     meets_small_business_goal: boolean | null;
     basis: string;
+    /** Where the goal percentages come from, including the FY2025 SDVOSB change. */
+    goal_source: string;
     /** Set when a set-aside bucket lookup failed: result_state becomes 'partial'. Billing unchanged. */
     incomplete_reason?: string;
   };
@@ -117,11 +122,12 @@ export async function getSbaGoalingShare(input: SbaGoalingInput): Promise<SbaGoa
         const actual = code === null
           ? detail.set_aside_share
           : detail.set_aside_breakdown.find((s) => s.codes.includes(code))?.pct_of_total ?? null;
-        const base = { key: g.key, category: g.category, measure: GOALING_MEASURE, indicator: GOALING_INDICATOR, goal_pct: g.goal_pct };
-        if (actual === null) return { ...base, actual_setaside_pct: null, gap_pct: null, meets_goal: null, status_label: goalingStatusLabel(g.goal_pct, null) };
-        const gap = Math.round((actual - g.goal_pct) * 10) / 10;
-        const meets = actual >= g.goal_pct;
-        return { ...base, actual_setaside_pct: actual, gap_pct: gap, meets_goal: meets, status_label: goalingStatusLabel(g.goal_pct, meets) };
+        const goalPct = statutoryGoalPct(g.key, detail.fiscal_year);
+        const base = { key: g.key, category: g.category, measure: GOALING_MEASURE, indicator: GOALING_INDICATOR, goal_pct: goalPct };
+        if (actual === null) return { ...base, actual_setaside_pct: null, gap_pct: null, meets_goal: null, status_label: goalingStatusLabel(goalPct, null) };
+        const gap = Math.round((actual - goalPct) * 10) / 10;
+        const meets = actual >= goalPct;
+        return { ...base, actual_setaside_pct: actual, gap_pct: gap, meets_goal: meets, status_label: goalingStatusLabel(goalPct, meets) };
       });
 
   const sbRow = goals?.find((g) => g.key === 'small_business');
@@ -144,6 +150,7 @@ export async function getSbaGoalingShare(input: SbaGoalingInput): Promise<SbaGoa
       recipient_small_business_share: detail.recipient_small_business_share,
       meets_small_business_goal: meetsSb,
       basis: BASIS,
+      goal_source: STATUTORY_GOAL_SOURCE,
       ...(grounded && setAsideIncompleteReason(detail.set_aside_breakdown) ? { incomplete_reason: setAsideIncompleteReason(detail.set_aside_breakdown)! } : {}),
     },
   };
@@ -160,7 +167,7 @@ export async function getSbaGoalingShare(input: SbaGoalingInput): Promise<SbaGoa
       how_to_use:
         'Each row is a set-aside indicator, not the SBA Scorecard: say "set-aside indicator above/below the goal", never "meets the SBA goal". Use goal_pct vs. actual_setaside_pct per category to gauge how set-aside-friendly this buyer is. A category ABOVE its goal signals an agency that leans into that program (a friendlier entry for that certification); consistently BELOW can mean either a hard market or headroom the agency is under pressure to fill.',
       key_caveats: [
-        'The goals are the STATUTORY government-wide minimums (23/5/5/3/3), not this agency\'s own SBA-negotiated targets — those vary and are not asserted here.',
+        `The goals are the STATUTORY government-wide minimums for FY${detail.fiscal_year} (SB 23 · SDB 5 · WOSB 5 · SDVOSB ${statutoryGoalPct('sdvosb', detail.fiscal_year)} · HUBZone 3; SDVOSB is 3% through FY2024 and 5% from FY2025, Pub. L. 118-31 §863), not this agency's own SBA-negotiated targets — those vary and are not asserted here.`,
         'Actuals are dollars through set-aside CODES — a FLOOR on, not identical to, the official SBA Scorecard small-business achievement (small firms also win full-and-open). This is not the Scorecard number.',
         'recipient_small_business_share (who won) is a different metric from set-aside share (how it was competed). Do not compare either to 23% as if they shared a denominator.',
         'toptier_code 097 on a Navy row is the Department of Defense parent in USASpending, not a claim these dollars are all of DoD. Navy subtier FY2025 contracts measured $176.56B vs DoD $491.77B.',
