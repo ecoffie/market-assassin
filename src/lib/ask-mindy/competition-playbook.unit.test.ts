@@ -55,13 +55,15 @@ describe('competition answer rules (production test 2026-11-28: SDVOSB IT, WOSB 
     expect(COMPETITION_ANSWER_RULES).toMatch(/Never turn where a list stops into a fact about the data/);
   });
   it('4. the Defense lag line is the exact #2549 wording, everywhere it is said', () => {
-    expect(DEFENSE_LAG_LINE).toBe('Defense awards are published on USAspending.gov with a delay of about 90 days (DoD reporting policy)');
+    // Worded to match the source and linked to it (Eric, 2026-11-28: "yes link the source").
+    expect(DEFENSE_LAG_LINE).toBe('Defense contract data (DoD and the Army Corps of Engineers) is published on a 90-day delay ([USAspending: About the Data](https://www.usaspending.gov/data/about-the-data-download.pdf))');
+    expect(DEFENSE_LAG_LINE).toMatch(/\[USAspending: About the Data\]\(https:\/\/www\.usaspending\.gov\/[^)]+\)/); // a markdown link
     expect(COMPETITION_ANSWER_RULES).toContain(`use exactly: "${DEFENSE_LAG_LINE}"`);
-    expect(NO_DATA_DATES.replace(/' \+ '/g, '')).toContain('Defense awards are published on USAspending.gov with a delay of about 90 days (DoD reporting policy)');
+    expect(NO_DATA_DATES).toContain(DEFENSE_LAG_LINE);
     expect(RESEARCH_INSTRUCTIONS).toContain(DEFENSE_LAG_LINE);
     const route = readFileSync(join(process.cwd(), 'src/app/api/app/chat/route.ts'), 'utf8');
-    expect(route).toContain(DEFENSE_LAG_LINE);
-    for (const t of [COMPETITION_ANSWER_RULES, NO_DATA_DATES, RESEARCH_INSTRUCTIONS, route]) expect(t).not.toMatch(/show up about 90 days late|post about 90 days late|publish about 90 days late/);
+    expect(route).toContain('${DEFENSE_LAG_LINE}, so recent awards may not appear yet'); // the route interpolates the one constant
+    for (const t of [COMPETITION_ANSWER_RULES, NO_DATA_DATES, RESEARCH_INSTRUCTIONS, route]) expect(t).not.toMatch(/show up about 90 days late|post about 90 days late|publish about 90 days late|with a delay of about 90 days \(DoD reporting policy\)/);
   });
   it('5. profile: a status with no trade is answered across trades first, then "For your saved profile (<trade>): ..."', () => {
     expect(QUESTION_OVER_PROFILE).toMatch(/names a status or place but no line of work .* do not narrow the searches to the saved profile's trade: answer across trades first, then add a short "For your saved profile \(<trade>\): \.\.\." part/);
@@ -70,5 +72,32 @@ describe('competition answer rules (production test 2026-11-28: SDVOSB IT, WOSB 
   it('the rules ride with the playbook into both engines', () => {
     expect(COMPETITION_AND_START_PLAYBOOK).toContain('COMPETITION ANSWER RULES');
     expect(RESEARCH_INSTRUCTIONS).toContain('COMPETITION ANSWER RULES');
+  });
+});
+
+describe('35-prompt production run fixes (2026-11-28: 28 pass / 7 fail)', () => {
+  it('Q19: not competed / sole source is "awarded without competition", never "only one bidder"; one offer only on a competed award', () => {
+    expect(COMPETITION_ANSWER_RULES).toMatch(/competition class is not_competed, whose extent_competed says not competed or not available for competition, or that has a sole_source_reason .* was AWARDED WITHOUT COMPETITION/);
+    expect(COMPETITION_ANSWER_RULES).toMatch(/Say "awarded without competition \(sole source: <reason>\)"\. Never call it "only one bidder" or "one offer"\. "One offer" applies only to a COMPETED award whose number_of_offers is 1/);
+  });
+  it('Q9/Q33: places are ranked only from a real count, never a sample; follow-ups keep the caveat', () => {
+    expect(COMPETITION_ANSWER_RULES).toMatch(/ranked only from a real count: assess_market_depth eligible_population and capable_depth per state \(exhaustive counts\)/);
+    expect(COMPETITION_ANSWER_RULES).toMatch(/A sample or a capped list of firms \(for example 5 per state\) is NEVER a count: never say "Vermont has 1 firm" from it/);
+    expect(COMPETITION_ANSWER_RULES).toMatch(/If no real count is available for the places asked, say the count is not available and do not rank them/);
+    expect(COMPETITION_ANSWER_RULES).toMatch(/A follow-up that reuses earlier numbers carries the same caveat and never restates a sample as fact/);
+  });
+  it('Q34: current period vs options, written against both potential-end field names', () => {
+    // Field names from #2592 (Agent 3): no potential_end_date exists on the row.
+    expect(COMPETITION_ANSWER_RULES).toMatch(/period_of_performance_current_end_record when present .* otherwise period_of_performance_current_end\. When period_of_performance_potential_end \(the end if every option is exercised\) is later, say "current period ends <date>; options can run to <date>"/);
+    expect(COMPETITION_ANSWER_RULES).toMatch(/A null potential end means NOT REPORTED or not checked, never "no options"/);
+    expect(COMPETITION_ANSWER_RULES).not.toMatch(/potential_end_date/);
+    expect(COMPETITION_ANSWER_RULES).toMatch(/Never present the current period end as the contract's end when options exist/);
+  });
+  it('Q13/Q26: "does not list a city" only when place_of_performance_city is actually empty', () => {
+    expect(COMPETITION_ANSWER_RULES).toMatch(/say a record "does not list a city" only when place_of_performance_city is actually empty on those rows \(place_of_performance_source tells where a filled city came from/);
+    expect(COMPETITION_ANSWER_RULES).toMatch(/number_of_offers_source or competition\.offers_source is "usaspending_parent_idv": those are offers on the VEHICLE, not on this order/);
+  });
+  it('Q27: a fact another result in the chat contains is used, never "could not be established"', () => {
+    expect(COMPETITION_ANSWER_RULES).toMatch(/if any tool result in this conversation gives a fact \(a response deadline, an incumbent, an end date\), use it\. Never say a fact "could not be established" when another result in the same conversation contains it/);
   });
 });

@@ -23,7 +23,13 @@ export const QUESTION_OVER_PROFILE =
   + ' profile (<trade>): ..." part. Saying you used the profile is not enough when it would change which results appear.';
 
 /** The one wording for the Defense reporting lag (#2549), wherever it is said. */
-export const DEFENSE_LAG_LINE = 'Defense awards are published on USAspending.gov with a delay of about 90 days (DoD reporting policy)';
+/**
+ * The one wording for the Defense reporting lag, with its source link (Eric, 2026-11-28: "yes link the source"). Worded
+ * to match the source: USAspending's About the Data says "Procurement data for DoD and USACE, including contracts and
+ * IDVs, is published on a 90-day delay in FPDS" (FPDS's DoD data availability page states the same 90-day delay).
+ */
+export const DEFENSE_LAG_SOURCE_URL = 'https://www.usaspending.gov/data/about-the-data-download.pdf';
+export const DEFENSE_LAG_LINE = `Defense contract data (DoD and the Army Corps of Engineers) is published on a 90-day delay ([USAspending: About the Data](${DEFENSE_LAG_SOURCE_URL}))`;
 
 /**
  * A company's OWN claims from its attached file (Eric, 2026-11-27, "claims-by-audience", from the Claude + Mindy MCP
@@ -53,9 +59,8 @@ export const NO_DATA_DATES =
   + ' "record from <date>", "retrieved", "verified on", "last updated"), even when a tool result carries that date. Say what'
   + ' the record shows. When data may be behind, say so in words without a date ("recent awards may not appear yet",'
   + ' "confirm on SAM.gov before relying on it"); never drop that warning. Dates that are facts about the work stay: response deadlines,'
-  + ' contract end dates, registration expiry, campaign timing, and caveats such as "Defense awards are published on'
-  + ' USAspending.gov with a delay of about 90 days (DoD reporting policy), so a missing recent award does not mean they'
-  + ' stopped buying".'
+  + ` contract end dates, registration expiry, campaign timing, and caveats such as "${DEFENSE_LAG_LINE}, so a missing recent`
+  + ' award does not mean they stopped buying".'
   + ' CONTACTS (Eric, 2026-11-27, "contacts: show notice date"): each named contact\'s "why they matter" names the source'
   + ' record and THAT record\'s own date, e.g. "primary contact on the office\'s newest notice (W91ZRS27QA001, Oct 28, 2026)",'
   + ' preferring the newest notice, with its citation marker [n]. A record\'s own date is a fact about the record, not data'
