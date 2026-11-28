@@ -70,3 +70,21 @@ export const vaultDocFlags = {
     return flagMode(FEATURE_ENV.generate) === 'on';
   },
 };
+
+/**
+ * Complete Vault deletion (account/Vault delete covers every sub-folder and page; explicit
+ * single-document Delete; backup copies marked for purge after the recovery window). Destructive, so
+ * it ships OFF and is turned on only after the retention + workspace policy is approved.
+ * Only the exact value 'true' turns it on.
+ */
+export function vaultCompleteDeletionEnabled(): boolean {
+  return flagMode('VAULT_COMPLETE_DELETION') === 'on';
+}
+
+/**
+ * Uploads refuse (fail closed) when the shared rate limiter cannot be reached, instead of falling back
+ * to a per-instance memory window. OFF by default; only the exact value 'true' turns it on.
+ */
+export function vaultUploadLimitFailClosed(): boolean {
+  return flagMode('VAULT_UPLOAD_LIMIT_FAIL_CLOSED') === 'on';
+}

@@ -1,4 +1,15 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { vaultCompleteDeletionEnabled } from './flags';
+import {
+  isFolderEntry,
+  listAllOwnedFiles,
+  removeOwnedFiles,
+  deleteAllOwnedFiles,
+  LIST_PAGE,
+  type StorageEntry,
+  type VaultStorageLike,
+} from './vault-delete';
+import { markBackupCopiesForPurge } from './vault-backup-purge';
 
 /**
  * Canonical definition of "a user's vault" — the single source of truth for
@@ -68,18 +79,31 @@ export async function readAllVaultData(
   );
 }
 
-/** List the Storage object paths a user owns (files are pathed `${email}/...`). */
+/**
+ * List the Storage FILE paths a user owns (files are pathed `${email}/...`). Folder entries are never
+ * reported as files. With VAULT_COMPLETE_DELETION on, this recurses into sub-folders (generated/,
+ * resumes/) and pages past 1000; off, it reads the top level only and says when that is incomplete.
+ */
 export async function listVaultStorageFiles(
   supabase: SupabaseClient,
   email: string,
-): Promise<{ paths: string[]; error?: string }> {
+): Promise<{ paths: string[]; error?: string; incomplete?: string }> {
   try {
-    const { data, error } = await supabase.storage
-      .from(VAULT_STORAGE_BUCKET)
-      .list(email, { limit: 1000 });
-    if (error) return { paths: [], error: error.message };
-    const paths = (data || []).map((f) => `${email}/${f.name}`);
-    return { paths };
+    const storage = supabase.storage as unknown as VaultStorageLike;
+    if (vaultCompleteDeletionEnabled()) {
+      const r = await listAllOwnedFiles(storage, VAULT_STORAGE_BUCKET, email);
+      return r.ok ? { paths: r.paths } : { paths: r.paths, error: r.error };
+    }
+    const { data, error } = await storage.from(VAULT_STORAGE_BUCKET).list(email, { limit: LIST_PAGE });
+    if (error) return { paths: [], error: error.message || 'unknown' };
+    const entries = (data || []) as StorageEntry[];
+    const paths = entries.filter((f) => f?.name && !isFolderEntry(f)).map((f) => `${email}/${f.name}`);
+    const folders = entries.filter((f) => f?.name && isFolderEntry(f)).length;
+    const notes = [
+      folders ? `${folders} sub-folder(s) not included` : '',
+      entries.length >= LIST_PAGE ? `more than ${LIST_PAGE} entries; later files not included` : '',
+    ].filter(Boolean);
+    return notes.length ? { paths, incomplete: notes.join('; ') } : { paths };
   } catch (err) {
     return { paths: [], error: err instanceof Error ? err.message : 'unknown' };
   }
@@ -87,7 +111,11 @@ export async function listVaultStorageFiles(
 
 export interface VaultDeleteResult {
   tables: { table: VaultTable; rows: number; error?: string }[];
-  storage: { files: number; error?: string };
+  /**
+   * `files` counts objects Storage confirmed it removed (never folder entries, never the number
+   * requested). Any `error` means the Vault was NOT completely deleted.
+   */
+  storage: { files: number; requested: number; error?: string; backupPurge?: { markedFiles: number; error?: string } };
   totalRowsDeleted: number;
 }
 
@@ -116,20 +144,43 @@ export async function deleteAllVaultData(
     }),
   );
 
-  // Remove the user's Storage files (resumes, uploaded docs).
-  let storage: VaultDeleteResult['storage'] = { files: 0 };
-  const { paths, error: listErr } = await listVaultStorageFiles(supabase, email);
-  if (listErr) {
-    storage = { files: 0, error: listErr };
-  } else if (paths.length > 0) {
-    try {
-      const { error: removeErr } = await supabase.storage.from(VAULT_STORAGE_BUCKET).remove(paths);
-      storage = removeErr ? { files: 0, error: removeErr.message } : { files: paths.length };
-    } catch (err) {
-      storage = { files: 0, error: err instanceof Error ? err.message : 'unknown' };
-    }
-  }
-
+  // Remove the user's Storage files (resumes, uploaded docs, generated files).
+  const storage = await deleteVaultStorage(supabase, email);
   const totalRowsDeleted = tables.reduce((sum, t) => sum + t.rows, 0);
   return { tables, storage, totalRowsDeleted };
+}
+
+/**
+ * Storage half of a Vault deletion.
+ *   - VAULT_COMPLETE_DELETION on: every file under `${email}/` (recursive, paged), verified empty
+ *     afterwards, and the backup copies marked for purge after the recovery window.
+ *   - off (legacy): the top level only, as before, but the receipt counts only confirmed removals and
+ *     reports anything it left behind (sub-folders, >1000 entries) as an error, never as success.
+ */
+export async function deleteVaultStorage(supabase: SupabaseClient, email: string): Promise<VaultDeleteResult['storage']> {
+  const storage = supabase.storage as unknown as VaultStorageLike;
+  try {
+    if (vaultCompleteDeletionEnabled()) {
+      const receipt = await deleteAllOwnedFiles(storage, VAULT_STORAGE_BUCKET, email);
+      const out: VaultDeleteResult['storage'] = { files: receipt.removed, requested: receipt.requested };
+      if (receipt.error) out.error = receipt.error;
+      if (receipt.removedPaths.length) {
+        const mark = await markBackupCopiesForPurge(storage, email, receipt.removedPaths);
+        out.backupPurge = mark.ok ? { markedFiles: receipt.removedPaths.length } : { markedFiles: 0, error: mark.error };
+        if (!mark.ok) out.error = [out.error, `files deleted, but their backup copies could not be scheduled for purge: ${mark.error}`].filter(Boolean).join('; ');
+      }
+      return out;
+    }
+    const listed = await listVaultStorageFiles(supabase, email);
+    if (listed.error) return { files: 0, requested: 0, error: listed.error };
+    const receipt = listed.paths.length
+      ? await removeOwnedFiles(storage, VAULT_STORAGE_BUCKET, email, listed.paths)
+      : { requested: 0, removed: 0, removedPaths: [] as string[] };
+    const problems = [receipt.error, listed.incomplete ? `not deleted: ${listed.incomplete}` : ''].filter(Boolean);
+    return problems.length
+      ? { files: receipt.removed, requested: receipt.requested, error: problems.join('; ') }
+      : { files: receipt.removed, requested: receipt.requested };
+  } catch (err) {
+    return { files: 0, requested: 0, error: err instanceof Error ? err.message : 'unknown' };
+  }
 }

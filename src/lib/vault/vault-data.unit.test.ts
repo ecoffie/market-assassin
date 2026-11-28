@@ -58,11 +58,13 @@ function makeMockSupabase(opts?: {
       list: (prefix: string) => {
         rec.storageList.push(prefix);
         if (opts?.storageListError) return Promise.resolve({ data: null, error: { message: opts.storageListError } });
-        return Promise.resolve({ data: (opts?.storageFiles || []).map((name) => ({ name })), error: null });
+        // Real Supabase list(): a FILE entry has an id + metadata (a folder has id:null, metadata:null).
+        return Promise.resolve({ data: (opts?.storageFiles || []).map((name) => ({ name, id: `obj-${name}`, metadata: { size: 1 } })), error: null });
       },
       remove: (paths: string[]) => {
         rec.storageRemoved.push(paths);
-        return Promise.resolve({ error: null });
+        // Real Supabase remove(): `data` lists the objects it actually deleted (full keys).
+        return Promise.resolve({ data: paths.map((name) => ({ name })), error: null });
       },
     }),
   };

@@ -6,6 +6,8 @@ export interface RateLimitResult {
   remaining: number;
   limit: number;
   resetAt: number; // Unix timestamp in seconds
+  /** True only when KV could not be reached and this result is the allow-by-default fallback. */
+  unavailable?: true;
 }
 
 /**
@@ -42,6 +44,7 @@ export async function checkRateLimit(
       remaining: limit,
       limit,
       resetAt: Math.floor(Date.now() / 1000) + windowSeconds,
+      unavailable: true,
     };
   }
 }

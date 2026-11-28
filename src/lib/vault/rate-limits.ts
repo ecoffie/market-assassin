@@ -9,8 +9,13 @@
  * in-memory window that applies the same limit and only bites when KV did not. Keyed
  * on the VERIFIED caller email (the person acting), so a coach's uploads into several
  * client Vaults share one budget.
+ *
+ * With VAULT_UPLOAD_LIMIT_FAIL_CLOSED='true', an UPLOAD is refused when KV is unavailable: the
+ * per-instance window applies per serverless instance, so "unknown" is treated as "not allowed" for
+ * writes. Parse keeps the fallback.
  */
 import { checkRateLimit } from '@/lib/rate-limit';
+import { vaultUploadLimitFailClosed } from './flags';
 
 export type VaultLimitKind = 'upload' | 'parse';
 
@@ -41,6 +46,14 @@ export async function checkVaultLimit(
   const { limit, windowSeconds } = VAULT_LIMITS[kind];
   const key = `vault${kind}:${callerEmail.trim().toLowerCase()}`;
   const rl = await checkRateLimit(key, limit, windowSeconds);
+  if (kind === 'upload' && rl.unavailable && vaultUploadLimitFailClosed()) {
+    console.warn('[vault/rate-limit] upload refused: shared rate limiter unavailable (fail-closed)');
+    return {
+      allowed: false,
+      retryAfterSeconds: 60,
+      message: "Uploads are paused for a moment because Mindy couldn't check your upload limit. Nothing was saved. Try again in a minute.",
+    };
+  }
   const local = localExceeded(key, limit, windowSeconds);
   if (rl.allowed && local) console.warn(`[vault/rate-limit] per-instance ${kind} limit hit (KV limiter allowed; KV may be unavailable)`);
   if (rl.allowed && !local) return { allowed: true };
