@@ -8,6 +8,7 @@
  * Live REST (not the cached usaspending_awards table) so a fresh UEI works the
  * first time. recipient_search_text is FUZZY, so we hard-filter on exact UEI.
  */
+import { awardNaics, awardPsc } from '@/lib/usaspending/award-search-fields';
 
 export interface UeiAwardRow {
   award_id: string;
@@ -41,7 +42,7 @@ export async function fetchUSASpendingAwardsByUei(uei: string, limit = 25): Prom
         fields: [
           'Award ID', 'Recipient Name', 'Recipient UEI', 'Award Amount', 'Description',
           'Start Date', 'End Date', 'Awarding Agency', 'Awarding Sub Agency',
-          'NAICS Code', 'NAICS', 'PSC Code', 'Last Modified Date',
+          'NAICS Code', 'NAICS', 'PSC Code', 'PSC', 'Last Modified Date',
         ],
         page: 1,
         limit,
@@ -70,9 +71,10 @@ export async function fetchUSASpendingAwardsByUei(uei: string, limit = 25): Prom
         period_end: (r['End Date'] as string) || null,
         contract_value: Number(r['Award Amount']) || null,
         scope_description: r['Description'] ? String(r['Description']).slice(0, 1000) : null,
-        naics: (r['NAICS Code'] as string) || (r['NAICS'] as string) || null,
-        naics_description: null,
-        psc: (r['PSC Code'] as string) || null,
+        // NAICS / PSC come back as { code, description } objects; the flat columns are null (award-search-fields.ts).
+        naics: awardNaics(r).code || null,
+        naics_description: awardNaics(r).description || null,
+        psc: awardPsc(r).code || null,
       }));
   } catch (err) {
     console.warn('[awards-by-uei] fetch failed:', err instanceof Error ? err.message : err);
