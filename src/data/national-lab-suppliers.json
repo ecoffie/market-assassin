@@ -1,1 +1,1015 @@
-{"labs":[]}
+{
+ "_about": "National lab / FFRDC supplier directory. Official lab or DOE pages only. A field the lab does not publish is null (unknown), never filled in. top_naics labelled \"DOE FY2026 small-business spend\" comes from DOE OSBP's directory, not the lab. No operator publishes its UEI on an official page, so operator_uei is null for all. Office contacts are office or generic addresses only.",
+ "labs": [
+  {
+   "id": "ames",
+   "aliases": [
+    "ames",
+    "ames lab",
+    "ames laboratory"
+   ],
+   "name": {
+    "value": "Ames National Laboratory",
+    "source_url": "https://www.ameslab.gov/operations/purchasing/small-business-program",
+    "retrieved_on": "2026-11-28"
+   },
+   "state": {
+    "value": "IA",
+    "source_url": "https://www.energy.gov/osbp/small-business-program-manager-directory",
+    "retrieved_on": "2026-11-28"
+   },
+   "operator": {
+    "value": "Iowa State University",
+    "source_url": "https://www.ameslab.gov/operations/purchasing/small-business-program",
+    "retrieved_on": "2026-11-28"
+   },
+   "operator_uei": {
+    "value": null,
+    "source_url": null,
+    "retrieved_on": null
+   },
+   "supplier_portal_url": {
+    "value": "https://app.smartsheet.com/b/form/d1d0255b3c0549c59e5c1bff9ad1e32f",
+    "source_url": "https://www.ameslab.gov/operations/purchasing/small-business-program",
+    "retrieved_on": "2026-11-28"
+   },
+   "registration_system": {
+    "value": "Lab's own New Vendor Submission form (Smartsheet), plus a Supplier Tool Box (Box)",
+    "source_url": "https://www.ameslab.gov/operations/purchasing/small-business-program",
+    "retrieved_on": "2026-11-28"
+   },
+   "small_business_goal": {
+    "value": "No percentage published. Goods and services are procured under DOE small business policies (SB, SDB, WOSB, VOSB/SDVOSB, HUBZone).",
+    "source_url": "https://www.ameslab.gov/operations/purchasing/small-business-program",
+    "retrieved_on": "2026-11-28"
+   },
+   "small_business_office": {
+    "value": "Small Business Program (Procurement); DOE lists a Small Business Program Manager. Page: https://www.ameslab.gov/operations/purchasing/small-business-program",
+    "source_url": "https://www.energy.gov/osbp/small-business-program-manager-directory",
+    "retrieved_on": "2026-11-28"
+   },
+   "top_naics": {
+    "value": null,
+    "source_url": null,
+    "retrieved_on": null
+   },
+   "buying_rules": {
+    "value": [
+     "Seeks small businesses offering best value and reasonable prices, strong past performance, high quality, and on-time delivery; vendors should complete the New Vendor Submission form."
+    ],
+    "source_url": "https://www.ameslab.gov/operations/purchasing/small-business-program",
+    "retrieved_on": "2026-11-28"
+   }
+  },
+  {
+   "id": "argonne",
+   "aliases": [
+    "argonne",
+    "anl"
+   ],
+   "name": {
+    "value": "Argonne National Laboratory",
+    "source_url": "https://www.energy.gov/osbp/small-business-program-manager-directory",
+    "retrieved_on": "2026-11-28"
+   },
+   "state": {
+    "value": "IL",
+    "source_url": "https://www.energy.gov/osbp/small-business-program-manager-directory",
+    "retrieved_on": "2026-11-28"
+   },
+   "operator": {
+    "value": "UChicago Argonne, LLC",
+    "source_url": "https://www.energy.gov/osbp/small-business-program-manager-directory",
+    "retrieved_on": "2026-11-28"
+   },
+   "operator_uei": {
+    "value": null,
+    "source_url": null,
+    "retrieved_on": null
+   },
+   "supplier_portal_url": {
+    "value": "https://www.anl.gov/partnerships/business-opportunities",
+    "source_url": "https://www.energy.gov/osbp/small-business-program-manager-directory",
+    "retrieved_on": "2026-11-28"
+   },
+   "registration_system": {
+    "value": null,
+    "source_url": null,
+    "retrieved_on": null
+   },
+   "small_business_goal": {
+    "value": null,
+    "source_url": null,
+    "retrieved_on": null
+   },
+   "small_business_office": {
+    "value": "Small Business Liaison Officer (SBLO); runs 'Small Business Fridays' every other Friday with one-on-one SBLO time",
+    "source_url": "https://www.energy.gov/sites/default/files/2023-07/July12_Session1-2_AlexAlcantar.pdf",
+    "retrieved_on": "2026-11-28"
+   },
+   "top_naics": {
+    "value": "DOE FY2026 small-business spend: 541519, 532490, 236220, 334111, 334516. Argonne lists what it buys: lab supplies and equipment, IT hardware/software, construction materials and services, custom fabrication, professional services (engineering, IT, staff augmentation).",
+    "source_url": "https://www.energy.gov/osbp/small-business-program-manager-directory",
+    "retrieved_on": "2026-11-28"
+   },
+   "buying_rules": {
+    "value": null,
+    "source_url": null,
+    "retrieved_on": null
+   }
+  },
+  {
+   "id": "brookhaven",
+   "aliases": [
+    "brookhaven",
+    "bnl"
+   ],
+   "name": {
+    "value": "Brookhaven National Laboratory",
+    "source_url": "https://www.bnl.gov/PPM/small-business.php",
+    "retrieved_on": "2026-11-28"
+   },
+   "state": {
+    "value": "NY",
+    "source_url": "https://www.energy.gov/osbp/small-business-program-manager-directory",
+    "retrieved_on": "2026-11-28"
+   },
+   "operator": {
+    "value": "Brookhaven Science Associates, LLC",
+    "source_url": "https://www.energy.gov/osbp/small-business-program-manager-directory",
+    "retrieved_on": "2026-11-28"
+   },
+   "operator_uei": {
+    "value": null,
+    "source_url": null,
+    "retrieved_on": null
+   },
+   "supplier_portal_url": {
+    "value": "https://surveys.external.bnl.gov/n/SmallBusinessVendorRegistry.aspx",
+    "source_url": "https://www.bnl.gov/PPM/small-business.php",
+    "retrieved_on": "2026-11-28"
+   },
+   "registration_system": {
+    "value": "Lab's own Small Business Vendor Registry plus SAM.gov ('register ... with both')",
+    "source_url": "https://www.bnl.gov/PPM/small-business.php",
+    "retrieved_on": "2026-11-28"
+   },
+   "small_business_goal": {
+    "value": null,
+    "source_url": null,
+    "retrieved_on": null
+   },
+   "small_business_office": {
+    "value": "Small Business Program / Small Business Liaison Officer, sblo@bnl.gov",
+    "source_url": "https://www.bnl.gov/PPM/small-business.php",
+    "retrieved_on": "2026-11-28"
+   },
+   "top_naics": {
+    "value": "DOE FY2026 small-business spend: 541519, 513210, 334516, 334112, 334419",
+    "source_url": "https://www.energy.gov/osbp/small-business-program-manager-directory",
+    "retrieved_on": "2026-11-28"
+   },
+   "buying_rules": {
+    "value": [
+     "Subcontracts between the Micro-Purchase Threshold ($15,000) and the Simplified Acquisition Threshold ($350,000) 'may be set aside to small businesses on a sole source basis', at fair and reasonable prices."
+    ],
+    "source_url": "https://www.bnl.gov/PPM/small-business.php",
+    "retrieved_on": "2026-11-28"
+   }
+  },
+  {
+   "id": "fermilab",
+   "aliases": [
+    "fermilab",
+    "fermi lab",
+    "fnal"
+   ],
+   "name": {
+    "value": "Fermi National Accelerator Laboratory",
+    "source_url": "https://www.energy.gov/osbp/small-business-program-manager-directory",
+    "retrieved_on": "2026-11-28"
+   },
+   "state": {
+    "value": "IL",
+    "source_url": "https://www.energy.gov/osbp/small-business-program-manager-directory",
+    "retrieved_on": "2026-11-28"
+   },
+   "operator": {
+    "value": "Fermi Forward Discovery Group LLC",
+    "source_url": "https://www.energy.gov/osbp/small-business-program-manager-directory",
+    "retrieved_on": "2026-11-28"
+   },
+   "operator_uei": {
+    "value": null,
+    "source_url": null,
+    "retrieved_on": null
+   },
+   "supplier_portal_url": {
+    "value": "https://procurement.fnal.gov/supplier-portal/",
+    "source_url": "https://www.energy.gov/osbp/small-business-program-manager-directory",
+    "retrieved_on": "2026-11-28"
+   },
+   "registration_system": {
+    "value": "Fermilab Supplier Portal",
+    "source_url": "https://www.energy.gov/osbp/small-business-program-manager-directory",
+    "retrieved_on": "2026-11-28"
+   },
+   "small_business_goal": {
+    "value": null,
+    "source_url": null,
+    "retrieved_on": null
+   },
+   "small_business_office": {
+    "value": "Small Business Program; contact page https://procurement.fnal.gov/procurement-contacts",
+    "source_url": "https://news.fnal.gov/wp-content/uploads/FINAL_SmallBusiness_031124.pdf",
+    "retrieved_on": "2026-11-28"
+   },
+   "top_naics": {
+    "value": "DOE FY2026 small-business spend: 333242, 334111, 541519, 238210, 334118",
+    "source_url": "https://www.energy.gov/osbp/small-business-program-manager-directory",
+    "retrieved_on": "2026-11-28"
+   },
+   "buying_rules": {
+    "value": null,
+    "source_url": null,
+    "retrieved_on": null
+   }
+  },
+  {
+   "id": "inl",
+   "aliases": [
+    "inl",
+    "idaho national lab",
+    "idaho national laboratory"
+   ],
+   "name": {
+    "value": "Idaho National Laboratory",
+    "source_url": "https://inl.gov/content/uploads/2024/11/FY25-Small-Business-Subcontracting-Plan.pdf",
+    "retrieved_on": "2026-11-28"
+   },
+   "state": {
+    "value": "ID",
+    "source_url": "https://www.energy.gov/osbp/small-business-program-manager-directory",
+    "retrieved_on": "2026-11-28"
+   },
+   "operator": {
+    "value": "Battelle Energy Alliance, LLC",
+    "source_url": "https://inl.gov/content/uploads/2024/11/FY25-Small-Business-Subcontracting-Plan.pdf",
+    "retrieved_on": "2026-11-28"
+   },
+   "operator_uei": {
+    "value": null,
+    "source_url": null,
+    "retrieved_on": null
+   },
+   "supplier_portal_url": {
+    "value": "https://vendor.inl.gov/ (public opportunities: https://vendor.inl.gov/Opportunity/PublicOpportunities)",
+    "source_url": "https://www.energy.gov/osbp/small-business-program-manager-directory",
+    "retrieved_on": "2026-11-28"
+   },
+   "registration_system": {
+    "value": "INL vendor portal (vendor.inl.gov)",
+    "source_url": "https://www.energy.gov/osbp/small-business-program-manager-directory",
+    "retrieved_on": "2026-11-28"
+   },
+   "small_business_goal": {
+    "value": "FY2025 (10/1/2024-9/30/2025): SB 57% (~$329.1M); SDB 8.15%; WOSB 9%; HUBZone 3%; VOSB 5%; SDVOSB 5%; plus Idaho Business Concerns 30%",
+    "source_url": "https://inl.gov/content/uploads/2024/11/FY25-Small-Business-Subcontracting-Plan.pdf",
+    "retrieved_on": "2026-11-28"
+   },
+   "small_business_office": {
+    "value": "Small Business Program (administered by the Small Business Program Manager, Idaho Falls); DOE lists the org email vendormanagment@inl.gov (spelled as printed)",
+    "source_url": "https://www.energy.gov/osbp/small-business-program-manager-directory",
+    "retrieved_on": "2026-11-28"
+   },
+   "top_naics": {
+    "value": "DOE FY2026 small-business spend: 236220, 236210, 541519, 238220, 541715. INL's plan names five categories: commodities, construction, major equipment, IT, services.",
+    "source_url": "https://www.energy.gov/osbp/small-business-program-manager-directory",
+    "retrieved_on": "2026-11-28"
+   },
+   "buying_rules": {
+    "value": [
+     "Advertises significant procurement actions externally through the INL Small Business Procurement Opportunities web page and SAM.gov; issues Expressions of Interest to gauge small business interest; separate 30% Idaho Business Concerns goal."
+    ],
+    "source_url": "https://inl.gov/content/uploads/2024/11/FY25-Small-Business-Subcontracting-Plan.pdf",
+    "retrieved_on": "2026-11-28"
+   }
+  },
+  {
+   "id": "lbnl",
+   "aliases": [
+    "lbnl",
+    "berkeley lab",
+    "lawrence berkeley"
+   ],
+   "name": {
+    "value": "Lawrence Berkeley National Laboratory",
+    "source_url": "https://www.energy.gov/osbp/small-business-program-manager-directory",
+    "retrieved_on": "2026-11-28"
+   },
+   "state": {
+    "value": "CA",
+    "source_url": "https://www.energy.gov/osbp/small-business-program-manager-directory",
+    "retrieved_on": "2026-11-28"
+   },
+   "operator": {
+    "value": "The Regents of the University of California",
+    "source_url": "https://www.energy.gov/osbp/small-business-program-manager-directory",
+    "retrieved_on": "2026-11-28"
+   },
+   "operator_uei": {
+    "value": null,
+    "source_url": null,
+    "retrieved_on": null
+   },
+   "supplier_portal_url": {
+    "value": "https://procurement.lbl.gov/welcome-to-procurement-property/become-a-supplier/ (opportunities: .../become-a-supplier/project-opportunities/)",
+    "source_url": "https://www.energy.gov/osbp/small-business-program-manager-directory",
+    "retrieved_on": "2026-11-28"
+   },
+   "registration_system": {
+    "value": null,
+    "source_url": null,
+    "retrieved_on": null
+   },
+   "small_business_goal": {
+    "value": null,
+    "source_url": null,
+    "retrieved_on": null
+   },
+   "small_business_office": {
+    "value": "Small Business Program Manager (Procurement & Property); outreach page https://procurement.lbl.gov/welcome-to-procurement-property/small-business-program/outreachevents/",
+    "source_url": "https://www.energy.gov/osbp/small-business-program-manager-directory",
+    "retrieved_on": "2026-11-28"
+   },
+   "top_naics": {
+    "value": "DOE FY2026 small-business spend: 236220, 334516, 334111, 561612, 541519",
+    "source_url": "https://www.energy.gov/osbp/small-business-program-manager-directory",
+    "retrieved_on": "2026-11-28"
+   },
+   "buying_rules": {
+    "value": null,
+    "source_url": null,
+    "retrieved_on": null
+   }
+  },
+  {
+   "id": "llnl",
+   "aliases": [
+    "llnl",
+    "livermore",
+    "lawrence livermore"
+   ],
+   "name": {
+    "value": "Lawrence Livermore National Laboratory",
+    "source_url": "https://procurement.llnl.gov/small-business-program/",
+    "retrieved_on": "2026-11-28"
+   },
+   "state": {
+    "value": "CA",
+    "source_url": "https://www.energy.gov/osbp/small-business-program-manager-directory",
+    "retrieved_on": "2026-11-28"
+   },
+   "operator": {
+    "value": "Lawrence Livermore National Security, LLC (LLNS)",
+    "source_url": "https://www.energy.gov/osbp/small-business-program-manager-directory",
+    "retrieved_on": "2026-11-28"
+   },
+   "operator_uei": {
+    "value": null,
+    "source_url": null,
+    "retrieved_on": null
+   },
+   "supplier_portal_url": {
+    "value": "https://vendor.llnl.gov/ (construction opportunities: https://procurement.llnl.gov/opportunities)",
+    "source_url": "https://procurement.llnl.gov/prospective-suppliers",
+    "retrieved_on": "2026-11-28"
+   },
+   "registration_system": {
+    "value": "LLNL's own prospective supplier form (vendor.llnl.gov); the page says SAM.gov and D&B are 'not required'",
+    "source_url": "https://procurement.llnl.gov/prospective-suppliers",
+    "retrieved_on": "2026-11-28"
+   },
+   "small_business_goal": {
+    "value": null,
+    "source_url": null,
+    "retrieved_on": null
+   },
+   "small_business_office": {
+    "value": "Small Business Program Office, smallbusiness@llnl.gov (email capability statements with subject 'Capability Statement for ...')",
+    "source_url": "https://procurement.llnl.gov/prospective-suppliers",
+    "retrieved_on": "2026-11-28"
+   },
+   "top_naics": {
+    "value": "LLNL's top 10 NAICS by small-business spend: 236220, 334111, 513210, 334516, 541715, 332710, 541511, 541611, 333314, 334515",
+    "source_url": "https://procurement.llnl.gov/small-business-program/",
+    "retrieved_on": "2026-11-28"
+   },
+   "buying_rules": {
+    "value": [
+     "'Generally higher dollar value, more complex and technically difficult procurements' are posted on SAM.gov; construction subcontractors must prequalify; capability statements must include the primary NAICS; being in the database 'does not imply preference, qualification, or endorsement'. Spends over $1B a year; runs a Mentor-Protégé Program."
+    ],
+    "source_url": "https://procurement.llnl.gov/prospective-suppliers",
+    "retrieved_on": "2026-11-28"
+   }
+  },
+  {
+   "id": "lanl",
+   "aliases": [
+    "lanl",
+    "los alamos"
+   ],
+   "name": {
+    "value": "Los Alamos National Laboratory",
+    "source_url": "https://lanl.gov/engage/business/small-business",
+    "retrieved_on": "2026-11-28"
+   },
+   "state": {
+    "value": "NM",
+    "source_url": "https://www.energy.gov/osbp/small-business-program-manager-directory",
+    "retrieved_on": "2026-11-28"
+   },
+   "operator": {
+    "value": "Triad National Security, LLC",
+    "source_url": "https://lanl.gov/engage/business/small-business",
+    "retrieved_on": "2026-11-28"
+   },
+   "operator_uei": {
+    "value": null,
+    "source_url": null,
+    "retrieved_on": null
+   },
+   "supplier_portal_url": {
+    "value": "https://service.ariba.com/Discovery.aw/ad/profile?key=AN01460290704 (registration: https://www.lanl.gov/engage/business/prospective-suppliers/ariba-registration)",
+    "source_url": "https://www.lanl.gov/engage/business/procurement-opportunities",
+    "retrieved_on": "2026-11-28"
+   },
+   "registration_system": {
+    "value": "SAP Ariba (Ariba Network registration questionnaire; UEI, tax ID and primary NAICS required). Opportunities are posted on Ariba Discovery.",
+    "source_url": "https://www.lanl.gov/engage/business/prospective-suppliers",
+    "retrieved_on": "2026-11-28"
+   },
+   "small_business_goal": {
+    "value": "FY25: SB 52%, SDB 8%, WOSB 6%, HUBZone 4%, VOSB 4%, SDVOSB 3%",
+    "source_url": "https://www.lanl.gov/engage/business",
+    "retrieved_on": "2026-11-28"
+   },
+   "small_business_office": {
+    "value": "Small Business Program, business@lanl.gov (supplier registration questions: aribasuppliers@lanl.gov)",
+    "source_url": "https://lanl.gov/engage/business/small-business",
+    "retrieved_on": "2026-11-28"
+   },
+   "top_naics": {
+    "value": "DOE FY2026 small-business spend: 561320, 334112, 334111, 334516, 541519",
+    "source_url": "https://www.energy.gov/osbp/small-business-program-manager-directory",
+    "retrieved_on": "2026-11-28"
+   },
+   "buying_rules": {
+    "value": [
+     "Active competitive opportunities 'greater than $250K' are listed on LANL's public Ariba Discovery profile. All suppliers must register with Ariba; registration 'does not constitute a pre-qualification status'."
+    ],
+    "source_url": "https://www.lanl.gov/engage/business/procurement-opportunities",
+    "retrieved_on": "2026-11-28"
+   }
+  },
+  {
+   "id": "netl",
+   "aliases": [
+    "netl",
+    "national energy technology lab"
+   ],
+   "name": {
+    "value": "National Energy Technology Laboratory",
+    "source_url": "https://netl.doe.gov/small-business",
+    "retrieved_on": "2026-11-28"
+   },
+   "state": {
+    "value": "WV",
+    "source_url": "https://www.energy.gov/osbp/small-business-program-manager-directory",
+    "retrieved_on": "2026-11-28"
+   },
+   "operator": {
+    "value": "None (no M&O): government-owned, government-operated by DOE",
+    "source_url": "https://www.energy.gov/national-laboratories",
+    "retrieved_on": "2026-11-28"
+   },
+   "operator_uei": {
+    "value": null,
+    "source_url": null,
+    "retrieved_on": null
+   },
+   "supplier_portal_url": {
+    "value": "https://www.SAM.gov and https://www.FedConnect.net (forecasts: https://netl.doe.gov/business/site-support)",
+    "source_url": "https://netl.doe.gov/small-business",
+    "retrieved_on": "2026-11-28"
+   },
+   "registration_system": {
+    "value": "SAM.gov (required before award for values over $10,000)",
+    "source_url": "https://netl.doe.gov/small-business",
+    "retrieved_on": "2026-11-28"
+   },
+   "small_business_goal": {
+    "value": "FY2024 SB goal 40.56% (actual 49.43%); FY2023 goal 32% (actual 41%)",
+    "source_url": "https://netl.doe.gov/small-business",
+    "retrieved_on": "2026-11-28"
+   },
+   "small_business_office": {
+    "value": "NETL Small Business Program, NETLSmallBusiness@netl.doe.gov",
+    "source_url": "https://netl.doe.gov/small-business",
+    "retrieved_on": "2026-11-28"
+   },
+   "top_naics": {
+    "value": "DOE FY2026 small-business spend: 541330, 561210, 236220, 541715",
+    "source_url": "https://www.energy.gov/osbp/small-business-program-manager-directory",
+    "retrieved_on": "2026-11-28"
+   },
+   "buying_rules": {
+    "value": [
+     "Awards over $10,000 require SAM registration before issuance. Monitor SAM.gov, FedConnect, GSA eBuy, NASA SEWP and NETL's Site Support reading room. Large-business site-support primes over $750K with subcontracting opportunities must have a small business subcontracting plan. Follows DOE's 'Small Business First' policy."
+    ],
+    "source_url": "https://netl.doe.gov/small-business",
+    "retrieved_on": "2026-11-28"
+   }
+  },
+  {
+   "id": "nlr",
+   "aliases": [
+    "nrel",
+    "nlr",
+    "national renewable energy laboratory",
+    "national renewable energy lab",
+    "rockies"
+   ],
+   "name": {
+    "value": "National Laboratory of the Rockies (formerly National Renewable Energy Laboratory, NREL)",
+    "source_url": "https://www.nlr.gov/workingwithus/small-business",
+    "retrieved_on": "2026-11-28"
+   },
+   "state": {
+    "value": "CO",
+    "source_url": "https://www.energy.gov/osbp/small-business-program-manager-directory",
+    "retrieved_on": "2026-11-28"
+   },
+   "operator": {
+    "value": "Alliance for Energy Innovation, LLC (per DOE's small business directory; energy.gov's national-laboratories page still names Alliance for Sustainable Energy)",
+    "source_url": "https://www.energy.gov/osbp/small-business-program-manager-directory",
+    "retrieved_on": "2026-11-28"
+   },
+   "operator_uei": {
+    "value": null,
+    "source_url": null,
+    "retrieved_on": null
+   },
+   "supplier_portal_url": {
+    "value": "https://small-business.nlr.gov/ (opportunities: https://www.nlr.gov/workingwithus/procurement-opps)",
+    "source_url": "https://www.nlr.gov/workingwithus/small-business",
+    "retrieved_on": "2026-11-28"
+   },
+   "registration_system": {
+    "value": "NLR Small Business Registration form (vendor database) plus SAM.gov, which is required for all subcontracts and POs",
+    "source_url": "https://www.nlr.gov/workingwithus/procurement",
+    "retrieved_on": "2026-11-28"
+   },
+   "small_business_goal": {
+    "value": null,
+    "source_url": null,
+    "retrieved_on": null
+   },
+   "small_business_office": {
+    "value": "NLR Small Business Office, Small.Business@nlr.gov",
+    "source_url": "https://www.nlr.gov/workingwithus/small-business",
+    "retrieved_on": "2026-11-28"
+   },
+   "top_naics": {
+    "value": "DOE FY2026 small-business spend: 541519, 236220, 522220, 513210, 541990",
+    "source_url": "https://www.energy.gov/osbp/small-business-program-manager-directory",
+    "retrieved_on": "2026-11-28"
+   },
+   "buying_rules": {
+    "value": [
+     "'All vendors/subcontractors must be registered' in SAM to receive subcontracts and POs. Sources-sought notices are posted on SAM.gov and responses may be used to invite vendors to later RFPs (questions: ppc@nlr.gov)."
+    ],
+    "source_url": "https://www.nlr.gov/workingwithus/procurement-opps",
+    "retrieved_on": "2026-11-28"
+   }
+  },
+  {
+   "id": "ornl",
+   "aliases": [
+    "ornl",
+    "oak ridge"
+   ],
+   "name": {
+    "value": "Oak Ridge National Laboratory",
+    "source_url": "https://smallbusiness.ornl.gov/",
+    "retrieved_on": "2026-11-28"
+   },
+   "state": {
+    "value": "TN",
+    "source_url": "https://www.energy.gov/osbp/small-business-program-manager-directory",
+    "retrieved_on": "2026-11-28"
+   },
+   "operator": {
+    "value": "UT-Battelle, LLC",
+    "source_url": "https://smallbusiness.ornl.gov/",
+    "retrieved_on": "2026-11-28"
+   },
+   "operator_uei": {
+    "value": null,
+    "source_url": null,
+    "retrieved_on": null
+   },
+   "supplier_portal_url": {
+    "value": "https://smallbusiness.ornl.gov/business-opportunities (supplier info: https://contracts.ornl.gov/ornl-supplier-portal/)",
+    "source_url": "https://contracts.ornl.gov/ornl-supplier-portal/",
+    "retrieved_on": "2026-11-28"
+   },
+   "registration_system": {
+    "value": "SAM.gov ('strongly suggests' registration) plus SAP Ariba Network, entered by invitation once a supplier is picked for a sourcing event or award",
+    "source_url": "https://contracts.ornl.gov/ornl-supplier-portal/",
+    "retrieved_on": "2026-11-28"
+   },
+   "small_business_goal": {
+    "value": "No percentage published. UT-Battelle policy: 'maximum practicable opportunities for small, small disadvantaged, women-owned and other socioeconomically disadvantaged businesses'.",
+    "source_url": "https://smallbusiness.ornl.gov/facts",
+    "retrieved_on": "2026-11-28"
+   },
+   "small_business_office": {
+    "value": "Small Business Programs Office, infosmallbiz@ornl.gov; monthly virtual 'Small Business Friday' one-on-ones",
+    "source_url": "https://smallbusiness.ornl.gov/business-opportunities",
+    "retrieved_on": "2026-11-28"
+   },
+   "top_naics": {
+    "value": "DOE FY2026 small-business spend: 541519, 561320, 334111, 511210, 335929. ORNL also posts a list of example FY2024 purchases.",
+    "source_url": "https://www.energy.gov/osbp/small-business-program-manager-directory",
+    "retrieved_on": "2026-11-28"
+   },
+   "buying_rules": {
+    "value": [
+     "For each listed opportunity, contact the Procurement Officer named 'to indicate interest in being placed on the bid list'. Construction subcontractors must prequalify. Fraud alerts go to vendoradm@ornl.gov."
+    ],
+    "source_url": "https://smallbusiness.ornl.gov/business-opportunities",
+    "retrieved_on": "2026-11-28"
+   }
+  },
+  {
+   "id": "pnnl",
+   "aliases": [
+    "pnnl",
+    "pacific northwest",
+    "pacific northwest national lab"
+   ],
+   "name": {
+    "value": "Pacific Northwest National Laboratory",
+    "source_url": "https://www.pnnl.gov/procurement/small-business-program",
+    "retrieved_on": "2026-11-28"
+   },
+   "state": {
+    "value": "WA",
+    "source_url": "https://www.energy.gov/osbp/small-business-program-manager-directory",
+    "retrieved_on": "2026-11-28"
+   },
+   "operator": {
+    "value": "Battelle (Battelle Memorial Institute), contract DE-AC05-76RL01830",
+    "source_url": "https://www.pnnl.gov/sites/default/files/media/file/small-business-program-brochure.pdf",
+    "retrieved_on": "2026-11-28"
+   },
+   "operator_uei": {
+    "value": null,
+    "source_url": null,
+    "retrieved_on": null
+   },
+   "supplier_portal_url": {
+    "value": "https://ebs.pnnl.gov (solicitations: https://ebs.pnnl.gov/advertised.aspx)",
+    "source_url": "https://www.pnnl.gov/procurement/small-business-program",
+    "retrieved_on": "2026-11-28"
+   },
+   "registration_system": {
+    "value": "PNNL Acquisition Supplier Portal (supplier database)",
+    "source_url": "https://www.pnnl.gov/procurement/small-business-program",
+    "retrieved_on": "2026-11-28"
+   },
+   "small_business_goal": {
+    "value": "FY2025: SB 49%, SDB 5%, WOSB 5%, HUBZone 3%, VOSB 5%, SDVOSB 5%",
+    "source_url": "https://www.pnnl.gov/procurement/small-business-program",
+    "retrieved_on": "2026-11-28"
+   },
+   "small_business_office": {
+    "value": "Small Business Program Manager, small.business@pnnl.gov",
+    "source_url": "https://www.pnnl.gov/procurement/small-business-program",
+    "retrieved_on": "2026-11-28"
+   },
+   "top_naics": {
+    "value": "DOE FY2026 small-business spend: 541519, 334516, 236220, 334111, 334519. The brochure lists purchases by operating division.",
+    "source_url": "https://www.energy.gov/osbp/small-business-program-manager-directory",
+    "retrieved_on": "2026-11-28"
+   },
+   "buying_rules": {
+    "value": [
+     "'One of the best things a small business can do is to enter their company profile into' the Acquisition Supplier Portal. PNNL buys over $200M a year from small businesses. B2B and P-Card questions: selfservice.acq@pnnl.gov."
+    ],
+    "source_url": "https://www.pnnl.gov/sites/default/files/media/file/small-business-program-brochure.pdf",
+    "retrieved_on": "2026-11-28"
+   }
+  },
+  {
+   "id": "pppl",
+   "aliases": [
+    "pppl",
+    "princeton plasma",
+    "princeton plasma physics"
+   ],
+   "name": {
+    "value": "Princeton Plasma Physics Laboratory",
+    "source_url": "https://sites.google.com/pppl.gov/procurement/small-business-program",
+    "retrieved_on": "2026-11-28"
+   },
+   "state": {
+    "value": "NJ",
+    "source_url": "https://www.energy.gov/osbp/small-business-program-manager-directory",
+    "retrieved_on": "2026-11-28"
+   },
+   "operator": {
+    "value": "Princeton University (The Trustees of Princeton University)",
+    "source_url": "https://sites.google.com/pppl.gov/procurement/small-business-program",
+    "retrieved_on": "2026-11-28"
+   },
+   "operator_uei": {
+    "value": null,
+    "source_url": null,
+    "retrieved_on": null
+   },
+   "supplier_portal_url": {
+    "value": "https://solutions.sciquest.com/apps/Router/SupplierLogin?CustOrg=Princeton",
+    "source_url": "https://sites.google.com/pppl.gov/procurement/doing-business-with-pppl",
+    "retrieved_on": "2026-11-28"
+   },
+   "registration_system": {
+    "value": "Princeton University Supplier Portal (SciQuest/Jaggaer); opportunities on SAM.gov",
+    "source_url": "https://sites.google.com/pppl.gov/procurement/doing-business-with-pppl",
+    "retrieved_on": "2026-11-28"
+   },
+   "small_business_goal": {
+    "value": "No percentage published. Policy: 'extend the maximum practicable opportunity to participate in subcontracting' to SB, SDB, WOSB, HUBZone, VOSB and SDVOSB.",
+    "source_url": "https://sites.google.com/pppl.gov/procurement/small-business-program",
+    "retrieved_on": "2026-11-28"
+   },
+   "small_business_office": {
+    "value": "PPPL Procurement Division, procurement@pppl.gov",
+    "source_url": "https://sites.google.com/pppl.gov/procurement/small-business-program",
+    "retrieved_on": "2026-11-28"
+   },
+   "top_naics": {
+    "value": "No NAICS published. Categories bought: commercial products and services, complex fabrications, computers, construction, chemicals, electronic components, facilities maintenance, lab supplies, machined parts, raw materials, scientific consulting, staff augmentation, training; also US ITER procurements.",
+    "source_url": "https://sites.google.com/pppl.gov/procurement/doing-business-with-pppl",
+    "retrieved_on": "2026-11-28"
+   },
+   "buying_rules": {
+    "value": [
+     "Procurement reviews registered profiles when choosing suppliers for sourcing events for PPPL and Princeton University. Selected suppliers are invited to complete a full portal profile, including payment information."
+    ],
+    "source_url": "https://sites.google.com/pppl.gov/procurement/doing-business-with-pppl",
+    "retrieved_on": "2026-11-28"
+   }
+  },
+  {
+   "id": "sandia",
+   "aliases": [
+    "sandia",
+    "snl",
+    "sandia labs"
+   ],
+   "name": {
+    "value": "Sandia National Laboratories",
+    "source_url": "https://www.sandia.gov/working-with-sandia/prospective-suppliers/",
+    "retrieved_on": "2026-11-28"
+   },
+   "state": {
+    "value": "NM",
+    "source_url": "https://www.energy.gov/osbp/small-business-program-manager-directory",
+    "retrieved_on": "2026-11-28"
+   },
+   "operator": {
+    "value": "National Technology and Engineering Solutions of Sandia, LLC (Honeywell subsidiary), contract DE-NA0003525",
+    "source_url": "https://www.sandia.gov/working-with-sandia/prospective-suppliers/",
+    "retrieved_on": "2026-11-28"
+   },
+   "operator_uei": {
+    "value": null,
+    "source_url": null,
+    "retrieved_on": null
+   },
+   "supplier_portal_url": {
+    "value": "https://www.sandia.gov/working-with-sandia/prospective-suppliers/business-opportunities/",
+    "source_url": "https://www.sandia.gov/working-with-sandia/prospective-suppliers/business-opportunities/",
+    "retrieved_on": "2026-11-28"
+   },
+   "registration_system": {
+    "value": "iSupplier (Oracle) portal; approval required before responding on the Business Opportunities Website",
+    "source_url": "https://www.sandia.gov/working-with-sandia/prospective-suppliers/business-opportunities/",
+    "retrieved_on": "2026-11-28"
+   },
+   "small_business_goal": {
+    "value": "FY26: SB 49.00%, SDB 10.00%, WOSB 9.25%, HUBZone 3.00%, VOSB 7.00%, SDVOSB 5.00% (FY25: SB 53%)",
+    "source_url": "https://www.sandia.gov/working-with-sandia/prospective-suppliers/sandias-small-business-goals/",
+    "retrieved_on": "2026-11-28"
+   },
+   "small_business_office": {
+    "value": "Supplier relations / small business program: supplier@sandia.gov (account help: supreg@sandia.gov)",
+    "source_url": "https://www.sandia.gov/working-with-sandia/prospective-suppliers/business-opportunities/",
+    "retrieved_on": "2026-11-28"
+   },
+   "top_naics": {
+    "value": "DOE FY2026 small-business spend: 236220, 541519, 238220, 334111, 531120",
+    "source_url": "https://www.energy.gov/osbp/small-business-program-manager-directory",
+    "retrieved_on": "2026-11-28"
+   },
+   "buying_rules": {
+    "value": [
+     "RFQs under $350K are typically posted for 3 business days and are designated \"Small Business First\" (the same page also cites $250,000 in one section).",
+     "Sources Sought are typically over $350K and posted 15+ calendar days; the first 8 days are set aside for small business.",
+     "5% small business pricing preference under the prime contract."
+    ],
+    "source_url": "https://www.sandia.gov/working-with-sandia/prospective-suppliers/business-opportunities/",
+    "retrieved_on": "2026-11-28"
+   }
+  },
+  {
+   "id": "srnl",
+   "aliases": [
+    "srnl",
+    "savannah river national lab"
+   ],
+   "name": {
+    "value": "Savannah River National Laboratory",
+    "source_url": "https://www.srnl.gov/procurement/",
+    "retrieved_on": "2026-11-28"
+   },
+   "state": {
+    "value": "SC",
+    "source_url": "https://www.energy.gov/osbp/small-business-program-manager-directory",
+    "retrieved_on": "2026-11-28"
+   },
+   "operator": {
+    "value": "Battelle Savannah River Alliance, LLC (BSRA)",
+    "source_url": "https://www.srnl.gov/procurement/",
+    "retrieved_on": "2026-11-28"
+   },
+   "operator_uei": {
+    "value": null,
+    "source_url": null,
+    "retrieved_on": null
+   },
+   "supplier_portal_url": {
+    "value": "https://ewvl.fa.us8.oraclecloud.com/fscmUI/faces/NegotiationAbstracts?prcBuId=300000004471117",
+    "source_url": "https://www.srnl.gov/procurement/",
+    "retrieved_on": "2026-11-28"
+   },
+   "registration_system": {
+    "value": "Oracle Fusion Supplier Portal",
+    "source_url": "https://www.srnl.gov/procurement/",
+    "retrieved_on": "2026-11-28"
+   },
+   "small_business_goal": {
+    "value": "No percentage published. The program 'provides significant opportunities' to SB, SDB, WOSB, HUBZone, VOSB and SDVOSB.",
+    "source_url": "https://www.srnl.gov/procurement/",
+    "retrieved_on": "2026-11-28"
+   },
+   "small_business_office": {
+    "value": "SRNL procurement team, Procurement@srnl.gov (the link points to Procurement@srnl.doe.gov)",
+    "source_url": "https://www.srnl.gov/procurement/",
+    "retrieved_on": "2026-11-28"
+   },
+   "top_naics": {
+    "value": "No NAICS published. Categories: analytical lab equipment and supplies; precision equipment repair; lab machinery purchase/lease and repair; facilities maintenance; computers and software; systems programming and design; IT and communications maintenance; administrative and support services; MRO; electrical; office supplies.",
+    "source_url": "https://www.srnl.gov/procurement/",
+    "retrieved_on": "2026-11-28"
+   },
+   "buying_rules": {
+    "value": [
+     "'Suppliers must have the ability to demonstrate sustained high performance in cost, quality, safety, and on-time delivery.' The page posts BSRA general provisions and its small business subcontracting plan form."
+    ],
+    "source_url": "https://www.srnl.gov/procurement/",
+    "retrieved_on": "2026-11-28"
+   }
+  },
+  {
+   "id": "slac",
+   "aliases": [
+    "slac"
+   ],
+   "name": {
+    "value": "SLAC National Accelerator Laboratory",
+    "source_url": "https://suppliers.slac.stanford.edu/",
+    "retrieved_on": "2026-11-28"
+   },
+   "state": {
+    "value": "CA",
+    "source_url": "https://www.energy.gov/osbp/small-business-program-manager-directory",
+    "retrieved_on": "2026-11-28"
+   },
+   "operator": {
+    "value": "Stanford University",
+    "source_url": "https://suppliers.slac.stanford.edu/",
+    "retrieved_on": "2026-11-28"
+   },
+   "operator_uei": {
+    "value": null,
+    "source_url": null,
+    "retrieved_on": null
+   },
+   "supplier_portal_url": {
+    "value": "https://suppliers.slac.stanford.edu/become-slac-supplier",
+    "source_url": "https://suppliers.slac.stanford.edu/become-slac-supplier",
+    "retrieved_on": "2026-11-28"
+   },
+   "registration_system": {
+    "value": "Three steps: SAM.gov ('All Awards' status), SLAC Prospective Supplier (or Construction Supplier) Information Form, then a PeopleSoft vendor profile",
+    "source_url": "https://suppliers.slac.stanford.edu/become-slac-supplier",
+    "retrieved_on": "2026-11-28"
+   },
+   "small_business_goal": {
+    "value": "Goal is set each fiscal year but its percentage is not in the page text. FY2025 actual: over $107M, 35.79% of spend, 'below FY2025's target percentage'.",
+    "source_url": "https://suppliers.slac.stanford.edu/find-opportunities/slac-small-business-program",
+    "retrieved_on": "2026-11-28"
+   },
+   "small_business_office": {
+    "value": "SLAC Procurement / Supply Chain Management, suppliers@slac.stanford.edu",
+    "source_url": "https://suppliers.slac.stanford.edu/",
+    "retrieved_on": "2026-11-28"
+   },
+   "top_naics": {
+    "value": "DOE FY2026 small-business spend: 339999, 238990, 561730, 541611, 541330",
+    "source_url": "https://www.energy.gov/osbp/small-business-program-manager-directory",
+    "retrieved_on": "2026-11-28"
+   },
+   "buying_rules": {
+    "value": [
+     "SLAC 'cannot issue contracts or purchase orders' until all three steps are done. Construction over the SAT ($250,000), or where the Buy America Act applies, is posted on SAM.gov; construction over $250K is first posted with a draft RFP, and bidders must respond to take part."
+    ],
+    "source_url": "https://suppliers.slac.stanford.edu/find-opportunities",
+    "retrieved_on": "2026-11-28"
+   }
+  },
+  {
+   "id": "jlab",
+   "aliases": [
+    "jlab",
+    "jefferson lab",
+    "thomas jefferson"
+   ],
+   "name": {
+    "value": "Thomas Jefferson National Accelerator Facility (Jefferson Lab)",
+    "source_url": "https://www.jlab.org/finance/procurement",
+    "retrieved_on": "2026-11-28"
+   },
+   "state": {
+    "value": "VA",
+    "source_url": "https://www.energy.gov/osbp/small-business-program-manager-directory",
+    "retrieved_on": "2026-11-28"
+   },
+   "operator": {
+    "value": "SURATech, LLC (the small business page still names Jefferson Science Associates)",
+    "source_url": "https://www.jlab.org/finance/procurement",
+    "retrieved_on": "2026-11-28"
+   },
+   "operator_uei": {
+    "value": null,
+    "source_url": null,
+    "retrieved_on": null
+   },
+   "supplier_portal_url": {
+    "value": "https://misportal.jlab.org/ul/bus_ops/ (Solicitation Bulletin Board); Bidder Portal https://misportal.jlab.org/bidderportal/",
+    "source_url": "https://www.jlab.org/finance/procurement/toolbox",
+    "retrieved_on": "2026-11-28"
+   },
+   "registration_system": {
+    "value": "Lab's own Bidder Portal / Vendor Management (misportal.jlab.org/vendorManagement)",
+    "source_url": "https://www.energy.gov/osbp/small-business-program-manager-directory",
+    "retrieved_on": "2026-11-28"
+   },
+   "small_business_goal": {
+    "value": "No percentage published. Policy: 'provide maximum opportunities to a variety of small businesses'.",
+    "source_url": "https://www.jlab.org/finance/procurement/smallbusiness",
+    "retrieved_on": "2026-11-28"
+   },
+   "small_business_office": {
+    "value": "Small Business Liaison Officer (email shown obfuscated); Vendor Toolbox page https://www.jlab.org/finance/procurement/toolbox",
+    "source_url": "https://www.jlab.org/finance/procurement/toolbox",
+    "retrieved_on": "2026-11-28"
+   },
+   "top_naics": {
+    "value": "DOE FY2026 small-business spend: 541519, 561612, 335999, 332710, 334418",
+    "source_url": "https://www.energy.gov/osbp/small-business-program-manager-directory",
+    "retrieved_on": "2026-11-28"
+   },
+   "buying_rules": {
+    "value": [
+     "Current opportunities are on the 'Solicitation Bulletin Board'; the toolbox carries sample bond forms and Department of Labor requirements."
+    ],
+    "source_url": "https://www.jlab.org/finance/procurement/toolbox",
+    "retrieved_on": "2026-11-28"
+   }
+  }
+ ]
+}

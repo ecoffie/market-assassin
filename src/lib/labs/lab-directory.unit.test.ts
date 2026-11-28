@@ -1,7 +1,17 @@
 import { describe, it, expect } from 'vitest';
 import { LAB_ENTRIES, LAB_FIELDS, DOE_LAB_COUNT, unsourcedFields, findLabs, labDirectoryAnswer, type LabSupplierEntry } from './lab-directory';
 
-const DOMAIN_OK = /^https:\/\/([a-z0-9-]+\.)*(gov|energy\.gov)(\/|$)/i;
+// Official lab or DOE hosts only. .gov, plus the three lab sites DOE's own directory links that are not .gov.
+const DOMAIN_OK = /^https:\/\/(([a-z0-9-]+\.)*gov|([a-z0-9-]+\.)*slac\.stanford\.edu|www\.jlab\.org|sites\.google\.com\/pppl\.gov)(\/|$)/i;
+
+// Every address in the file, reviewed: office or role mailboxes printed on the lab's own page. A new address fails until
+// it is reviewed here — never a named person's email.
+const REVIEWED_OFFICE_EMAILS = new Set([
+  'netlsmallbusiness@netl.doe.gov', 'procurement@srnl.doe.gov', 'procurement@srnl.gov', 'small.business@nlr.gov', 'ppc@nlr.gov',
+  'aribasuppliers@lanl.gov', 'business@lanl.gov', 'infosmallbiz@ornl.gov', 'vendoradm@ornl.gov', 'procurement@pppl.gov',
+  'sblo@bnl.gov', 'selfservice.acq@pnnl.gov', 'small.business@pnnl.gov', 'smallbusiness@llnl.gov', 'supplier@sandia.gov',
+  'supreg@sandia.gov', 'suppliers@slac.stanford.edu', 'vendormanagment@inl.gov',
+]);
 
 describe('national lab supplier directory — data integrity', () => {
   it('every published field carries an https source_url and a retrieved_on date', () => {
@@ -24,12 +34,14 @@ describe('national lab supplier directory — data integrity', () => {
     }
   });
 
-  it('no personal email addresses (office or generic only)', () => {
-    const generic = /^(small\s*business|smallbusiness|sbp|sbo|osbp|procurement|purchasing|supplier|suppliers|subcontracts|business|sb|socio)[a-z0-9._-]*@/i;
-    const bad: string[] = [];
+  it('no personal email addresses (only reviewed office mailboxes)', () => {
     const json = JSON.stringify(LAB_ENTRIES);
-    for (const m of json.matchAll(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[a-z]{2,}/g)) if (!generic.test(m[0])) bad.push(m[0]);
-    expect(bad).toEqual([]);
+    const found = [...json.matchAll(/[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*\.[a-z]{2,}/g)].map((m) => m[0].toLowerCase());
+    expect(found.filter((e) => !REVIEWED_OFFICE_EMAILS.has(e))).toEqual([]);
+  });
+
+  it('operator UEI is never filled from a non-official source (none is published)', () => {
+    for (const l of LAB_ENTRIES) if (l.operator_uei.value != null) expect(l.operator_uei.source_url, l.id).toMatch(DOMAIN_OK);
   });
 
   it('every row has a sourced name, unique ids, and stays within the 17 DOE labs', () => {
@@ -66,10 +78,25 @@ describe('national lab supplier directory — answer', () => {
     expect(a.rules.join(' ')).toMatch(/No lab in this directory matches/);
   });
 
-  it('finds a lab by alias when present', () => {
-    const sandia = LAB_ENTRIES.find((l) => l.id === 'sandia');
-    if (!sandia) return;
+  it('covers the 17 DOE labs', () => {
+    expect(LAB_ENTRIES.length).toBe(17);
+  });
+
+  it('finds a lab by alias', () => {
+    expect(findLabs('how do I sell to NREL').map((l) => l.id)).toEqual(['nlr']);
+    expect(findLabs('Los Alamos supplier portal').map((l) => l.id)).toEqual(['lanl']);
+    expect(findLabs('Oak Ridge and PNNL').map((l) => l.id).sort()).toEqual(['ornl', 'pnnl']);
     expect(findLabs('how do I sell to Sandia?').map((l) => l.id)).toEqual(['sandia']);
     expect((labDirectoryAnswer('Sandia') as { matched: number }).matched).toBe(1);
+  });
+
+  it('"the national labs" returns the whole directory', () => {
+    expect((labDirectoryAnswer('how do I sell to the national labs') as { matched: number }).matched).toBe(17);
+  });
+
+  it("Sandia carries Eric's named rule with its source", () => {
+    const s = LAB_ENTRIES.find((l) => l.id === 'sandia')!;
+    expect(s.buying_rules.value!.join(' ')).toMatch(/under \$350K.*3 business days.*Small Business First/);
+    expect(s.buying_rules.source_url).toMatch(/^https:\/\/www\.sandia\.gov\//);
   });
 });

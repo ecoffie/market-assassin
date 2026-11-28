@@ -7869,3 +7869,13 @@ the notices. Test: `federal-events-ranking.unit.test.ts`.
 **SEO:** read capability statement from Google Drive, AI capability statement analysis, OneDrive PDF government contracting assistant.
 
 **Proof:** Found in the 2026-11-27 production re-test: Encore_Capabilities_Statement_Suite380.pdf (a LibreOffice text PDF; Mindy's own extractor reads 2,603 characters from it locally) came back unreadable from Drive. The PDF reader's helper file was not shipped with the chat service; it now is (production build: chat bundle 123 MB of the 250 MB limit). Test: `src/lib/connected-apps/pdf-worker-bundle.unit.test.ts`. Connected apps are in limited release.
+
+## How to sell to a DOE national lab, in Ask Mindy, 2026-11-28
+
+**What:** Ask Mindy now answers "how do I sell to Sandia / Los Alamos / Oak Ridge / the national labs" for all 17 DOE national laboratories. For each lab it gives the operator that does the buying, where suppliers register (Ariba, iSupplier, the lab's own portal, SAM.gov), the published small-business goals, the small-business office's mailbox, what the lab buys most from small businesses, and its published buying rules (for example, Sandia posts RFQs under $350K for 3 business days as "Small Business First"). Every fact links to the lab's or DOE's own page, and anything a lab does not publish is labelled not published.
+
+**Why:** National labs buy billions through their operating contractors, and most of that buying never appears in SAM.gov or in federal subaward data. The lab's own supplier portal is the way in, and small businesses rarely know which portal, which rules or which office.
+
+**SEO:** how to sell to national labs, Sandia small business, Los Alamos supplier registration Ariba, Oak Ridge National Laboratory small business, DOE national laboratory subcontracting, FFRDC supplier portal.
+
+**Proof:** Sources are official lab pages and DOE's Small Business Program Manager Directory (energy.gov). Coverage: 17 of 17 DOE national labs, with unpublished fields left blank (no operator publishes its UEI). Sandia's operator, NTESS, reports no subawards in federal subaward data for its prime contract, which is why the portal route matters. A unit test fails on any fact without a source (`src/lib/labs/lab-directory.unit.test.ts`). Ask Mindy only for now; not yet on the MCP connector.
