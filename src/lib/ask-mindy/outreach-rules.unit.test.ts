@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { QUESTION_OVER_PROFILE, NO_DATA_DATES, OUTREACH_RULES, ACTION_PLAN_STRUCTURE, OUTREACH_AND_PLAN_RULES } from './outreach-rules';
+import { QUESTION_OVER_PROFILE, NO_DATA_DATES, OUTREACH_RULES, ACTION_PLAN_STRUCTURE, OUTREACH_AND_PLAN_RULES, ATTACHED_FACTS_SOURCED } from './outreach-rules';
 import { RESEARCH_INSTRUCTIONS, researchSystemDynamic } from './research-mode';
 import { CREATE_DOCUMENT_TOOL_DEF } from '@/lib/chat/generate-document-tool';
 
@@ -92,5 +92,15 @@ describe('every surface carries the rules', () => {
     expect(d).toMatch(/DATES: no data-freshness dates/);
     expect(d).toMatch(/every named contact cites its source with the citation marker/);
     expect(d).toMatch(/no 'from the notice\.\.\.' prose in the table or body/);
+  });
+});
+
+describe('ATTACHED_FACTS_SOURCED (production retest 2026-11-27)', () => {
+  it('a file\'s figure is sourced and attributed, never "not established"; not established stays for facts found nowhere', () => {
+    expect(ATTACHED_FACTS_SOURCED).toMatch(/sourced to that file/);
+    expect(ATTACHED_FACTS_SOURCED).toMatch(/State it with attribution to the company and the file/);
+    expect(ATTACHED_FACTS_SOURCED).toMatch(/not independently verified/);
+    expect(ATTACHED_FACTS_SOURCED).toMatch(/never "not established"/);
+    expect(ATTACHED_FACTS_SOURCED).toMatch(/"Not established" is only for something that appears in no tool result, web page, customer message or attached file/);
   });
 });

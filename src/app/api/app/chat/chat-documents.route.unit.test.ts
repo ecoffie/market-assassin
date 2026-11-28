@@ -123,6 +123,17 @@ describe('Ask Mindy reads the conversation\'s uploaded documents', () => {
     expect(sys).toContain('proposals are due December 4');
   });
 
+  it('standard chat: with a file attached, facts it states are sourced to it and stated with attribution (never "not established")', async () => {
+    await ask();
+    expect(answerSystem()).toContain('FACTS FROM AN ATTACHED FILE ARE SOURCED');
+  });
+
+  it('standard chat: no attachment, no attached-facts rule', async () => {
+    state.docs = [];
+    await ask();
+    expect(answerSystem()).not.toContain('FACTS FROM AN ATTACHED FILE ARE SOURCED');
+  });
+
   it('a file cannot close its own fence: the forged closing marker is neutralized', async () => {
     await ask();
     const sys = answerSystem();
