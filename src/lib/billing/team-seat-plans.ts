@@ -76,8 +76,8 @@ export const MINDY_DAY_ANNUAL_PRICE_IDS: Record<TeamSeatCount, string> = {
   4: 'price_1UgZhTK5zyiZ50PB0j9k6UMY',
   5: 'price_1UgZhxK5zyiZ50PBjEZTqDgZ',
 };
-/** Inclusive start, exclusive end (UTC instants). 2026-11-28 00:00 ET → 2026-12-06 00:00 ET. */
-export const MINDY_DAY_WINDOW = { startMs: Date.UTC(2026, 10, 28, 5), endMs: Date.UTC(2026, 11, 6, 5) };
+/** Inclusive start, exclusive end (UTC instants). 2026-11-27 00:00 ET (started early, owner 2026-11-27) → 2026-12-06 00:00 ET. */
+export const MINDY_DAY_WINDOW = { startMs: Date.UTC(2026, 10, 27, 5), endMs: Date.UTC(2026, 11, 6, 5) };
 
 export function isMindyDayPricing(nowMs: number = Date.now()): boolean {
   return nowMs >= MINDY_DAY_WINDOW.startMs && nowMs < MINDY_DAY_WINDOW.endMs;
