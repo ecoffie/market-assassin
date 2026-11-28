@@ -11,7 +11,7 @@
  * says "$0 today" (the charge only comes after 14 days).
  * The credit-only MCP plans keep their own page at /mcp/pricing.
  */
-import { TEAM_SEAT_CREDITS_PER_USER, teamSeatPlan } from '@/lib/billing/team-seat-plans';
+import { TEAM_SEAT_CREDITS_PER_USER, teamSeatPlan, teamSeatAnnualOffer, isMindyDayPricing } from '@/lib/billing/team-seat-plans';
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import MemberProof from '@/components/public-site/MemberProof';
@@ -303,14 +303,18 @@ export default function SimplePricing({ proCredits, teamCredits, forecastsLabel,
   // feature and credits. Monthly or yearly (33% off) follows the Monthly/Annual toggle.
   const withSeats = (p: Plan): Plan => {
     if (p.name !== 'Team' || !seatOpt || !seatPlan) return p;
-    const yearly = annual && !!seatPlan.annualPriceId;
+    // Yearly price: Mindy Day week = 2 months free, otherwise 33% off (team-seat-plans.ts).
+    const offer = teamSeatAnnualOffer(seatPlan.seats);
+    const yearly = annual && !!offer.priceId;
     const credits = seatPlan.credits;
     return {
       ...p,
       featured: true,
-      price: yearly ? `$${fmt(Math.round(seatPlan.annualUsd / 12))}` : `$${fmt(seatOpt.monthlyUsd)}`,
+      price: yearly ? `$${fmt(Math.round(offer.usd / 12))}` : `$${fmt(seatOpt.monthlyUsd)}`,
       was: yearly ? `$${fmt(seatOpt.monthlyUsd)}` : undefined,
-      per: yearly ? `/ mo, billed annually ($${fmt(seatPlan.annualUsd)} / year). Add seats any time.` : seatOpt.per,
+      per: yearly
+        ? `/ mo, billed annually ($${fmt(offer.usd)} / year${offer.mindyDay ? ', 2 months free' : ''}). Add seats any time.`
+        : seatOpt.per,
       trial: false,
       takesPayment: teamSeatTakesPayment(seatOpt),
       cta: seatOpt.cta,
@@ -377,7 +381,7 @@ export default function SimplePricing({ proCredits, teamCredits, forecastsLabel,
           <style dangerouslySetInnerHTML={{ __html: SEAT_CSS }} />
           <section className="hero" data-testid="seat-pricing-header">
             <h1>{TEAM_SEAT_PRICING.header.title}</h1>
-            <p className="sub">{TEAM_SEAT_PRICING.header.sub}</p>
+            <p className="sub">{isMindyDayPricing() ? TEAM_SEAT_PRICING.header.subMindyDay : TEAM_SEAT_PRICING.header.sub}</p>
             {me && <p className="you">You&apos;re on the <b>{PLAN_NAME[me]}</b> plan.{me !== 'free' && <> <a href={BILLING_URL}>Manage billing</a></>}</p>}
           </section>
         </>
