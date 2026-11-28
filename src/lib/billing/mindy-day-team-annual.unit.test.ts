@@ -15,8 +15,8 @@ const BEFORE = MINDY_DAY_WINDOW.startMs - 1;
 const AFTER = MINDY_DAY_WINDOW.endMs; // end is exclusive
 
 describe('Mindy Day yearly Team prices (2 months free, one week)', () => {
-  it('window is Nov 28 00:00 ET to Dec 6 00:00 ET', () => {
-    expect(new Date(MINDY_DAY_WINDOW.startMs).toISOString()).toBe('2026-11-28T05:00:00.000Z');
+  it('window is Nov 27 00:00 ET to Dec 6 00:00 ET', () => {
+    expect(new Date(MINDY_DAY_WINDOW.startMs).toISOString()).toBe('2026-11-27T05:00:00.000Z');
     expect(new Date(MINDY_DAY_WINDOW.endMs).toISOString()).toBe('2026-12-06T05:00:00.000Z');
     expect(isMindyDayPricing(BEFORE)).toBe(false);
     expect(isMindyDayPricing(DURING)).toBe(true);
