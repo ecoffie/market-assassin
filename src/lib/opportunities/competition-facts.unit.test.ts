@@ -58,3 +58,14 @@ describe('competitionFactsFor — fails open, bounded', () => {
     expect(competitionCounts(m.values())).toEqual({ competed: 0, not_competed: 2, unknown: 2 });
   });
 });
+
+describe('orders: the fair-opportunity field when no extent code is recorded', () => {
+  it('"FAIR OPPORTUNITY GIVEN" → competed; an exception → not competed with the exception as the reason', () => {
+    expect(classifyCompetition({ fair_opportunity_limited_sources_description: 'FAIR OPPORTUNITY GIVEN', number_of_offers_received: '4' })).toMatchObject({ class: 'competed', offers_received: 4 });
+    expect(classifyCompetition({ fair_opportunity_limited_sources_description: 'ONLY ONE SOURCE - OTHER' })).toMatchObject({ class: 'not_competed', sole_source_reason: 'ONLY ONE SOURCE - OTHER' });
+  });
+  it('an extent code still wins; "NO SET ASIDE USED." is kept as set_aside_reported, not as set_aside', () => {
+    const f = classifyCompetition({ extent_competed: 'A', fair_opportunity_limited_sources_description: 'URGENCY', type_set_aside_description: 'NO SET ASIDE USED.' });
+    expect(f).toMatchObject({ class: 'competed', set_aside: null, set_aside_reported: 'NO SET ASIDE USED.' });
+  });
+});

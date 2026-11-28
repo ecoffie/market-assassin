@@ -28,7 +28,7 @@ import {
  * At most this many rows get a competition lookup per call (USASpending award record, cached 7 days). The rest read
  * `competition: null` + `_meta.competition.not_checked` — not looked up, never "unknown" or zero.
  */
-export const COMPETITION_LOOKUP_CAP = 25;
+export const COMPETITION_LOOKUP_CAP = 50;
 
 /** An order under a vehicle, listed at top level so an in-window order is never only nested. */
 /**
@@ -36,7 +36,46 @@ export const COMPETITION_LOOKUP_CAP = 25;
  * `recompete_opportunities.competition_type` / `number_of_offers` are never written by the live sync (0% filled,
  * Agent 4 / Eric 2026-11-27: 15 of 15 VA HVAC rows empty), so these come from the award record instead.
  */
-export type WithCompetition = { competition?: CompetitionFacts | null };
+export type WithCompetition = {
+  competition?: CompetitionFacts | null;
+  /** checked = looked up (see competition.class); not_checked = past the lookup cap or budget — never "not reported". */
+  competition_status?: 'checked' | 'not_checked';
+  /** Which record filled set_aside_type / number_of_offers / competition_type when the stored row had none. */
+  competition_fields_source?: 'usaspending_award' | 'usaspending_parent_idv' | null;
+};
+
+/** Short set-aside label from the award record's own value (the same vocabulary as the stored set_aside_type). */
+export function setAsideLabelFromRecord(raw: string | null | undefined): string | null {
+  const s = (raw || '').trim();
+  if (!s) return null;
+  if (/no set.?aside used/i.test(s)) return 'Full & Open (no set-aside)';
+  if (/8\s*\(?a\)?\s*sole source/i.test(s)) return '8(a) Sole Source';
+  if (/8\s*\(?a\)?/i.test(s)) return '8(a)';
+  if (/service[- ]disabled/i.test(s)) return 'SDVOSB';
+  if (/hubzone/i.test(s)) return 'HUBZone';
+  if (/economically disadvantaged wom/i.test(s)) return 'EDWOSB';
+  if (/wom[ae]n/i.test(s)) return 'WOSB';
+  if (/partial small business/i.test(s)) return 'SB-Partial';
+  if (/small business set.?aside\s*-\s*total|total small business/i.test(s)) return 'SB-Total';
+  if (/veteran/i.test(s)) return 'VOSB';
+  return s;
+}
+
+/**
+ * Fill the stored row's empty competition columns from the award record that was looked up (unknown stays null).
+ * The stored set_aside_type / number_of_offers / competition_type are never overwritten when they hold a value.
+ */
+export function fillCompetitionColumns<T extends ExpiringContract & WithCompetition>(row: T): T {
+  const c = row.competition;
+  if (!c || c.source === 'none') return { ...row, competition_fields_source: null };
+  const out = { ...row } as T;
+  let filled = false;
+  if (out.set_aside_type == null && c.set_aside_reported) { out.set_aside_type = setAsideLabelFromRecord(c.set_aside_reported); filled = true; }
+  if (out.number_of_offers == null && c.offers_received != null) { out.number_of_offers = c.offers_received; filled = true; }
+  if (out.competition_type == null && c.extent_competed) { out.competition_type = c.extent_competed; filled = true; }
+  out.competition_fields_source = filled ? c.source : null;
+  return out;
+}
 
 export type ExpiringOrderInWindow = ExpiringContract & WithCompetition & {
   parent_vehicle_piid: string | null;
@@ -154,7 +193,12 @@ export interface ExpiringContractsToolResult {
      * past COMPETITION_LOOKUP_CAP (competition: null). unknown = looked up but not established. Offers received is
      * reported only where the award record carries it: null means NOT REPORTED, never one bidder and never zero.
      */
-    competition?: { source: 'usaspending_award'; checked: number; not_checked: number; competed: number; not_competed: number; unknown: number; offers_reported: number };
+    competition?: {
+      source: 'usaspending_award'; checked: number; not_checked: number; competed: number; not_competed: number; unknown: number;
+      offers_reported: number; set_aside_reported: number; from_parent_vehicle: number;
+      /** Cite this line: "Competition checked on X of Y …; offers reported on N …". */
+      coverage_line: string;
+    };
   };
 }
 
@@ -243,18 +287,41 @@ export async function expiringContracts(
     const opt = typeof deps.competition === 'object' ? deps.competition : {};
     const candidates = [...standalone, ...expiringOrders].map((c) => c.contract_id).filter(Boolean) as string[];
     const toCheck = [...new Set(candidates)].slice(0, COMPETITION_LOOKUP_CAP);
-    const facts = await competitionFactsFor(toCheck, opt.lookup ?? usaspendingCompetitionLookup, { budgetMs: opt.budgetMs ?? 5000 });
-    const attach = <T extends ExpiringContract>(c: T): T & WithCompetition => ({ ...c, competition: facts.get(c.contract_id) ?? null });
+    const lookup = opt.lookup ?? usaspendingCompetitionLookup;
+    const started = Date.now();
+    const budgetMs = opt.budgetMs ?? 10_000;
+    const facts = await competitionFactsFor(toCheck, lookup, { budgetMs });
+    // Orders whose own record does not establish competition: read the parent vehicle's record (same budget).
+    const orderParent = new Map(expiringOrders.filter((o) => o.parent_vehicle_id).map((o) => [o.contract_id, o.parent_vehicle_id as string]));
+    const needParent = [...facts].filter(([id, f]) => f.class === 'unknown' && orderParent.has(id)).map(([id]) => id);
+    const remaining = budgetMs - (Date.now() - started);
+    if (needParent.length && remaining > 500) {
+      const parents = await competitionFactsFor([...new Set(needParent.map((id) => orderParent.get(id)!))], lookup, { budgetMs: remaining });
+      for (const id of needParent) {
+        const p = parents.get(orderParent.get(id)!);
+        if (p && p.class !== 'unknown') facts.set(id, { ...p, source: 'usaspending_parent_idv', detail: `${p.detail} (read from the parent vehicle's record; the order's own record did not state it).` });
+      }
+    }
+    const attach = <T extends ExpiringContract>(c: T): T & WithCompetition => {
+      const f = facts.get(c.contract_id);
+      return fillCompetitionColumns({ ...c, competition: f ?? null, competition_status: f ? 'checked' as const : 'not_checked' as const });
+    };
     withCompetition = standalone.map(attach);
     ordersOut = expiringOrders.map(attach);
     const counts = competitionCounts(facts.values());
     const allIds = new Set(candidates);
+    const offersReported = [...facts.values()].filter((f) => f.offers_received != null).length;
+    const setAsideReported = [...facts.values()].filter((f) => f.set_aside_reported != null).length;
+    const notChecked = allIds.size - facts.size;
     competitionMeta = {
       source: 'usaspending_award',
       checked: facts.size,
-      not_checked: allIds.size - facts.size,
+      not_checked: notChecked,
       ...counts,
-      offers_reported: [...facts.values()].filter((f) => f.offers_received != null).length,
+      offers_reported: offersReported,
+      set_aside_reported: setAsideReported,
+      from_parent_vehicle: [...facts.values()].filter((f) => f.source === 'usaspending_parent_idv').length,
+      coverage_line: `Competition checked on ${facts.size} of ${allIds.size} contracts; offers reported on ${offersReported}, set-aside reported on ${setAsideReported}${notChecked ? `; ${notChecked} not checked (lookup cap)` : ''}.`,
     };
   }
   const applied: Record<string, unknown> = {};
@@ -316,7 +383,7 @@ export async function expiringContracts(
         'vehicles[] groups orders by the parent IDV recorded on each order. Holders of a multiple-award vehicle each hold their own IDV number, so sibling IDVs from one solicitation appear as separate vehicles; holders_in_result lists only holders seen in these rows.',
         'place_of_performance_state is the place of performance as reported by USASpending, shown as reported; null means USASpending reported none.',
         'recompete_likelihood is an inference; some contracts get extended or not recompeted.',
-        'competition (when present) is read from each award\'s own USASpending record: class competed | not_competed | unknown. competition.offers_received null = NOT REPORTED on the award, never "1 bidder" or zero. competition: null = not looked up (row past the lookup cap). The row columns competition_type / number_of_offers are not populated by the sync; use competition instead.',
+        'competition is read from each award\'s own USASpending record (orders fall back to the parent vehicle, competition.source=usaspending_parent_idv): class competed | not_competed | unknown. set_aside_type / number_of_offers / competition_type are filled from that record when the stored row had none (competition_fields_source). number_of_offers null = NOT REPORTED on the award, never "1 bidder" or zero. competition_status=not_checked = not looked up (past the lookup cap) — say so, never "not established". Cite _meta.competition.coverage_line.',
         // set_aside_type is NULL on ~65% of rows (only PIIDs matched in the BQ awards
         // backfill carry it). NULL means UNKNOWN, never "Full & Open" — do not tell a
         // user a contract is open to them because the field is empty.
