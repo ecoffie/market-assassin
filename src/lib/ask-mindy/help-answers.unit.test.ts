@@ -30,9 +30,12 @@ const FIXTURES: Array<[string, HelpIntentId]> = [
   ['Can you help me write a proposal?', 'write_proposal'],
   // Security (Eric, 2026-11-28)
   ['Is my data safe?', 'security'],
-  ['Are you SOC 2 certified?', 'security'],
-  ['Are you FedRAMP authorized?', 'security'],
-  ['Are you CMMC compliant?', 'security'],
+  ['Are you SOC 2 certified?', 'security_soc2'],
+  ['Do you have a SOC 2 report?', 'security_soc2'],
+  ['Are you FedRAMP authorized?', 'security_gov_authorization'],
+  ['Are you CMMC compliant?', 'security_gov_authorization'],
+  ['Can I upload CUI?', 'security_cui'],
+  ['Is Mindy approved for classified information?', 'security_cui'],
   ['Do you train AI on my data?', 'security'],
   ['Who can see my files?', 'security'],
   ['I have a security questionnaire for you', 'security'],
@@ -108,6 +111,8 @@ describe('help-answers: content rules', () => {
     expect(e.answer).not.toMatch(/[–—]/);
     const n = (e.answer.match(/^\d+\. /gm) || []).length;
     if (['cancel_subscription', 'stop_emails', 'unsubscribe_either'].includes(e.id)) { expect(n).toBe(0); expect(e.answer.length).toBeLessThan(400); return; }
+    // One honest line plus the summary (Eric, 2026-11-28): short, no steps.
+    if (['security_soc2', 'security_gov_authorization', 'security_cui'].includes(e.id)) { expect(n).toBe(0); expect(e.answer.length).toBeLessThan(800); return; }
     expect(n).toBeGreaterThanOrEqual(3);
     expect(n).toBeLessThanOrEqual(6);
   });
@@ -289,34 +294,40 @@ describe('cancel vs unsubscribe: paid plan, emails, or both', () => {
   });
 });
 
-describe('security help answer (Eric, 2026-11-28)', () => {
+describe('security help answers (Eric, 2026-11-28: lead with what Mindy HAS; a limit only when asked)', () => {
   const e = HELP_ENTRIES.security;
-  it('states the honest limits plainly', () => {
-    expect(e.answer).toContain('**What Mindy is not:** Mindy itself is not SOC 2 certified (its providers are), it is not FedRAMP authorized and it has not been assessed under CMMC. Do not put classified information or Controlled Unclassified Information (CUI) in Mindy.');
+  const all = [HELP_ENTRIES.security, HELP_ENTRIES.security_soc2, HELP_ENTRIES.security_gov_authorization, HELP_ENTRIES.security_cui];
+  it('the general answer is what Mindy has, with no limits section', () => {
+    for (const claim of [/row-level security/, /short-lived signed links/, /contractually do not train on it/, /AI sees only your own records/, /encrypted in transit and at rest/, /two-factor email codes/, /real-time alert/, /audit log/, /SOC 2 certified infrastructure/, /Vercel and Supabase/, /Stripe \(PCI-DSS Level 1\)/, /never stores your card details/, /export everything as one file/, /delete your vault and every uploaded file permanently/]) expect(e.answer).toMatch(claim);
+    expect(e.answer).not.toMatch(/What Mindy is not|not FedRAMP|not SOC 2|has not been assessed|not authorized|CUI|classified/i);
   });
-  it('never claims Mindy itself is SOC 2 certified, FedRAMP authorized or CMMC compliant', () => {
-    expect(e.answer).not.toMatch(/Mindy is SOC ?2 certified|Mindy is (FedRAMP|CMMC)|we are SOC ?2|we're SOC ?2/i);
-    expect(e.answer).toMatch(/Built on SOC 2 certified providers/);
+  it('"Are you SOC 2?" gets one honest, positive line', () => {
+    expect(HELP_ENTRIES.security_soc2.answer).toMatch(/^Mindy runs on SOC 2 certified infrastructure \(Vercel and Supabase\); Mindy itself does not hold its own SOC 2 report\./);
   });
-  it('only claims backed by the trust page and the security doc', () => {
-    for (const claim of [/row-level security/, /short-lived signed links/, /contractually do not train on it/, /AI sees only your own records/, /encrypted in transit and at rest/, /one-time email code/, /audit log/, /Vercel and Supabase/, /Stripe \(PCI-DSS Level 1\)/, /never stores your card details/, /export everything as one file/, /delete your vault and every uploaded file permanently/]) expect(e.answer).toMatch(claim);
+  it('FedRAMP / CMMC: one honest line, with the government-cloud path from the trust page', () => {
+    expect(HELP_ENTRIES.security_gov_authorization.answer).toMatch(/it is not FedRAMP authorized and has not been assessed under CMMC\. Where a contract requires it, ask us about deployment inside your own government-authorized cloud environment\./);
   });
-  it('connected files: what Mindy reads, and the Microsoft grant stated honestly (ACCESS_DISCLOSURE)', () => {
+  it('CUI / classified: one honest line', () => {
+    expect(HELP_ENTRIES.security_cui.answer).toMatch(/^Keep classified information and Controlled Unclassified Information \(CUI\) out of Mindy; it is not authorized to process them\./);
+  });
+  it('none of them ever says Mindy itself is SOC 2 certified, FedRAMP authorized or CMMC compliant', () => {
+    for (const x of all) expect(x.answer).not.toMatch(/Mindy is SOC ?2 certified|Mindy is (FedRAMP|CMMC)|we are SOC ?2|we're SOC ?2|Mindy (is|has been) (SOC|FedRAMP|CMMC)/i);
+  });
+  it('connected files: only what the code backs (Mindy reads only the files you pick)', () => {
     expect(e.answer).toContain('Mindy reads only the files you pick, when you ask a question about them.');
-    expect(e.answer).toMatch(/Microsoft's permission screen covers all of your OneDrive files; Mindy still opens only the ones you choose/);
   });
-  it('links the trust page and uses the trust page\'s own contact address (no invented email)', () => {
-    expect(e.answer).toContain('[the trust page](https://getmindy.ai/app/trust)');
-    const emails = (e.answer.match(/[\w.+-]+@[\w-]+(\.[\w-]+)+/g) || []);
-    expect(emails).toEqual(['admin@getmindy.ai']);
+  it('trust page link and the trust page\'s own contact address, never an invented email', () => {
     const trust = readFileSync(join(process.cwd(), 'src/app/app/trust/page.tsx'), 'utf8');
     expect(trust).toContain('admin@getmindy.ai');
+    for (const x of all) {
+      expect(x.answer).toContain('[the trust page](https://getmindy.ai/app/trust)');
+      expect(x.answer.match(/[\w.+-]+@[\w-]+(\.[\w-]+)+/g) || []).toEqual(['admin@getmindy.ai']);
+    }
   });
-  it('a security question hits this answer, never a contract search', () => {
-    for (const q of ['Is my data secure?', 'Are you SOC 2 certified?', 'Who can see my files?']) expect(matchHelpIntent(q)).toBe('security');
+  it('security questions hit these answers, never a contract search; market questions naming a certification do not', () => {
+    for (const q of ['Is my data secure?', 'Who can see my files?']) expect(matchHelpIntent(q)).toBe('security');
+    expect(matchHelpIntent('Are you SOC 2 certified?')).toBe('security_soc2');
     expect(matchHelpIntent('Find me cybersecurity work in Florida')).toBeNull();
-    // A market question that names a certification is NOT a question about Mindy's security.
-    expect(matchHelpIntent('Which agencies buy CMMC assessment services?')).not.toBe('security');
-    expect(matchHelpIntent('Find FedRAMP cloud contracts at DHS')).not.toBe('security');
+    for (const q of ['Which agencies buy CMMC assessment services?', 'Find FedRAMP cloud contracts at DHS']) expect(String(matchHelpIntent(q))).not.toMatch(/^security/);
   });
 });

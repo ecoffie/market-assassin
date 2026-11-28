@@ -300,27 +300,65 @@ function addProductEntries() {
 
   // Security and data handling (Eric, 2026-11-28). ONLY claims from src/app/app/trust/page.tsx and
   // docs/SECURITY-CUSTOMER-FACING.md; connected-file wording from ACCESS_DISCLOSURE (src/lib/connected-apps/config.ts).
-  // Honest limits are stated plainly. Contact: the trust page's own address (never an invented one).
+  // Eric: lead with what Mindy HAS. A limit is said only when the question asks about that thing, in one honest line
+  // (security_soc2 / security_gov_authorization / security_cui). Contact: the trust page's own address.
+  const SECURITY_CONTACT = 'Your security team can get our full security overview by emailing admin@getmindy.ai.';
+  const SECURITY_SUMMARY = 'Your vault is private and enforced by the database, your data never trains AI, everything is encrypted in transit and at rest, sign-in uses two-factor email codes, and you can export or delete your data yourself.';
   add({
     id: 'security',
     kind: 'product',
     triggers: [
-      'is my data safe', 'is my data secure', 'are you SOC 2 certified', 'are you FedRAMP authorized', 'are you CMMC compliant',
-      'do you train AI on my data', 'who can see my files', 'I have a security questionnaire', 'can I delete my data',
+      'is my data safe', 'is my data secure', 'do you train AI on my data', 'who can see my files', 'I have a security questionnaire',
+      'can I delete my data', 'how secure is Mindy',
     ],
     routes: ['/app/trust', '/app'],
     answer: [
       'Here is how Mindy protects what you put in it:',
       steps([
         '**Only you can see your vault.** Your company profile, past performance and uploaded documents are tied to your account, and the database itself enforces that (row-level security). Uploads sit in private storage and download only through short-lived signed links.',
-        '**Your data does not train AI.** Requests that carry your vault data go only to business AI providers that contractually do not train on it, and the AI sees only your own records.',
-        '**Protected sign-in and monitoring.** Data is encrypted in transit and at rest. Sign-in uses a one-time email code, suspicious login activity triggers an alert, and sensitive admin actions are written to an audit log.',
-        '**Built on SOC 2 certified providers.** Mindy runs on Vercel and Supabase. Payments go through Stripe (PCI-DSS Level 1), and Mindy never stores your card details.',
+        '**Your data never trains AI.** Requests that carry your vault data go only to business AI providers that contractually do not train on it, and the AI sees only your own records.',
+        '**Strong sign-in and monitoring.** Data is encrypted in transit and at rest. Sign-in uses two-factor email codes, suspicious login activity triggers a real-time alert, and sensitive admin actions are written to an audit log.',
+        '**SOC 2 certified infrastructure.** Mindy runs on Vercel and Supabase. Payments go through Stripe (PCI-DSS Level 1), and Mindy never stores your card details.',
         `**Export or delete it yourself.** In ${link('My Vault', '/app?panel=vault')} you can export everything as one file, or delete your vault and every uploaded file permanently.`,
       ]),
-      'Files from Google Drive or OneDrive: Mindy reads only the files you pick, when you ask a question about them. (Microsoft\'s permission screen covers all of your OneDrive files; Mindy still opens only the ones you choose.)',
-      '**What Mindy is not:** Mindy itself is not SOC 2 certified (its providers are), it is not FedRAMP authorized and it has not been assessed under CMMC. Do not put classified information or Controlled Unclassified Information (CUI) in Mindy.',
-      `More detail is on ${link('the trust page', '/app/trust')}. Your security team can get the full security overview by emailing admin@getmindy.ai.`,
+      'Files from Google Drive or OneDrive: Mindy reads only the files you pick, when you ask a question about them.',
+      `More detail is on ${link('the trust page', '/app/trust')}. ${SECURITY_CONTACT}`,
+    ].join('\n\n'),
+  });
+
+  add({
+    id: 'security_soc2',
+    kind: 'product',
+    triggers: ['are you SOC 2 certified', 'do you have a SOC 2 report', 'is Mindy SOC 2 compliant'],
+    routes: ['/app/trust'],
+    answer: [
+      'Mindy runs on SOC 2 certified infrastructure (Vercel and Supabase); Mindy itself does not hold its own SOC 2 report.',
+      SECURITY_SUMMARY,
+      `More detail is on ${link('the trust page', '/app/trust')}. ${SECURITY_CONTACT}`,
+    ].join('\n\n'),
+  });
+
+  add({
+    id: 'security_gov_authorization',
+    kind: 'product',
+    triggers: ['are you FedRAMP authorized', 'is Mindy CMMC compliant', 'do you have FedRAMP'],
+    routes: ['/app/trust'],
+    answer: [
+      'Mindy is a commercial product built on SOC 2 certified infrastructure (Vercel and Supabase); it is not FedRAMP authorized and has not been assessed under CMMC. Where a contract requires it, ask us about deployment inside your own government-authorized cloud environment.',
+      SECURITY_SUMMARY,
+      `More detail is on ${link('the trust page', '/app/trust')}. ${SECURITY_CONTACT}`,
+    ].join('\n\n'),
+  });
+
+  add({
+    id: 'security_cui',
+    kind: 'product',
+    triggers: ['can I upload CUI', 'is Mindy approved for classified information', 'can we store controlled unclassified information'],
+    routes: ['/app/trust'],
+    answer: [
+      'Keep classified information and Controlled Unclassified Information (CUI) out of Mindy; it is not authorized to process them. Everything else you upload stays in your private vault.',
+      SECURITY_SUMMARY,
+      `More detail is on ${link('the trust page', '/app/trust')}. ${SECURITY_CONTACT}`,
     ].join('\n\n'),
   });
 }

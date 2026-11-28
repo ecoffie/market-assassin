@@ -10,7 +10,7 @@ export type HelpIntentId =
   | 'find_contracts' | 'pull_bids_from_map' | 'build_shortlist' | 'upload_capability_statement' | 'find_events'
   | 'connect_chatgpt' | 'cancel_subscription' | 'stop_emails' | 'unsubscribe_either'
   | 'write_capability_statement' | 'set_asides' | 'disadvantaged_meaning' | 'certifications' | 'first_bid' | 'write_proposal'
-  | 'security';
+  | 'security' | 'security_soc2' | 'security_gov_authorization' | 'security_cui';
 
 /** The question is asking how to do something, what something means, or for help writing. */
 const HOW_TO = /\b(how (do|can|should|would) (i|we|you)|how to|how does|where (do|can) (i|we)|what (does|do) .{1,60}\bmean|what('s| is| are) (a|an|the)?\s*(set[- ]?aside|8\s*\(?a\)?|capability statement|sdb|hubzone|wosb|sdvosb|vosb)|is (this|it|that) (a )?set[- ]?aside|can you (help|show|walk|teach|tell)|help me (write|draft|create|make|find|get|understand|pursue|bid|cancel|connect|upload)|walk me through|i want to (cancel|connect|upload)|teach me)\b/i;
@@ -29,8 +29,13 @@ const DIRECT: Array<{ id: HelpIntentId; re: RegExp; unless?: RegExp }> = [
   { id: 'stop_emails', re: /\b(unsubscribe|stop|turn off|opt out|pause|too many|fewer|less)\b.{0,30}\b(e-?mails?|alerts?|newsletters?|notifications?|briefings?|digests?)\b/i },
   { id: 'cancel_subscription', re: /\b(cancel(l?ing)? (my |the |our )?(mindy )?(subscription|plan|membership|account|pro|team|trial)|stop (billing|charging)|end (my |the )?(subscription|plan|membership)|refund|cancel mindy)\b/i },
   { id: 'unsubscribe_either', re: /\bunsubscribe\b/i },
-  // Security and data handling (Eric, 2026-11-28): asked without a how-to form, these mean one thing.
-  { id: 'security', re: /\b(is|are) (my|our) (data|files?|information|vault|documents?|uploads?) (safe|secure|private|protected|encrypted)\b|\b(are you|is mindy|is it|is this (app|platform|site)|do you (have|hold)|does mindy (have|hold))\b.{0,30}\b(soc\s*2|fedramp|cmmc|fisma|iso\s*27001)\b|\b(train|training|trained)\b.{0,30}\b(ai|models?|llms?)\b.{0,20}\b(on )?(my|our) (data|files?|documents?|information)\b|\bwho can (see|access|read) (my|our) (data|files?|documents?|vault|information|uploads?)\b|\bsecurity (questionnaire|review|overview|policy|practices|documentation|docs)\b|\b(delete|remove|erase|export|download) (all )?(of )?(my|our) (data|vault|files?|information)\b|\bhow (secure|safe) is (mindy|my data|your (app|platform|site))\b/i },
+  // Security and data handling (Eric, 2026-11-28). The specific questions first, each with its own one-line honest
+  // answer; certification names count only when the question is ABOUT Mindy ("are you…", "is Mindy…", "do you have…"),
+  // so "which agencies buy CMMC services" stays a contract question.
+  { id: 'security_soc2', re: /\b(are you|is mindy|is it|is this (app|platform|site)|do you (have|hold)|does mindy (have|hold)|can you (share|send))\b.{0,30}\bsoc\s*2\b/i },
+  { id: 'security_gov_authorization', re: /\b(are you|is mindy|is it|is this (app|platform|site)|do you (have|hold)|does mindy (have|hold))\b.{0,30}\b(fedramp|cmmc|fisma|il\s*[245]|impact level)\b/i },
+  { id: 'security_cui', re: /\b(can|may|should) (i|we) (upload|put|store|share|add|use)\b.{0,30}\b(cui|controlled unclassified|classified)\b|\b(is|are) (mindy|you|it)\b.{0,20}\b(approved|authorized|cleared|ok|okay|allowed)\b.{0,20}\b(for )?(cui|controlled unclassified|classified)\b/i },
+  { id: 'security', re: /\b(is|are) (my|our) (data|files?|information|vault|documents?|uploads?) (safe|secure|private|protected|encrypted)\b|\b(train|training|trained)\b.{0,30}\b(ai|models?|llms?)\b.{0,20}\b(on )?(my|our) (data|files?|documents?|information)\b|\bwho can (see|access|read) (my|our) (data|files?|documents?|vault|information|uploads?)\b|\bsecurity (questionnaire|review|overview|policy|practices|documentation|docs)\b|\b(delete|remove|erase|export|download) (all )?(of )?(my|our) (data|vault|files?|information)\b|\bhow (secure|safe) is (mindy|my data|your (app|platform|site))\b/i },
   { id: 'write_capability_statement', re: /\b(need|want|looking for|template|example|sample|format)\b.{0,40}\b(capabilit(y|ies) statement|cap statement)\b|\b(capabilit(y|ies) statement|cap statement)\b.{0,30}\b(template|example|sample|format)\b|\bwhat should (my|a) (capabilit(y|ies) statement|cap statement) (include|say|have|look like)\b/i },
 ];
 
