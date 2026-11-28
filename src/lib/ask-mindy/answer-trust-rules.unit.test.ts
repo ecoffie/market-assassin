@@ -38,8 +38,8 @@ describe('c. channels no platform can see: honest, with where to go instead', ()
     expect(UNSEEN_CHANNELS_RULES).toMatch(/Consortium-managed OTA solicitations: project calls go to consortium members only\. Where to go: join the consortium .*name one only when a source in the conversation or the rules register names it as active/);
     expect(UNSEEN_CHANNELS_RULES).toMatch(/Purchase-card micro-purchases: not posted anywhere.* the buying office's award history shows what it buys small/);
   });
-  it('lab/FFRDC subcontracts are not tracked; NECO is never an active channel', () => {
-    expect(UNSEEN_CHANNELS_RULES).toMatch(/Mindy does not track lab subcontracting\. Name a lab's supplier portal only when a source in this conversation gives it/);
+  it('lab/FFRDC subcontracts are not in award data (DOE labs via get_lab_supplier_info); NECO is never an active channel', () => {
+    expect(UNSEEN_CHANNELS_RULES).toMatch(/National lab and FFRDC subcontracts: these do not appear in federal award or subaward data\. For how to sell to a DOE national lab, call get_lab_supplier_info and give its sourced portal, rules and office; for other FFRDCs, name a portal only when a source in the conversation gives it/);
     expect(UNSEEN_CHANNELS_RULES).toMatch(/NECO .* never cite it as an active place to find Navy solicitations/);
   });
 });

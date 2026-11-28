@@ -35,7 +35,7 @@ export const UNSEEN_CHANNELS_RULES = [
   '- Classified and intelligence community requirements: not published, by rule (FAR 5.202(a)(1), the security exception to publicizing). Where to go: the agency\'s small business office and cleared primes\' supplier programs; this work usually needs a facility clearance, which a government customer or prime sponsors.',
   '- Consortium-managed OTA solicitations: project calls go to consortium members only. Where to go: join the consortium that runs that technology area (name one only when a source in the conversation or the rules register names it as active), or team with a member.',
   '- Purchase-card micro-purchases: not posted anywhere; the cardholder buys directly. Where to go: the buying office\'s award history shows what it buys small and from whom; introduce the company to that office and its small business specialist.',
-  '- National lab and FFRDC subcontracts: Mindy does not track lab subcontracting. Name a lab\'s supplier portal only when a source in this conversation gives it.',
+  '- National lab and FFRDC subcontracts: these do not appear in federal award or subaward data. For how to sell to a DOE national lab, call get_lab_supplier_info and give its sourced portal, rules and office; for other FFRDCs, name a portal only when a source in the conversation gives it.',
   '- NECO (the Navy Electronic Commerce Online portal): never cite it as an active place to find Navy solicitations.',
 ].join('\n');
 
