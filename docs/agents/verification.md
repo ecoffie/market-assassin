@@ -39,6 +39,16 @@ npm run db -- cron_jobs --select job_name,cron_expr,enabled --eq enabled=true
 **Env var is in prod:** `vercel env ls production | grep -i <VAR>`. Remember a var only binds on
 a build *after* `vercel env add` — trigger a fresh deploy.
 
+**Ask Mindy answer changes: the Claude + Mindy MCP baseline is the release bar** (Eric, 2026-11-27: "anything about
+Claude MCP should be a baseline benchmark … we don't have to copy but we can learn from them"). For every PR that
+changes Ask Mindy answers, the same fixed prompts answered by Claude with the Mindy MCP connector are the reference.
+**Hard gates** (block release): wrong or invented facts; a fact the baseline found, with tool support, that Ask Mindy
+misses; the dates policy; sourcing and attribution. **Soft signals** (reported, not blocking): structure, tone, length,
+approach. Each run writes `tasks/ask-mindy-vs-claude-mcp-<date>.md` with a learnings section. Design:
+`tasks/claude-mcp-baseline-benchmark-design.md`. **Not built yet** (after Mindy Day): until it is, run
+`verify-ask-mindy` (R1–R10 before/after) and attach a manual side-by-side with a Claude + MCP answer for the changed
+behavior.
+
 **Panel renders what the API returns** (rendered rows == API rows): `/verify-panel <name>`.
 
 **Backfill/drainer progress:** `/backfill-status <job>` (drained vs stalled vs progressing).
