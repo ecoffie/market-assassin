@@ -1,8 +1,9 @@
 /**
  * GET /api/checkout/team-seats?seats=<2..5>&billing=<monthly|annual>
  *
- * Team by seats (owner, 2026-11-24): one Stripe checkout for the chosen team size, on the same
- * 14-day trial as the Team trial links. Card required, promotion codes allowed.
+ * Team by seats (owner, 2026-11-24): one Stripe checkout for the chosen team size. Monthly is on
+ * the same 14-day trial as the Team trial links; yearly is charged immediately, no trial (owner,
+ * 2026-11-28). Card required, promotion codes allowed.
  *
  * ⛔ HELD until Eric approves the seat proposal: the Stripe prices do not exist yet. Until the
  * STRIPE_TEAM_<N>_SEATS_{MONTHLY,ANNUAL}_PRICE env vars are set (prices created on the Mindy app
@@ -36,11 +37,12 @@ export async function GET(req: NextRequest) {
     const session = await getStripe().checkout.sessions.create({
       mode: 'subscription',
       line_items: [{ price, quantity: 1 }],
-      subscription_data: { trial_period_days: TRIAL_DAYS, metadata },
+      // Yearly is paid today (owner, 2026-11-28): no trial. Monthly keeps the 14-day trial.
+      subscription_data: annual ? { metadata } : { trial_period_days: TRIAL_DAYS, metadata },
       payment_method_collection: 'always',
       allow_promotion_codes: true,
       metadata,
-      success_url: `${SITE}/app?trial=started`,
+      success_url: annual ? `${SITE}/app?checkout=success` : `${SITE}/app?trial=started`,
       cancel_url: `${SITE}/pricing`,
     });
     return NextResponse.redirect(session.url || fallback, 303);
