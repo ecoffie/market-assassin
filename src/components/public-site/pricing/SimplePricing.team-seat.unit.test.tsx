@@ -104,8 +104,8 @@ describe('/pricing with the seat switch ON (server render)', () => {
     expect(h.textContent).toContain('Pay monthly, or pay yearly and save up to 33%.');
     expect(doc.querySelector('[aria-label="Billing period"]')).not.toBeNull();
     const foot = doc.querySelector('.seat-foot')!;
-    expect(foot.textContent).toBe('Questions about a rollout: hello@getmindy.ai');
-    expect(foot.querySelector('a')?.getAttribute('href')).toBe('mailto:hello@getmindy.ai');
+    expect(foot.textContent).toBe('Questions about a rollout: admin@getmindy.ai');
+    expect(foot.querySelector('a')?.getAttribute('href')).toBe('mailto:admin@getmindy.ai');
   });
 
   it('moves "Most popular" and the highlighted border from Pro to Team', () => {
