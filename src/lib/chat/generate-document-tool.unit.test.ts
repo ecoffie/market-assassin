@@ -71,6 +71,7 @@ function setup(opts: {
   defenseBuyersAppear?: boolean;
   requestedSections?: ReturnType<typeof requestedDocSections>;
   provenance?: Array<{ retrievedAt: string; asOf?: string | null; url?: string | null; recordIds?: string[] }>;
+  retryForHeading?: boolean;
 } = {}) {
   const tables: Record<string, R[]> = { user_boilerplate_docs: opts.rows ?? [], mindy_chat_sessions: [] };
   const storage = fakeStorage();
@@ -85,6 +86,7 @@ function setup(opts: {
     today: () => '2026-11-17',
     ...(opts.requestedSections ? { requestedSections: opts.requestedSections } : {}),
     ...(opts.provenance ? { provenance: () => opts.provenance! } : {}),
+    ...(opts.retryForHeading ? { retryForHeading: true } : {}),
     ...(opts.federalMarketProfile
       ? {
         federalMarketProfile: true,
@@ -583,5 +585,49 @@ describe('create_document: source provenance from tool results (read dates, link
     expect(s.docs()[0].doc_model.sources[0]).toEqual({ id: 's1', kind: 'usaspending', label: 'USAspending award data' });
     // what the customer sees: the rendered Word/PDF model carries no unverified date
     expect(s.renders.every((x) => x.model.sources[0].retrievedAt === undefined)).toBe(true);
+  });
+});
+
+describe('a market or company report carries a section titled exactly "How They Buy Now" (production retest 2026-11-27)', () => {
+  const sec = (id: string, heading: string) => ({ id, heading, blocks: [{ type: 'paragraph', id: `p-${id}`, text: `VA obligated $412.5M for janitorial services (${heading}).`, claim: 'fact', cites: ['s1'] }] });
+  const reportWithout = () => model({ title: 'Acme Clean market report', sections: [sec('a', 'Summary'), sec('b', 'Where the money is moving'), sec('c', 'Pathways'), sec('d', 'Action plan')] });
+  const reportWith = () => model({ title: 'Acme Clean market report', sections: [sec('a', 'Summary'), sec('h', 'How They Buy Now'), sec('b', 'Where the money is moving'), sec('c', 'Pathways'), sec('d', 'Action plan')] });
+
+  beforeEach(() => { vi.stubEnv('VAULT_GENERATED_FILES', 'true'); });
+  afterEach(() => { vi.unstubAllEnvs(); });
+
+  it('research mode: the first report without the heading is refused with the fix and nothing is saved; the corrected one is saved with it', async () => {
+    const { tool, docs, renders } = setup({ retryForHeading: true });
+    const r1 = await tool.execute({ doc_model: reportWithout() });
+    expect(r1).toMatchObject({ ok: false, error: 'missing_how_they_buy_now' });
+    expect(String(r1.note)).toContain('titled exactly "How They Buy Now" right after the Summary');
+    expect(docs()).toHaveLength(0);
+    const r2 = await tool.execute({ doc_model: reportWith() });
+    expect(r2.ok).toBe(true);
+    expect(r2).not.toHaveProperty('missing_section');
+    const headings = (renders[0].model.sections as Array<{ heading: string }>).map((x) => x.heading);
+    expect(headings.slice(0, 2)).toEqual(['Summary', 'How They Buy Now']);
+  });
+
+  it('a report is never lost: a second attempt still without the heading is saved, with a warning', async () => {
+    const { tool, docs } = setup({ retryForHeading: true });
+    await tool.execute({ doc_model: reportWithout() });
+    const r2 = await tool.execute({ doc_model: reportWithout() });
+    expect(r2).toMatchObject({ ok: true, missing_section: 'How They Buy Now' });
+    expect(String(r2.note)).toMatch(/no section titled "How They Buy Now"/);
+    expect(docs().length).toBeGreaterThan(0);
+  });
+
+  it('standard path (one tool round): saved with the warning, never refused', async () => {
+    const { tool } = setup();
+    const r = await tool.execute({ doc_model: reportWithout() });
+    expect(r).toMatchObject({ ok: true, missing_section: 'How They Buy Now' });
+  });
+
+  it('a document that is not a How They Buy Now report is untouched (one marker is not enough)', async () => {
+    const { tool } = setup({ retryForHeading: true });
+    const r = await tool.execute({ doc_model: model({ sections: [sec('a', 'Summary'), sec('d', 'Action plan')] }) });
+    expect(r.ok).toBe(true);
+    expect(r).not.toHaveProperty('missing_section');
   });
 });

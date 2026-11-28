@@ -14,7 +14,7 @@ export const HOW_THEY_BUY_NOW = [
   'Block 3, the doors: mark ALL EIGHT as fit, possible or not applicable: market research (sources sought, RFIs), vehicles (IDIQ, MACC, MATOC, GSA Schedule, OASIS+, BPA; a seat is a license, not a pipeline), open calls (first awards under $350,000), R&D (SBIR/STTR, BAAs; research and technology firms only), OTAs, consortia, CSOs and rapid capabilities offices, PAEs. Then the CONSORTIUM DECISION as one line: "Join <consortium> (sponsor: <command>) because <capability match>; first move: <team with X / answer the next project call>" or "No consortium: <reason>; your doors are <Y>". Service firms (staffing, janitorial, advertising, consulting) do not join one; a consortium must still be issuing project calls in that area; a firm new to DoW usually teams first; construction firms with a DoW buyer use the military construction OTA authority (10 U.S.C. 2808a, FY2026 NDAA; FAR construction protections are negotiated, not assumed) unless they bring a new construction method; never quote a membership fee the consortium\'s own site does not confirm. Then the TALENT TEST ("Can a contracting officer verify <client>\'s record in four minutes?": public awards, SAM codes, SBA profile, written past performance) and ATTENTION (where they are known, which buyers still need an introduction).',
   'Block 4, where the money is moving: a From | To | What it means table with 2 to 5 rows tied to this client.',
   'Block 5, outreach in a less set-aside world = the action plan: build the buyer list (buying offices, not agencies; target 25; ordering offices on vehicles held; the owning PAE portfolio), brief the small business offices, call named contracting officers, PAE small business leads and primes\' supplier liaisons (who, why, the exact question), say what buyers need to hear (OUTREACH rules; ask what they plan in the next 12 months, whether it will be set aside and for whom, which vehicle, who else to talk to), and work the right events (confirmed events only, or say none are confirmed). Pick what fits from: show up in market research, team with firms that already win, get the GSA vehicle first, price and describe the work as commercial, ask how each buy will be structured (at the VA always ask veteran-owned vs small business generally).',
-  'Report order: 1 Summary (Block 1) · 2 Where <client> stands · 3 What the buyers are dealing with (GAO/IG) · 4 New DoW structure (Block 2, if a DoW buyer) · 5 Where the money is moving (Block 4) · 6 Pathways and examples (Block 3, opportunities and recompetes as supporting examples) · 7 Readiness checklist (always SBA profile keywords) · 8 Action plan (Block 5) · 9 How GovCon Giants helps · 10 Mindy box and sources.',
+  'Report order: 1 Summary (the answer and the ranked moves) · 2 a level-1 section titled exactly "How They Buy Now" (Block 1: the cited shifts and what each means for this client; never folded into the Summary or renamed) · 3 Where <client> stands · 4 What the buyers are dealing with (GAO/IG) · 5 New DoW structure (Block 2, if a DoW buyer) · 6 Where the money is moving (Block 4) · 7 Pathways and examples (Block 3, opportunities and recompetes as supporting examples) · 8 Readiness checklist (always SBA profile keywords) · 9 Action plan (Block 5) · 10 How GovCon Giants helps · 11 Mindy box and sources.',
 ].join('\n');
 
 /** Eric's hardening Fixes 2 and 3: run before any report ships. */
@@ -28,3 +28,20 @@ export const REPORT_SHIP_CHECKS = [
 ].join('\n');
 
 export const HOW_THEY_BUY_NOW_RULES = [HOW_THEY_BUY_NOW, '', REPORT_SHIP_CHECKS].join('\n');
+
+/** The literal section title every market or company report carries (Agent 4 production retest, 2026-11-27). */
+export const HTBN_HEADING = 'How They Buy Now';
+
+/** Section titles that mark a document as a How They Buy Now report (at least two must be present). */
+const HTBN_REPORT_MARKERS = [/where the money is moving/i, /\bpathways\b/i, /readiness checklist/i, /action plan/i, /how govcon giants helps/i, /what the buyers are dealing with/i];
+
+/**
+ * True when a document is built as a market or company report (two or more How They Buy Now section titles) but has
+ * no section titled exactly "How They Buy Now". The content may be there under other headings: the production retest
+ * found the shifts, doors and consortium line present with no such heading.
+ */
+export function htbnHeadingMissing(sections: ReadonlyArray<{ heading?: unknown }> | undefined): boolean {
+  const titles = (sections ?? []).map((s) => (typeof s?.heading === 'string' ? s.heading.trim() : '')).filter(Boolean);
+  if (titles.some((t) => t.toLowerCase() === HTBN_HEADING.toLowerCase())) return false;
+  return HTBN_REPORT_MARKERS.filter((re) => titles.some((t) => re.test(t))).length >= 2;
+}
