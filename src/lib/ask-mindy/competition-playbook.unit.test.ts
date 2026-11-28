@@ -55,13 +55,15 @@ describe('competition answer rules (production test 2026-11-28: SDVOSB IT, WOSB 
     expect(COMPETITION_ANSWER_RULES).toMatch(/Never turn where a list stops into a fact about the data/);
   });
   it('4. the Defense lag line is the exact #2549 wording, everywhere it is said', () => {
-    expect(DEFENSE_LAG_LINE).toBe('Defense awards are published on USAspending.gov with a delay of about 90 days (DoD reporting policy)');
+    // Worded to match the source and linked to it (Eric, 2026-11-28: "yes link the source").
+    expect(DEFENSE_LAG_LINE).toBe('Defense contract data (DoD and the Army Corps of Engineers) is published on a 90-day delay ([USAspending: About the Data](https://www.usaspending.gov/data/about-the-data-download.pdf))');
+    expect(DEFENSE_LAG_LINE).toMatch(/\[USAspending: About the Data\]\(https:\/\/www\.usaspending\.gov\/[^)]+\)/); // a markdown link
     expect(COMPETITION_ANSWER_RULES).toContain(`use exactly: "${DEFENSE_LAG_LINE}"`);
-    expect(NO_DATA_DATES.replace(/' \+ '/g, '')).toContain('Defense awards are published on USAspending.gov with a delay of about 90 days (DoD reporting policy)');
+    expect(NO_DATA_DATES).toContain(DEFENSE_LAG_LINE);
     expect(RESEARCH_INSTRUCTIONS).toContain(DEFENSE_LAG_LINE);
     const route = readFileSync(join(process.cwd(), 'src/app/api/app/chat/route.ts'), 'utf8');
-    expect(route).toContain(DEFENSE_LAG_LINE);
-    for (const t of [COMPETITION_ANSWER_RULES, NO_DATA_DATES, RESEARCH_INSTRUCTIONS, route]) expect(t).not.toMatch(/show up about 90 days late|post about 90 days late|publish about 90 days late/);
+    expect(route).toContain('${DEFENSE_LAG_LINE}, so recent awards may not appear yet'); // the route interpolates the one constant
+    for (const t of [COMPETITION_ANSWER_RULES, NO_DATA_DATES, RESEARCH_INSTRUCTIONS, route]) expect(t).not.toMatch(/show up about 90 days late|post about 90 days late|publish about 90 days late|with a delay of about 90 days \(DoD reporting policy\)/);
   });
   it('5. profile: a status with no trade is answered across trades first, then "For your saved profile (<trade>): ..."', () => {
     expect(QUESTION_OVER_PROFILE).toMatch(/names a status or place but no line of work .* do not narrow the searches to the saved profile's trade: answer across trades first, then add a short "For your saved profile \(<trade>\): \.\.\." part/);

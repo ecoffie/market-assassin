@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { QUESTION_OVER_PROFILE, NO_DATA_DATES, OUTREACH_RULES, ACTION_PLAN_STRUCTURE, OUTREACH_AND_PLAN_RULES, ATTACHED_FACTS_SOURCED } from './outreach-rules';
+import { QUESTION_OVER_PROFILE, NO_DATA_DATES, OUTREACH_RULES, ACTION_PLAN_STRUCTURE, OUTREACH_AND_PLAN_RULES, ATTACHED_FACTS_SOURCED, DEFENSE_LAG_LINE } from './outreach-rules';
 import { RESEARCH_INSTRUCTIONS, researchSystemDynamic } from './research-mode';
 import { CREATE_DOCUMENT_TOOL_DEF } from '@/lib/chat/generate-document-tool';
 
@@ -74,7 +74,7 @@ describe('question over profile, and no data dates', () => {
   it('no freshness dates, but opportunity dates stay', () => {
     expect(NO_DATA_DATES).toMatch(/never print how current Mindy's data is/);
     expect(NO_DATA_DATES).toMatch(/response deadlines, contract end dates, registration expiry/);
-    expect(NO_DATA_DATES).toMatch(/Defense awards are published on USAspending\.gov with a delay of about 90 days \(DoD reporting policy\)/);
+    expect(NO_DATA_DATES).toContain(DEFENSE_LAG_LINE); // the one sourced wording (Eric, 2026-11-28)
   });
 });
 
