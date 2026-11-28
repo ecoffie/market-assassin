@@ -10938,6 +10938,15 @@ const ASK_MINDY_CSS =
   + '.amk-in{display:flex;gap:8px;align-items:flex-end}'
   + '.amk-attach{margin-bottom:6px}.amk-attach-bar{display:flex;align-items:center;gap:8px}.amk-clip{flex:none;border:1px solid #dde3ec;background:#fff;color:#334155;cursor:pointer;font:600 11.5px Inter,system-ui,sans-serif;border-radius:7px;padding:4px 9px}.amk-clip:disabled{opacity:.5;cursor:default}'
   + '.amk-priv{font:500 11px Inter,system-ui,sans-serif;color:#6b7787}.amk-docs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:4px}.amk-doc{display:inline-flex;align-items:center;gap:6px;max-width:100%;border:1px solid #dde3ec;border-radius:7px;padding:2px 4px 2px 8px;font:500 11.5px Inter,system-ui,sans-serif;color:#334155}'
+  + '.amk-drive{margin-bottom:6px;position:relative}.amk-drive-files{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:4px}.amk-drive-files:empty{display:none}.amk-drive-bar{display:flex;align-items:center;gap:8px}'
+  + '.amk-drive-menu{position:absolute;bottom:100%;left:0;z-index:5;width:min(300px,100%);margin-bottom:4px;border:1px solid #dde3ec;border-radius:9px;background:#fff;box-shadow:0 6px 18px rgba(15,23,42,.12);padding:4px}.amk-drive-menu[hidden]{display:none}'
+  + '.amk-drive-item{display:block;width:100%;text-align:left;border:0;background:none;border-radius:6px;padding:6px 8px;font:500 12px Inter,system-ui,sans-serif;color:#111c26;cursor:pointer;text-decoration:none}.amk-drive-item:hover{background:#f1f5f9}'
+  + '.amk-drive-consent{margin-top:6px;border:1px solid #bcd3fb;background:#f5f9ff;border-radius:9px;padding:8px;font:500 12px Inter,system-ui,sans-serif;color:#111c26}.amk-drive-consent[hidden]{display:none}.amk-drive-consent p{margin:0 0 6px}.amk-drive-consent-bar{display:flex;gap:6px}'
+  + '.amk-drive-msg{font:500 11.5px Inter,system-ui,sans-serif;color:#b45309;margin-top:4px}.amk-drive-msg:empty{display:none}.amk-card .amk-drive{display:none}'
+  + '.amk-drive-od{margin-top:6px;border:1px solid #dde3ec;border-radius:9px;padding:6px;background:#fff}.amk-drive-od[hidden]{display:none}.amk-od-hd{display:flex;justify-content:space-between;align-items:center;font:600 12px Inter,system-ui,sans-serif;color:#111c26;margin-bottom:4px}.amk-od-x{border:0;background:none;cursor:pointer;color:#6b7787;font:600 14px Inter}'
+  + '.amk-od-q input{width:100%;box-sizing:border-box;border:1px solid #dde3ec;border-radius:7px;padding:5px 8px;font:400 12px Inter,system-ui,sans-serif;margin-bottom:4px}.amk-od-path button{border:0;background:none;color:#2563eb;cursor:pointer;font:500 11.5px Inter,system-ui,sans-serif;padding:0 2px}.amk-od-path button:disabled{color:#6b7787;cursor:default}'
+  + '.amk-od-list{max-height:200px;overflow-y:auto;font:500 12px Inter,system-ui,sans-serif;color:#6b7787}.amk-od-item{display:block;width:100%;text-align:left;border:0;background:none;border-radius:6px;padding:5px 6px;color:#111c26;cursor:pointer;font:500 12px Inter,system-ui,sans-serif}.amk-od-item:hover{background:#f1f5f9}.amk-od-err{font:500 11.5px Inter,system-ui,sans-serif;color:#b91c1c}.amk-od-err:empty{display:none}'
+  + '@media(prefers-color-scheme:dark){.amk-drive-menu,.amk-drive-od{background:#0d141d;border-color:#202b39}.amk-drive-item,.amk-od-item,.amk-od-hd{color:#eaf1f8}.amk-drive-item:hover,.amk-od-item:hover{background:#16202c}}'
   + '.amk-shots{margin-bottom:6px}.amk-shot-list{display:flex;flex-wrap:wrap;gap:6px}.amk-shot-list:empty{display:none}.amk-shot{position:relative;width:64px;height:44px;border:1px solid #dde3ec;border-radius:7px;overflow:hidden;background:#f5f8fb}.amk-shot img{width:100%;height:100%;object-fit:cover;display:block}'
   + '.amk-shot button{position:absolute;top:2px;right:2px;border:0;border-radius:4px;background:rgba(0,0,0,.65);color:#fff;cursor:pointer;font:600 10px Inter,system-ui,sans-serif;line-height:1;padding:2px 4px}.amk-shot-note{font:500 11.5px Inter,system-ui,sans-serif;color:#b45309;margin-top:4px}.amk-shot-note:empty{display:none}'
   + '.amk-doc button{border:0;background:none;color:#6b7787;cursor:pointer;font:600 12px Inter;padding:0 4px}.amk-attach-err{font:500 11.5px Inter,system-ui,sans-serif;color:#b91c1c}.amk-attach-err:empty{display:none}'
@@ -11220,7 +11229,7 @@ const ASK_MINDY_JS = `<script>(function(){
   }
   function newChat(){
     if(busy||oppCtx) return;
-    sessionId=''; history=[]; viewState={sessionId:'',history:[]}; saveView(); clearFollowups(); greet(); hideHistory();
+    sessionId=''; history=[]; viewState={sessionId:'',history:[]}; saveView(); clearFollowups(); greet(); hideHistory(); if(amkDrive) amkDrive.reset();
     if(input){ input.value=''; input.focus(); }
     try{ if(window.__track) window.__track('tool_use','map_chat_new',{}); }catch(e){}
   }
@@ -11270,7 +11279,7 @@ const ASK_MINDY_JS = `<script>(function(){
       .then(function(r){ if(!r.ok) throw new Error('session '+r.status); return r.json(); })
       .then(function(d){
         if(!d||!d.success||!Array.isArray(d.messages)) throw new Error('shape');
-        sessionId=sid;
+        sessionId=sid; if(amkDrive) amkDrive.reset();
         history=d.messages.filter(function(m){ return m&&(m.role==='user'||m.role==='assistant')&&typeof m.content==='string'; }).map(function(m){
           var h={role:m.role,content:m.content}; var f=m.deliverables&&Array.isArray(m.deliverables.files)?m.deliverables.files:null; if(f&&f.length) h.files=f;
           var r=m.market_report?savedReport({id:m.market_report.report_id,title:m.market_report.title}):null; if(r) h.report=r; if(m.role==='assistant'&&m.research_mode) h.tag=betaLabel(m.research_mode.label); return h; });
@@ -11285,7 +11294,7 @@ const ASK_MINDY_JS = `<script>(function(){
       .then(function(r){
         if(!r.ok) throw new Error('delete '+r.status);
         if(row.parentNode) row.parentNode.removeChild(row);
-        if(sid===sessionId){ sessionId=''; history=[]; saveView(); greet(); }
+        if(sid===sessionId){ sessionId=''; history=[]; saveView(); greet(); if(amkDrive) amkDrive.reset(); }
         var list=histEl.querySelector('.amk-hist-list'); if(list&&!list.querySelector('.amk-hist-row')) histMsg(list,'No saved conversations yet.');
       })
       .catch(function(){ var e=row.querySelector('.amk-hist-err'); if(!e){ e=document.createElement('span'); e.className='amk-hist-err'; e.setAttribute('role','alert'); row.appendChild(e); } e.textContent="Couldn't delete. Try again."; });
@@ -11364,6 +11373,112 @@ const ASK_MINDY_JS = `<script>(function(){
       fetch('/api/app/vault/doc-access?email='+encodeURIComponent(email()),{headers:{'x-mi-auth-token':tok()||'','x-user-email':email()}})
         .then(function(r){ return r.ok?r.json():null; },function(){ return null; })
         .then(function(d){ if(d && d.uploads===true && !amkDocs) buildAttach(); },function(){});
+    }catch(e){}
+  }
+  // ── GOOGLE DRIVE / ONEDRIVE in the drawer (CONNECTED_APPS, Eric 2026-11-28). The same server routes, signed file
+  // handles and 24-hour handle rule as Ask Mindy in the app (src/components/app/chat/ConnectedFiles.tsx). Shown only
+  // when the server says connected files are on for this account (/api/app/chat/capabilities → connected_files) and
+  // GET /api/app/connected-apps lists an account that is already
+  // connected (connecting a first account and disconnecting stay in Ask Mindy in the app). A grant that cannot read files
+  // is reconnected HERE (POST /start, the access note first, then the provider; it returns to the Map). Picks become
+  // removable chips and ride with each question as connectedFiles handles; they belong to THIS conversation (a new
+  // chat or a reopened one starts empty) and are never stored in the browser. Card chat never sends them.
+  var amkDrive=null;
+  var DRIVE_LABEL={google:'Google Drive',microsoft:'OneDrive'};
+  var DRIVE_FILE_SCOPE={google:'https://www.googleapis.com/auth/drive.file',microsoft:'files.read'};
+  var DRIVE_PICK_ERR={unsupported_type:'Mindy can read PDF, Word, Excel, text, Google Docs and Google Sheets files.',too_large:'That file is larger than 15 MB.',reauth_needed:'Please reconnect this account, then pick the file again.',picker_not_configured:'The Google file picker is not set up yet.',file_permission_needed:'Mindy does not have permission to open files in this account. Choose "Reconnect to allow file access" in this menu.',no_access:'Mindy does not have permission to open files in this account. Choose "Reconnect to allow file access" in this menu.'};
+  var DRIVE_MIME=['application/pdf','application/vnd.openxmlformats-officedocument.wordprocessingml.document','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','application/vnd.ms-excel','text/plain','application/vnd.google-apps.document','application/vnd.google-apps.spreadsheet'].join(',');
+  // Known to lack file access only when the provider LISTED its scopes (an empty list is unknown, never a block).
+  function driveLacksFile(c){ var g=c&&c.granted_scopes; if(!g||!g.length) return false; var want=DRIVE_FILE_SCOPE[c.provider];
+    for(var i=0;i<g.length;i++){ if(String(g[i]).replace(/^https:\\/\\/graph\\.microsoft\\.com\\//i,'').toLowerCase()===want) return false; } return true; }
+  var drivePickerLoad=null;
+  function driveLoadPicker(){ if(drivePickerLoad) return drivePickerLoad;
+    drivePickerLoad=new Promise(function(res,rej){ function done(){ window.gapi.load('picker',function(){ res(); }); }
+      if(window.gapi){ done(); return; } var s=document.createElement('script'); s.src='https://apis.google.com/js/api.js'; s.async=true; s.onload=done; s.onerror=function(){ drivePickerLoad=null; rej(new Error('picker_script')); }; document.head.appendChild(s); });
+    return drivePickerLoad; }
+  function buildDrive(conns){
+    var foot=drawer.querySelector('.amk-foot'); if(!foot||amkDrive) return;
+    var row=document.createElement('div'); row.className='amk-drive'; row.setAttribute('data-testid','amk-drive');
+    row.innerHTML='<div class="amk-drive-files"></div><div class="amk-drive-bar"><button type="button" class="amk-clip amk-drive-btn" data-testid="amk-drive-open" aria-expanded="false">Drive or OneDrive</button></div><div class="amk-drive-menu" role="menu" hidden></div><div class="amk-drive-consent" data-testid="amk-drive-consent" hidden></div><div class="amk-drive-od" hidden></div><div class="amk-drive-msg" role="status"></div>';
+    var inRow=foot.querySelector('.amk-in'); foot.insertBefore(row,inRow||null);
+    var filesEl=row.querySelector('.amk-drive-files'), btn=row.querySelector('.amk-drive-btn'), menu=row.querySelector('.amk-drive-menu'), od=row.querySelector('.amk-drive-od'), consent=row.querySelector('.amk-drive-consent'), msg=row.querySelector('.amk-drive-msg');
+    var files=[], noAccess={}, working=false;
+    function hdrs(){ return withWorkspace({'Content-Type':'application/json','x-mi-auth-token':tok()||'','x-user-email':email()}); }
+    function post(path,body){ body.email=email(); return fetch(path,{method:'POST',headers:hdrs(),body:JSON.stringify(body)}).then(function(r){ return r.json().then(function(j){ return {ok:r.ok,j:j||{}}; },function(){ return {ok:r.ok,j:{}}; }); }); }
+    function say(t){ msg.textContent=t||''; }
+    function paint(){ filesEl.innerHTML=''; files.forEach(function(f){ var c=document.createElement('span'); c.className='amk-doc'; c.setAttribute('data-testid','amk-drive-file');
+      var n=document.createElement('span'); n.textContent=f.name; n.title=f.name+' ('+DRIVE_LABEL[f.provider]+')'; c.appendChild(n);
+      var x=document.createElement('button'); x.type='button'; x.setAttribute('aria-label','Remove '+f.name); x.textContent='×'; x.onclick=function(){ files=files.filter(function(o){ return o!==f; }); paint(); }; c.appendChild(x); filesEl.appendChild(c); }); }
+    function addFile(f){ for(var i=0;i<files.length;i++){ if(files[i].handle===f.handle) return; } files.push(f); if(files.length>5) files=files.slice(-5); paint(); }
+    function closeMenu(){ menu.hidden=true; btn.setAttribute('aria-expanded','false'); }
+    function item(text,fn,testid){ var b=document.createElement('button'); b.type='button'; b.className='amk-drive-item'; b.setAttribute('role','menuitem'); if(testid) b.setAttribute('data-testid',testid); b.textContent=text; b.onclick=function(){ closeMenu(); fn(); }; menu.appendChild(b); }
+    // Reconnect for file access (the #2555 rule: never a raw provider 403 page). The server's access note is shown BEFORE
+    // leaving Mindy; the customer chooses to continue. The provider returns to this Map page.
+    function reconnect(c){ busyOn(true); say('');
+      post('/api/app/connected-apps/start',{provider:c.provider,capabilities:['file'],returnTo:location.pathname+location.search}).then(function(r){
+        if(!r.ok||!r.j.authorize_url){ say('Reconnecting is not available right now. Please try again.'); return; }
+        consent.hidden=false; consent.innerHTML='<p></p><div class="amk-drive-consent-bar"><button type="button" class="amk-clip" data-testid="amk-drive-continue"></button><button type="button" class="amk-clip" data-testid="amk-drive-cancel">Cancel</button></div>';
+        consent.querySelector('p').textContent=r.j.access_note||'';
+        var go=consent.querySelector('[data-testid="amk-drive-continue"]'); go.textContent='Continue to '+(c.provider==='google'?'Google':'Microsoft');
+        go.onclick=function(){ location.assign(r.j.authorize_url); };
+        consent.querySelector('[data-testid="amk-drive-cancel"]').onclick=function(){ consent.hidden=true; consent.innerHTML=''; };
+      },function(){ say('Reconnecting is not available right now. Please try again.'); }).then(function(){ busyOn(false); }); }
+    function paintMenu(){ menu.innerHTML=''; conns.forEach(function(c){
+        if(c.status==='reauth_needed'||noAccess[c.id]||driveLacksFile(c)) item('Reconnect '+DRIVE_LABEL[c.provider]+' to allow file access ('+c.connected_email+')',function(){ reconnect(c); },'amk-drive-reconnect');
+        else if(c.provider==='google') item('Pick from Google Drive ('+c.connected_email+')',function(){ pickGoogle(c); },'amk-drive-pick-google');
+        else item('Pick from OneDrive ('+c.connected_email+')',function(){ openOneDrive(c); },'amk-drive-pick-onedrive'); }); }
+    btn.onclick=function(){ if(working) return; say(''); if(menu.hidden){ paintMenu(); menu.hidden=false; btn.setAttribute('aria-expanded','true'); } else closeMenu(); };
+    function refused(c,err){ if(err==='file_permission_needed'||err==='no_access') noAccess[c.id]=1; }
+    function busyOn(on){ working=on; btn.disabled=on; btn.textContent=on?'Opening…':'Drive or OneDrive'; }
+    function pickGoogle(c){ busyOn(true);
+      post('/api/app/connected-apps/picker-token',{connection_id:c.id}).then(function(t){
+        if(!t.ok){ refused(c,t.j.error); say(DRIVE_PICK_ERR[t.j.error]||'The file picker could not open.'); return; }
+        return driveLoadPicker().then(function(){ var g=window.google.picker;
+          var view=new g.DocsView(g.ViewId.DOCS).setIncludeFolders(false).setMimeTypes(DRIVE_MIME);
+          var picker=new g.PickerBuilder().addView(view).setOAuthToken(t.j.access_token).setDeveloperKey(t.j.developer_key).setAppId(t.j.app_id).setTitle('Pick a file for Mindy to read')
+            .setCallback(function(data){ if(data[g.Response.ACTION]!==g.Action.PICKED) return; var d=data[g.Response.DOCUMENTS]&&data[g.Response.DOCUMENTS][0]; if(!d) return;
+              select(c,d[g.Document.ID],'google'); }).build();
+          picker.setVisible(true); });
+      }).catch(function(){ say('The file picker could not open.'); }).then(function(){ busyOn(false); }); }
+    function select(c,fileId,provider){ busyOn(true);
+      return post('/api/app/connected-apps/selections',{connection_id:c.id,file_id:fileId}).then(function(s){
+        if(!s.ok||!s.j.file_handle){ refused(c,s.j.error); say(DRIVE_PICK_ERR[s.j.error]||'That file could not be used.'); return false; }
+        addFile({handle:s.j.file_handle,name:(s.j.file&&s.j.file.name)||'file',provider:provider}); return true;
+      },function(){ say('That file could not be used.'); return false; }).then(function(ok){ busyOn(false); return ok; }); }
+    // OneDrive: Mindy's own chooser over the existing grant, server-side (POST /browse); no Microsoft token in the page.
+    function openOneDrive(c){
+      var path=[{id:null,name:'My files'}], q='';
+      od.hidden=false; od.innerHTML='<div class="amk-od-hd"><span></span><button type="button" class="amk-od-x" aria-label="Close">×</button></div><form class="amk-od-q"><input type="search" maxlength="100" placeholder="Search your OneDrive by file name" aria-label="Search your OneDrive"></form><div class="amk-od-path"></div><div class="amk-od-list" data-testid="amk-od-list"></div><div class="amk-od-err" role="status"></div>';
+      od.setAttribute('role','dialog'); od.setAttribute('aria-label','Pick a file from OneDrive');
+      od.querySelector('.amk-od-hd span').textContent='OneDrive ('+c.connected_email+')';
+      var list=od.querySelector('.amk-od-list'), err=od.querySelector('.amk-od-err'), crumbs=od.querySelector('.amk-od-path'), qIn=od.querySelector('input');
+      function close(){ od.hidden=true; od.innerHTML=''; }
+      od.querySelector('.amk-od-x').onclick=close;
+      od.querySelector('form').onsubmit=function(e){ e.preventDefault(); q=String(qIn.value||'').trim(); load(); };
+      function paintPath(){ crumbs.innerHTML=''; if(q) return; path.forEach(function(p,i){ var b=document.createElement('button'); b.type='button'; b.textContent=(i?'› ':'')+p.name; b.disabled=i===path.length-1; b.onclick=function(){ path=path.slice(0,i+1); load(); }; crumbs.appendChild(b); }); }
+      function load(){ var folder=path[path.length-1]; list.textContent='Loading…'; err.textContent=''; paintPath();
+        var body=q?{connection_id:c.id,q:q}:(folder.id?{connection_id:c.id,folder_id:folder.id}:{connection_id:c.id});
+        post('/api/app/connected-apps/browse',body).then(function(r){ list.innerHTML='';
+          if(!r.ok){ refused(c,r.j.error); if(r.j.error==='file_permission_needed'||r.j.error==='no_access'){ close(); say(DRIVE_PICK_ERR.file_permission_needed); return; } err.textContent=DRIVE_PICK_ERR[r.j.error]||'OneDrive did not respond. Please try again.'; return; }
+          var items=r.j.items||[]; if(!items.length){ list.textContent=q?'No readable files match that name.':'No folders or readable files here.'; return; }
+          items.forEach(function(e){ var b=document.createElement('button'); b.type='button'; b.className='amk-od-item'; b.setAttribute('data-kind',e.kind); b.textContent=(e.kind==='folder'?'▸ ':'')+e.name;
+            b.onclick=function(){ if(e.kind==='folder'){ q=''; qIn.value=''; path.push({id:e.id,name:e.name}); load(); } else { select(c,e.id,'microsoft').then(function(ok){ if(ok) close(); else if(noAccess[c.id]) close(); }); } };
+            list.appendChild(b); });
+        },function(){ list.innerHTML=''; err.textContent='OneDrive did not respond. Please try again.'; }); }
+      load(); }
+    amkDrive={
+      // Handles for one question (never in card chat).
+      handles:function(){ return oppCtx?[]:files.map(function(f){ return f.handle; }); },
+      // A new or reopened conversation starts without picks (the same rule as Ask Mindy in the app).
+      reset:function(){ files=[]; paint(); say(''); closeMenu(); od.hidden=true; od.innerHTML=''; consent.hidden=true; consent.innerHTML=''; }
+    };
+  }
+  function loadDrive(){
+    try{
+      fetch('/api/app/connected-apps?email='+encodeURIComponent(email()),{headers:withWorkspace({'x-mi-auth-token':tok()||'','x-user-email':email()})})
+        .then(function(r){ return r.ok?r.json():null; },function(){ return null; })
+        .then(function(d){ var c=d&&Array.isArray(d.connections)?d.connections.filter(function(x){ return x&&(x.status==='connected'||x.status==='reauth_needed')&&(x.provider==='google'||x.provider==='microsoft'); }):[];
+          if(c.length&&!amkDrive) buildDrive(c); },function(){});
     }catch(e){}
   }
   // Pasted screenshots (view mode only): shown only when the SERVER says it will read them for this account
@@ -11451,7 +11566,7 @@ const ASK_MINDY_JS = `<script>(function(){
     try{
       fetch('/api/app/chat/capabilities?email='+encodeURIComponent(email()),{headers:{'x-mi-auth-token':tok()||'','x-user-email':email()}})
         .then(function(r){ return r.ok?r.json():null; },function(){ return null; })
-        .then(function(d){ if(d && d.screenshots===true) buildShots(); if(d && d.actions===true) actionsOn=true; },function(){});
+        .then(function(d){ if(d && d.screenshots===true) buildShots(); if(d && d.actions===true) actionsOn=true; if(d && d.connected_files===true) loadDrive(); },function(){});
     }catch(e){}
   }
   // ── ASK MINDY CONTROLS THE MAP (beta). The server proposes {type:'action', id, name, args} on the chat stream; this
@@ -12077,6 +12192,7 @@ const ASK_MINDY_JS = `<script>(function(){
     if(!oppCtx&&!history.length&&rep&&rep.ledger&&rep.email===em){ history.push({role:'assistant',content:'I saved your report'+(rep.title?' "'+rep.title+'"':'')+' to your Vault.',sources:rep.ledger}); }
     var payload={email:em,message:sendMsg,sessionId:sessionId||undefined,history:history.slice(-8).map(function(h){ return h.sources?{role:h.role,content:h.content,sources:h.sources}:{role:h.role,content:h.content}; }),display:'narrow_panel',surface:'map'};
     if(shotsAtSend.length) payload.images=shotsAtSend.map(function(x){ return {media_type:x.media_type,data:x.data}; });
+    if(amkDrive){ var driveHs=amkDrive.handles(); if(driveHs.length) payload.connectedFiles=driveHs; }
     if(attAtSend){ payload.context={kind:'opportunity',notice_id:attAtSend.id}; try{ if(window.__track) window.__track('tool_use','ask_mindy_with_notice',{}); }catch(e){} }
     if(oppCtx){ payload.context={kind:'opportunity',notice_id:oppCtx.id}; payload.turn_id=turnId; if(opts.replay)payload.replay_only=true;
       if(!opts.turnId){ try{ if(window.__track) window.__track('tool_use','card_chat_ask',{turn:Math.floor(history.length/2)+1}); }catch(e){} } }
