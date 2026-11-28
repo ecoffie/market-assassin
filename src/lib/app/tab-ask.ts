@@ -30,6 +30,26 @@ export function isTabAskEnabled(): boolean {
 
 /** Event the box fires to open the in-app chat with the question (the app shell listens). */
 export const TAB_ASK_CHAT_EVENT = 'mindy:tab-ask-chat';
+
+/**
+ * The floating Ask Mindy button opens the active tab's Ask box in place (owner, 2026-11-27): no bar
+ * across the top of the tab. Each mounted TabAskBox counts itself here; the button sends
+ * TAB_ASK_TOGGLE_EVENT when a box is mounted and falls back to the chat panel when none is.
+ */
+export const TAB_ASK_TOGGLE_EVENT = 'mindy:tab-ask-toggle';
+let mountedTabAskBoxes = 0;
+export function registerTabAskBox(): () => void {
+  mountedTabAskBoxes += 1;
+  let done = false;
+  return () => { if (!done) { done = true; mountedTabAskBoxes -= 1; } };
+}
+export function hasTabAskBox(): boolean {
+  return mountedTabAskBoxes > 0;
+}
+export function toggleTabAskBox(): void {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new CustomEvent(TAB_ASK_TOGGLE_EVENT));
+}
 /** The chat panel's existing seed key (MindyChatPanel reads it once on mount and sends it). */
 export const CHAT_SEED_KEY = 'mindy_chat_seed';
 
