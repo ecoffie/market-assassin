@@ -39,6 +39,21 @@ export interface ActionDef {
   argsSchema: JsonSchema;
 }
 
+/**
+ * "Take me to ..." (Phase A of tasks/ask-mindy-operates-mindy-plan.md, approved for Mindy Day 2026-11-28). The model
+ * names a destination; the /app client maps it to (panel, section) from its own hard-coded table
+ * (src/lib/app/nav-destinations.ts, Agent 2), whose keys must equal this list. No panel ids, sections or URLs from the
+ * model. Labels are what the answer says, so it stands alone if the customer never clicks.
+ */
+export const NAV_DESTINATION_IDS = ['my_documents', 'my_pursuits', 'alert_settings', 'billing'] as const;
+export type NavDestination = (typeof NAV_DESTINATION_IDS)[number];
+export const NAV_DESTINATION_LABELS: Record<NavDestination, string> = {
+  my_documents: 'My Documents',
+  my_pursuits: 'My Pursuits',
+  alert_settings: 'Settings → Alerts & matching',
+  billing: 'Settings → Billing & credits',
+};
+
 const PLAIN_PATTERN = "^[A-Za-z0-9 ,.&()'/:_-]+$";
 const UUID_PATTERN = '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$';
 const NOTICE_PATTERN = '^[A-Za-z0-9_-]{6,64}$';
@@ -88,6 +103,12 @@ export const ACTIONS: Record<string, ActionDef> = {
     description: 'Open one opportunity on the map. Only a notice id that appeared in THIS turn\'s tool results.',
     args: ['notice_id'],
     argsSchema: { type: 'object', additionalProperties: false, required: ['notice_id'], properties: { notice_id: { type: 'string', pattern: '^[A-Za-z0-9_-]{6,64}$' } } },
+  },
+  'app.navigate': {
+    surfaces: ['app'], kind: 'view', needsConfirm: false, gate: 'none',
+    description: 'Take the customer to a page in the Mindy app: their documents (files Mindy made and their uploads), their pursuits, their alert and matching settings, or billing and credits. Only when they ask where something is or to go there. View only: it never changes a setting.',
+    args: ['destination'],
+    argsSchema: { type: 'object', additionalProperties: false, required: ['destination'], properties: { destination: { type: 'string', enum: [...NAV_DESTINATION_IDS] } } },
   },
   // ── Write actions (slice 2): always the one-line inline confirm; executed by POST /api/app/mindy-actions (Agent 3).
   'map.save_search': {
@@ -210,6 +231,9 @@ export function validateAction(evt: unknown, surface: ActionSurface): ActionChec
   } else if (name === 'map.open_record') {
     if (typeof raw.notice_id !== 'string' || !NOTICE_ID.test(raw.notice_id)) return { ok: false, reason: 'notice_id' };
     args.notice_id = raw.notice_id;
+  } else if (name === 'app.navigate') {
+    if (!(NAV_DESTINATION_IDS as readonly string[]).includes(raw.destination as string)) return { ok: false, reason: 'destination' };
+    args.destination = raw.destination;
   } else if (name === 'map.save_search') {
     const n = plain(raw.name, 80);
     if (n == null) return { ok: false, reason: 'name' };

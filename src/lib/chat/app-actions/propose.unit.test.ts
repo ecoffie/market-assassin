@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   appActionsEnabledFor, parseActionSurface, actionNamesFor, proposeAppActionToolDef, createAppActionProposer,
-  PROPOSE_APP_ACTION, APP_ACTIONS_NOTE, ACTION_OWNED_WRITE_TOOLS, WRITE_CONFIRM_HINTS, pendingWriteNote, type ActionEvent,
+  PROPOSE_APP_ACTION, APP_ACTIONS_NOTE, ACTION_OWNED_WRITE_TOOLS, actionOwnedWriteToolsFor, WRITE_CONFIRM_HINTS, pendingWriteNote, type ActionEvent,
 } from './propose';
 import { ACTIONS, MAX_ACTIONS_PER_TURN } from './registry';
 
@@ -47,9 +47,12 @@ describe('proposeAppActionToolDef', () => {
     expect((params.properties as { name: { enum: string[] } }).name.enum).toEqual(actionNamesFor('map'));
     for (const n of actionNamesFor('map')) expect(def.function.description).toContain(n);
   });
-  it('the app surface has no actions yet, so the route never offers the tool there', () => {
-    expect(actionNamesFor('app')).toEqual(Object.entries(ACTIONS).filter(([, d]) => d.surfaces.includes('app')).map(([n]) => n));
-    expect(actionNamesFor('app')).toHaveLength(0);
+  it('the app surface has exactly app.navigate (Phase A); the Map keeps its own actions', () => {
+    expect(actionNamesFor('app')).toEqual(['app.navigate']);
+    expect(actionNamesFor('map')).not.toContain('app.navigate');
+    const def = proposeAppActionToolDef('app');
+    expect((def.function.parameters as { properties: { name: { enum: string[] } } }).properties.name.enum).toEqual(['app.navigate']);
+    expect(def.function.description).toContain('app.navigate');
   });
 });
 
@@ -197,6 +200,46 @@ describe('app actions own saved-search writes (production test 2026-11-28: updat
   });
   it('the route deny-lists them only on a turn that offers actions', () => {
     const src = readFileSync(join(process.cwd(), 'src/app/api/app/chat/route.ts'), 'utf8');
-    expect(src).toMatch(/\.\.\.\(actions \? \{ blockedToolNames: ACTION_OWNED_WRITE_TOOLS \} : \{\}\),/);
+    expect(src).toMatch(/\.\.\.\(actions && actionOwnedWriteToolsFor\(actions\.surface\) \? \{ blockedToolNames: actionOwnedWriteToolsFor\(actions\.surface\)! \} : \{\}\),/);
+  });
+});
+
+describe('app.navigate: "take me to ..." (Phase A, approved for Mindy Day 2026-11-28)', () => {
+  it('a valid destination is emitted as a view (no confirm), and the model is told the page has NOT opened', () => {
+    const { p, sent } = mk({ surface: 'app' });
+    const r = p.propose({ name: 'app.navigate', args: { destination: 'alert_settings' } });
+    expect(r).toMatchObject({ status: 'proposed' });
+    expect(String(r.note)).toContain('Say exactly: "It\'s in Settings → Alerts & matching. Click Open below." Never say the page opened.');
+    expect(sent).toEqual([{ type: 'action', id: 'act-1', name: 'app.navigate', args: { destination: 'alert_settings' } }]);
+    expect(sent[0]).not.toHaveProperty('needs_confirm');
+  });
+  it('each destination has its own "where it is" label', () => {
+    const want: Record<string, string> = { my_documents: 'My Documents', my_pursuits: 'My Pursuits', alert_settings: 'Settings → Alerts & matching', billing: 'Settings → Billing & credits' };
+    for (const [d, label] of Object.entries(want)) {
+      const { p } = mk({ surface: 'app' });
+      expect(String(p.propose({ name: 'app.navigate', args: { destination: d } }).note)).toContain(`It's in ${label}.`);
+    }
+  });
+  it('no free-form routes: an unknown destination, a URL, a panel id or an extra arg is refused whole', () => {
+    const { p, sent } = mk({ surface: 'app' });
+    expect(p.propose({ name: 'app.navigate', args: { destination: 'admin' } })).toMatchObject({ status: 'rejected', reason: 'destination' });
+    expect(p.propose({ name: 'app.navigate', args: { destination: '/app?panel=settings' } })).toMatchObject({ status: 'rejected', reason: 'destination' });
+    expect(p.propose({ name: 'app.navigate', args: { destination: 'billing', url: 'https://evil' } })).toMatchObject({ status: 'rejected', reason: 'arg:url' });
+    expect(p.propose({ name: 'app.navigate', args: {} })).toMatchObject({ status: 'rejected', reason: 'destination' });
+    expect(sent).toEqual([]);
+  });
+  it('the Map surface cannot propose app.navigate', () => {
+    const { p } = mk({ surface: 'map' });
+    expect(p.propose({ name: 'app.navigate', args: { destination: 'billing' } })).toMatchObject({ status: 'rejected', reason: 'surface' });
+  });
+  it('the system note teaches the "where it is" line and forbids claiming the page opened', () => {
+    expect(APP_ACTIONS_NOTE).toMatch(/propose app\.navigate and say in one line where it is \(My Documents; My Pursuits; Settings → Alerts & matching; Settings → Billing & credits\), then "Click Open below"; never say the page opened/);
+  });
+});
+
+describe('the saved-search deny-list follows the surface (only where the confirmed actions exist)', () => {
+  it('Map: deny-listed; /app (app.navigate only): not deny-listed, so chat there can still create alerts', () => {
+    expect(actionOwnedWriteToolsFor('map')).toBe(ACTION_OWNED_WRITE_TOOLS);
+    expect(actionOwnedWriteToolsFor('app')).toBeNull();
   });
 });
