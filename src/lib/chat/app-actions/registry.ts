@@ -104,13 +104,13 @@ export const ACTIONS: Record<string, ActionDef> = {
     args: ['notice_id'],
     argsSchema: { type: 'object', additionalProperties: false, required: ['notice_id'], properties: { notice_id: { type: 'string', pattern: '^[A-Za-z0-9_-]{6,64}$' } } },
   },
-  // ── Write actions (slice 2): always the one-line inline confirm; executed by POST /api/app/mindy-actions (Agent 3).
   'app.navigate': {
     surfaces: ['app'], kind: 'view', needsConfirm: false, gate: 'none',
     description: 'Take the customer to a page in the Mindy app: their documents (files Mindy made and their uploads), their pursuits, their alert and matching settings, or billing and credits. Only when they ask where something is or to go there. View only: it never changes a setting.',
     args: ['destination'],
     argsSchema: { type: 'object', additionalProperties: false, required: ['destination'], properties: { destination: { type: 'string', enum: [...NAV_DESTINATION_IDS] } } },
   },
+  // ── Write actions (slice 2): always the one-line inline confirm; executed by POST /api/app/mindy-actions (Agent 3).
   'map.save_search': {
     surfaces: ['map'], kind: 'write', needsConfirm: true, gate: 'signed_in',
     description: 'Save the map view the customer is looking at as a saved search, with alerts. The client saves exactly what is on screen; give only a short name and the alert frequency.',
