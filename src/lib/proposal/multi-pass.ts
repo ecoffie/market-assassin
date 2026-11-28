@@ -89,6 +89,9 @@ export async function generateMultiPassSection(opts: MultiPassOpts): Promise<Dra
   );
 
   const ok = results.filter((r): r is DraftResult => !!r && !!r.draft);
+  // A past-performance gap returns the same fill-in template for every subsection — use it once.
+  const gap = ok.find((r) => r.meta.pastPerformanceGap);
+  if (gap) return gap;
   // Total failure → fall back to a single-pass draft so the user still gets something.
   if (ok.length === 0) return generateV2Draft(opts);
 

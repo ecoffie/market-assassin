@@ -264,6 +264,8 @@ export interface DraftProposalSectionResult {
     grounded: boolean;
     degraded: boolean;
     section_type: string;
+    /** Past-performance section not drafted: none saved ('none_on_file') or vault unreadable ('unavailable'). */
+    past_performance_gap?: 'none_on_file' | 'unavailable';
   };
 }
 
@@ -309,15 +311,20 @@ export async function draftProposalSection(input: DraftProposalSectionInput): Pr
 
   const grounded = !!draft && (draft.draft || '').trim().length > 0;
 
+  const ppGap = draft?.meta?.pastPerformanceGap;
   const result: DraftProposalSectionResult = {
     draft,
-    _meta: { grounded, degraded, section_type: sectionType },
+    _meta: { grounded, degraded, section_type: sectionType, ...(ppGap ? { past_performance_gap: ppGap } : {}) },
   };
 
   if (mcpFlags.aiHint) {
     result._ai_hint = {
       summary: degraded
         ? 'The drafting model was unavailable — treat as temporarily unavailable. Retry shortly.'
+        : ppGap === 'none_on_file'
+        ? 'No past performance is saved for this company, so the section was NOT written — it is a fill-in template. Ask the user for their real projects (commercial, state/local and subcontract work can count). Never invent or describe past work for them.'
+        : ppGap === 'unavailable'
+        ? 'Saved past performance could not be loaded, so nothing was drafted. Retry; do not write past performance from nothing.'
         : !grounded
         ? 'The section came back empty — the source may be too thin. Supply the full solicitation text.'
         : `Drafted the ${draft?.label} section (~${draft?.wordCount} words). ${(draft?.meta?.factGuardFlags ?? 0) > 0 ? `${draft?.meta?.factGuardFlags} unverified fact(s) were neutralized to [placeholders].` : 'Vault-grounded where matching past performance existed.'}`,

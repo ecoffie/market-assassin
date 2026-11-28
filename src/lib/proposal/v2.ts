@@ -29,6 +29,7 @@ import { isCapStatementSection, type SectionType, type BuiltPrompt, type DraftRe
 import { alignMatrix, priorityOf, normalizeCategory, type ComplianceReq } from './section-alignment';
 import { buildTemplateCorpusQuery, getTemplateCorpusDocTypes } from './template-corpus';
 import { matchRequirementsToEvidence, formatEvidenceMapForPrompt, type RequirementInput } from './evidence-match';
+import { pastPerformanceGap, noPastPerformanceDraft } from './no-past-performance';
 
 // Evidence weave (Phase 4) is env-gated for a controlled rollout. When off, the
 // drafter keeps the existing behavior (whole-vault dump + gap nudges). When on, it
@@ -351,6 +352,42 @@ export async function generateV2Draft(opts: {
 
   const built = await buildV2Prompt(opts);
   const sectionMeta = getSectionMeta(opts.sectionType);
+
+  // No past performance on file (or the vault read failed) → never ask the model
+  // to write this section; it invented credentials despite the prompt rule.
+  // See no-past-performance.ts.
+  const ppGap = pastPerformanceGap(opts.sectionType, built.context.vault);
+  if (ppGap) {
+    const draft = noPastPerformanceDraft(opts.sectionType, sectionMeta.label, ppGap);
+    return {
+      section: opts.sectionType,
+      label: sectionMeta.label,
+      draft,
+      wordCount: draft.split(/\s+/).filter(Boolean).length,
+      targetWords: built.context.targetWords ?? sectionMeta.targetWords,
+      meta: {
+        model: 'none (deterministic template)',
+        pipeline: 'v2',
+        inputChars: built.context.inputChars,
+        truncated: built.context.wasTruncated,
+        originalChars: opts.sourceText.length,
+        profileGrounded: !!(built.context.profile.naicsCodes?.length || built.context.profile.companyName),
+        vaultGrounded: built.context.vault.has_any,
+        vaultCounts: {
+          past_performance: 0,
+          capabilities: built.context.vault.capabilities?.length || 0,
+          team: built.context.vault.team?.length || 0,
+        },
+        ragChunksUsed: 0,
+        ragSources: [],
+        agencyDetected: built.context.agency.agency,
+        painPointsUsed: 0,
+        lensId: null,
+        humanized: false,
+        pastPerformanceGap: ppGap,
+      },
+    };
+  }
 
   // PROVIDER-AGNOSTIC drafting (Eric QC: "5 sections failed" — Groq's daily quota
   // was exhausted and the old 70B→8B fallback is BOTH Groq, so both died). Use
