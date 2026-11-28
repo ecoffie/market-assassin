@@ -15,6 +15,7 @@
  * on awards (unlike SAM opportunity notices, where pop_state is ~36% filled).
  */
 
+import { AWARD_SEARCH_NESTED_FIELDS, awardNaics, awardPopState, awardPsc, awardRecipientState } from '@/lib/usaspending/award-search-fields';
 import { isoDay } from '@/lib/usaspending/freshness';
 import { CONTRACT_CODES, IDV_CODES } from '@/lib/usaspending/award-type-codes';
 import { usaSpendingAwardingAgencyFilter } from '@/lib/usaspending/awarding-agency-filter';
@@ -143,6 +144,8 @@ const FIELDS = [
   'Contract Award Type',
   'Recipient State Code',
   'Place of Performance State Code',
+  // Current object-shaped names: the flat NAICS/PSC/recipient-state columns above return null (2026-11-28).
+  ...AWARD_SEARCH_NESTED_FIELDS,
   // generated_internal_id is the id the award-detail API + /award/ deep link need
   // (generated_unique_award_id is null for contracts/IDVs). Request both.
   'generated_internal_id',
@@ -170,8 +173,10 @@ export function mapAwardRow(
 ): AwardRow {
   const gid = (c['generated_internal_id'] || c['generated_unique_award_id'] || '') as string;
   const awardId = (c['Award ID'] as string) || '';
-  const sourceNaics = String(c['NAICS Code'] || '').trim();
-  const sourcePsc = String(c['Product or Service Code'] || '').trim();
+  const naics = awardNaics(c);
+  const psc = awardPsc(c);
+  const sourceNaics = naics.code;
+  const sourcePsc = psc.code;
   const qNaics = String(filter.naics || '').trim();
   const qPsc = String(filter.psc || '').trim().toUpperCase();
   return {
@@ -186,11 +191,11 @@ export function mapAwardRow(
     subAgency: (c['Awarding Sub Agency'] as string) || '',
     awardingOffice: (c['Awarding Office'] as string) || '',
     naicsCode: sourceNaics,
-    naicsDescription: (c['NAICS Description'] as string) || '',
+    naicsDescription: naics.description,
     pscCode: sourcePsc,
-    pscDescription: (c['Product or Service Code Description'] as string) || '',
-    recipientState: (c['Recipient State Code'] as string) || '',
-    popState: (c['Place of Performance State Code'] as string) || '',
+    pscDescription: psc.description,
+    recipientState: awardRecipientState(c),
+    popState: awardPopState(c),
     awardType: (c['Contract Award Type'] as string) || '',
     generatedId: gid,
     usaSpendingUrl: gid

@@ -8,12 +8,28 @@
  * Data gaps stated honestly until Data Core fixes them: number_of_offers / competition_type are empty on awards, and
  * assess_market_depth works at state level, not near one buyer.
  */
+import { DEFENSE_LAG_LINE } from './outreach-rules';
+
+/**
+ * Answer rules from the production test of least-competition questions (2026-11-28: SDVOSB IT, WOSB Virginia, SDVOSB with
+ * 1 to 2 bidders). Every ranking states its coverage, every pick shows its real set-aside, and no list cut-off is
+ * presented as a fact about the data.
+ */
+export const COMPETITION_ANSWER_RULES = [
+  'COMPETITION ANSWER RULES (every least-competition or bidder-count answer):',
+  '- COVERAGE: any ranking by competition or bidder count states its coverage. When get_expiring_contracts returns _meta.competition.coverage_line ("Competition checked on X of Y contracts; offers reported on N, set-aside reported on M; K not checked"), quote it VERBATIM. Otherwise count the rows yourself and say "offers reported on X of Y candidates" (X = rows whose offers are reported, Y = all candidate rows you ranked from). Ranking a few contracts without a coverage line is wrong.',
+  '- Offers: a row\'s number_of_offers, competition_type and set_aside_type are usable when competition_fields_source is set ("usaspending_award" = that award\'s own record; "usaspending_parent_idv" = the parent vehicle\'s record, so say the count is for the vehicle, not this order). number_of_offers null means NOT REPORTED, never one bidder and never zero. competition_status "not_checked" means the row was NOT CHECKED (past the lookup cap): say "not checked", never "not reported".',
+  '- SET-ASIDE FIT: when the question names a set-aside group (SDVOSB, VOSB, WOSB, EDWOSB, 8(a), HUBZone), every recommended item shows its actual set-aside. An item set aside for another group, or for small business generally, says so ("set aside for small business generally, not SDVOSB"); an item with no set-aside says "not set aside: open to all firms (full and open)". An empty set_aside_type means the set-aside is NOT ON RECORD: say "set-aside not on record; confirm on SAM.gov before relying on it", never "full and open". Never present an item outside the named group as if it fit it.',
+  '- REAL LIMITS ONLY: when a list stops because of a row limit, a lookup cap or the window searched, say that ("I looked at the first N expiring contracts in this window"; "bidder counts were checked on the first N"). Never turn where a list stops into a fact about the data (not "records show bidder counts only through February").',
+  `- DEFENSE LAG: when it matters, use exactly: "${DEFENSE_LAG_LINE}".`,
+].join('\n');
+
 export const COMPETITION_AND_START_PLAYBOOK = [
   'LEAST COMPETITION / WHERE TO START (two question types; follow this method):',
   'A. "Where is no one bidding" or "where is the least competition for X":',
   '- Call order: find_opportunities(query = X); get_expiring_contracts(naics, agency, state); assess_market_depth(naics, set_aside, state); get_award_detail on the top 2 to 3; get_agency_spending_detail(agency) for the buyer\'s set-aside share.',
   '- Competition signals: capable_depth, eligible_population and tiers (few capable firms means fewer real bidders); the set_aside_type; a single-award or few-holder vehicle (one incumbent to displace); a small total_obligation (a smaller order is an easier first win); the buyer\'s set-aside share.',
-  '- number_of_offers and competition_type are EMPTY in Mindy\'s award data today: say bidder counts are not available, and never imply bidders were counted.',
+  '- Bidder counts come from get_expiring_contracts: a row\'s number_of_offers / competition_type count only when competition_fields_source is set (otherwise those fields are empty and say nothing). Where a row was not checked or its offers are null, say so for those contracts, and never imply bidders were counted.',
   '- Never call it "no competition" because a search came back empty or a contract is still within its term. A firm that only holds a registration is not a competitor.',
   'B. "I\'m an SDVOSB (or similar) and can sell almost anything, where do I start?" (a beginner with no lane):',
   '- Call order: get_sba_goaling_share("VA") or get_agency_spending_detail("VA") (start at the VA, Vets First, unless the customer says otherwise); find_opportunities(query, agency = "VA", set_aside = "SDVOSB", location = state); get_expiring_contracts for the 2 to 3 lines with the most repeat buying nearby; assess_market_depth(naics, "SDVOSB", state); search_federal_contacts(dodaac) once a lane is picked.',
@@ -22,4 +38,6 @@ export const COMPETITION_AND_START_PLAYBOOK = [
   '- assess_market_depth measures a state, not the area around one buyer: say "statewide" when you cite it.',
   'Answer order for both: (1) where I would start, in 2 to 3 lines: one buyer, one line of work, one first target with its date; (2) why: 3 contracts proving the buyer repeats, each with value, incumbent, set-aside and end date; (3) how crowded: the depth numbers, with what could and could not be measured; (4) next move: who to call and the one question to ask; (5) one refinement question (for example "Which can your crew do today: HVAC, electrical or grounds?").',
   'Leave out: NAICS jargon, long lists (no 40-row tables), and asking for company details before giving value.',
+  '',
+  ...COMPETITION_ANSWER_RULES.split('\n'),
 ].join('\n');
