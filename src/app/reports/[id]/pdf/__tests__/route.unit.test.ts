@@ -172,6 +172,37 @@ describe('GET /reports/[id]/pdf — KV unavailable never means "no limit" (owner
   });
 });
 
+describe('GET /reports/[id]/pdf — revoked or expired links', () => {
+  it('a revoked link answers 410 and never starts Chromium', async () => {
+    getMarketReport.mockResolvedValue({ ...REPORT, revoked_at: new Date().toISOString() });
+    const res = await GET(req('application/json'), params(REPORT.id));
+    expect(res.status).toBe(410);
+    expect(await res.json()).toMatchObject({ success: false, error: 'link_unavailable' });
+    expect(htmlToPdf).not.toHaveBeenCalled();
+  });
+
+  it('an expired link answers 410 (HTML for a link click) and never starts Chromium', async () => {
+    getMarketReport.mockResolvedValue({ ...REPORT, expires_at: new Date(Date.now() - 1000).toISOString() });
+    const res = await GET(req('text/html'), params(REPORT.id));
+    expect(res.status).toBe(410);
+    const html = await res.text();
+    expect(html).toContain('expired or was withdrawn');
+    expect(html).not.toContain('drones');
+    expect(htmlToPdf).not.toHaveBeenCalled();
+  });
+
+  it('the id check and the rate limit still run BEFORE the liveness lookup', async () => {
+    const bad = await GET(req('application/json'), params('../x'));
+    expect(bad.status).toBe(404);
+    expect(getMarketReport).not.toHaveBeenCalled();
+    kvDown = true;
+    for (let i = 0; i < PDF_FALLBACK_PER_IP_HOUR; i++) await GET(req('application/json'), params(REPORT.id));
+    getMarketReport.mockClear();
+    expect((await GET(req('application/json'), params(REPORT.id))).status).toBe(429);
+    expect(getMarketReport).not.toHaveBeenCalled();
+  });
+});
+
 describe('build: the route can reach a browser on Vercel', () => {
   it('is listed in next.config.ts outputFileTracingIncludes', async () => {
     const { readFileSync } = await import('node:fs');
