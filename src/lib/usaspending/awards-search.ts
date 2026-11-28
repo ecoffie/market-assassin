@@ -15,7 +15,7 @@
  * on awards (unlike SAM opportunity notices, where pop_state is ~36% filled).
  */
 
-import { AWARD_SEARCH_NESTED_FIELDS, awardNaics, awardPopState, awardPsc, awardRecipientState } from '@/lib/usaspending/award-search-fields';
+import { AWARD_SEARCH_NESTED_FIELDS, awardNaics, awardPopCity, awardPopState, awardPsc, awardRecipientState } from '@/lib/usaspending/award-search-fields';
 import { isoDay } from '@/lib/usaspending/freshness';
 import { CONTRACT_CODES, IDV_CODES } from '@/lib/usaspending/award-type-codes';
 import { usaSpendingAwardingAgencyFilter } from '@/lib/usaspending/awarding-agency-filter';
@@ -74,6 +74,8 @@ export interface AwardRow {
   recipientState: string;
   /** Place of performance state (not recipient HQ). */
   popState: string;
+  /** Place of performance city (not recipient HQ). Empty when USASpending reports none. */
+  popCity: string;
   awardType: string;
   generatedId: string;
   usaSpendingUrl: string;
@@ -196,6 +198,7 @@ export function mapAwardRow(
     pscDescription: psc.description,
     recipientState: awardRecipientState(c),
     popState: awardPopState(c),
+    popCity: awardPopCity(c),
     awardType: (c['Contract Award Type'] as string) || '',
     generatedId: gid,
     usaSpendingUrl: gid

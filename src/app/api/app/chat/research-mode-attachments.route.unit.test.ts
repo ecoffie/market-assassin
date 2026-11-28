@@ -253,6 +253,16 @@ describe('research mode sees the files the customer attached (P0)', () => {
     vi.unstubAllEnvs();
   });
 
+  it('app actions turn on /app: app.navigate is offered and the direct alert tools stay (no confirmed save action there)', async () => {
+    vi.stubEnv('ASK_MINDY_APP_ACTIONS', 'true');
+    vi.stubEnv('ASK_MINDY_APP_ACTIONS_ALLOWLIST', EMAIL);
+    await ask('Where are my alert settings?', { surface: 'app' });
+    expect(openaiTools).toContain('propose_app_action');
+    expect(openaiTools).toContain('schedule_market_search');
+    expect(openaiTools).toContain('update_market_schedule');
+    vi.unstubAllEnvs();
+  });
+
   it('no app actions on the turn (flag off): the schedule tools are still offered, unchanged', async () => {
     await ask('Alert me weekly on janitorial work in Florida');
     expect(openaiTools).not.toContain('propose_app_action');

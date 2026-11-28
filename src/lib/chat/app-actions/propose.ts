@@ -16,7 +16,7 @@
  * - write actions carry needs_confirm: true (the client shows the one-line confirm). None are registered yet.
  */
 import { randomUUID } from 'node:crypto';
-import { ACTIONS, MAX_ACTIONS_PER_TURN, validateAction, type ActionSurface } from './registry';
+import { ACTIONS, MAX_ACTIONS_PER_TURN, validateAction, type ActionSurface, NAV_DESTINATION_LABELS, type NavDestination } from './registry';
 
 export const PROPOSE_APP_ACTION = 'propose_app_action';
 
@@ -87,12 +87,24 @@ export function proposeAppActionToolDef(surface: ActionSurface) {
  */
 export const ACTION_OWNED_WRITE_TOOLS: ReadonlySet<string> = new Set(['schedule_market_search', 'update_market_schedule']);
 
+/**
+ * The deny-list applies only where the confirmed saved-search actions exist (the Map). /app has app.navigate but no
+ * save_search/update_alert, so chat there keeps the direct alert tools (otherwise it could not create alerts at all).
+ */
+export function actionOwnedWriteToolsFor(surface: ActionSurface): ReadonlySet<string> | null {
+  const names = actionNamesFor(surface);
+  return names.includes('map.save_search') || names.includes('map.update_alert') ? ACTION_OWNED_WRITE_TOOLS : null;
+}
+
 /** One line for the system prompt, so the model knows the tool exists and when not to use it. */
 export const APP_ACTIONS_NOTE =
   'APP ACTIONS (beta): propose_app_action can change what the customer sees on this page (filters, horizons, zoom, opening'
   + ' a record). Use it only when they asked to see, filter, open or go somewhere, once per intent, and always answer in words'
   + ' too. Saving a search or changing its alerts goes ONLY through map.save_search / map.update_alert (frequencies: daily,'
   + ' weekly or off; say plainly that other schedules, such as certain weekdays, are not available).'
+  + ' To take the customer somewhere in the app ("where are my documents", "take me to billing"), propose app.navigate and'
+  + ' say in one line where it is (My Documents; My Pursuits; Settings → Alerts & matching; Settings → Billing & credits),'
+  + ' then "Click Open below"; never say the page opened.'
   + ' Never say the change was made: say what you set it to show. A save, add, change or remove is only WAITING until the'
   + ' customer clicks its button: tell them which button to click (for example "Click Add to save it to My Pursuits") and'
   + ' never write "I\'ve added", "I\'ve sent", "saved" or "done" for it.';
@@ -200,7 +212,9 @@ export function createAppActionProposer(opts: {
         id,
         note: def.needsConfirm
           ? pendingWriteNote(check.action.name, check.action.args)
-          : 'Sent to the page; it applies the change and offers Undo. Do not say it was done; say what you set it to show.',
+          : check.action.name === 'app.navigate'
+            ? `The page shows an Open button; nothing has opened yet. Say exactly: "It's in ${NAV_DESTINATION_LABELS[check.action.args.destination as NavDestination]}. Click Open below." Never say the page opened.`
+            : 'Sent to the page; it applies the change and offers Undo. Do not say it was done; say what you set it to show.',
       };
     },
   };

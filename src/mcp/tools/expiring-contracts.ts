@@ -42,6 +42,18 @@ export type WithCompetition = {
   competition_status?: 'checked' | 'not_checked';
   /** Which record filled set_aside_type / number_of_offers / competition_type when the stored row had none. */
   competition_fields_source?: 'usaspending_award' | 'usaspending_parent_idv' | null;
+  /** Where number_of_offers came from. usaspending_parent_idv = offers on the parent VEHICLE, not on this order. */
+  number_of_offers_source?: 'stored' | 'usaspending_award' | 'usaspending_parent_idv' | null;
+  /**
+   * Potential end if every option is exercised, from the award's own record. period_of_performance_current_end is the
+   * CURRENT period (base + exercised options): a base period ending soon with options to a later year is not the
+   * contract's end. null = not checked or not reported.
+   */
+  period_of_performance_potential_end?: string | null;
+  /** Current period end as the award record reports it today (the stored current end can lag the record). */
+  period_of_performance_current_end_record?: string | null;
+  /** usaspending_award = place city/state filled from the award's own record because the stored row had none. */
+  place_of_performance_source?: 'stored' | 'usaspending_award' | null;
 };
 
 /** Short set-aside label from the award record's own value (the same vocabulary as the stored set_aside_type). */
@@ -71,9 +83,28 @@ export function fillCompetitionColumns<T extends ExpiringContract & WithCompetit
   const out = { ...row } as T;
   let filled = false;
   if (out.set_aside_type == null && c.set_aside_reported) { out.set_aside_type = setAsideLabelFromRecord(c.set_aside_reported); filled = true; }
-  if (out.number_of_offers == null && c.offers_received != null) { out.number_of_offers = c.offers_received; filled = true; }
+  if (out.number_of_offers != null) out.number_of_offers_source = 'stored';
+  else if (c.offers_received != null) { out.number_of_offers = c.offers_received; out.number_of_offers_source = c.offers_source ?? c.source; filled = true; }
+  else out.number_of_offers_source = null;
   if (out.competition_type == null && c.extent_competed) { out.competition_type = c.extent_competed; filled = true; }
   out.competition_fields_source = filled ? c.source : null;
+  return fillAwardRecordFields(out);
+}
+
+/**
+ * Place of performance and period ends from the award's OWN record (never a parent vehicle's). A stored value is kept;
+ * an empty one is filled and labelled. Unreported stays null.
+ */
+export function fillAwardRecordFields<T extends ExpiringContract & WithCompetition>(row: T): T {
+  const r = row.competition?.award_record;
+  const out = { ...row } as T;
+  out.period_of_performance_potential_end = r?.period_potential_end ?? null;
+  out.period_of_performance_current_end_record = r?.period_current_end ?? null;
+  const hadPlace = !!(out.place_of_performance_city || out.place_of_performance_state);
+  let filledPlace = false;
+  if (!out.place_of_performance_city && r?.place_of_performance_city) { out.place_of_performance_city = r.place_of_performance_city; filledPlace = true; }
+  if (!out.place_of_performance_state && r?.place_of_performance_state) { out.place_of_performance_state = r.place_of_performance_state; filledPlace = true; }
+  out.place_of_performance_source = filledPlace ? 'usaspending_award' : hadPlace ? 'stored' : null;
   return out;
 }
 
@@ -196,6 +227,8 @@ export interface ExpiringContractsToolResult {
     competition?: {
       source: 'usaspending_award'; checked: number; not_checked: number; competed: number; not_competed: number; unknown: number;
       offers_reported: number; set_aside_reported: number; from_parent_vehicle: number;
+      /** Rows whose offer count is the parent VEHICLE's (the order's own record had none). */
+      offers_from_parent_vehicle: number;
       /** Cite this line: "Competition checked on X of Y …; offers reported on N …". */
       coverage_line: string;
     };
@@ -291,15 +324,24 @@ export async function expiringContracts(
     const started = Date.now();
     const budgetMs = opt.budgetMs ?? 10_000;
     const facts = await competitionFactsFor(toCheck, lookup, { budgetMs });
-    // Orders whose own record does not establish competition: read the parent vehicle's record (same budget).
+    // Orders whose own record leaves competition OR the offer count unestablished: read the parent vehicle's record
+    // (same budget). Previously only class=unknown orders were sent, so an order classed from its own record but
+    // missing its offer count never got the vehicle's count — offers appeared on some orders and not others.
     const orderParent = new Map(expiringOrders.filter((o) => o.parent_vehicle_id).map((o) => [o.contract_id, o.parent_vehicle_id as string]));
-    const needParent = [...facts].filter(([id, f]) => f.class === 'unknown' && orderParent.has(id)).map(([id]) => id);
+    const needParent = [...facts].filter(([id, f]) => (f.class === 'unknown' || f.offers_received == null) && orderParent.has(id)).map(([id]) => id);
     const remaining = budgetMs - (Date.now() - started);
     if (needParent.length && remaining > 500) {
       const parents = await competitionFactsFor([...new Set(needParent.map((id) => orderParent.get(id)!))], lookup, { budgetMs: remaining });
       for (const id of needParent) {
+        const own = facts.get(id)!;
         const p = parents.get(orderParent.get(id)!);
-        if (p && p.class !== 'unknown') facts.set(id, { ...p, source: 'usaspending_parent_idv', detail: `${p.detail} (read from the parent vehicle's record; the order's own record did not state it).` });
+        if (!p || p.source === 'none') continue;
+        if (own.class === 'unknown' && p.class !== 'unknown') {
+          // Competition from the vehicle; place and period stay the ORDER's own.
+          facts.set(id, { ...p, source: 'usaspending_parent_idv', offers_source: p.offers_received != null ? 'usaspending_parent_idv' : null, award_record: own.award_record ?? null, detail: `${p.detail} (read from the parent vehicle's record; the order's own record did not state it).` });
+        } else if (own.offers_received == null && p.offers_received != null) {
+          facts.set(id, { ...own, offers_received: p.offers_received, offers_source: 'usaspending_parent_idv' });
+        }
       }
     }
     const attach = <T extends ExpiringContract>(c: T): T & WithCompetition => {
@@ -313,6 +355,7 @@ export async function expiringContracts(
     const offersReported = [...facts.values()].filter((f) => f.offers_received != null).length;
     const setAsideReported = [...facts.values()].filter((f) => f.set_aside_reported != null).length;
     const notChecked = allIds.size - facts.size;
+    const offersFromParent = [...facts.values()].filter((f) => f.offers_source === 'usaspending_parent_idv').length;
     competitionMeta = {
       source: 'usaspending_award',
       checked: facts.size,
@@ -321,7 +364,8 @@ export async function expiringContracts(
       offers_reported: offersReported,
       set_aside_reported: setAsideReported,
       from_parent_vehicle: [...facts.values()].filter((f) => f.source === 'usaspending_parent_idv').length,
-      coverage_line: `Competition checked on ${facts.size} of ${allIds.size} contracts; offers reported on ${offersReported}, set-aside reported on ${setAsideReported}${notChecked ? `; ${notChecked} not checked (lookup cap)` : ''}.`,
+      offers_from_parent_vehicle: offersFromParent,
+      coverage_line: `Competition checked on ${facts.size} of ${allIds.size} contracts; offers reported on ${offersReported}${offersFromParent ? ` (${offersFromParent} from the parent vehicle)` : ''}, set-aside reported on ${setAsideReported}${notChecked ? `; ${notChecked} not checked (lookup cap)` : ''}.`,
     };
   }
   const applied: Record<string, unknown> = {};
@@ -372,7 +416,7 @@ export async function expiringContracts(
         ? `${standalone.length} standalone contract(s) expiring in-window${top ? ` (soonest: ${top.incumbent_name ?? 'incumbent n/a'} @ ${top.awarding_agency ?? 'agency n/a'} ends ${top.period_of_performance_current_end ?? '?'})` : ''}; ${vehicles.length} vehicle(s) with orders flowing under them.`
         : 'No expiring contracts matched. Widen months_window or drop filters.',
       how_to_use: grounded
-        ? 'contracts[] are standalone awards: incumbent_name = who to unseat; period_of_performance_current_end = the clock; total_obligation = dollars obligated to date; potential_total_value = the award ceiling ONLY when a source reported one (ceiling_basis=source_reported) — null with ceiling_basis=not_established means the ceiling is unknown here, never that it equals the obligation; get_award_detail returns the award record\'s ceiling. '
+        ? 'contracts[] are standalone awards: incumbent_name = who to unseat; period_of_performance_current_end = the current period end (the clock); period_of_performance_potential_end = the end if every option is exercised — a base period ending soon with options running later is not the contract\'s end; total_obligation = dollars obligated to date; potential_total_value = the award ceiling ONLY when a source reported one (ceiling_basis=source_reported) — null with ceiling_basis=not_established means the ceiling is unknown here, never that it equals the obligation; get_award_detail returns the award record\'s ceiling. '
           + 'capture_start_date is a SUGGESTED capture start derived by rule (capture_start_basis: PoP end − 12 months) — say "Contract ends <end>. Suggested capture start: <date>." Never call it a recompete date. estimated_recompete_date is null: no source establishes when the follow-on will be solicited. '
           + 'unresolved_orders[] are task/delivery orders whose parent vehicle is not recorded (parent_vehicle = UNKNOWN) — not recompetes, and not grouped. '
           + 'vehicles[] are task/delivery orders grouped by parent vehicle — orders are NOT re-competed on their own; ordering_end_date is the vehicle\'s recompete signal, and null means unknown; ordering_period_status=closed means the vehicle already stopped taking orders (its follow-on is not established here). Present them as "work flowing under <vehicle>", a teaming/sub-under lead, never as recompetes. '
@@ -381,7 +425,7 @@ export async function expiringContracts(
         : 'No grounded contracts; say none matched rather than inventing one.',
       key_caveats: [
         'vehicles[] groups orders by the parent IDV recorded on each order. Holders of a multiple-award vehicle each hold their own IDV number, so sibling IDVs from one solicitation appear as separate vehicles; holders_in_result lists only holders seen in these rows.',
-        'place_of_performance_state is the place of performance as reported by USASpending, shown as reported; null means USASpending reported none.',
+        'place_of_performance_state / place_of_performance_city are the place of performance as reported by USASpending (place_of_performance_source=usaspending_award when filled from the award record); null means not reported or not checked.',
         'recompete_likelihood is an inference; some contracts get extended or not recompeted.',
         'competition is read from each award\'s own USASpending record (orders fall back to the parent vehicle, competition.source=usaspending_parent_idv): class competed | not_competed | unknown. set_aside_type / number_of_offers / competition_type are filled from that record when the stored row had none (competition_fields_source). number_of_offers null = NOT REPORTED on the award, never "1 bidder" or zero. competition_status=not_checked = not looked up (past the lookup cap) — say so, never "not established". Cite _meta.competition.coverage_line.',
         // set_aside_type is NULL on ~65% of rows (only PIIDs matched in the BQ awards
