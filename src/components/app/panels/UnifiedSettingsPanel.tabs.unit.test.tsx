@@ -89,3 +89,41 @@ describe('Settings tabs (actual panel)', () => {
     expect(panel('profile').querySelector<HTMLInputElement>('input[placeholder="John Doe"]')!.value).toBe('Grace');
   });
 });
+
+describe('Settings: a section request while Settings is already open (Ask Mindy, sidebar)', () => {
+  async function renderReq(section: 'alerts' | 'profile' | undefined, sectionRequest: unknown) {
+    const { ToastHost } = await import('@/components/app/Toast');
+    const { default: UnifiedSettingsPanel } = await import('./UnifiedSettingsPanel');
+    await act(async () => { root.render(<ToastHost><UnifiedSettingsPanel email={EMAIL} tier="pro" initialSection={section} sectionRequest={sectionRequest} /></ToastHost>); });
+    for (let i = 0; i < 200 && !tabBtn('Profile'); i++) {
+      await act(async () => { await new Promise((r) => setTimeout(r, 10)); });
+    }
+  }
+
+  it('asking again for the same section after the customer moved to another tab jumps back to it', async () => {
+    const first = { section: 'alerts' };
+    await renderReq('alerts', first);
+    expect(tabBtn('Alerts & matching')?.getAttribute('aria-selected')).toBe('true');
+    await act(async () => { tabBtn('Account')!.click(); });
+    expect(tabBtn('Account')?.getAttribute('aria-selected')).toBe('true');
+    // A NEW request object for the same section (a second "show me my alert settings").
+    await renderReq('alerts', { section: 'alerts' });
+    expect(tabBtn('Alerts & matching')?.getAttribute('aria-selected')).toBe('true');
+  });
+
+  it('a re-render with the SAME request does not undo the customer\'s own tab click', async () => {
+    const req = { section: 'profile' };
+    await renderReq('profile', req);
+    await act(async () => { tabBtn('Account')!.click(); });
+    await renderReq('profile', req);
+    expect(tabBtn('Account')?.getAttribute('aria-selected')).toBe('true');
+  });
+
+  it('the panel router passes the navigation context, and the address bar keeps the Settings section', async () => {
+    const { readFileSync } = await import('node:fs');
+    const router = readFileSync('src/components/app/panels/index.tsx', 'utf8');
+    expect(router).toMatch(/<UnifiedSettingsPanel[\s\S]{0,300}sectionRequest=\{panelContext\}/);
+    const page = readFileSync('src/app/app/page.tsx', 'utf8');
+    expect(page).toContain("if ((panel === 'vault' || panel === 'settings') && typeof context?.section === 'string') params.set('section', context.section);");
+  });
+});

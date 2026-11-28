@@ -135,6 +135,7 @@ export default function PanelContainer({ activePanel, email, tier, onPanelChange
             email={email}
             tier={tier}
             initialSection={parseSettingsSection(typeof panelContext?.section === 'string' ? panelContext.section : null)}
+            sectionRequest={panelContext}
           />
         );
       case 'proposals':

@@ -235,6 +235,31 @@ describe('research mode sees the files the customer attached (P0)', () => {
     delete process.env.VAULT_ASK_MINDY_UPLOADS;
   });
 
+  it('app actions turn (Map): the unconfirmed saved-search writes are NOT offered, in either engine; a normal turn keeps them', async () => {
+    vi.stubEnv('ASK_MINDY_APP_ACTIONS', 'true');
+    vi.stubEnv('ASK_MINDY_APP_ACTIONS_ALLOWLIST', EMAIL);
+    // standard path (research off)
+    await ask('Change my TEST alerts to daily', { surface: 'map' });
+    expect(openaiTools).toContain('propose_app_action');
+    expect(openaiTools).not.toContain('update_market_schedule');
+    expect(openaiTools).not.toContain('schedule_market_search');
+    // research path
+    flagOn();
+    await ask('Change my TEST alerts to daily', { surface: 'map' });
+    const names = (h.create.mock.calls[0][0] as { tools: Array<{ name: string }> }).tools.map((t) => t.name);
+    expect(names).toContain('propose_app_action');
+    expect(names).not.toContain('update_market_schedule');
+    expect(names).not.toContain('schedule_market_search');
+    vi.unstubAllEnvs();
+  });
+
+  it('no app actions on the turn (flag off): the schedule tools are still offered, unchanged', async () => {
+    await ask('Alert me weekly on janitorial work in Florida');
+    expect(openaiTools).not.toContain('propose_app_action');
+    expect(openaiTools).toContain('schedule_market_search');
+    expect(openaiTools).toContain('update_market_schedule');
+  });
+
   it('nothing attached: no ATTACHED FILES block at all', async () => {
     flagOn();
     await ask(Q);

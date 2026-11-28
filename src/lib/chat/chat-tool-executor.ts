@@ -88,6 +88,11 @@ export interface ChatToolExecutorOptions {
    */
   allowedToolNames?: ReadonlySet<string>;
   /**
+   * Optional NARROWING deny-list: these names are never offered nor executed this turn (e.g. the direct saved-search
+   * writes on a turn where the confirmed app actions own them). Like the allow-list, it can only remove tools.
+   */
+  blockedToolNames?: ReadonlySet<string>;
+  /**
    * Whose Vault grounds Vault-reading registry tools (drafting) when a coach is acting in an
    * authorized client workspace. Unset = the caller's own (unchanged). See chat-acting-scope.ts.
    */
@@ -181,7 +186,8 @@ export function createChatToolExecutor(opts: ChatToolExecutorOptions) {
 
   const isRegistered = (name: string) => tier0.names.has(name) || deps.isMcpTool(name);
   const allowed = opts.allowedToolNames;
-  const inAllowList = (name: string) => !allowed || allowed.has(name);
+  const blocked = opts.blockedToolNames;
+  const inAllowList = (name: string) => (!allowed || allowed.has(name)) && !(blocked && blocked.has(name));
   const policyFor = (name: string) => chatToolPolicy(name, isRegistered(name));
 
   // Tool JSON schemas, so redaction can validate enum fields against the declared values.
