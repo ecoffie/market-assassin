@@ -87,11 +87,15 @@ describe('35-prompt production run fixes (2026-11-28: 28 pass / 7 fail)', () => 
     expect(COMPETITION_ANSWER_RULES).toMatch(/A follow-up that reuses earlier numbers carries the same caveat and never restates a sample as fact/);
   });
   it('Q34: current period vs options, written against both potential-end field names', () => {
-    expect(COMPETITION_ANSWER_RULES).toMatch(/current period end \(period_of_performance_current_end\) and a potential end with all options \(period_of_performance_potential_end or potential_end_date\), say "current period ends <date>; options can run to <date>"/);
+    // Field names from #2592 (Agent 3): no potential_end_date exists on the row.
+    expect(COMPETITION_ANSWER_RULES).toMatch(/period_of_performance_current_end_record when present .* otherwise period_of_performance_current_end\. When period_of_performance_potential_end \(the end if every option is exercised\) is later, say "current period ends <date>; options can run to <date>"/);
+    expect(COMPETITION_ANSWER_RULES).toMatch(/A null potential end means NOT REPORTED or not checked, never "no options"/);
+    expect(COMPETITION_ANSWER_RULES).not.toMatch(/potential_end_date/);
     expect(COMPETITION_ANSWER_RULES).toMatch(/Never present the current period end as the contract's end when options exist/);
   });
   it('Q13/Q26: "does not list a city" only when place_of_performance_city is actually empty', () => {
-    expect(COMPETITION_ANSWER_RULES).toMatch(/say a record "does not list a city" only when the place-of-performance city field \(place_of_performance_city\) is actually empty on those rows/);
+    expect(COMPETITION_ANSWER_RULES).toMatch(/say a record "does not list a city" only when place_of_performance_city is actually empty on those rows \(place_of_performance_source tells where a filled city came from/);
+    expect(COMPETITION_ANSWER_RULES).toMatch(/number_of_offers_source or competition\.offers_source is "usaspending_parent_idv": those are offers on the VEHICLE, not on this order/);
   });
   it('Q27: a fact another result in the chat contains is used, never "could not be established"', () => {
     expect(COMPETITION_ANSWER_RULES).toMatch(/if any tool result in this conversation gives a fact \(a response deadline, an incumbent, an end date\), use it\. Never say a fact "could not be established" when another result in the same conversation contains it/);
