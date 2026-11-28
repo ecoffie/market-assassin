@@ -344,7 +344,7 @@ function addProductEntries() {
     triggers: ['are you FedRAMP authorized', 'is Mindy CMMC compliant', 'do you have FedRAMP'],
     routes: ['/app/trust'],
     answer: [
-      'Mindy is a commercial product built on SOC 2 certified infrastructure (Vercel and Supabase); it is not FedRAMP authorized and has not been assessed under CMMC. Where a contract requires it, ask us about deployment inside your own government-authorized cloud environment.',
+      'Mindy is a commercial product built on SOC 2 certified infrastructure (Vercel and Supabase); it is not FedRAMP authorized and has not been assessed under CMMC. Deployment inside your own government-authorized cloud environment is on our roadmap for contracts that require it; ask us and we\'ll tell you exactly where it stands.',
       SECURITY_SUMMARY,
       `More detail is on ${link('the trust page', '/app/trust')}. ${SECURITY_CONTACT}`,
     ].join('\n\n'),

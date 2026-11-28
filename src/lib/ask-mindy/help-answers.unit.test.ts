@@ -304,8 +304,10 @@ describe('security help answers (Eric, 2026-11-28: lead with what Mindy HAS; a l
   it('"Are you SOC 2?" gets one honest, positive line', () => {
     expect(HELP_ENTRIES.security_soc2.answer).toMatch(/^Mindy runs on SOC 2 certified infrastructure \(Vercel and Supabase\); Mindy itself does not hold its own SOC 2 report\./);
   });
-  it('FedRAMP / CMMC: one honest line, with the government-cloud path from the trust page', () => {
-    expect(HELP_ENTRIES.security_gov_authorization.answer).toMatch(/it is not FedRAMP authorized and has not been assessed under CMMC\. Where a contract requires it, ask us about deployment inside your own government-authorized cloud environment\./);
+  it('FedRAMP / CMMC: one honest line; the government-cloud deployment is stated as ROADMAP, not available today', () => {
+    expect(HELP_ENTRIES.security_gov_authorization.answer).toMatch(/it is not FedRAMP authorized and has not been assessed under CMMC\. Deployment inside your own government-authorized cloud environment is on our roadmap for contracts that require it; ask us and we'll tell you exactly where it stands\./);
+    expect(HELP_ENTRIES.security_gov_authorization.answer).toMatch(/government-authorized cloud environment is on our roadmap/);
+    expect(HELP_ENTRIES.security_gov_authorization.answer).not.toMatch(/ask us about deployment/);
   });
   it('CUI / classified: one honest line', () => {
     expect(HELP_ENTRIES.security_cui.answer).toMatch(/^Keep classified information and Controlled Unclassified Information \(CUI\) out of Mindy; it is not authorized to process them\./);
