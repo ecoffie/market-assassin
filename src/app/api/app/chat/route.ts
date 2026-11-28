@@ -1240,6 +1240,8 @@ export async function POST(request: NextRequest) {
               request,
               chatSessionId: body.sessionId === sessionId ? turnSessionId : null,
               ...(requestedSections.length ? { requestedSections } : {}),
+              // Research loops: a report missing its "How They Buy Now" section is refused once so the model can fix it.
+              ...(researchTurn ? { retryForHeading: true } : {}),
               // Read dates / links / record ids for DocSources, from this turn's tool results and earlier signed ledgers.
               provenance: () => provenanceRecords(turnSources, priorLedgers.flatMap((l) => l.entries)),
               // FMP step-8 validator: refuse incomplete / banned profiles before Vault save.

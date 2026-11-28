@@ -14,7 +14,10 @@ export const QUESTION_OVER_PROFILE =
   'QUESTION OVER PROFILE: facts the customer states in THIS conversation (their status or certifications, location, what'
   + ' they sell, the company they name) override the saved profile. Use the profile only to fill what the question leaves'
   + ' out. When the question describes a different business (another company named, other work, another place), do not use'
-  + ' the profile at all and do not mention it in the answer body; at most one line in Sources and coverage.';
+  + ' the profile at all and do not mention it in the answer body; at most one line in Sources and coverage.'
+  + ' A FILE THE CUSTOMER ATTACHED counts as their words: when an attached file (a capability statement, company'
+  + ' profile, past performance) describes a company, research THAT company, not the saved profile, and say whose'
+  + ' file it is from its own name.';
 
 /** No data-freshness dates in what the customer reads. */
 export const NO_DATA_DATES =
