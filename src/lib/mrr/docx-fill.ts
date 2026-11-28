@@ -50,7 +50,9 @@ export function resolveMrrTemplatePath(): string {
 export const PROTOTYPE_BANNER = 'PROTOTYPE — NOT FOR SIGNATURE';
 
 export function sha256File(path: string): string {
-  return createHash('sha256').update(readFileSync(path)).digest('hex');
+  // turbopackIgnore: the template reaches the lambda through next.config outputFileTracingIncludes, not tracing.
+  // Without it Next 16.4 traces the WHOLE project into every route that imports this module.
+  return createHash('sha256').update(readFileSync(/*turbopackIgnore: true*/ path)).digest('hex');
 }
 
 /** Throws if the source template drifted. Call before AND after every fill. */
@@ -65,7 +67,7 @@ export type DocxParts = Record<string, Uint8Array>;
 
 /** Read every ZIP entry into memory. The source file is opened read-only. */
 export function readDocxParts(path: string = resolveMrrTemplatePath()): DocxParts {
-  return unzipSync(readFileSync(path));
+  return unzipSync(readFileSync(/*turbopackIgnore: true*/ path)); // see sha256File
 }
 
 export function getDocumentXml(parts: DocxParts): string {
