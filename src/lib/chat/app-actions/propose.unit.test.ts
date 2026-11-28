@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   appActionsEnabledFor, parseActionSurface, actionNamesFor, proposeAppActionToolDef, createAppActionProposer,
-  PROPOSE_APP_ACTION, APP_ACTIONS_NOTE, WRITE_CONFIRM_HINTS, pendingWriteNote, type ActionEvent,
+  PROPOSE_APP_ACTION, APP_ACTIONS_NOTE, ACTION_OWNED_WRITE_TOOLS, WRITE_CONFIRM_HINTS, pendingWriteNote, type ActionEvent,
 } from './propose';
 import { ACTIONS, MAX_ACTIONS_PER_TURN } from './registry';
 
@@ -158,5 +158,45 @@ describe('chat route wiring (static guard)', () => {
   });
   it('research mode: the actions note rides in the per-turn system part, never the cached static prefix', () => {
     expect(src).toMatch(/system: RESEARCH_SYSTEM_STATIC,\n\s*systemDynamic: researchSystemDynamic\(\{ today, profileBlock: userProfileBlock(, attachments: \[[^\]]*\])? \}\) \+ \(actions \? `\\n\\n\$\{APP_ACTIONS_NOTE\}` : ''\)( \+ \(fileHint \? `\\n\\n\$\{fileHint\}` : ''\))?,/);
+  });
+});
+
+describe('every write action is pending until the click (production test 2026-11-28: "I\'ve set up a saved search ...")', () => {
+  const pending = (name: string, args: Record<string, unknown>, evidence?: string) => {
+    const { p } = mk();
+    if (evidence) p.observeToolResult('find_opportunities', evidence);
+    return p.propose({ name, args });
+  };
+  it('save_search names the search and its frequency, and forbids done-wording', () => {
+    const r = pending('map.save_search', { name: 'TEST actions smoke', alert_frequency: 'daily' });
+    expect(r.status).toBe('proposed');
+    expect(String(r.note)).toContain('Say exactly: "Click Save to save this view as "TEST actions smoke" with daily alerts."');
+    expect(String(r.note)).toMatch(/NOT DONE YET/);
+    expect(String(r.note)).toMatch(/"I've set up", "I've created"/);
+  });
+  it('update_alert names the new frequency (and "off" reads as paused)', () => {
+    const id = '0b0b0b0b-1111-4222-8333-444444444444';
+    expect(String(pending('map.update_alert', { search_id: id, alert_frequency: 'weekly' }).note)).toContain('"Click Change to switch that search to weekly alerts."');
+    expect(String(pending('map.update_alert', { search_id: id, alert_frequency: 'off' }).note)).toContain('"Click Change to pause that search\'s alerts."');
+  });
+  it('add_to_pursuits and remove_from_pursuits are pending too', () => {
+    const ev = JSON.stringify({ open: [{ notice_id: 'abc123def' }] });
+    expect(String(pending('map.add_to_pursuits', { kind: 'opportunity', notice_id: 'abc123def' }, ev).note)).toContain('"Click Add to save it to My Pursuits."');
+    expect(String(pending('map.remove_from_pursuits', { notice_id: 'abc123def' }, ev).note)).toContain('"Click Remove to remove it from My Pursuits."');
+  });
+  it('every registered write gets the NOT DONE YET note', () => {
+    for (const [n, d] of Object.entries(ACTIONS)) if (d.needsConfirm) expect(pendingWriteNote(n)).toMatch(/^NOT DONE YET/);
+  });
+});
+
+describe('app actions own saved-search writes (production test 2026-11-28: update_market_schedule ran with no confirm)', () => {
+  it('the direct schedule writes are the deny-listed set; the note says saves and alert changes go only through the actions', () => {
+    expect([...ACTION_OWNED_WRITE_TOOLS].sort()).toEqual(['schedule_market_search', 'update_market_schedule']);
+    expect(APP_ACTIONS_NOTE).toMatch(/Saving a search or changing its alerts goes ONLY through map\.save_search \/ map\.update_alert/);
+    expect(APP_ACTIONS_NOTE).toMatch(/daily, weekly or off; say plainly that other schedules, such as certain weekdays, are not available/);
+  });
+  it('the route deny-lists them only on a turn that offers actions', () => {
+    const src = readFileSync(join(process.cwd(), 'src/app/api/app/chat/route.ts'), 'utf8');
+    expect(src).toMatch(/\.\.\.\(actions \? \{ blockedToolNames: ACTION_OWNED_WRITE_TOOLS \} : \{\}\),/);
   });
 });
