@@ -134,6 +134,28 @@ describe('Ask Mindy reads the conversation\'s uploaded documents', () => {
     expect(answerSystem()).not.toContain('FACTS FROM AN ATTACHED FILE ARE SOURCED');
   });
 
+  it('Map drawer turn: the file control is named where it is ("Attach" under the message box), never "none of my tools can"', async () => {
+    await ask({ surface: 'map' });
+    const sys = answerSystem();
+    expect(sys).toContain('"Use **Attach** under the message box in this panel to add a file from your computer."');
+    expect(sys).not.toContain('Use a file from Drive or OneDrive'); // Drive line only when connected apps are on
+    expect(sys).toContain('Never say "none of my tools can"');
+  });
+
+  it('Map drawer with Drive/OneDrive enabled: Drive goes to Ask Mindy in the left sidebar, with the link (display hint recognised)', async () => {
+    vi.stubEnv('CONNECTED_APPS', 'true');
+    vi.stubEnv('CONNECTED_APPS_ALLOWLIST', ME);
+    await ask({ display: 'narrow_panel' });
+    expect(answerSystem()).toContain('"For Google Drive or OneDrive, open [Ask Mindy](/app?panel=chat) in the left sidebar and use **Use a file from Drive or OneDrive**."');
+  });
+
+  it('full /app chat: the controls are "under the message box", no sidebar detour', async () => {
+    await ask();
+    const sys = answerSystem();
+    expect(sys).toContain('"Use **Attach file** under the message box."');
+    expect(sys).not.toContain('left sidebar');
+  });
+
   it('a file cannot close its own fence: the forged closing marker is neutralized', async () => {
     await ask();
     const sys = answerSystem();

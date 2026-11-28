@@ -149,6 +149,7 @@ import { capabilityPlannerNote, interpretCapabilityNaics } from '@/lib/market/ca
 import { guardUnstatedStates, guardUnstatedCities } from '@/lib/chat/stated-filters';
 import { parseDisplayHint, displayHintNote } from '@/lib/chat/display-hint';
 import { appActionsEnabledFor, parseActionSurface, actionNamesFor, createAppActionProposer, proposeAppActionToolDef, PROPOSE_APP_ACTION, APP_ACTIONS_NOTE, type AppActionProposer } from '@/lib/chat/app-actions/propose';
+import { fileControlsNote } from '@/lib/ask-mindy/file-controls';
 import { QUESTION_OVER_PROFILE, OUTREACH_AND_PLAN_RULES, ATTACHED_FACTS_SOURCED } from '@/lib/ask-mindy/outreach-rules';
 import { compileIntent, enforceIntent, dedupeToolCalls, isMapScopeNote, splitViewPreamble } from '@/lib/chat/intent-compiler';
 import { sessionTitleFrom } from '@/lib/chat/view-preamble';
@@ -965,6 +966,14 @@ export async function POST(request: NextRequest) {
           : null;
         if (connectedFiles?.block) messages.push({ role: 'system', content: connectedFiles.block });
         if (documentContext || connectedFiles?.block) messages.push({ role: 'system', content: ATTACHED_FACTS_SOURCED });
+        // Where the file controls are: the Map drawer has none, so a Map turn points to Ask Mindy in the left sidebar
+        // (production 2026-11-27). Card turns have no file controls to point to.
+        const fileHint = cardCtx ? null : fileControlsNote({
+          surface: parseActionSurface(body),
+          uploads: isVaultChatDocumentsEnabled(auth.email),
+          connected: connectedAppsEnabledFor(auth.email),
+        });
+        if (fileHint) messages.push({ role: 'system', content: fileHint });
         // Category caveat grounded by the work the customer named in THIS message (janitorial → AbilityOne).
         const categoryNote = abilityOneCaveat(customerWords, interpretCapabilityNaics(customerWords).codes);
         if (categoryNote) messages.push({ role: 'system', content: categoryNote });
@@ -1423,7 +1432,7 @@ export async function POST(request: NextRequest) {
                 // App actions (allowlisted users only) go in the per-turn part so the cached prefix stays identical for all.
                 // Attached files (uploads + Drive/OneDrive) go there too, like the standard path's system blocks.
                 system: RESEARCH_SYSTEM_STATIC,
-                systemDynamic: researchSystemDynamic({ today, profileBlock: userProfileBlock, attachments: [documentContext?.block, connectedFiles?.block] }) + (actions ? `\n\n${APP_ACTIONS_NOTE}` : ''),
+                systemDynamic: researchSystemDynamic({ today, profileBlock: userProfileBlock, attachments: [documentContext?.block, connectedFiles?.block] }) + (actions ? `\n\n${APP_ACTIONS_NOTE}` : '') + (fileHint ? `\n\n${fileHint}` : ''),
                 conversation,
                 tools: rmTools,
                 effort: process.env.ASK_MINDY_RESEARCH_EFFORT || 'high',
