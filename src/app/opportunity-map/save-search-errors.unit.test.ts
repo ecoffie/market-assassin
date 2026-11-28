@@ -13,6 +13,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { WATCH_SCOPE_JS } from '@/lib/saved-searches/watch-scope-client';
+import { fakeMdDialog } from './md-dialog-fake.test-helper';
 import {
   alertableScope,
   savedSearchWantsForecasts,
@@ -37,14 +38,15 @@ function handlerSource(): string {
 type Horizons = { open?: boolean; recompete?: boolean; forecast?: boolean };
 type Reply = { status?: number; body?: unknown; reject?: boolean; nonJson?: boolean };
 
-function run(opts: { horizons: Horizons; mode?: string; signedIn?: boolean; reply?: Reply }) {
+function run(opts: { horizons: Horizons; mode?: string; signedIn?: boolean; reply?: Reply; choice?: string }) {
   const calls: { url: string; body: Record<string, unknown> }[] = [];
   const confirms: string[] = [];
   const alerts: string[] = [];
   const events: unknown[][] = [];
   const win: Record<string, unknown> = { __horizons: { ...opts.horizons }, __track: (...a: unknown[]) => events.push(a) };
   new Function('window', WATCH_SCOPE_JS)(win);
-  win.prompt = (_m: string, d: string) => d;
+  const md = fakeMdDialog({ confirms, alerts, choice: opts.choice });
+  win.__mdDialog = md.fn;
   const btn = { textContent: 'Save search', innerHTML: '', title: '', onclick: null as null | (() => void) };
   const pending: Promise<unknown>[] = [];
   const reply = opts.reply ?? { status: 200, body: { success: true } };
@@ -84,7 +86,7 @@ function run(opts: { horizons: Horizons; mode?: string; signedIn?: boolean; repl
   new Function(...names, handlerSource())(...names.map((n) => deps[n as keyof typeof deps]));
   btn.onclick!();
   const settle = () => Promise.all(pending).then(() => new Promise((r) => setImmediate(r)));
-  return { calls, confirms, alerts, events, btn, settle };
+  return { calls, confirms, alerts, events, btn, settle, dialogs: md.dialogs };
 }
 
 /** The real service, with an empty account and a capturing insert. */
@@ -214,5 +216,38 @@ describe('a failed save says what to do — never a bare "Couldn\'t save"', () =
     await r.settle();
     expect(r.btn.textContent).toMatch(/Saved/);
     expect(r.alerts).toEqual([]);
+  });
+});
+
+describe('alert frequency is chosen in the save dialog (Daily / Weekly / Off)', () => {
+  beforeEach(() => { mockFrom.mockReset(); });
+  const H: Horizons = { open: true, recompete: false, forecast: true };
+
+  it('the name dialog offers Daily / Weekly / Off with the server default preselected', () => {
+    const r = run({ horizons: H });
+    const d = r.dialogs.find((x) => x.input)!;
+    expect(d.okLabel).toBe('Save');
+    expect(d.cancelLabel).toBe('Cancel');
+    expect(d.choice!.options.map((o) => o.label)).toEqual(['Daily', 'Weekly', 'Off']);
+    // DEFAULT_ALERT_FREQUENCY is interpolated by the server template; the raw source names the constant.
+    expect(MAP).toContain("choice:{label:'Email alerts',value:'${DEFAULT_ALERT_FREQUENCY}'");
+  });
+
+  it.each<[string, Record<string, unknown>]>([
+    ['daily', { alerts_enabled: true, alert_frequency: 'daily' }],
+    ['weekly', { alerts_enabled: true, alert_frequency: 'weekly' }],
+    ['off', { alerts_enabled: false }],
+  ])('%s is written through the existing saved-search POST', async (choice, expected) => {
+    const r = run({ horizons: H, choice });
+    expect(r.calls[0].url).toBe('/api/app/saved-searches');
+    expect(r.calls[0].body).toMatchObject(expected);
+    if (choice === 'off') expect(r.calls[0].body).not.toHaveProperty('alert_frequency');
+    await r.settle();
+    expect(r.btn.textContent).toMatch(choice === 'off' ? /alerts off/ : /alerts on/);
+  });
+
+  it('the service default is unchanged (daily) and shared with the dialog', async () => {
+    const mod = await import('@/lib/saved-searches/alert-preferences');
+    expect(mod.DEFAULT_ALERT_FREQUENCY).toBe('daily');
   });
 });

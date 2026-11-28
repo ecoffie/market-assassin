@@ -28,6 +28,7 @@ import { SUBPAGE_APP_SHELL_CSS, applyAppShell, isAppShellRequest } from '../app-
 import { LOGIN_MODAL_CSS, LOGIN_MODAL_HTML, LOGIN_MODAL_JS } from '../login-modal';
 import { MAPS_HOME_PATH } from '@/lib/mindy/maps-home';
 import { ACCOUNT_MENU_CSS, ACCOUNT_MENU_HTML, ACCOUNT_MENU_JS } from '../account-menu';
+import { MAP_DIALOG_SCRIPT } from '../map-dialog';
 import { isTabAskEnabled } from '@/lib/app/tab-ask';
 import { applyWatchlistTabAsk } from './tab-ask-bridge';
 
@@ -477,10 +478,11 @@ const PAGE = `<!DOCTYPE html><html lang="en" class="mindy-map"><head>
       var edit=menu&&menu.querySelector('[data-act="edit"]');
       if(edit)edit.onclick=function(){ closeMenus();
         var cur=(r&&r.name)||'';
-        var nn=prompt('Rename this saved search:',cur);
-        if(nn==null)return; nn=String(nn).trim(); if(!nn||nn===cur)return;
-        fetch('/api/app/saved-searches',{method:'PATCH',headers:hdrs(),body:JSON.stringify({email:em,id:id,name:nn})})
-          .then(function(res){return res.json();}).then(function(d){ if(d&&d.success){ if(r)r.name=nn; renderRows(); } }).catch(function(){});
+        window.__mdDialog({title:'Rename saved search',input:{label:'Name',value:cur,maxLength:80},okLabel:'Save',cancelLabel:'Cancel'},function(res){
+          if(!res)return; var nn=String(res.value||'').trim(); if(!nn||nn===cur)return;
+          fetch('/api/app/saved-searches',{method:'PATCH',headers:hdrs(),body:JSON.stringify({email:em,id:id,name:nn})})
+            .then(function(res){return res.json();}).then(function(d){ if(d&&d.success){ if(r)r.name=nn; renderRows(); } }).catch(function(){});
+        });
       };
       // Run market report → generate the whole-market report for THIS saved search, inline (the PEEK).
       var report=menu&&menu.querySelector('[data-act="report"]'), box=row.querySelector('.rptbox');
@@ -501,9 +503,11 @@ const PAGE = `<!DOCTYPE html><html lang="en" class="mindy-map"><head>
       // Delete → DELETE /api/app/saved-searches
       var del=menu&&menu.querySelector('[data-act="delete"]');
       if(del)del.onclick=function(){ closeMenus();
-        if(!confirm('Delete this saved search?'))return;
-        fetch('/api/app/saved-searches?email='+encodeURIComponent(em)+'&id='+encodeURIComponent(id),{method:'DELETE',headers:hdrs()})
-          .then(function(){ SEARCHES=SEARCHES.filter(function(x){return String(x.id)!==id;}); delete BRIEF[id]; renderRows(); }).catch(function(){});
+        window.__mdDialog({title:'Delete this saved search?',message:'You will stop getting alerts for '+((r&&r.name)?('\u201c'+r.name+'\u201d'):'this search')+'. This cannot be undone.',okLabel:'Delete',cancelLabel:'Keep it',danger:true},function(ok){
+          if(!ok)return;
+          fetch('/api/app/saved-searches?email='+encodeURIComponent(em)+'&id='+encodeURIComponent(id),{method:'DELETE',headers:hdrs()})
+            .then(function(){ SEARCHES=SEARCHES.filter(function(x){return String(x.id)!==id;}); delete BRIEF[id]; renderRows(); }).catch(function(){});
+        });
       };
     });
   }
@@ -613,6 +617,7 @@ const PAGE = `<!DOCTYPE html><html lang="en" class="mindy-map"><head>
 })();
 </script>
 ${ACCOUNT_MENU_JS}
+${MAP_DIALOG_SCRIPT}
 ${LOGIN_MODAL_HTML}${LOGIN_MODAL_JS}${'<script>'}window.__mapsSignIn=function(){var stale=false;try{stale=!!localStorage.getItem('mi_beta_email')&&!localStorage.getItem('mi_beta_auth_token');}catch(e){}var phrase=stale?'continue where you left off':'see your Morning Brief';if(typeof window.openSignInModal==='function'){window.openSignInModal(phrase,function(){location.reload();});}else{location.href='/app?next='+encodeURIComponent('/opportunity-map/saved');}return false;};${'</script>'}</body></html>`;
 
 export async function GET(request?: Request) {
