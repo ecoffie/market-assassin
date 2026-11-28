@@ -94,4 +94,50 @@ describe('the stored row\'s empty competition columns are filled from the award 
     expect(o.competition_fields_source).toBe('usaspending_parent_idv');
     expect(r._meta.competition!.from_parent_vehicle).toBe(1);
   });
+  it('Q31: an order classed from its OWN record but missing its offer count gets the parent vehicle\'s count, labelled', async () => {
+    const order = { ...row('ORD2'), award_kind: 'order_under_vehicle', parent_vehicle_piid: 'V2', parent_vehicle_id: 'CONT_IDV_V2' };
+    queryMock.mockResolvedValue({ contracts: [order], total: 1, count: 1, duplicates_collapsed: 0, degraded: false, window: WINDOW });
+    // W91YTZ25FA135 shape on USAspending: extent A, no offers on the order; the vehicle reports 2.
+    const lookup = async (id: string) => (id === 'CONT_IDV_V2' ? { extent_competed: 'A', number_of_offers_received: '2' } : { extent_competed: 'A', place_of_performance_city: 'FORT MOORE', place_of_performance_state: 'GA' });
+    const r = await expiringContracts({ naics: '238220' }, { vehicleLookup: async () => ({ id: 'CONT_IDV_V2', ordering_end_date: null }) as never, competition: { lookup } });
+    const o = r.expiring_orders_in_window.find((c) => c.contract_id === 'ORD2')!;
+    expect(o.competition).toMatchObject({ class: 'competed', source: 'usaspending_award', offers_received: 2, offers_source: 'usaspending_parent_idv' });
+    expect(o).toMatchObject({ number_of_offers: 2, number_of_offers_source: 'usaspending_parent_idv' });
+    expect(o.competition!.award_record).toMatchObject({ place_of_performance_city: 'FORT MOORE' }); // the order's own place, not the vehicle's
+    expect(r._meta.competition).toMatchObject({ from_parent_vehicle: 0, offers_from_parent_vehicle: 1, offers_reported: 1 });
+    expect(r._meta.competition!.coverage_line).toMatch(/offers reported on 1 \(1 from the parent vehicle\)/);
+  });
+  it('a parent-substituted competition keeps the ORDER\'s own place and period', async () => {
+    const order = { ...row('ORD3'), place_of_performance_city: null, place_of_performance_state: null, award_kind: 'order_under_vehicle', parent_vehicle_piid: 'V3', parent_vehicle_id: 'CONT_IDV_V3' };
+    queryMock.mockResolvedValue({ contracts: [order], total: 1, count: 1, duplicates_collapsed: 0, degraded: false, window: WINDOW });
+    const lookup = async (id: string) => (id === 'CONT_IDV_V3'
+      ? { extent_competed: 'A', number_of_offers_received: '5', place_of_performance_city: 'VEHICLE CITY', period_potential_end: '2035-01-01 00:00:00' }
+      : { place_of_performance_city: 'ATHENS', place_of_performance_state: 'GA', period_current_end: '2027-02-28', period_potential_end: '2031-02-28 00:00:00' });
+    const r = await expiringContracts({ naics: '238220' }, { vehicleLookup: async () => ({ id: 'CONT_IDV_V3', ordering_end_date: null }) as never, competition: { lookup } });
+    const o = r.expiring_orders_in_window.find((c) => c.contract_id === 'ORD3')!;
+    expect(o.competition).toMatchObject({ source: 'usaspending_parent_idv', offers_received: 5 });
+    expect(o).toMatchObject({ place_of_performance_city: 'ATHENS', place_of_performance_state: 'GA', place_of_performance_source: 'usaspending_award', period_of_performance_potential_end: '2031-02-28' });
+  });
+});
+
+describe('place of performance and period ends from the award record (Q13/Q26 city, Q34 potential end)', () => {
+  const REC = { extent_competed: 'A', place_of_performance_city: 'MARIETTA', place_of_performance_state: 'GA', period_current_end: '2027-02-28', period_potential_end: '2031-02-28 00:00:00' };
+  it('fills an empty city/state from the award record, labelled; exposes current and potential end separately', async () => {
+    const empty = { ...row('E'), place_of_performance_city: null, place_of_performance_state: null, period_of_performance_current_end: '2027-02-28' };
+    queryMock.mockResolvedValue({ contracts: [empty], total: 1, count: 1, duplicates_collapsed: 0, degraded: false, window: WINDOW });
+    const r = await expiringContracts({ naics: '238220' }, { vehicleLookup: async () => null, competition: { lookup: async () => REC } });
+    expect(r.contracts[0]).toMatchObject({
+      place_of_performance_city: 'MARIETTA', place_of_performance_state: 'GA', place_of_performance_source: 'usaspending_award',
+      period_of_performance_current_end: '2027-02-28', period_of_performance_current_end_record: '2027-02-28', period_of_performance_potential_end: '2031-02-28',
+    });
+  });
+  it('a stored city is kept (source stored); an unreported one stays null; a row past the cap gets no dates', async () => {
+    const stored = row('S'); // Washington, DC
+    const none = { ...row('N'), place_of_performance_city: null, place_of_performance_state: null };
+    queryMock.mockResolvedValue({ contracts: [stored, none], total: 2, count: 2, duplicates_collapsed: 0, degraded: false, window: WINDOW });
+    const r = await expiringContracts({ naics: '238220' }, { vehicleLookup: async () => null, competition: { lookup: async (id: string) => (id === 'S' ? REC : { extent_competed: 'A' }) } });
+    const by = Object.fromEntries(r.contracts.map((c) => [c.contract_id, c]));
+    expect(by.S).toMatchObject({ place_of_performance_city: 'Washington', place_of_performance_state: 'DC', place_of_performance_source: 'stored', period_of_performance_potential_end: '2031-02-28' });
+    expect(by.N).toMatchObject({ place_of_performance_city: null, place_of_performance_state: null, place_of_performance_source: null, period_of_performance_potential_end: null });
+  });
 });
