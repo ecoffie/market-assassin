@@ -7,8 +7,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 
-const DOCX = '11111111-1111-4111-8111-111111111111';
-const PDF = '11111111-1111-4111-8111-111111111112';
 const RICH = '<!doctype html><h2>The read</h2><p>Pathways first</p><table><tr><td>Federal Highway Administration</td></tr></table>';
 
 let sse: string[] = [];
