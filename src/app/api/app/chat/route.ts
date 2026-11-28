@@ -134,6 +134,7 @@ import {
 import { toolLabel } from '@/lib/chat/context-sources';
 import { researchCapDecision } from '@/lib/ask-mindy/research-caps';
 import { COMPETITION_AND_START_PLAYBOOK } from '@/lib/ask-mindy/competition-playbook';
+import { ANSWER_TRUST_RULES } from '@/lib/ask-mindy/answer-trust-rules';
 import { parseChatImages, imageContentBlocks, SCREENSHOT_NOT_READ } from '@/lib/chat/chat-images';
 import { researchCapDeps } from '@/lib/ask-mindy/research-caps-deps';
 import { gateEligible, extractWorkPhrase, profileForGate } from '@/lib/ask-mindy/gate-intent';
@@ -896,6 +897,8 @@ export async function POST(request: NextRequest) {
         const systemPrompt = SYSTEM_PROMPT_TEMPLATE.replace('{today}', today).replace('{userProfile}', userProfileBlock)
           // The least-competition / where-to-start method (Claude + MCP's), for standard answers too (same tools).
           + `\n\n${COMPETITION_AND_START_PLAYBOOK}`
+          // Date kinds, thin results inside the reporting lag, channels no platform can see (Eric, 2026-11-28).
+          + `\n\n${ANSWER_TRUST_RULES}`
           + hostContract
           + rulesBlock;
         // Step 2–8: self-report → pathways → vehicles → market size → contacts → web gap → write-up.
