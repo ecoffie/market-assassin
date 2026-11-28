@@ -2,9 +2,9 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { ANSWER_TRUST_RULES, DATE_KIND_RULES, LAG_WINDOW_RULES, UNSEEN_CHANNELS_RULES, DEFENSE_LAG_SENTENCE } from './answer-trust-rules';
+import { ANSWER_TRUST_RULES, DATE_KIND_RULES, LAG_WINDOW_RULES, UNSEEN_CHANNELS_RULES } from './answer-trust-rules';
 import { RESEARCH_INSTRUCTIONS } from './research-mode';
-import { NO_DATA_DATES } from './outreach-rules';
+import { NO_DATA_DATES, DEFENSE_LAG_LINE } from './outreach-rules';
 
 describe('a. date kinds', () => {
   it('a contract end is not a recompete date; a forecast is the agency plan, not a solicitation', () => {
@@ -19,10 +19,9 @@ describe('b. thin results inside the reporting lag', () => {
   it('"not yet published", never "no award was made"; reuse lag_note; the Defense line carries its source', () => {
     expect(LAG_WINDOW_RULES).toMatch(/say the recent awards are "not yet published", never "no award was made", "they stopped buying" or "no activity"/);
     expect(LAG_WINDOW_RULES).toMatch(/Reuse the tool's lag_note in plain words/);
-    expect(DEFENSE_LAG_SENTENCE).toBe('Defense awards are published on USAspending.gov with a delay of about 90 days (DoD reporting policy)');
-    expect(LAG_WINDOW_RULES).toContain(`use exactly: "${DEFENSE_LAG_SENTENCE}"`);
-    // Same wording as the standing no-dates rule (#2549).
-    expect(NO_DATA_DATES.replace(/'\s*\+\s*'/g, '')).toContain(DEFENSE_LAG_SENTENCE);
+    // One wording, one source: the shared DEFENSE_LAG_LINE (#2582), never a second constant.
+    expect(LAG_WINDOW_RULES).toContain(`use exactly: "${DEFENSE_LAG_LINE}"`);
+    expect(NO_DATA_DATES.replace(/'\s*\+\s*'/g, '')).toContain(DEFENSE_LAG_LINE);
   });
   it('no freshness dates', () => {
     expect(LAG_WINDOW_RULES).toMatch(/No data-freshness dates/);

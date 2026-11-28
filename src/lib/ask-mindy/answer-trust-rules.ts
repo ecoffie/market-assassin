@@ -10,9 +10,7 @@
  *      never cited as an active channel. Lab/FFRDC subcontracts are not tracked.
  */
 
-/** The one wording for the Defense reporting lag (#2549), wherever it is said. */
-export const DEFENSE_LAG_SENTENCE =
-  'Defense awards are published on USAspending.gov with a delay of about 90 days (DoD reporting policy)';
+import { DEFENSE_LAG_LINE } from './outreach-rules';
 
 export const DATE_KIND_RULES = [
   'DATE KINDS: every date in an answer says what kind of date it is.',
@@ -25,7 +23,7 @@ export const DATE_KIND_RULES = [
 
 export const LAG_WINDOW_RULES = [
   'THIN RESULTS INSIDE THE REPORTING LAG: when recent awards or a time series look thin or empty for the latest months, and the tool returned _meta.lag_note (or the buyer is Defense), say the recent awards are "not yet published", never "no award was made", "they stopped buying" or "no activity". Reuse the tool\'s lag_note in plain words.',
-  `- For Defense, use exactly: "${DEFENSE_LAG_SENTENCE}".`,
+  `- For Defense, use exactly: "${DEFENSE_LAG_LINE}".`,
   '- No data-freshness dates ("as of", "data through"): say it in words ("recent awards may not appear yet").',
 ].join('\n');
 
