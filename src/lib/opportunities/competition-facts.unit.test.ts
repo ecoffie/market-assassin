@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { classifyCompetition, competitionFactsFor, competitionCounts, fetchAwardCompetition, awardRecordFacts } from './competition-facts';
+import { classifyCompetition, competitionFactsFor, competitionCounts, fetchAwardCompetition, awardRecordFacts, orderFairOpportunity } from './competition-facts';
 
 // Field values copied from the live USASpending award records (2026-11-16).
 const GULFSTREAM_GOODWILL = { // W912EP22C0005 — the $15.4M row the FL answer called "Full and open"
@@ -90,6 +90,23 @@ describe('fetchAwardCompetition reads the fields USASpending actually returns (2
   it('a record with no place or period facts → award_record null (never empty strings)', () => {
     expect(awardRecordFacts({ extent_competed: 'A' })).toBeNull();
     expect(classifyCompetition(null).award_record).toBeNull();
+  });
+});
+
+describe('order-level fair opportunity (W91YTZ25FA185: extent A + "single source" exception)', () => {
+  it('class stays from the extent code; the order-level fact is exposed separately', () => {
+    // Live values on CONT_AWD_W91YTZ25FA185_9700_36F79723D0073_3600 (2026-11-28).
+    const c = classifyCompetition({ extent_competed: 'A', number_of_offers_received: '1', fair_opportunity_limited_sources_description: 'FAR 16.505(B)(2)(I)(G) SINGLE SOURCE' });
+    expect(c.class).toBe('competed');
+    expect(c).toMatchObject({ order_fair_opportunity: 'FAR 16.505(B)(2)(I)(G) SINGLE SOURCE', order_competed_among_holders: false });
+  });
+  it('fair opportunity given / competitive set-aside = competed among holders; absent = null (never false)', () => {
+    expect(orderFairOpportunity('FAIR OPPORTUNITY GIVEN').order_competed_among_holders).toBe(true);
+    expect(orderFairOpportunity('COMPETITIVE SET ASIDE').order_competed_among_holders).toBe(true);
+    expect(orderFairOpportunity('URGENCY').order_competed_among_holders).toBe(false);
+    expect(orderFairOpportunity(null)).toEqual({ order_fair_opportunity: null, order_competed_among_holders: null });
+    expect(classifyCompetition({ extent_competed: 'A' }).order_competed_among_holders).toBeNull();
+    expect(classifyCompetition(null).order_competed_among_holders).toBeNull();
   });
 });
 

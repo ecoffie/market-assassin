@@ -140,4 +140,13 @@ describe('place of performance and period ends from the award record (Q13/Q26 ci
     expect(by.S).toMatchObject({ place_of_performance_city: 'Washington', place_of_performance_state: 'DC', place_of_performance_source: 'stored', period_of_performance_potential_end: '2031-02-28' });
     expect(by.N).toMatchObject({ place_of_performance_city: null, place_of_performance_state: null, place_of_performance_source: null, period_of_performance_potential_end: null });
   });
+  it('a parent-substituted competition never carries the PARENT\'s order-level fair opportunity', async () => {
+    const order = { ...row('ORD4'), award_kind: 'order_under_vehicle', parent_vehicle_piid: 'V4', parent_vehicle_id: 'CONT_IDV_V4' };
+    queryMock.mockResolvedValue({ contracts: [order], total: 1, count: 1, duplicates_collapsed: 0, degraded: false, window: WINDOW });
+    const lookup = async (id: string) => (id === 'CONT_IDV_V4' ? { extent_competed: 'A', number_of_offers_received: '4', fair_opportunity_limited_sources_description: 'URGENCY' } : {});
+    const r = await expiringContracts({ naics: '238220' }, { vehicleLookup: async () => ({ id: 'CONT_IDV_V4', ordering_end_date: null }) as never, competition: { lookup } });
+    const o = r.expiring_orders_in_window.find((c) => c.contract_id === 'ORD4')!;
+    expect(o.competition).toMatchObject({ source: 'usaspending_parent_idv', order_fair_opportunity: null, order_competed_among_holders: null });
+  });
 });
+

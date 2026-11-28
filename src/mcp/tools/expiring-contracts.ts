@@ -338,7 +338,7 @@ export async function expiringContracts(
         if (!p || p.source === 'none') continue;
         if (own.class === 'unknown' && p.class !== 'unknown') {
           // Competition from the vehicle; place and period stay the ORDER's own.
-          facts.set(id, { ...p, source: 'usaspending_parent_idv', offers_source: p.offers_received != null ? 'usaspending_parent_idv' : null, award_record: own.award_record ?? null, detail: `${p.detail} (read from the parent vehicle's record; the order's own record did not state it).` });
+          facts.set(id, { ...p, source: 'usaspending_parent_idv', offers_source: p.offers_received != null ? 'usaspending_parent_idv' : null, award_record: own.award_record ?? null, order_fair_opportunity: own.order_fair_opportunity ?? null, order_competed_among_holders: own.order_competed_among_holders ?? null, detail: `${p.detail} (read from the parent vehicle's record; the order's own record did not state it).` });
         } else if (own.offers_received == null && p.offers_received != null) {
           facts.set(id, { ...own, offers_received: p.offers_received, offers_source: 'usaspending_parent_idv' });
         }
@@ -425,6 +425,7 @@ export async function expiringContracts(
         : 'No grounded contracts; say none matched rather than inventing one.',
       key_caveats: [
         'vehicles[] groups orders by the parent IDV recorded on each order. Holders of a multiple-award vehicle each hold their own IDV number, so sibling IDVs from one solicitation appear as separate vehicles; holders_in_result lists only holders seen in these rows.',
+        'competition.order_competed_among_holders (orders): false = this order was issued under a fair-opportunity exception (competition.order_fair_opportunity names it) even when class=competed (the vehicle was competed); null = not reported.',
         'place_of_performance_state / place_of_performance_city are the place of performance as reported by USASpending (place_of_performance_source=usaspending_award when filled from the award record); null means not reported or not checked.',
         'recompete_likelihood is an inference; some contracts get extended or not recompeted.',
         'competition is read from each award\'s own USASpending record (orders fall back to the parent vehicle, competition.source=usaspending_parent_idv): class competed | not_competed | unknown. set_aside_type / number_of_offers / competition_type are filled from that record when the stored row had none (competition_fields_source). number_of_offers null = NOT REPORTED on the award, never "1 bidder" or zero. competition_status=not_checked = not looked up (past the lookup cap) — say so, never "not established". Cite _meta.competition.coverage_line.',
