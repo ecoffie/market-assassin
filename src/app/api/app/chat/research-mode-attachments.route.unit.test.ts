@@ -228,8 +228,8 @@ describe('research mode sees the files the customer attached (P0)', () => {
     vi.stubEnv('CONNECTED_APPS_ALLOWLIST', EMAIL);
     await ask('Can you connect my Google Drive?', { surface: 'map' });
     const [stat, dyn] = sysParts();
-    expect(dyn.text).toContain('"Use **Attach** under the message box."');
-    expect(dyn.text).toContain('Open [Ask Mindy](/app?panel=chat) in the left sidebar');
+    expect(dyn.text).toContain('"Use **Attach** under the message box in this panel to add a file from your computer."');
+    expect(dyn.text).toContain('open [Ask Mindy](/app?panel=chat) in the left sidebar');
     expect(stat.text).not.toContain('left sidebar'); // never in the cached prefix
     vi.unstubAllEnvs();
     delete process.env.VAULT_ASK_MINDY_UPLOADS;

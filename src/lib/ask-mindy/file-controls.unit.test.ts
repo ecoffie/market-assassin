@@ -5,14 +5,16 @@ describe('fileControlsNote (production 2026-11-27: say WHERE the control is)', (
   it('Map: Attach is under the message box; Drive/OneDrive sends them to Ask Mindy in the left sidebar, with the link', () => {
     const n = fileControlsNote({ surface: 'map', uploads: true, connected: true });
     expect(ASK_MINDY_CHAT_HREF).toBe('/app?panel=chat');
-    expect(n).toContain('"Use **Attach** under the message box."');
-    expect(n).toContain('"Open [Ask Mindy](/app?panel=chat) in the left sidebar, then use **Use a file from Drive or OneDrive** under the message box."');
+    expect(n).toContain('"Use **Attach** under the message box in this panel to add a file from your computer."');
+    expect(n).toContain('"For Google Drive or OneDrive, open [Ask Mindy](/app?panel=chat) in the left sidebar and use **Use a file from Drive or OneDrive**."');
+    expect(n).not.toMatch(/can't take files/);
     expect(n).toContain('this Map panel has no Drive or OneDrive picker');
   });
   it('Map without Drive/OneDrive enabled: no sidebar detour, Attach only', () => {
     const n = fileControlsNote({ surface: 'map', uploads: true, connected: false });
-    expect(n).toContain('**Attach** under the message box');
+    expect(n).toContain('**Attach** under the message box in this panel');
     expect(n).not.toContain('left sidebar');
+    expect(n).not.toContain('Drive or OneDrive**');
   });
   it('app: both controls are under the message box', () => {
     const n = fileControlsNote({ surface: 'app', uploads: true, connected: true });

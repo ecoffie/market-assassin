@@ -137,7 +137,8 @@ describe('Ask Mindy reads the conversation\'s uploaded documents', () => {
   it('Map drawer turn: the file control is named where it is ("Attach" under the message box), never "none of my tools can"', async () => {
     await ask({ surface: 'map' });
     const sys = answerSystem();
-    expect(sys).toContain('"Use **Attach** under the message box."');
+    expect(sys).toContain('"Use **Attach** under the message box in this panel to add a file from your computer."');
+    expect(sys).not.toContain('Use a file from Drive or OneDrive'); // Drive line only when connected apps are on
     expect(sys).toContain('Never say "none of my tools can"');
   });
 
@@ -145,7 +146,7 @@ describe('Ask Mindy reads the conversation\'s uploaded documents', () => {
     vi.stubEnv('CONNECTED_APPS', 'true');
     vi.stubEnv('CONNECTED_APPS_ALLOWLIST', ME);
     await ask({ display: 'narrow_panel' });
-    expect(answerSystem()).toContain('"Open [Ask Mindy](/app?panel=chat) in the left sidebar, then use **Use a file from Drive or OneDrive** under the message box."');
+    expect(answerSystem()).toContain('"For Google Drive or OneDrive, open [Ask Mindy](/app?panel=chat) in the left sidebar and use **Use a file from Drive or OneDrive**."');
   });
 
   it('full /app chat: the controls are "under the message box", no sidebar detour', async () => {

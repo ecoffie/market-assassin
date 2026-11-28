@@ -18,9 +18,9 @@ export function fileControlsNote(a: { surface: FileSurface; uploads: boolean; co
   const lines: string[] = [];
   if (a.surface === 'map') {
     lines.push(a.uploads
-      ? 'For a file from their computer: "Use **Attach** under the message box."'
+      ? 'For a file from their computer: "Use **Attach** under the message box in this panel to add a file from your computer."'
       : 'For a file from their computer: attaching files is not turned on for their account yet.');
-    if (a.connected) lines.push(`For Google Drive or OneDrive: "Open [Ask Mindy](${ASK_MINDY_CHAT_HREF}) in the left sidebar, then use **Use a file from Drive or OneDrive** under the message box." Include that link exactly; this Map panel has no Drive or OneDrive picker.`);
+    if (a.connected) lines.push(`For Google Drive or OneDrive: "For Google Drive or OneDrive, open [Ask Mindy](${ASK_MINDY_CHAT_HREF}) in the left sidebar and use **Use a file from Drive or OneDrive**." Include that link exactly; this Map panel has no Drive or OneDrive picker.`);
   } else {
     lines.push(a.uploads
       ? 'For a file from their computer: "Use **Attach file** under the message box."'
