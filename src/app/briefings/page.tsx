@@ -918,7 +918,19 @@ function BriefingsDashboardContent() {
         headers: getMIApiHeaders(userEmail, { 'Content-Type': 'application/json' }),
         body: JSON.stringify({ email: userEmail }),
       });
-      const data = await response.json();
+      const data = await response.json().catch(() => ({}));
+
+      // Not signed in on this browser is NOT "no access". /api/briefings/verify answers 401
+      // auth_required for any unverified caller, and this used to fall through to 'denied',
+      // telling a trialing customer "No Access Found — purchase access" (2026-11-25). Ask for
+      // the secure sign-in link instead, the same as fetchBriefings does on a 401.
+      if (response.status === 401 || data.auth_required) {
+        setInputEmail(userEmail);
+        setNeedsVerification(true);
+        setError('Please confirm it’s you — we’ll email a secure sign-in link.');
+        setStatus('gate');
+        return;
+      }
 
       if (!data.hasAccess) {
         clearAccessEmail();

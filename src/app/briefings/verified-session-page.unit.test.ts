@@ -30,4 +30,15 @@ describe('/briefings page authenticates from the verified session', () => {
   it('the secure link returns the reader to /briefings', () => {
     expect(page).toMatch(/destination: 'briefings', returnTo: '\/briefings'/);
   });
+
+  it('an unverified reader is asked to sign in, never told "No Access Found" (2026-11-25 regression)', () => {
+    // /api/briefings/verify returns 401 auth_required for anyone not signed in on this browser.
+    const verify = page.slice(page.indexOf("fetch('/api/briefings/verify'"));
+    const authCheck = verify.indexOf('response.status === 401 || data.auth_required');
+    const deniedCheck = verify.indexOf('if (!data.hasAccess)');
+    expect(authCheck).toBeGreaterThan(-1);
+    expect(authCheck).toBeLessThan(deniedCheck);
+    expect(verify.slice(authCheck, deniedCheck)).toContain('setNeedsVerification(true)');
+    expect(verify.slice(authCheck, deniedCheck)).not.toContain("setStatus('denied')");
+  });
 });
