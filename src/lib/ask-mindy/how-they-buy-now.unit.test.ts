@@ -58,14 +58,17 @@ describe('report ship checks (Fixes 2 and 3)', () => {
   });
   it('contact rules: a citation marker, no prose or dates, internal 180-day check, no reuse, published inbox, never an inferred email', () => {
     expect(REPORT_SHIP_CHECKS).toMatch(/every named contact carries a citation marker \[n\] pointing to its source/);
-    expect(REPORT_SHIP_CHECKS).toMatch(/no "from the notice\.\.\." prose and no dates in the table or body/);
-    expect(REPORT_SHIP_CHECKS).toMatch(/older than 180 days is dropped or marked "confirm this contact before reaching out"/);
+    // Eric, 2026-11-27 ("contacts: show notice date", from the Claude + Mindy MCP baseline): the record and ITS date.
+    expect(REPORT_SHIP_CHECKS).toMatch(/the "why they matter" cell names that record and the record's own date \("primary contact on the office's newest notice \(W91ZRS27QA001, Oct 28, 2026\)"\), preferring the newest notice; never a data-freshness date/);
+    expect(REPORT_SHIP_CHECKS).toMatch(/A contact found only on a notice older than 180 days is marked "confirm before reaching out"/);
     expect(REPORT_SHIP_CHECKS).not.toMatch(/retrieved|dated <date>|last seen/);
     expect(REPORT_SHIP_CHECKS).toMatch(/No contact is reused from an earlier report without a re-check/);
     expect(REPORT_SHIP_CHECKS).toMatch(/give the office's published inbox/);
     expect(REPORT_SHIP_CHECKS).toMatch(/Never infer an email from a name pattern/);
-    // Eric, 2026-11-27: no dates for contacts either.
-    expect(NO_DATA_DATES).toMatch(/Contacts carry no dates either: cite their source with a citation marker/);
+    // Eric, 2026-11-27: contacts carry their source record's own date (not data freshness).
+    expect(NO_DATA_DATES).toMatch(/each named contact's "why they matter" names the source record and THAT record's own date/);
+    expect(NO_DATA_DATES).toMatch(/A record's own date is a fact about the record, not data freshness/);
+    expect(NO_DATA_DATES).not.toMatch(/Contacts carry no dates/);
   });
 });
 

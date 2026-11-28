@@ -20,15 +20,26 @@ export const QUESTION_OVER_PROFILE =
   + ' file it is from its own name.';
 
 /**
- * Production retest 2026-11-27: figures that ARE in an attached capability statement ("$35 billion+", contract dates
- * and values) came back as "not established". A fact an attached file states is sourced to that file.
+ * A company's OWN claims from its attached file (Eric, 2026-11-27, "claims-by-audience", from the Claude + Mindy MCP
+ * baseline). Production retest: figures in an attached capability statement ("$35 billion+") came back "not
+ * established". They are sourced to the file, and WHO READS decides the wording.
  */
 export const ATTACHED_FACTS_SOURCED =
-  'FACTS FROM AN ATTACHED FILE ARE SOURCED: a figure, date, award, certification or claim that an attached file states is'
-  + ' sourced to that file. State it with attribution to the company and the file ("<Company> states it has funded $35'
-  + ' billion+, per its capability statement"): it is the company\'s own claim, attributed, not independently verified, and'
-  + ' never "not established", "not verified" or "could not be confirmed". "Not established" is only for something that'
-  + ' appears in no tool result, web page, customer message or attached file.';
+  'FACTS FROM AN ATTACHED FILE ARE SOURCED to that file: cite the file. Who reads decides the wording.'
+  + ' (a) In a document prepared FOR that company (its report, capability statement, leave-behind), state its own claims AS'
+  + ' WRITTEN: no "<Company> states", no brackets, no "reportedly", and never an "Unverified" label.'
+  + ' (b) In anything addressed to a third party (an outreach email, a teaming note), attribute in plain words: "<Company>'
+  + ' has funded <the figure as the file writes it>".'
+  + ' (c) In the chat answer, say where it comes from ("your capability statement says ...").'
+  + ' Never change their word ("funded" is not "awarded" or "revenue"); never round, convert or combine a file figure with'
+  + ' Mindy\'s figures.'
+  + ' CONFLICTS: an official record beats the file for status (the file says "WOSB pending" and SAM shows WOSB certified: the'
+  + ' report uses SAM, and the chat says to update the capability statement). An eligibility claim found only in the file'
+  + ' (8(a), HUBZone, SDVOSB, WOSB, sole-source eligibility) is never pitched or used to rank; the chat says "confirm before'
+  + ' using".'
+  + ' Doubts about the file go in the chat answer under "Before you hand it out", never in the client document.'
+  + ' A file\'s figure is never "not established": "not established" is only for Mindy\'s own inferences or third-party facts'
+  + ' the data does not show, and it says what the data does NOT prove (no prime awards does not mean the firm is small or new).';
 
 /** No data-freshness dates in what the customer reads. */
 export const NO_DATA_DATES =
@@ -38,8 +49,12 @@ export const NO_DATA_DATES =
   + ' "confirm on SAM.gov before relying on it"); never drop that warning. Dates that are facts about the work stay: response deadlines,'
   + ' contract end dates, registration expiry, campaign timing, and caveats such as "Defense awards are published on'
   + ' USAspending.gov with a delay of about 90 days (DoD reporting policy), so a missing recent award does not mean they'
-  + ' stopped buying". Contacts carry no dates either: cite their source'
-  + ' with a citation marker.';
+  + ' stopped buying".'
+  + ' CONTACTS (Eric, 2026-11-27, "contacts: show notice date"): each named contact\'s "why they matter" names the source'
+  + ' record and THAT record\'s own date, e.g. "primary contact on the office\'s newest notice (W91ZRS27QA001, Oct 28, 2026)",'
+  + ' preferring the newest notice, with its citation marker [n]. A record\'s own date is a fact about the record, not data'
+  + ' freshness. A contact found only on a notice older than 180 days gets "confirm before reaching out". Never an inferred'
+  + ' email; with no supported person, give the office\'s published inbox.';
 
 /** Eric's outreach method (rules 0-6), the "Before you send" checklist and the closing line. */
 export const OUTREACH_RULES = [
@@ -59,7 +74,7 @@ export const ACTION_PLAN_STRUCTURE = [
   '1. Dates that matter: opportunity dates only (response deadlines, registration expiry, contract end dates, when the buyer usually buys), each with what to do by then.',
   '2. The pitch in three lines: what the company does, the buyer\'s cited problem and what the company delivers against it, why they are close (local, already known). No certification in the pitch.',
   '3. Who buys this work here: a table of the buyer\'s own past buys (year, what, who won, amount), and what a missing recent year means.',
-  '4. Who to talk to and what to say: a table (person or office, how to reach them, why they matter to this company, the one question to ask). Contracting officers from recent notices, the person who feels the problem (program, outreach or recruiting lead from an official page), the agency small business office (lookup_federal_osbp), and the office\'s published inbox when no person is named. Every named contact carries a citation marker [n] pointing to its source (the notice number or official page) in Sources; write no \'from the notice...\' prose in the table or body. Check staleness yourself: a contact whose newest source is older than about six months is dropped or marked "confirm this contact before reaching out", with no date shown. Fewer verified contacts beat a long list. Never infer an email from a name pattern; unpublished means it is left out, and say so.',
+  '4. Who to talk to and what to say: a table (person or office, how to reach them, why they matter to this company, the one question to ask). Contracting officers from recent notices, the person who feels the problem (program, outreach or recruiting lead from an official page), the agency small business office (lookup_federal_osbp), and the office\'s published inbox when no person is named. Every named contact carries a citation marker [n] pointing to its source (the notice number or official page) in Sources, and its "why they matter" cell names that record and the record\'s own date (e.g. "primary contact on the office\'s newest notice (W91ZRS27QA001, Oct 28, 2026)"), preferring the newest notice. A contact found only on a notice older than 180 days is marked "confirm before reaching out". Never a data-freshness date. Fewer verified contacts beat a long list. Never infer an email from a name pattern; unpublished means it is left out, and say so.',
   '5. The plan, week by week: dated moves, including the events where these buyers will be (search_federal_events / get_federal_event_series, or an official event page read with read_web_page); name only events confirmed by a source, and say plainly when none are confirmed.',
   '6. What to say on every call: lead with their problem, show one real example, be local, end with what they plan to buy, when and how they will post it, and ask to be on the quote list rather than for the work.',
   '7. Emails to send: short, following OUTREACH, each naming that office\'s own past buys.',
