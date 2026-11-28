@@ -178,6 +178,42 @@ describe('helpAnswerFor + flag', () => {
   });
 });
 
+describe('help-match: only a short how-to request gets a canned answer', () => {
+  // Production mis-route (2026-11-28): a question about Mindy's own behaviour got the upload help answer.
+  const PROD = 'When I attach a company\'s capability statement and it states a number (like "$35 billion funded"), how do you present that number? When do you say something is "not established" or unverified?';
+
+  it('the production question falls through to a normal answer', () => {
+    expect(matchHelpIntent(PROD)).toBeNull();
+    expect(helpAnswerFor(PROD)).toBeNull();
+  });
+
+  const NEAR_MISSES = [
+    'If a solicitation says to attach a capability statement, what do you recommend I emphasize for an Army logistics contract?',
+    'How does Mindy decide which past performance from my uploaded document counts as relevant?',
+    'When do you mark a number from an uploaded capability statement as unverified?',
+    'What do you do when my capability statement says $2M in past performance but SAM shows less?',
+    'How do I upload my capability statement? Also, which of the Navy recompetes fits it best?',
+    'Explain how I should rewrite the "Core competencies" section of my attached capability statement.',
+    'how do you present a capability statement figure like 35 billion',
+    'The agency may cancel the solicitation if fewer than two offers arrive; how do I plan for that risk on this bid?',
+    'Will the government unsubscribe us from the bidders list if we stop sending capability statements to the contracting office?',
+    'Can you help me understand why the contracting officer might cancel a set-aside after only one small business responds to it?',
+    'How do I find contracts in Florida worth more than 250,000 dollars?',
+    'For the VA janitorial bid we discussed, how do I cancel my plan to bid and pick a better one?',
+  ];
+
+  it.each(NEAR_MISSES)('near-miss "%s" is not a help question', (q) => {
+    expect(matchHelpIntent(q)).toBeNull();
+  });
+
+  it('a short greeting before the how-to still matches; a long lead-in does not', () => {
+    expect(matchHelpIntent('Hi, how do I cancel my subscription?')).toBe('cancel_subscription');
+    expect(matchHelpIntent('Thinking about the Navy industry day you mentioned, how do I find events like it?')).toBeNull();
+    // A one-meaning phrase (cancel my subscription) still matches inside one short question.
+    expect(matchHelpIntent('After the trial ends, how do I cancel my subscription?')).toBe('cancel_subscription');
+  });
+});
+
 describe('capability statement: one answer, always the draft offer', () => {
   // Five paraphrased ways of asking the same thing. Each must get the SAME playbook.
   const VARIANTS = [
