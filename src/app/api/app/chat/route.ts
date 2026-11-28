@@ -148,7 +148,7 @@ import { getNaics } from '@/lib/codes/lookup';
 import { capabilityPlannerNote, interpretCapabilityNaics } from '@/lib/market/capability-naics';
 import { guardUnstatedStates, guardUnstatedCities } from '@/lib/chat/stated-filters';
 import { parseDisplayHint, displayHintNote } from '@/lib/chat/display-hint';
-import { appActionsEnabledFor, parseActionSurface, actionNamesFor, createAppActionProposer, proposeAppActionToolDef, PROPOSE_APP_ACTION, APP_ACTIONS_NOTE, type AppActionProposer, ACTION_OWNED_WRITE_TOOLS } from '@/lib/chat/app-actions/propose';
+import { appActionsEnabledFor, parseActionSurface, actionNamesFor, createAppActionProposer, proposeAppActionToolDef, PROPOSE_APP_ACTION, APP_ACTIONS_NOTE, type AppActionProposer, actionOwnedWriteToolsFor } from '@/lib/chat/app-actions/propose';
 import { fileControlsNote } from '@/lib/ask-mindy/file-controls';
 import { QUESTION_OVER_PROFILE, OUTREACH_AND_PLAN_RULES, ATTACHED_FACTS_SOURCED } from '@/lib/ask-mindy/outreach-rules';
 import { compileIntent, enforceIntent, dedupeToolCalls, isMapScopeNote, splitViewPreamble } from '@/lib/chat/intent-compiler';
@@ -1346,7 +1346,8 @@ export async function POST(request: NextRequest) {
             // Card chat offers only its opportunity tools (narrowing; the policy still applies).
             ...(cardCtx ? { allowedToolNames: CARD_CHAT_TOOLS } : {}),
             // App actions own saved-search writes on this turn: the direct (unconfirmed) schedule tools are not offered.
-            ...(actions ? { blockedToolNames: ACTION_OWNED_WRITE_TOOLS } : {}),
+            // Only where the confirmed save/update actions exist (the Map); /app keeps the direct alert tools.
+            ...(actions && actionOwnedWriteToolsFor(actions.surface) ? { blockedToolNames: actionOwnedWriteToolsFor(actions.surface)! } : {}),
             toolTimeoutMs: (n) => toolTimeoutMs(n, deadlines),
             // Research mode: SAM-backed tools read Mindy's caches only (zero live SAM calls).
             ...(researchTurn ? { samCacheOnly: true } : {}),
