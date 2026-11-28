@@ -50,15 +50,43 @@ const RULES: Array<{ id: HelpIntentId; re: RegExp }> = [
 ];
 
 /**
+ * A canned answer fires only when the message IS a short how-to request (Agent 4, 2026-11-28: a question about how
+ * Mindy presents a number from an attached capability statement got the "upload your capability statement" answer).
+ * When in doubt, fall through: a missed help answer still gets a normal answer; a wrong one looks broken.
+ */
+const MAX_WORDS = 18;
+/** Questions about Mindy's own behaviour ("how do you present…", "when do you say…", "what do you do when…"). */
+const ABOUT_MINDY = /\b(how|when|why|where) (do|does|did|would|will|should) (you|mindy|it)\b|\bwhat (do|does|would|will) (you|mindy) do\b|\bhow (are|is) (you|mindy) (going to|deciding|handling)\b/i;
+/** Digits, money or percentages the help register never needs (8(a), "top 25" and "1st" are part of real how-tos). */
+function hasNumbers(q: string): boolean {
+  const stripped = q.replace(/\b8\s*\(?a\)?/gi, ' ').replace(/\btop\s*\d+\b/gi, ' ').replace(/\b1st\b/gi, ' ');
+  return /[\d$%€£]/.test(stripped);
+}
+/** True when the message is shaped like ONE short how-to request and nothing else. */
+export function isHelpShaped(q: string): boolean {
+  const words = q.split(' ').filter(Boolean);
+  if (words.length > MAX_WORDS) return false;
+  // One sentence or question only: no second question, no follow-on clause after a full stop.
+  if (q.replace(/[.?!]+$/, '').split(/[.?!;]+\s+/).filter((x) => x.trim()).length > 1) return false;
+  if (/["\u201c\u201d]/.test(q)) return false;
+  if (hasNumbers(q)) return false;
+  if (ABOUT_MINDY.test(q)) return false;
+  return true;
+}
+
+/**
  * Returns the matching help intent, or null. `hasAttachedOpportunity`: an opportunity is attached to the turn, so
  * "how do I pursue this" is about THAT notice and belongs to the full answer path, not a generic playbook.
  */
 export function matchHelpIntent(question: string, opts: { hasAttachedOpportunity?: boolean } = {}): HelpIntentId | null {
   const q = String(question || '').replace(/\s+/g, ' ').trim();
   if (!q || q.length > 400) return null;
+  if (!isHelpShaped(q)) return null;
   // Asked without a how-to form, these still mean exactly one thing.
   for (const d of DIRECT) if (d.re.test(q) && !(d.unless && d.unless.test(q))) return d.id;
-  if (!HOW_TO.test(q)) return null;
+  const how = HOW_TO.exec(q);
+  // The how-to phrase leads the message (a greeting or two words of lead-in at most), not buried in a longer ask.
+  if (!how || q.slice(0, how.index).split(' ').filter(Boolean).length > 4) return null;
   for (const r of RULES) {
     if (!r.re.test(q)) continue;
     if (r.id === 'first_bid' && opts.hasAttachedOpportunity) return null;
