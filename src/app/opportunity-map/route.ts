@@ -10963,6 +10963,7 @@ const ASK_MINDY_CSS =
   + '.amk-hist-row{display:flex;align-items:center;gap:4px;border-radius:8px}.amk-hist-row:hover{background:#f1f5f9}.amk-hist-row.cur{background:#eaf1fe}'
   + '.amk-hist-item{flex:1;min-width:0;display:flex;flex-direction:column;align-items:flex-start;border:0;background:none;text-align:left;padding:8px 10px;cursor:pointer}.amk-hist-item b{font:600 13px Inter,system-ui,sans-serif;color:#111c26;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.amk-hist-item span{font:500 11px Inter,system-ui,sans-serif;color:#64748b}'
   + '.amk-hist-del{flex:none;border:0;background:none;color:#94a3b8;font:400 18px/1 Inter,system-ui,sans-serif;padding:4px 8px;cursor:pointer}.amk-hist-del:hover{color:#b91c1c}.amk-hist-err{font:500 11px Inter,system-ui,sans-serif;color:#b91c1c;padding-right:6px}'
+  + '.amk-hist-row{flex-wrap:wrap}.amk-hist-row.confirming .amk-hist-del{display:none}.amk-hist-confirm{flex-basis:100%;display:flex;align-items:center;gap:8px;padding:0 10px 8px;font:500 12px Inter,system-ui,sans-serif;color:#475569}.amk-hist-yes{border:0;background:#b91c1c;color:#fff;font:600 11.5px Inter,system-ui,sans-serif;border-radius:7px;padding:4px 10px;cursor:pointer}.amk-hist-yes:disabled{opacity:.6}.amk-hist-no{border:1px solid #dde3ec;background:#fff;color:#334155;font:600 11.5px Inter,system-ui,sans-serif;border-radius:7px;padding:4px 10px;cursor:pointer}'
   + '.amk-hist-msg{font:500 12.5px Inter,system-ui,sans-serif;color:#475569;padding:10px 4px}.amk-hist-retry{border:1px solid #bcd3fb;background:#eaf1fe;color:#1d4ed8;font:600 12px Inter,system-ui,sans-serif;border-radius:8px;padding:6px 10px;cursor:pointer}'
   + '@media(prefers-color-scheme:dark){.amk-tool{background:#0d141d;color:#cbd5e1;border-color:#202b39}.amk-hist-hd,.amk-hist-item b{color:#eaf1f8}.amk-hist-row:hover{background:#111a26}.amk-hist-row.cur{background:#0f1f3a}}'
   + '.amk-stop{display:inline-block;margin-top:6px;border:1px solid #dde3ec;background:#fff;color:#334155;font:600 11.5px Inter,system-ui,sans-serif;border-radius:7px;padding:4px 10px;cursor:pointer}.amk-stop:hover{background:#f1f5f9}'
@@ -11257,7 +11258,7 @@ const ASK_MINDY_JS = `<script>(function(){
           var m=document.createElement('span'); var dt=s.updated_at?new Date(s.updated_at):null; m.textContent=(dt&&!isNaN(dt.getTime()))?dt.toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'}):'';
           open.appendChild(t); open.appendChild(m); open.onclick=function(){ openConversation(s.id); };
           var del=document.createElement('button'); del.type='button'; del.className='amk-hist-del'; del.setAttribute('aria-label','Delete conversation'); del.title='Delete conversation'; del.textContent='\u00d7';
-          del.onclick=function(){ deleteConversation(s.id,row); };
+          del.onclick=function(){ confirmDelete(s.id,row); };
           row.appendChild(open); row.appendChild(del); list.appendChild(row);
         });
       })
@@ -11279,6 +11280,18 @@ const ASK_MINDY_JS = `<script>(function(){
       })
       .catch(function(){ histMsg(list,"Couldn't open that conversation. Try again.",true); });
   }
+  // Deleting a conversation is permanent, so the row asks first: "Delete this conversation? Delete / Cancel".
+  function confirmDelete(sid,row){
+    if(row.querySelector('.amk-hist-confirm')) return;
+    var c=document.createElement('div'); c.className='amk-hist-confirm'; c.setAttribute('role','group'); c.setAttribute('aria-label','Confirm delete');
+    var q=document.createElement('span'); q.textContent='Delete this conversation?';
+    var yes=document.createElement('button'); yes.type='button'; yes.className='amk-hist-yes'; yes.textContent='Delete';
+    var no=document.createElement('button'); no.type='button'; no.className='amk-hist-no'; no.textContent='Cancel';
+    yes.onclick=function(){ yes.disabled=true; deleteConversation(sid,row); };
+    no.onclick=function(){ if(c.parentNode) c.parentNode.removeChild(c); row.classList.remove('confirming'); };
+    c.appendChild(q); c.appendChild(yes); c.appendChild(no);
+    row.classList.add('confirming'); row.appendChild(c); no.focus();
+  }
   function deleteConversation(sid,row){
     var em=email();
     fetch('/api/app/chat-sessions',{method:'DELETE',headers:Object.assign({'Content-Type':'application/json'},authHdrs()),body:JSON.stringify({email:em,sessionId:sid})})
@@ -11288,7 +11301,7 @@ const ASK_MINDY_JS = `<script>(function(){
         if(sid===sessionId){ sessionId=''; history=[]; saveView(); greet(); }
         var list=histEl.querySelector('.amk-hist-list'); if(list&&!list.querySelector('.amk-hist-row')) histMsg(list,'No saved conversations yet.');
       })
-      .catch(function(){ var e=row.querySelector('.amk-hist-err'); if(!e){ e=document.createElement('span'); e.className='amk-hist-err'; e.setAttribute('role','alert'); row.appendChild(e); } e.textContent="Couldn't delete. Try again."; });
+      .catch(function(){ var y=row.querySelector('.amk-hist-yes'); if(y) y.disabled=false; var e=row.querySelector('.amk-hist-err'); if(!e){ e=document.createElement('span'); e.className='amk-hist-err'; e.setAttribute('role','alert'); row.appendChild(e); } e.textContent="Couldn't delete. Try again."; });
   }
   // Public opener (does NOT auto-send). An explicit question (typed in the search bar, then "Ask") goes into the
   // box as the customer's own words. What is sent = what is in the box (map filters are not injected).

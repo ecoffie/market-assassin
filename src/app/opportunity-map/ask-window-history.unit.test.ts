@@ -173,6 +173,7 @@ describe('History (GET /api/app/chat-sessions)', () => {
     t.click('.amk-hist-item'); await t.settle();
     t.click('[data-testid="amk-history-btn"]'); await t.settle();
     t.click('.amk-hist-del'); await t.settle();
+    t.click('.amk-hist-yes'); await t.settle();
     const del = t.calls.find((c) => c.method === 'DELETE')!;
     expect(JSON.parse(del.body!)).toEqual({ email: 'pro@example.com', sessionId: SID2 });
     expect(t.doc.querySelector('.amk-hist-row')).toBeNull();
@@ -181,13 +182,30 @@ describe('History (GET /api/app/chat-sessions)', () => {
     expect(t.bubbles()).toEqual([]);
   });
 
+  it('the × asks first: nothing is deleted until "Delete" is pressed, and Cancel keeps the conversation', async () => {
+    const t = boot({ sessions: { list: { status: 200, json: LIST } } });
+    t.open();
+    t.click('[data-testid="amk-history-btn"]'); await t.settle();
+    t.click('.amk-hist-del'); await t.settle();
+    expect(t.calls.some((c) => c.method === 'DELETE')).toBe(false);
+    expect(t.doc.querySelector('.amk-hist-confirm')?.textContent).toContain('Delete this conversation?');
+    t.click('.amk-hist-del'); // a second click does not stack a second prompt
+    expect(t.doc.querySelectorAll('.amk-hist-confirm')).toHaveLength(1);
+    t.click('.amk-hist-no'); await t.settle();
+    expect(t.doc.querySelector('.amk-hist-confirm')).toBeNull();
+    expect(t.doc.querySelector('.amk-hist-row')).not.toBeNull();
+    expect(t.calls.some((c) => c.method === 'DELETE')).toBe(false);
+  });
+
   it('a failed delete says so on the row and keeps it', async () => {
     const t = boot({ sessions: { list: { status: 200, json: LIST }, del: { status: 500 } } });
     t.open();
     t.click('[data-testid="amk-history-btn"]'); await t.settle();
     t.click('.amk-hist-del'); await t.settle();
+    t.click('.amk-hist-yes'); await t.settle();
     expect(t.doc.querySelector('.amk-hist-row')).not.toBeNull();
     expect(t.doc.querySelector('.amk-hist-err')?.textContent).toMatch(/Couldn't delete/);
+    expect((t.doc.querySelector('.amk-hist-yes') as HTMLButtonElement).disabled).toBe(false); // can try again
   });
 
   it('free accounts, sign-in and errors get plain messages (errors offer Try again)', async () => {
