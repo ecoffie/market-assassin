@@ -79,11 +79,21 @@ export function proposeAppActionToolDef(surface: ActionSurface) {
   };
 }
 
+/**
+ * Production test 2026-11-28: "change the TEST actions smoke alerts to daily" ran IMMEDIATELY through the chat tool
+ * update_market_schedule (allowed_write, no confirm) instead of map.update_alert (confirm). On a turn where app actions
+ * are offered, the direct saved-search writes are not offered: creating a saved search or changing its alerts goes
+ * only through the confirmed actions (map.save_search / map.update_alert).
+ */
+export const ACTION_OWNED_WRITE_TOOLS: ReadonlySet<string> = new Set(['schedule_market_search', 'update_market_schedule']);
+
 /** One line for the system prompt, so the model knows the tool exists and when not to use it. */
 export const APP_ACTIONS_NOTE =
   'APP ACTIONS (beta): propose_app_action can change what the customer sees on this page (filters, horizons, zoom, opening'
   + ' a record). Use it only when they asked to see, filter, open or go somewhere, once per intent, and always answer in words'
-  + ' too. Never say the change was made: say what you set it to show. A save, add, change or remove is only WAITING until the'
+  + ' too. Saving a search or changing its alerts goes ONLY through map.save_search / map.update_alert (frequencies: daily,'
+  + ' weekly or off; say plainly that other schedules, such as certain weekdays, are not available).'
+  + ' Never say the change was made: say what you set it to show. A save, add, change or remove is only WAITING until the'
   + ' customer clicks its button: tell them which button to click (for example "Click Add to save it to My Pursuits") and'
   + ' never write "I\'ve added", "I\'ve sent", "saved" or "done" for it.';
 
@@ -99,11 +109,25 @@ export const WRITE_CONFIRM_HINTS: Record<string, { button: string; does: string 
 };
 
 /** The reply text the model gets back for an accepted write: pending, with the exact sentence to use. */
-export function pendingWriteNote(name: string): string {
+/** What clicking will do, from the validated args (search name, frequency), so the sentence is specific. */
+function pendingDoes(name: string, args: Record<string, unknown> | undefined, fallback: string): string {
+  const freq = typeof args?.alert_frequency === 'string' ? args.alert_frequency : null;
+  const freqWords = freq === 'off' ? 'with alerts paused' : freq ? `with ${freq} alerts` : '';
+  if (name === 'map.save_search' && typeof args?.name === 'string') return `save this view as "${args.name}"${freqWords ? ` ${freqWords}` : ''}`;
+  if (name === 'map.update_alert' && freq) return freq === 'off' ? 'pause that search\'s alerts' : `switch that search to ${freq} alerts`;
+  return fallback;
+}
+
+/**
+ * The reply the model gets for an accepted write: pending, with the exact sentence to use. Production test 2026-11-28:
+ * before Save was clicked Mindy said "I've set up a saved search called ...": the rule covers EVERY write action.
+ */
+export function pendingWriteNote(name: string, args?: Record<string, unknown>): string {
   const h = WRITE_CONFIRM_HINTS[name];
-  const say = h ? `Click ${h.button} to ${h.does}.` : 'Click the button under this answer to confirm it.';
+  const say = h ? `Click ${h.button} to ${pendingDoes(name, args, h.does)}.` : 'Click the button under this answer to confirm it.';
   return `NOT DONE YET: the page is showing a confirm button and nothing changes until the customer clicks it. Say exactly: "${say}"`
-    + ' Never write "I\'ve added", "I\'ve sent", "I\'ve saved", "saved", "added" or "done" about it in this answer.';
+    + ' Never write "I\'ve added", "I\'ve sent", "I\'ve saved", "I\'ve set up", "I\'ve created", "I\'ve changed", "I\'ve updated",'
+    + ' "I\'ve removed", "saved", "added", "set up", "is now set" or "done" about it in this answer.';
 }
 
 export interface ActionEvent {
@@ -175,7 +199,7 @@ export function createAppActionProposer(opts: {
         status: 'proposed',
         id,
         note: def.needsConfirm
-          ? pendingWriteNote(check.action.name)
+          ? pendingWriteNote(check.action.name, check.action.args)
           : 'Sent to the page; it applies the change and offers Undo. Do not say it was done; say what you set it to show.',
       };
     },
