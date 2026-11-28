@@ -55,7 +55,7 @@ describe('get_sba_goaling_share prime row', () => {
     const r = await getSbaGoalingShare({ agency: 'VA', fiscal_year: 2026 });
     const row = (c: string) => r.goals!.find((g) => g.category === c)!;
     expect(row('8(a) / SDB')).toMatchObject({ goal_pct: 5, actual_setaside_pct: 0.01 });
-    expect(row('SDVOSB')).toMatchObject({ goal_pct: 3, actual_setaside_pct: 8.8, meets_goal: true });
+    expect(row('SDVOSB')).toMatchObject({ goal_pct: 5, actual_setaside_pct: 8.8, meets_goal: true }); // FY2026: 5% (Pub. L. 118-31 §863)
     expect(row('WOSB / EDWOSB')).toMatchObject({ goal_pct: 5, actual_setaside_pct: 0.01 });
     expect(row('HUBZone')).toMatchObject({ goal_pct: 3, actual_setaside_pct: 0.01 });
     expect(r.goals!.map((g) => g.category)).toEqual(['Small Business (prime): combined set-aside-code share', '8(a) / SDB', 'SDVOSB', 'WOSB / EDWOSB', 'HUBZone']);

@@ -38,7 +38,7 @@ const CONTRACT_AWARD_TYPES = ['A', 'B', 'C', 'D'];
 // WOSB/EDWOSB include their SOLE-SOURCE codes (WOSBSS, EDWOSBSS), as admin set-aside-stats and the map
 // already do — the bucket used to count only the competed codes, understating WOSB (VA report 2026-11-22).
 // VA's veteran codes (VSA "Veteran Set Aside" / veteran sole source) are deliberately NOT in SDVOSB: they
-// are Veteran-Owned (VOSB), a wider group, and counting them would overstate SDVOSB against its 3% goal.
+// are Veteran-Owned (VOSB), a wider group, and counting them would overstate SDVOSB against its goal (3% through FY2024, 5% from FY2025).
 // SBA is "Total Small Business Set-Aside (FAR 19.5)": TOTAL means the whole requirement was set aside, as
 // opposed to SBP "Partial". It is NOT an aggregate of all set-asides. The old label "Small Business (total
 // set-aside)" read as one (0.6% beside a 9.4% combined share for VA FY2026). The combined share is
