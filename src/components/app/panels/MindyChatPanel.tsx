@@ -24,6 +24,8 @@ import { authedFetch } from '../authHeaders';
 import { ChatAttachments } from '../chat/ChatAttachments';
 import { ConnectedFiles, type ConnectedFile } from '../chat/ConnectedFiles';
 import type { GeneratedDownloadFile } from '../chat/GeneratedDownloadChips';
+import { NavActionCard } from '../chat/NavActionCard';
+import { parseNavAction, type NavAction } from '@/lib/app/nav-destinations';
 import { ChatReportPreview, validReportId, type ChatInlineReport, type ChatSavedReport } from '../chat/ChatReportPreview';
 import { useVaultCapabilities } from '../chat/useVaultCapabilities';
 import { useChatCapabilities } from '../chat/useChatCapabilities';
@@ -92,6 +94,8 @@ interface ChatMessage {
   /** W2: create_document files saved this turn — in-chat download chips mint signed URLs on click. */
   deliverables?: GeneratedDownloadFile[];
   deliverablePdfNote?: string | null;
+  /** Ask Mindy "take me to…": navigation cards proposed this turn (app.navigate, at most 3). Never auto-run. */
+  navActions?: NavAction[];
   /** Packaged generate_market_report: the rendered report HTML, read in the chat (not persisted in History). */
   report?: ChatInlineReport;
   /** A packaged market report in a reopened conversation: History keeps its id and title; the pane reloads it. */
@@ -308,6 +312,8 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
           email,
           message: text,
           sessionId: sessionId || undefined,
+          // Which surface is asking, so the server offers only /app actions (app-actions/propose.ts).
+          surface: 'app',
           history: historyForServer,
           ...opportunityContextField(attachedOpp),
           ...(connectedFiles.length ? { connectedFiles: connectedFiles.map((f) => f.handle) } : {}),
@@ -380,6 +386,16 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
                   ? { ...m, content: m.content + evt.content, ...(m.progress && !m.progressDoneAt ? { progressDoneAt: Date.now() } : {}) }
                   : m
               ));
+            } else if (evt.type === 'action') {
+              // Only an app.navigate to a known destination becomes a card; anything else renders nothing.
+              const nav = parseNavAction(evt);
+              if (nav) {
+                setMessages(prev => prev.map(m =>
+                  m.id === assistantMsg.id && !(m.navActions || []).some((a) => a.id === nav.id) && (m.navActions || []).length < 3
+                    ? { ...m, navActions: [...(m.navActions || []), nav] }
+                    : m
+                ));
+              }
             } else if (evt.type === 'deliverables' && Array.isArray(evt.files)) {
               const files = (evt.files as GeneratedDownloadFile[]).filter(
                 (f) => f && typeof f.document_id === 'string' && typeof f.format === 'string',
@@ -857,6 +873,11 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
                         ? <span className="text-faint italic">Thinking…</span>
                         : null}
                   </div>
+                  {msg.role === 'assistant' && !msg.isStreaming && !msg.errored && !!msg.navActions?.length && (
+                    <div className="flex flex-wrap gap-2" data-testid="nav-actions">
+                      {msg.navActions.map((a) => <NavActionCard key={a.id} action={a} tier={tier} onPanelChange={onPanelChange} />)}
+                    </div>
+                  )}
                   {msg.role === 'assistant' && !!msg.citations?.length && !msg.isStreaming && (
                     <div className="mt-3 pt-3 border-t border-surface/50">
                       <div className="text-[10px] font-semibold tracking-wider text-faint mb-1.5">SOURCES</div>
