@@ -821,6 +821,44 @@ export async function POST(request: NextRequest) {
       if (!customer.deleted) email = customer.email;
     }
 
+    // "Mindy Teams Lifetime" is sold on a manual invoice: no checkout session, so this is the ONLY
+    // place it can be provisioned. Before this, the buyer got Pro (lifetime classification) and
+    // could not invite a teammate (src/lib/billing/lifetime-team.ts). Every step is idempotent
+    // (flags set to true, workspace provisioning re-runs safely), so a failure returns 500 and
+    // Stripe retries rather than silently losing a $6,000 entitlement.
+    const { invoiceGrantsLifetimeTeam, TEAM_LIFETIME_TIER } = await import('@/lib/billing/lifetime-team');
+    if (invoiceGrantsLifetimeTeam(invoice)) {
+      if (!email) {
+        console.error('[stripe-webhook] Teams Lifetime invoice has no customer email (will retry):', invoice.id);
+        return NextResponse.json({ error: 'team_lifetime_no_email' }, { status: 500 });
+      }
+      const teamUpdates = await updateAccessFlags(email, TEAM_LIFETIME_TIER);
+      if (!teamUpdates.access_team) {
+        console.error('[stripe-webhook] Teams Lifetime access_team write failed (will retry):', email, invoice.id);
+        return NextResponse.json({ error: 'team_lifetime_grant_failed' }, { status: 500 });
+      }
+      const wroteKv = teamUpdates.access_briefings ? await grantBriefingsAccess(email) : false;
+      await recordAccessGrant({
+        email,
+        capability: 'team',
+        source: 'stripe_webhook',
+        tier: TEAM_LIFETIME_TIER,
+        actor: 'stripe',
+        reason: `invoice.paid — ${invoice.lines?.data?.[0]?.description || 'Mindy Teams Lifetime'}`,
+        wroteProfile: true,
+        wroteKv,
+        metadata: { event_id: event.id, invoice_id: invoice.id, amount_paid: invoice.amount_paid },
+      });
+      try {
+        const { provisionTeamWorkspace } = await import('@/lib/app/workspace');
+        await provisionTeamWorkspace(email);
+      } catch (provisionErr) {
+        // Non-fatal, same as the checkout path: POST /api/app/team/upgrade self-heals the workspace.
+        console.error('[stripe-webhook] Teams Lifetime workspace provisioning failed (non-fatal):', provisionErr);
+      }
+      console.log(`[stripe-webhook] granted Teams Lifetime (team) to ${email} from ${invoice.id}`);
+    }
+
     if (grossCents > 0 && email) {
       try {
         const { recordAffiliateFromStripePayment } = await import('@/lib/mindy/affiliate-commissions');

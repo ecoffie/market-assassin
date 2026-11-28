@@ -560,7 +560,8 @@ export async function updateAccessFlags(
     // gates still light up automatically). Per-seat invite flow
     // is a separate workstream — see TODO-stripe-team-pricing.md
     // Step 6.
-    if (tier === 'team_monthly' || tier === 'team_annual') {
+    // team_lifetime = "Mindy Teams Lifetime", a one-time manual invoice (src/lib/billing/lifetime-team.ts).
+    if (tier === 'team_monthly' || tier === 'team_annual' || tier === 'team_lifetime') {
       updates.access_team = true;
       updates.access_briefings = true;
     }
