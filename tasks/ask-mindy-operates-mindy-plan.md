@@ -65,7 +65,7 @@ first.
 | action | surfaces | kind | gate | args | client runs |
 |---|---|---|---|---|---|
 | `app.navigate` | app, map | view | none (the destination keeps its own gate) | `panel` ∈ `AppPanel` minus admin-only and route-only panels; optional `section` ∈ the panel's known sections (Settings: `SETTINGS_SECTION_VALUES`; Vault: `VaultDeepLinkSection`) | `onPanelChange(panel)` plus `section=`; from the Map, `/app?panel=…&section=…` opens in a new tab (Decision 1) |
-| `app.open_record` | app | view | none (the server already checks ownership) | `kind` ∈ `report`, `document`, `pursuit`, `saved_search`, `opportunity`; `id` matching that kind's id pattern, **from this turn's tool results only** (the evidence rule `map.open_record` uses) | opens the record in its panel (report pane, Vault document, pursuit drawer, watchlist item, map `?opp=`) |
+| `app.open_record` | app | view | none (the server already checks ownership) | `kind` ∈ `report`, `pursuit`, `opportunity` (document and saved_search wait for their deep links; see Client review); `id` matching that kind's id pattern, **from this turn's tool results only** (the evidence rule `map.open_record` uses) | opens the record in its panel (report pane, Vault document, pursuit drawer, watchlist item, map `?opp=`) |
 | `app.show` | app | view | none | `what` ∈ a fixed list (`my_documents`, `my_pursuits`, `my_saved_searches`, `my_alert_settings`, `my_matching`, `my_profile`, `my_billing`, `my_team`) | maps to `app.navigate` with the right `panel` and `section`; a model-friendly alias, so "show me my alert settings" needs no panel ids |
 
 Prompt rules (Agent 1):
@@ -146,6 +146,33 @@ is checked.
 3. The Claude + Mindy MCP baseline check passes its hard gates for the answer text. Actions themselves have no baseline;
    they are judged on correctness and on never acting unconfirmed.
 4. Agent 4 review, then Eric's go to widen the allowlist; `'*'` only after one clean day on the allowlist.
+
+## Client review (Agent 2, 2026-11-28): folded in
+
+- **/app has no action UI today.** The Map's card and Undo are ES5 in `opportunity-map/route.ts`, so /app Phase A
+  needs a new React action card plus a handler table (about one PR, Agent 2). The parity test is extended to cover
+  that table.
+- **Gates on navigation:** `app.navigate` applies the destination's lock through the sidebar's
+  `clickActionFor()` / `nav-groups.ts`. A gated panel can be proposed, but the client shows it locked exactly as the
+  sidebar does. Test: the client applies the gate.
+- **Settings deep link:** add a `sectionRequest` nonce (the same bug class as Vault in #2560), and `syncAppUrl` writes
+  `section=` for settings.
+- **`app.open_record` in Phase A:** `report`, `pursuit` and `opportunity` work today. `document` needs a Vault per-document
+  deep link first. `saved_search` lives in the Map shell's watchlist and needs a watchlist item param. Until those
+  exist, both are **dropped from Phase A** (registry enum = report, pursuit, opportunity).
+- **Phase B starts by extracting the Settings save** into `src/lib/app/settings-writes.ts`, one writer used by both the
+  panel and the action. No action writes through a second code path.
+- **List fields REPLACE on `/api/alerts/preferences`:** add/remove = GET current → compute the new list → POST **that
+  field only**. NAICS and keyword posts trigger the route's derived-field step, which gets contract tests.
+- **Re-GET at click time,** not at proposal time, and Undo restores **only the touched fields**.
+- **After an action write,** emit a refetch event so open panels (Settings, Watchlist) show the new state.
+- **Auth:** same auth and workspace headers as the page. Test: a coach-scope refusal (Phase B is own account only, per
+  Decision 3).
+- **One writer for briefings:** briefing on/off and cadence are also accepted by `/api/alerts/preferences`
+  (`briefingsEnabled` / `briefingFrequency`). `settings.set_notifications` uses the single writer the Notifications
+  card uses today; it is not split across two routes.
+- **Phase C:** delete-search Undo re-creates the search from the full snapshot, so it gets a new id. The confirm says
+  so.
 
 ## Decisions (Agent 4 reviewer defaults, 2026-11-28; Eric can override)
 
