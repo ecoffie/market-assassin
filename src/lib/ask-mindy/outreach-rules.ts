@@ -17,7 +17,13 @@ export const QUESTION_OVER_PROFILE =
   + ' the profile at all and do not mention it in the answer body; at most one line in Sources and coverage.'
   + ' A FILE THE CUSTOMER ATTACHED counts as their words: when an attached file (a capability statement, company'
   + ' profile, past performance) describes a company, research THAT company, not the saved profile, and say whose'
-  + ' file it is from its own name.';
+  + ' file it is from its own name.'
+  + ' When the question names a status or place but no line of work ("I\'m an SDVOSB, where is the least competition?"),'
+  + ' do not narrow the searches to the saved profile\'s trade: answer across trades first, then add a short "For your saved'
+  + ' profile (<trade>): ..." part. Saying you used the profile is not enough when it would change which results appear.';
+
+/** The one wording for the Defense reporting lag (#2549), wherever it is said. */
+export const DEFENSE_LAG_LINE = 'Defense awards are published on USAspending.gov with a delay of about 90 days (DoD reporting policy)';
 
 /**
  * A company's OWN claims from its attached file (Eric, 2026-11-27, "claims-by-audience", from the Claude + Mindy MCP
