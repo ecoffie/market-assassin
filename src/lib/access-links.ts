@@ -1,6 +1,7 @@
 import { kv } from '@vercel/kv';
 import { hasBriefingsAccess } from '@/lib/briefings/access';
 import { sendEmail } from '@/lib/send-email';
+import { MINDY_ALERT_SETTINGS_PATH } from '@/lib/mindy/email-branding';
 
 export type AccessDestination = 'briefings' | 'preferences';
 
@@ -35,7 +36,9 @@ function buildFallbackUrl(email: string, destination: AccessDestination): string
   const normalizedEmail = normalizeEmail(email);
 
   if (destination === 'preferences') {
-    return `${baseUrl}/alerts/preferences?email=${encodeURIComponent(normalizedEmail)}`;
+    // No token here (KV was down), and /alerts/preferences rejects a reader without one: Settings → Alerts signs
+    // them in first (2026-11-28).
+    return `${baseUrl}${MINDY_ALERT_SETTINGS_PATH}`;
   }
 
   return `${baseUrl}/app?email=${encodeURIComponent(normalizedEmail)}`;

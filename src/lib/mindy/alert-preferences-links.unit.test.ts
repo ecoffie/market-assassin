@@ -3,7 +3,7 @@
  * unless the link carries ?email=&token=. Customer-facing links without a signed token go to in-app Settings → Alerts &
  * matching instead (/app signs them in first). Token-carrying links (daily alerts, access links) keep the old page.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { MINDY_ALERT_SETTINGS_PATH, MINDY_PREFERENCES_URL } from './email-branding';
@@ -22,7 +22,6 @@ function walk(dir: string, out: string[] = []): string[] {
 /** Links that carry a signed token or are admin-only text, with the reason each is allowed. */
 const KEEP: Record<string, string> = {
   'src/app/api/cron/daily-alerts/route.ts': 'preferencesUrl carries ?email=&token=&ts= (works)',
-  'src/lib/access-links.ts': 'access-link flow (Agent 4: keep)',
   'src/app/api/access-links/consume/route.ts': 'redirect after a consumed one-time access link (Agent 4: keep)',
   'src/app/api/admin/backfill-alerts/route.ts': 'admin JSON note, not customer copy',
 };
@@ -44,6 +43,20 @@ describe('customer-facing links never send a reader to the token-only /alerts/pr
       });
     }
     expect(offenders).toEqual([]);
+  });
+
+  it('the secure access link fallback (KV down, so no token) lands on Settings → Alerts, not the token-only page', async () => {
+    vi.resetModules();
+    vi.doMock('@vercel/kv', () => ({ kv: { set: async () => { throw new Error('kv down'); } } }));
+    vi.doMock('@/lib/send-email', () => ({ sendEmail: async () => ({ success: true }) }));
+    vi.doMock('@/lib/briefings/access', () => ({ hasBriefingsAccess: async () => false }));
+    const { createSecureAccessUrl } = await import('@/lib/access-links');
+    const u = new URL(await createSecureAccessUrl('Pat@Example.com', 'preferences'));
+    expect(u.pathname).toBe('/app');
+    expect(u.searchParams.get('panel')).toBe('settings');
+    expect(u.searchParams.get('section')).toBe('alerts');
+    expect(findLegacyDestinations(`<a href="${u.toString()}">x</a>`)).toEqual([]);
+    vi.doUnmock('@vercel/kv'); vi.doUnmock('@/lib/send-email'); vi.doUnmock('@/lib/briefings/access');
   });
 
   it('the email guard allows exactly Settings → Alerts (and Billing), nothing broader', () => {
