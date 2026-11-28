@@ -14,7 +14,7 @@ export function normalizeAlertPreferences(opts: {
   alertsEnabled?: boolean;
   alertFrequency?: SavedSearchAlertFrequency;
 }): NormalizedAlertPreferences {
-  let alertFrequency: SavedSearchAlertFrequency = opts.alertFrequency ?? 'daily';
+  let alertFrequency: SavedSearchAlertFrequency = opts.alertFrequency ?? DEFAULT_ALERT_FREQUENCY;
   let alertsEnabled = opts.alertsEnabled !== false;
 
   if (alertFrequency === 'paused') {
@@ -31,3 +31,6 @@ export function normalizeAlertPreferences(opts: {
 
   return { alertsEnabled: true, alertFrequency };
 }
+
+/** The alert frequency a new saved search gets when none is chosen (the Map save dialog preselects it). */
+export const DEFAULT_ALERT_FREQUENCY = 'daily' as const;

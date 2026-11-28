@@ -19,6 +19,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { WATCH_SCOPE_JS } from '@/lib/saved-searches/watch-scope-client';
+import { fakeMdDialog } from './md-dialog-fake.test-helper';
 import { isUnsupportedAlertScope, cronWillDeliverAlerts } from '@/lib/saved-searches/alert-scope';
 
 const MAP = readFileSync(join(__dirname, 'route.ts'), 'utf8');
@@ -57,7 +58,7 @@ function run(opts: {
     __track: (...a: unknown[]) => events.push(a),
   };
   new Function('window', WATCH_SCOPE_JS)(win);
-  win.prompt = (_m: string, d: string) => { prompts.push(d); return 'My watch'; };
+  win.__mdDialog = fakeMdDialog({ prompts, confirms, confirmAnswer: opts.confirmAnswer, name: 'My watch' }).fn;
   const btn: { textContent: string; innerHTML: string; title: string; onclick: null | (() => void) } =
     { textContent: 'Save search', innerHTML: '', title: '', onclick: null };
   const pending: Promise<unknown>[] = [];
@@ -185,6 +186,7 @@ function runAnon(horizons: Horizons, confirmAnswer = true) {
     requireSignIn: (why: string) => { signIns.push(why); return false; },
   };
   new Function('window', WATCH_SCOPE_JS)(win);
+  win.__mdDialog = fakeMdDialog({ confirms, confirmAnswer }).fn;
   const btn: { textContent: string; innerHTML: string; title: string; onclick: null | (() => void) } =
     { textContent: 'Save search', innerHTML: '', title: '', onclick: null };
   const later: Array<() => void> = [];

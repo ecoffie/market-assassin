@@ -24,6 +24,8 @@ import { MARKET_FEEDBACK_CSS, MARKET_BOOT_HTML, MARKET_BOOT_APP_OPEN, MARKET_FEE
 import { LAYOUT_MOVE_JS } from './layout-move';
 import { HIERARCHY_HORIZON_LIMIT_JS } from '@/lib/opportunities/hierarchy-sub-agency';
 import { WATCH_SCOPE_JS } from '@/lib/saved-searches/watch-scope-client';
+import { DEFAULT_ALERT_FREQUENCY } from '@/lib/saved-searches/alert-preferences';
+import { MAP_DIALOG_SCRIPT } from './map-dialog';
 import { MAP_APP_SHELL_CSS, MAP_APP_SHELL_RESIZE_JS, applyAppShell, applySignedInAppRedirect, isAppShellRequest } from './app-shell';
 
 export const dynamic = 'force-dynamic';
@@ -5441,10 +5443,12 @@ const VIEWPORT_JS = `<script>
               var _askAlerts=(_ap&&_ap.kind==='partial')
                 ? 'Watching this market. Get email alerts for '+[_ap.horizons.open?'Open Now':'',_ap.horizons.forecast?'Coming Soon':''].filter(Boolean).join(' + ')+'? Coming Back contracts are not emailed \\u2014 to follow one, open it and use \\u201cTrack this recompete\\u201d. (sign-in required so we email the right person)'
                 : 'Watching this market. Get alerted when new opportunities match? (sign-in required so we email the right person)';
-              if(!confirm(_askAlerts)){ _ssReset(); return; }
-              var _a=window.requireSignIn('get alerts for this market', function(){ window.__claimAnonWatches&&window.__claimAnonWatches(); });
-              if(!_a){ _ssReset(); return; }
-              window.__claimAnonWatches&&window.__claimAnonWatches();
+              window.__mdDialog({title:'Get email alerts?',message:_askAlerts,okLabel:'Get alerts',cancelLabel:'Not now'},function(_ok){
+                if(!_ok){ _ssReset(); return; }
+                var _a=window.requireSignIn('get alerts for this market', function(){ window.__claimAnonWatches&&window.__claimAnonWatches(); });
+                if(!_a){ _ssReset(); return; }
+                window.__claimAnonWatches&&window.__claimAnonWatches();
+              });
             },500);
           } else _ssMsg('Couldn\\'t save');
         }).catch(function(){ _ssMsg('Couldn\\'t save'); });
@@ -5464,15 +5468,17 @@ const VIEWPORT_JS = `<script>
       setTimeout(_ssReset,4200);
       return;
     }
-    if(_plan&&_plan.kind==='partial'){
-      var _keep=[]; if(_plan.horizons.open)_keep.push('Open Now'); if(_plan.horizons.forecast)_keep.push('Coming Soon');
-      if(!confirm('Email alerts cover Open Now and Coming Soon. Coming Back contracts are not emailed \\u2014 to follow one, open it and use \\u201cTrack this recompete\\u201d.\\n\\nSave a watch for '+_keep.join(' + ')+'? Your map stays as it is.')){ return; }
-      try{ if(window.__track) window.__track('tool_use','watch_scope_narrowed',{mode:MODE,keep:_keep.join('+')}); }catch(e){}
-    }
     var _watchLabel=(_plan&&_plan.horizons)?(function(hz){ var on=[]; if(hz.open)on.push('Open Now'); if(hz.forecast)on.push('Coming Soon'); return on.join(' + ')||'Open Now'; })(_plan.horizons):_ssScopeLabel();
-    var name=window.prompt('Name this saved search (you\\'ll get alerts on new matches):',
-      (FILT.setAside||FILT.naics||Q||'My opportunities')+' — '+_watchLabel);
-    if(!name)return;
+    // Name + alert frequency in ONE in-page dialog (no browser pop-ups: they blocked the alerts acceptance run).
+    // The frequency preselects the server default (DEFAULT_ALERT_FREQUENCY) and is written through the same
+    // saved-search POST that stores alerts_enabled / alert_frequency (the path map.update_alert changes later).
+    var _ssAfterScope=function(){
+      window.__mdDialog({title:'Save this search',message:'Mindy watches this market for you and emails you when new opportunities match.',
+        input:{label:'Name',value:(FILT.setAside||FILT.naics||Q||'My opportunities')+' \u2014 '+_watchLabel,maxLength:80},
+        choice:{label:'Email alerts',value:'${DEFAULT_ALERT_FREQUENCY}',options:[{value:'daily',label:'Daily'},{value:'weekly',label:'Weekly'},{value:'off',label:'Off'}]},
+        okLabel:'Save',cancelLabel:'Cancel'},function(_res){
+      if(!_res||!_res.value)return;
+      var name=_res.value; var _freq=_res.choice||'${DEFAULT_ALERT_FREQUENCY}';
     // Snapshot the active filters (skip empties + scope=all) + the current viewport.
     var filters={}; for(var k in FILT){ if(FILT[k]&&FILT[k]!=='all')filters[k]=FILT[k]; }
     if(Q)filters.q=Q;
@@ -5491,11 +5497,11 @@ const VIEWPORT_JS = `<script>
       var m=window.__saveSearchError?window.__saveSearchError(status,d):{short:'Couldn\\'t save',detail:''};
       try{ if(window.__track) window.__track('tool_use','watch_save_failed',{status:status,code:(d&&d.code)||''}); }catch(e){}
       _ss.textContent=m.short; _ss.title=m.detail||''; setTimeout(_ssReset,4200);
-      if(m.detail){ try{ alert(m.detail); }catch(e){} }
+      if(m.detail){ window.__mdDialog({title:'Couldn\\'t save this search',message:m.detail,okLabel:'OK',hideCancel:true},function(){}); }
     };
     fetch('/api/app/saved-searches',{method:'POST',
       headers:{'Content-Type':'application/json','x-mi-auth-token':t,'x-user-email':em},
-      body:JSON.stringify({email:em,name:name.slice(0,80),mode:MODE,filters:filters,bbox:b})})
+      body:JSON.stringify({email:em,name:name.slice(0,80),mode:MODE,filters:filters,bbox:b,alerts_enabled:_freq!=='off',alert_frequency:_freq==='off'?undefined:_freq})})
       .then(function(r){ return r.json().then(function(j){ return {s:r.status,d:j}; },function(){ return {s:r.status,d:null}; }); })
       .then(function(res){ var d=res.d;
         if(d&&d.success){
@@ -5509,10 +5515,20 @@ const VIEWPORT_JS = `<script>
           // distinguishable without needing two tokens.
           // (No backticks in here: this block lives inside a TS template literal.)
           try{ if(window.__track) window.__track('tool_use','watch_created',{anonymous:false,mode:MODE}); }catch(e){}
-          _ss.textContent='✓ Saved — alerts on'; setTimeout(function(){ if(confirm('Saved! We\\'ll email you when new opportunities match. View your saved searches?'))location.href='/opportunity-map/saved'; else _ssReset(); },400); }
+          _ss.textContent=_freq==='off'?'✓ Saved — alerts off':'✓ Saved — alerts on'; setTimeout(function(){ window.__mdDialog({title:'Search saved',message:_freq==='off'?'Email alerts are off for this search. You can turn them on from Saved searches.':'We\\'ll email you '+(_freq==='weekly'?'weekly':'daily')+' when new opportunities match.',okLabel:'View saved searches',cancelLabel:'Stay on the map'},function(_go){ if(_go)location.href='/opportunity-map/saved'; else _ssReset(); }); },400); }
         // Never a bare "Couldn't save": every known refusal says what to do next.
         else _ssFail(res.s,d);
       }).catch(function(){ _ssFail(0,null); });
+      });
+    };
+    if(_plan&&_plan.kind==='partial'){
+      var _keep=[]; if(_plan.horizons.open)_keep.push('Open Now'); if(_plan.horizons.forecast)_keep.push('Coming Soon');
+      window.__mdDialog({title:'Save a watch for '+_keep.join(' + ')+'?',message:'Email alerts cover Open Now and Coming Soon. Coming Back contracts are not emailed \\u2014 to follow one, open it and use \\u201cTrack this recompete\\u201d. Your map stays as it is.',okLabel:'Continue',cancelLabel:'Cancel'},function(_ok){
+        if(!_ok)return;
+        try{ if(window.__track) window.__track('tool_use','watch_scope_narrowed',{mode:MODE,keep:_keep.join('+')}); }catch(e){}
+        _ssAfterScope();
+      });
+    } else _ssAfterScope();
   };
 
   // Apply a SAVED SEARCH to the map in-place (the reverse of Save search): take its stored
@@ -12571,7 +12587,7 @@ export async function GET(request: NextRequest) {
     // <div>, so anything after it gets parsed INTO that hidden .lgm-ov (display:none) and the
     // fixed FAB/drawer compute to 0×0. Leading the body keeps the mobile chrome a direct <body> child.
     // MARKET_FEEDBACK_JS precedes VIEWPORT_JS so window.__mf exists before the first fetch round reports to it.
-    const bodyInject = MOBILE_HTML + DRAWER_HTML + ASK_MINDY_HTML + LOGIN_MODAL_HTML + DIBBS_FLAG_JS + WATCH_SCOPE_SCRIPT + HIERARCHY_HORIZON_LIMIT_JS + PLAYERS_COPY_JS + LAYOUT_MOVE_JS + MARKET_FEEDBACK_JS + VIEWPORT_JS + DRAW_JS + SAVE_JS + DRAWER_JS + BOOT_VIEW_JS + SEARCH_PANEL_JS + SORT_EXTRA_JS + CARD_CHAT_FLAG_JS + SAFE_MARKDOWN_SCRIPT + ASK_MINDY_JS + LOGIN_MODAL_JS + ACCOUNT_MENU_JS + ZHEAD_HEIGHT_JS + CARD_TRACK_JS + MOBILE_JS + '</body>';
+    const bodyInject = MOBILE_HTML + DRAWER_HTML + ASK_MINDY_HTML + LOGIN_MODAL_HTML + DIBBS_FLAG_JS + MAP_DIALOG_SCRIPT + WATCH_SCOPE_SCRIPT + HIERARCHY_HORIZON_LIMIT_JS + PLAYERS_COPY_JS + LAYOUT_MOVE_JS + MARKET_FEEDBACK_JS + VIEWPORT_JS + DRAW_JS + SAVE_JS + DRAWER_JS + BOOT_VIEW_JS + SEARCH_PANEL_JS + SORT_EXTRA_JS + CARD_CHAT_FLAG_JS + SAFE_MARKDOWN_SCRIPT + ASK_MINDY_JS + LOGIN_MODAL_JS + ACCOUNT_MENU_JS + ZHEAD_HEIGHT_JS + CARD_TRACK_JS + MOBILE_JS + '</body>';
     html = html.replace('</body>', () => bodyInject);
     html = html.replace('__STATE_CENTROIDS__', () => JSON.stringify(STATE_CENTROIDS));
     // Code→name for the State picker (50 states + DC). Already a shared constant — the Filters
