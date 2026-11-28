@@ -32,6 +32,7 @@ describe('/pricing metadata', () => {
 
   it('keeps the visible plan prices in the snippet', () => {
     expect(description).toContain('$149/mo');
-    expect(description).toContain('$499/mo');
+    // Team: the 2-user seat price when the seat picker is on (as in production), else $499.
+    expect(description).toContain(process.env.NEXT_PUBLIC_TEAM_SEAT_PRICING === 'on' ? 'Team from $249/mo' : '$499/mo');
   });
 });

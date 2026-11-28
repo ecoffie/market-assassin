@@ -101,10 +101,11 @@ describe('/pricing with the seat switch ON (server render)', () => {
   it('shows the header, footer and the Monthly/Annual toggle', () => {
     const h = doc.querySelector('[data-testid="seat-pricing-header"]')!;
     expect(h.querySelector('h1')?.textContent).toBe('Pricing');
-    // Mindy Day week shows "2 months free"; every other day the normal 33% line.
+    // Mindy Day week shows "2 months free"; every other day the plain "save" line (no percentage).
     expect(h.textContent).toContain(isMindyDayPricing()
       ? 'Pay monthly, or pay yearly and get 2 months free.'
-      : 'Pay monthly, or pay yearly and save up to 33%.');
+      : 'Pay monthly, or pay yearly and save.');
+    expect(h.textContent).not.toContain('33%');
     expect(doc.querySelector('[aria-label="Billing period"]')).not.toBeNull();
     const foot = doc.querySelector('.seat-foot')!;
     expect(foot.textContent).toBe('Questions about a rollout: hello@getmindy.ai');

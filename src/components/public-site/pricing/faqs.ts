@@ -106,7 +106,7 @@ export function appPricingFaqs(c: { proCredits: number; teamCredits: number }): 
     },
     {
       q: 'How much do I save with annual billing?',
-      a: 'Pro is $1,490 a year instead of $1,788 (17% off). Team is $4,027 a year instead of $5,988 (33% off).',
+      a: 'Pro is $1,490 a year instead of $1,788 (17% off). Team is discounted when billed yearly too: choose Annual on the Team card to see the yearly price for your team size.',
     },
     {
       q: 'What is your refund policy?',
