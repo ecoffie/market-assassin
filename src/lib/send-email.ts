@@ -1,11 +1,13 @@
 import { assertNoLegacyDestinations } from '@/lib/email/legacy-destination-guard';
 import { fillUnsubscribePlaceholder, fillUnsubscribePlaceholderText, listUnsubscribeHeaders, UNSUBSCRIBE_URL_PLACEHOLDER } from '@/lib/email/unsubscribe';
 
-const MINDY_UNSUB_FALLBACK = 'https://getmindy.ai/alerts/preferences';
+// No signing secret: the signed-in-safe preferences page (never the token-only /alerts/preferences).
+const MINDY_UNSUB_FALLBACK = MINDY_PREFERENCES_URL;
 import { Resend } from 'resend';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { createSecureAccessUrl } from '@/lib/access-links';
 import { appendEmailUtm } from '@/lib/engagement';
+import { MINDY_PREFERENCES_URL } from '@/lib/mindy/email-branding';
 
 // Where a PAYING customer lands from a purchase email: the product (the Map). Not
 // /market-intelligence — that is an upgrade page (plan cards + trial links) whose email box

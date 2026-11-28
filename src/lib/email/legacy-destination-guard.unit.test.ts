@@ -94,7 +94,10 @@ describe('the shared constants no longer resolve to a legacy surface', () => {
     const { MINDY_APP_URL, MINDY_PREFERENCES_URL } = await import('@/lib/mindy/email-branding');
     expect(MINDY_APP_URL).toContain('/opportunity-map');
     expect(MINDY_APP_URL).not.toContain('/briefings');
-    expect(MINDY_PREFERENCES_URL).not.toMatch(/\/(app|briefings)\b/);
+    // Preferences = exactly Settings → Alerts & matching, the one documented exception besides Billing (2026-11-28:
+    // the token-only /alerts/preferences page rejects signed-in customers).
+    expect(MINDY_PREFERENCES_URL).toMatch(/\/app\?panel=settings&section=alerts$/);
+    expect(findLegacyDestinations(`<a href="${MINDY_PREFERENCES_URL}">x</a>`)).toEqual([]);
   });
 
   it('an env override at a legacy surface is REJECTED, not honoured', async () => {

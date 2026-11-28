@@ -6,6 +6,7 @@
 
 import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
+import { MINDY_ALERT_SETTINGS_PATH } from '@/lib/mindy/email-branding';
 
 function RequestedContent() {
   const searchParams = useSearchParams();
@@ -31,7 +32,7 @@ function RequestedContent() {
 
         <div className="mt-8 pt-6 border-t border-gray-200">
           <a
-            href="/alerts/preferences"
+            href={MINDY_ALERT_SETTINGS_PATH}
             className="text-purple-600 hover:text-purple-800 text-sm font-medium"
           >
             Manage Alert Preferences →

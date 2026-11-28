@@ -228,7 +228,8 @@ describe('cancel vs unsubscribe: paid plan, emails, or both', () => {
   it.each(['unsubscribe me from these emails', 'how do I unsubscribe from alerts', 'stop the daily alerts', 'too many emails'])('"%s" is email only', (q) => {
     expect(matchHelpIntent(q)).toBe('stop_emails');
     const a = helpAnswerFor(q)!.text;
-    expect(a).toContain('https://getmindy.ai/alerts/preferences');
+    expect(a).toContain('https://getmindy.ai/app?panel=settings&section=alerts');
+    expect(a).not.toContain('/alerts/preferences');
     expect(a).toContain('**Unsubscribe** link at the bottom of any Mindy email');
     expect(a).not.toContain('/account/cancel');
   });
@@ -236,7 +237,7 @@ describe('cancel vs unsubscribe: paid plan, emails, or both', () => {
   it.each(['unsubscribe', 'Unsubscribe from Mindy', 'how do I unsubscribe?'])('"%s" is ambiguous: both links in one answer', (q) => {
     expect(matchHelpIntent(q)).toBe('unsubscribe_either');
     const a = helpAnswerFor(q)!.text;
-    expect(a).toMatch(/To stop Mindy emails:.*\/alerts\/preferences/);
+    expect(a).toMatch(/To stop Mindy emails:.*\/app\?panel=settings&section=alerts/);
     expect(a).toMatch(/To cancel your paid plan:.*\/account\/cancel/);
   });
 });

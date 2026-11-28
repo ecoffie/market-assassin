@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateWeeklyBriefing, WeeklyBriefing } from '@/lib/briefings/delivery/weekly-briefing-generator';
 import { sendEmail } from '@/lib/send-email';
+import { MINDY_PREFERENCES_URL } from '@/lib/mindy/email-branding';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
@@ -97,7 +98,7 @@ function formatValue(value: string | number): string {
 }
 
 function generateWeeklyEmailHtml(briefing: WeeklyBriefing): string {
-  const preferencesUrl = 'https://getmindy.ai/alerts/preferences';
+  const preferencesUrl = MINDY_PREFERENCES_URL;
 
   return `
 <!DOCTYPE html>

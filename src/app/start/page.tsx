@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { MINDY_ALERT_SETTINGS_PATH } from '@/lib/mindy/email-branding';
 
 // Top 30 most common NAICS codes in federal contracting
 const POPULAR_NAICS = [
@@ -305,7 +306,7 @@ export default function StartPage() {
           {/* Next steps */}
           <div className="text-center space-y-3">
             <Link
-              href="/alerts/preferences"
+              href={MINDY_ALERT_SETTINGS_PATH}
               onClick={rememberPreferencesEmail}
               className="inline-flex items-center gap-2 text-slate-400 hover:text-white text-sm transition-colors"
             >
@@ -343,7 +344,7 @@ export default function StartPage() {
             </div>
             <span className="text-white font-semibold">GovCon Giants</span>
           </Link>
-          <Link href="/alerts/preferences" className="text-slate-400 hover:text-white text-sm">
+          <Link href={MINDY_ALERT_SETTINGS_PATH} className="text-slate-400 hover:text-white text-sm">
             Already have an account?
           </Link>
         </div>
