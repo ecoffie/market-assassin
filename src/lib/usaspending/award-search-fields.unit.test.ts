@@ -4,7 +4,7 @@
  * recipientState empty on all 10 rows). Row shape below is a live response for W91ZRS25PA014.
  */
 import { describe, it, expect } from 'vitest';
-import { awardNaics, awardPsc, awardRecipientState, awardPopState, AWARD_SEARCH_NESTED_FIELDS } from './award-search-fields';
+import { awardNaics, awardPsc, awardRecipientState, awardPopState, awardPopCity, AWARD_SEARCH_NESTED_FIELDS } from './award-search-fields';
 import { mapAwardRow } from './awards-search';
 
 const LIVE = {
@@ -48,3 +48,13 @@ describe('award search field shapes', () => {
     expect(AWARD_SEARCH_NESTED_FIELDS).toEqual(['NAICS', 'PSC', 'Recipient Location', 'Primary Place of Performance']);
   });
 });
+
+describe('place-of-performance city (Q13/Q26)', () => {
+  it('reads Primary Place of Performance.city_name; never the recipient HQ city; empty when absent', () => {
+    const r = { 'Primary Place of Performance': { state_code: 'GA', city_name: 'KENNESAW' }, 'Recipient Location': { state_code: 'VA', city_name: 'RESTON' } };
+    expect(awardPopCity(r)).toBe('KENNESAW');
+    expect(awardPopCity({ 'Recipient Location': { city_name: 'RESTON' } })).toBe('');
+    expect(mapAwardRow({ 'Award ID': 'W91YTZ26PA001', ...r }).popCity).toBe('KENNESAW');
+  });
+});
+

@@ -36,6 +36,23 @@ export interface CompetitionFacts {
   set_aside_reported: string | null;
   /** usaspending_parent_idv = an order whose own record did not establish it, read from its parent vehicle. */
   source: 'usaspending_award' | 'usaspending_parent_idv' | 'none';
+  /**
+   * Where offers_received came from. An order's own record often omits the offer count; the parent vehicle's count is
+   * then used and labelled (it counts offers on the VEHICLE, not on this order). null = not reported.
+   */
+  offers_source?: 'usaspending_award' | 'usaspending_parent_idv' | null;
+  /** The award's OWN record facts beyond competition (never the parent's). null when no record was read. */
+  award_record?: AwardRecordFacts | null;
+}
+
+/** Place and period facts from the same award record (USASpending /awards/{id}). Each null = not reported. */
+export interface AwardRecordFacts {
+  place_of_performance_city: string | null;
+  place_of_performance_state: string | null;
+  /** Current period end (base + exercised options). */
+  period_current_end: string | null;
+  /** Potential end if every option is exercised. */
+  period_potential_end: string | null;
 }
 
 /** The award fields this reads, as USASpending returns them (latest_transaction_contract_data + recipient). */
@@ -48,6 +65,27 @@ export interface AwardCompetitionFields {
   business_categories?: string[] | null;
   /** Orders: FPDS fair-opportunity field ("FAIR OPPORTUNITY GIVEN" or the exception taken). */
   fair_opportunity_limited_sources_description?: string | null;
+  place_of_performance_city?: string | null;
+  place_of_performance_state?: string | null;
+  period_current_end?: string | null;
+  period_potential_end?: string | null;
+}
+
+const dateOnly = (v: unknown): string | null => {
+  const m = /^(\d{4}-\d{2}-\d{2})/.exec(String(v ?? '').trim());
+  return m ? m[1] : null;
+};
+
+/** Pure. The award's own place/period facts; null when the record carried none of them. */
+export function awardRecordFacts(f: AwardCompetitionFields | null | undefined): AwardRecordFacts | null {
+  if (!f) return null;
+  const r: AwardRecordFacts = {
+    place_of_performance_city: clean(f.place_of_performance_city),
+    place_of_performance_state: clean(f.place_of_performance_state)?.toUpperCase() ?? null,
+    period_current_end: dateOnly(f.period_current_end),
+    period_potential_end: dateOnly(f.period_potential_end),
+  };
+  return Object.values(r).some((v) => v != null) ? r : null;
 }
 
 // FPDS extent_competed codes. CDO/NDO = competitive / non-competitive delivery order.
@@ -57,6 +95,7 @@ const NOT_COMPETED = new Set(['B', 'C', 'G', 'NDO']);
 const UNKNOWN: CompetitionFacts = {
   class: 'unknown', label: 'Not established', detail: 'How the current award was competed could not be established.',
   extent_competed: null, set_aside: null, offers_received: null, sole_source_reason: null, abilityone_holder: null, set_aside_reported: null, source: 'none',
+  offers_source: null, award_record: null,
 };
 
 const clean = (s: unknown): string | null => {
@@ -79,7 +118,11 @@ export function classifyCompetition(f: AwardCompetitionFields | null | undefined
   const abilityone = cats ? cats.some((c) => /abilityone/i.test(String(c))) : null;
   const eightASole = !!setAside && /8\s*\(?a\)?\s*sole source/i.test(setAside);
 
-  const base = { extent_competed: extent, set_aside: setAside, offers_received: offers, sole_source_reason: reason, abilityone_holder: abilityone, set_aside_reported: setAsideRaw, source: 'usaspending_award' as const };
+  const base = {
+    extent_competed: extent, set_aside: setAside, offers_received: offers, sole_source_reason: reason, abilityone_holder: abilityone,
+    set_aside_reported: setAsideRaw, source: 'usaspending_award' as const,
+    offers_source: offers != null ? 'usaspending_award' as const : null, award_record: awardRecordFacts(f),
+  };
   // Orders often carry no extent_competed code; FPDS records the fair-opportunity decision instead.
   const fair = clean(f.fair_opportunity_limited_sources_description);
   if (!code && fair && !eightASole) {
@@ -136,8 +179,13 @@ export async function fetchAwardCompetition(contractId: string, timeoutMs = 4000
       type_set_aside_description: c.type_set_aside_description ?? null,
       other_than_full_and_open_description: c.other_than_full_and_open_description ?? null,
       number_of_offers_received: c.number_of_offers_received ?? null,
-      fair_opportunity_limited_sources_description: c.fair_opportunity_limited_sources_description ?? c.fair_opportunity_limited_sources ?? null,
+      // USASpending names it fair_opportunity_limited_description (measured 2026-11-28); the older names never existed.
+      fair_opportunity_limited_sources_description: c.fair_opportunity_limited_description ?? c.fair_opportunity_limited_sources_description ?? null,
       business_categories: Array.isArray(d?.recipient?.business_categories) ? d.recipient.business_categories : null,
+      place_of_performance_city: d?.place_of_performance?.city_name ?? null,
+      place_of_performance_state: d?.place_of_performance?.state_code ?? null,
+      period_current_end: d?.period_of_performance?.end_date ?? null,
+      period_potential_end: d?.period_of_performance?.potential_end_date ?? null,
     };
   } catch {
     return null;
@@ -150,7 +198,7 @@ export type CompetitionLookup = (contractId: string) => Promise<AwardCompetition
 
 /** Default lookup: USASpending, cached 7 days (an award's competition basis does not change). */
 export const usaspendingCompetitionLookup: CompetitionLookup = async (contractId) => {
-  const { value } = await withCache('usaspending_award_competition', { contract_id: contractId, v: 2 }, 7 * 24 * 3600, async () => {
+  const { value } = await withCache('usaspending_award_competition', { contract_id: contractId, v: 3 }, 7 * 24 * 3600, async () => {
     const v = await fetchAwardCompetition(contractId);
     if (!v) throw new Error('no award record'); // do not cache a miss as a fact
     return v;

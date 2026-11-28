@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 import type { NextConfig } from "next";
 import { agencySlugRedirects } from "./src/lib/seo/agency-slug-redirects";
 import { authAliasRedirects } from "./src/lib/seo/auth-alias-redirects";
+import { trustAliasRedirects } from "./src/lib/seo/trust-alias-redirects";
 
 /**
  * Git worktrees live at `.claude/worktrees/<slug>` inside the parent checkout.
@@ -451,6 +452,8 @@ const nextConfig: NextConfig = {
       ...agencySlugRedirects(),
       // /login, /sign-in -> /signin and /register -> /pricing (they used to 404).
       ...authAliasRedirects(),
+      // /trust, /security -> /app/trust and /trust/enterprise -> /app/trust/enterprise (they 404ed).
+      ...trustAliasRedirects(),
       // ── RETIRED LEGACY STOREFRONT (Eric, 2026-07-28) ────────────────────────────────
       // These 7 routes are pure SALES pages for products we no longer sell. Their Stripe
       // payment links were deactivated the same day (10 links: GovCon Starter Bundle $697,
