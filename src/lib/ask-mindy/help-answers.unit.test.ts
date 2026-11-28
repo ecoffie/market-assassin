@@ -5,7 +5,7 @@
  * route an answer names exists under src/app.
  */
 import { describe, it, expect } from 'vitest';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { HELP_ENTRIES, helpAnswerFor, helpAnswersEnabledFor, HELP_BETA_NOTE } from './help-answers';
 import { matchHelpIntent, type HelpIntentId } from './help-match';
@@ -28,6 +28,15 @@ const FIXTURES: Array<[string, HelpIntentId]> = [
   ['How do I go after my first federal contract?', 'first_bid'],
   ['How should I pursue this opportunity?', 'first_bid'],
   ['Can you help me write a proposal?', 'write_proposal'],
+  // Security (Eric, 2026-11-28)
+  ['Is my data safe?', 'security'],
+  ['Are you SOC 2 certified?', 'security'],
+  ['Are you FedRAMP authorized?', 'security'],
+  ['Are you CMMC compliant?', 'security'],
+  ['Do you train AI on my data?', 'security'],
+  ['Who can see my files?', 'security'],
+  ['I have a security questionnaire for you', 'security'],
+  ['Can I delete my data?', 'security'],
 ];
 
 const NOT_HELP = [
@@ -79,6 +88,8 @@ describe('help-answers: content rules', () => {
     // The only figures allowed: step numbers, the SBA-quoted 51% (8(a) entry), "13 CFR Part 124", the quoted "top 25".
     const figures = e.answer
       .replace(/^\d+\. /gm, '')
+      // Security entry: names that carry a digit, not figures.
+      .replace(/SOC 2/g, '').replace(/PCI-DSS Level 1/g, '')
       .replace(/8\(a\)/g, '')
       .replace(/13 CFR Part 124/g, '')
       .replace(/"top 25"/g, '')
@@ -275,5 +286,37 @@ describe('cancel vs unsubscribe: paid plan, emails, or both', () => {
     const a = helpAnswerFor(q)!.text;
     expect(a).toMatch(/To stop Mindy emails:.*\/app\?panel=settings&section=alerts/);
     expect(a).toMatch(/To cancel your paid plan:.*\/account\/cancel/);
+  });
+});
+
+describe('security help answer (Eric, 2026-11-28)', () => {
+  const e = HELP_ENTRIES.security;
+  it('states the honest limits plainly', () => {
+    expect(e.answer).toContain('**What Mindy is not:** Mindy itself is not SOC 2 certified (its providers are), it is not FedRAMP authorized and it has not been assessed under CMMC. Do not put classified information or Controlled Unclassified Information (CUI) in Mindy.');
+  });
+  it('never claims Mindy itself is SOC 2 certified, FedRAMP authorized or CMMC compliant', () => {
+    expect(e.answer).not.toMatch(/Mindy is SOC ?2 certified|Mindy is (FedRAMP|CMMC)|we are SOC ?2|we're SOC ?2/i);
+    expect(e.answer).toMatch(/Built on SOC 2 certified providers/);
+  });
+  it('only claims backed by the trust page and the security doc', () => {
+    for (const claim of [/row-level security/, /short-lived signed links/, /contractually do not train on it/, /AI sees only your own records/, /encrypted in transit and at rest/, /one-time email code/, /audit log/, /Vercel and Supabase/, /Stripe \(PCI-DSS Level 1\)/, /never stores your card details/, /export everything as one file/, /delete your vault and every uploaded file permanently/]) expect(e.answer).toMatch(claim);
+  });
+  it('connected files: what Mindy reads, and the Microsoft grant stated honestly (ACCESS_DISCLOSURE)', () => {
+    expect(e.answer).toContain('Mindy reads only the files you pick, when you ask a question about them.');
+    expect(e.answer).toMatch(/Microsoft's permission screen covers all of your OneDrive files; Mindy still opens only the ones you choose/);
+  });
+  it('links the trust page and uses the trust page\'s own contact address (no invented email)', () => {
+    expect(e.answer).toContain('[the trust page](https://getmindy.ai/app/trust)');
+    const emails = (e.answer.match(/[\w.+-]+@[\w-]+(\.[\w-]+)+/g) || []);
+    expect(emails).toEqual(['admin@getmindy.ai']);
+    const trust = readFileSync(join(process.cwd(), 'src/app/app/trust/page.tsx'), 'utf8');
+    expect(trust).toContain('admin@getmindy.ai');
+  });
+  it('a security question hits this answer, never a contract search', () => {
+    for (const q of ['Is my data secure?', 'Are you SOC 2 certified?', 'Who can see my files?']) expect(matchHelpIntent(q)).toBe('security');
+    expect(matchHelpIntent('Find me cybersecurity work in Florida')).toBeNull();
+    // A market question that names a certification is NOT a question about Mindy's security.
+    expect(matchHelpIntent('Which agencies buy CMMC assessment services?')).not.toBe('security');
+    expect(matchHelpIntent('Find FedRAMP cloud contracts at DHS')).not.toBe('security');
   });
 });

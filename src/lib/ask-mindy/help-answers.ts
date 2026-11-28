@@ -297,6 +297,32 @@ function addProductEntries() {
       `To cancel your paid plan: open ${link('getmindy.ai/account/cancel', '/account/cancel')} and click **Manage / cancel**.`,
     ].join('\n\n'),
   });
+
+  // Security and data handling (Eric, 2026-11-28). ONLY claims from src/app/app/trust/page.tsx and
+  // docs/SECURITY-CUSTOMER-FACING.md; connected-file wording from ACCESS_DISCLOSURE (src/lib/connected-apps/config.ts).
+  // Honest limits are stated plainly. Contact: the trust page's own address (never an invented one).
+  add({
+    id: 'security',
+    kind: 'product',
+    triggers: [
+      'is my data safe', 'is my data secure', 'are you SOC 2 certified', 'are you FedRAMP authorized', 'are you CMMC compliant',
+      'do you train AI on my data', 'who can see my files', 'I have a security questionnaire', 'can I delete my data',
+    ],
+    routes: ['/app/trust', '/app'],
+    answer: [
+      'Here is how Mindy protects what you put in it:',
+      steps([
+        '**Only you can see your vault.** Your company profile, past performance and uploaded documents are tied to your account, and the database itself enforces that (row-level security). Uploads sit in private storage and download only through short-lived signed links.',
+        '**Your data does not train AI.** Requests that carry your vault data go only to business AI providers that contractually do not train on it, and the AI sees only your own records.',
+        '**Protected sign-in and monitoring.** Data is encrypted in transit and at rest. Sign-in uses a one-time email code, suspicious login activity triggers an alert, and sensitive admin actions are written to an audit log.',
+        '**Built on SOC 2 certified providers.** Mindy runs on Vercel and Supabase. Payments go through Stripe (PCI-DSS Level 1), and Mindy never stores your card details.',
+        `**Export or delete it yourself.** In ${link('My Vault', '/app?panel=vault')} you can export everything as one file, or delete your vault and every uploaded file permanently.`,
+      ]),
+      'Files from Google Drive or OneDrive: Mindy reads only the files you pick, when you ask a question about them. (Microsoft\'s permission screen covers all of your OneDrive files; Mindy still opens only the ones you choose.)',
+      '**What Mindy is not:** Mindy itself is not SOC 2 certified (its providers are), it is not FedRAMP authorized and it has not been assessed under CMMC. Do not put classified information or Controlled Unclassified Information (CUI) in Mindy.',
+      `More detail is on ${link('the trust page', '/app/trust')}. Your security team can get the full security overview by emailing admin@getmindy.ai.`,
+    ].join('\n\n'),
+  });
 }
 
 /** Text appended to every help answer: this is a beta feature. */
