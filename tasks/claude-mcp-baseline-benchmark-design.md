@@ -38,7 +38,7 @@ the surface (`app` / `map`), the mode (`research` / `standard`) and the dimensio
 | B5 | Capability statement from a UEI or file | Document shape, file claims stated as written |
 | B6 | The SDVOSB question near a named base | FY-aware statutory goal (#2556), set-aside language |
 | B7 | Outreach email to a named office | OUTREACH rules 0–6 |
-| H1–H15 | The help questions in `src/lib/ask-mindy/help-answers.ts` | Short, sourced, no invented figures |
+| H1–H15 | The help questions in `src/lib/ask-mindy/help-answers.ts` | Judged on routing, links and facts; no baseline comparison (Decision 3) |
 
 Every attachment is a **synthetic** file (made-up company, made-up figures) committed under
 `tests/fixtures/claude-mcp-baseline/files/`. The repository is public: never a customer's file.
@@ -60,8 +60,8 @@ Every attachment is a **synthetic** file (made-up company, made-up figures) comm
 ## 3. Ask Mindy column
 
 `scripts/ask-mindy-baseline.mts --set claude-mcp-baseline`. This is a new flag; the runner is unchanged otherwise. It
-runs the same prompts on the preview with the same files, in both `research` and `standard` where the surface offers
-both. It saves the answer, the trace evidence, any `create_document` model and the notices, as today.
+runs the same prompts on the preview with the same files, in `research` mode, plus the small `standard`-mode
+over-cap set (Decision 2). It saves the answer, the trace evidence, any `create_document` model and the notices, as today.
 
 ## 4. Grading
 
@@ -119,9 +119,12 @@ For any PR that changes Ask Mindy answers (prompts, rules, tools offered, ground
 5. Report writer plus the `--compare-baseline` exit code. One PR.
 6. First operator baseline run and the first report.
 
-## Open questions for Agent 4 / Eric
+## Decisions (Agent 4 reviewer defaults, 2026-11-28; Eric can override)
 
-- Who runs the baseline transcripts (Eric, or a named operator), and how often?
-- Should `standard` mode be benchmarked at all, or only `research` (the default for everyone after Mindy Day)?
-- Is a `worse` on "facts missed" acceptable when Ask Mindy's answer is shorter by design (e.g. the help answers)?
-  The proposal is to judge help answers on their own short contract, not on fact-count parity.
+1. **Who runs the baseline:** Claude Local runs it on Eric's machine with his Claude + Mindy connector. It is
+   operator-run, and the transcripts are stored as fixtures. Files are synthetic or used with consent only.
+2. **Which mode:** benchmark **research** mode, the default for everyone, across the full prompt set. Run a small
+   **standard**-mode set only for the over-cap fallback path.
+3. **Help answers (H1–H15):** no baseline comparison. Judge them on routing correctness (each question matches its help
+   answer, and near-miss questions do not), link validity (every source link resolves to the official page) and facts
+   (no invented thresholds, figures or dates). These are their own hard gates.
