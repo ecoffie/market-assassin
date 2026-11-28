@@ -191,9 +191,12 @@ export const SITE_NAV_CSS = [
     + '.mp-burger-close{display:none}html.mp-menu-open .mp-burger-open{display:none}html.mp-menu-open .mp-burger-close{display:block}'
     + 'html.mp-menu-open{overflow:hidden}'
     + 'html.mp-menu-open .mp-menu{display:flex}'
+    // The menu covers the screen, so the floating "Get help" button (help-widget.ts, z-index far
+    // above the menu) steps aside while it is open; it sat on top of the trial button (2026-11-28).
+    + 'html.mp-menu-open .mhw-btn,html.mp-menu-open .mhw-p{display:none!important}'
     + '.mp-menu{position:fixed;left:0;right:0;top:60px;bottom:0;z-index:60;flex-direction:column;overflow-y:auto;background:var(--mp-surface);'
     + 'border-top:1px solid var(--mp-hair);padding:16px max(16px,env(safe-area-inset-right,0px)) calc(20px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}'
-    + '.mp-menu-search{display:flex;align-items:center;gap:10px;height:52px;padding:0 16px;border-radius:14px;background:var(--mp-navy-wash);margin:0 0 14px}'
+    + '.mp-menu-search{display:flex;flex:none;align-items:center;gap:10px;height:52px;padding:0 16px;border-radius:14px;background:var(--mp-navy-wash);margin:0 0 14px}'
     + '.mp-menu-search svg{width:20px;height:20px;flex:none;fill:none;stroke:var(--mp-ink);stroke-width:2.2;stroke-linecap:round}'
     + '.mp-menu-search input{flex:1;min-width:0;border:0;outline:0;background:none;font:400 17px var(--mp-font-sans);color:var(--mp-ink)}'
     + '.mp-menu-links{display:flex;flex-direction:column}'
@@ -201,10 +204,15 @@ export const SITE_NAV_CSS = [
     + '.mp-menu-links a{display:flex;align-items:center;justify-content:space-between;min-height:56px;padding:0 8px;font:600 19px var(--mp-font-sans);color:var(--mp-ink);text-decoration:none}'
     + '.mp-menu-h2{margin-top:18px}'
     + '.mp-menu-chev{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}'
-    + '.mp-menu-foot{margin-top:auto;padding-top:28px;display:flex;flex-direction:column;gap:10px}'
+    // flex:none: the menu is a column flex box that scrolls, so its children would otherwise shrink
+    // to fit (the 52px search box measured 20px). The footer sticks to the bottom of the menu so
+    // Sign in and the trial button are on the first screen, not below the links.
+    + '.mp-menu-links,.mp-menu-foot{flex:none}'
+    + '.mp-menu-foot{margin-top:auto;position:sticky;bottom:calc(-20px - env(safe-area-inset-bottom,0px));margin-bottom:calc(-20px - env(safe-area-inset-bottom,0px));'
+    + 'padding:12px 0 calc(20px + env(safe-area-inset-bottom,0px));background:var(--mp-surface);border-top:1px solid var(--mp-hair);display:flex;flex-direction:column;gap:10px}'
     + '.mp-menu-signin{padding:10px 8px;font:600 17px var(--mp-font-sans);color:var(--mp-ink);text-decoration:none}'
     + '.mp-menu-su{display:flex;align-items:center;justify-content:center;height:52px;margin-top:6px;border-radius:12px;background:var(--mp-navy);color:var(--mp-surface);font:700 17px var(--mp-font-sans);text-decoration:none}'
-    + 'html:has(.mindy-acct-ini,.mindy-acct-btn img) .mp-menu .mp-anon{display:none}'
+    + 'html:has(.mindy-acct-ini,.mindy-acct-btn img) .mp-menu .mp-anon,html:has(.mindy-acct-ini,.mindy-acct-btn img) .mp-menu-foot{display:none}'
     + '}',
   // Tablet: the bar keeps the banner above it and Sign in / Start for free in it, so the menu drops
   // down from the bottom of the sticky top bar (.mp-top) instead of covering a fixed 60px offset,
