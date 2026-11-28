@@ -244,11 +244,10 @@ export default function MindyLandingPage() {
 
           {/* LIVE-PROOF BAR — real, verified numbers (not vague claims). For a new
               brand, concrete scale + real usage substitutes for big-name logos. */}
-          <div className="mt-8 grid grid-cols-2 md:grid-cols-4 gap-3 max-w-3xl mx-auto">
+          <div className="mt-8 grid grid-cols-1 sm:grid-cols-3 gap-3 max-w-3xl mx-auto">
             {[
               { n: `${OPPORTUNITY_COUNT.toLocaleString()}+`, l: 'opportunities tracked' },
               { n: forecastsLabel, l: 'agency forecasts tracked' },
-              { n: '9,900+', l: 'contractors using Mindy' },
               { n: 'Daily 6 AM', l: 'fresh scan, before coffee' },
             ].map((s) => (
               <div key={s.l} className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-4">

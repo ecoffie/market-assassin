@@ -1,7 +1,7 @@
 /**
  * /lifetime — Mindy Founders Lifetime ($4,997) sales page.
  *
- * Single price: $4,997 (100 seats) — same WTP as legacy course lifetime.
+ * Single price: $4,997 (100 seats).
  * The $2,997 bootcamp-alumni discount was discontinued 2026-07-05.
  * Ultimate Giant Bundle ($1,497) is retired.
  */
@@ -32,7 +32,7 @@ const breakEvenMonths = foundersBreakEvenMonths();
 export const metadata: Metadata = {
   title: 'Mindy Founders Lifetime — $4,997 once, federal intelligence forever',
   description:
-    `Join the first ${FOUNDERS_LIFETIME_CAP} founding members. $4,997 one-time for lifetime Mindy Pro — daily briefings, recompete alerts, and every future feature. Same price as our legacy course lifetime.`,
+    `Join the first ${FOUNDERS_LIFETIME_CAP} founding members. $4,997 one-time for lifetime Mindy Pro — daily briefings, recompete alerts, and every future feature.`,
   alternates: { canonical: 'https://getmindy.ai/lifetime' },
   openGraph: {
     title: 'Mindy Founders Lifetime — Buy once, use forever',
@@ -67,7 +67,7 @@ const founderPerks = [
 const faqs: Array<{ q: string; a: string }> = [
   {
     q: 'Why $4,997?',
-    a: `That's what lifetime course access cost before Mindy existed — and Mindy delivers far more (daily briefings, live federal data, full Pro platform). At $${PRO_MONTHLY}/mo you'd break even in about ${breakEvenMonths} months; most serious contractors stay longer.`,
+    a: `One payment covers lifetime Mindy Pro: daily briefings, live federal data and the full platform. At $${PRO_MONTHLY}/mo you'd break even in about ${breakEvenMonths} months.`,
   },
   {
     q: 'Is this really lifetime?',
@@ -264,8 +264,8 @@ export default function LifetimePage() {
         <div className="max-w-3xl mx-auto space-y-6 text-(--mp-body) text-lg leading-relaxed">
           <h2 className="text-3xl font-bold text-(--mp-ink) text-center mb-8 font-(family-name:--mp-font-serif)">Why $4,997</h2>
           <p>
-            People paid $4,997 for lifetime access to our courses — videos and community, no daily AI,
-            no live federal data. Mindy is the product now. One platform, one price, one decision.
+            Mindy is the product now: daily briefings, live federal data and the full Pro platform.
+            One platform, one price, one decision.
           </p>
           <p>
             Founders Lifetime is capped at {FOUNDERS_LIFETIME_CAP} because I want a small group of
