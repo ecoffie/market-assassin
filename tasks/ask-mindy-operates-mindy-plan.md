@@ -64,7 +64,7 @@ first.
 
 | action | surfaces | kind | gate | args | client runs |
 |---|---|---|---|---|---|
-| `app.navigate` | app, map | view | none (the destination keeps its own gate) | `panel` ∈ `AppPanel` minus admin-only and route-only panels; optional `section` ∈ the panel's known sections (Settings: `SETTINGS_SECTION_VALUES`; Vault: `VaultDeepLinkSection`) | `onPanelChange(panel)` plus `section=`; from the Map, a link to `/app?panel=…&section=…` |
+| `app.navigate` | app, map | view | none (the destination keeps its own gate) | `panel` ∈ `AppPanel` minus admin-only and route-only panels; optional `section` ∈ the panel's known sections (Settings: `SETTINGS_SECTION_VALUES`; Vault: `VaultDeepLinkSection`) | `onPanelChange(panel)` plus `section=`; from the Map, `/app?panel=…&section=…` opens in a new tab (Decision 1) |
 | `app.open_record` | app | view | none (the server already checks ownership) | `kind` ∈ `report`, `document`, `pursuit`, `saved_search`, `opportunity`; `id` matching that kind's id pattern, **from this turn's tool results only** (the evidence rule `map.open_record` uses) | opens the record in its panel (report pane, Vault document, pursuit drawer, watchlist item, map `?opp=`) |
 | `app.show` | app | view | none | `what` ∈ a fixed list (`my_documents`, `my_pursuits`, `my_saved_searches`, `my_alert_settings`, `my_matching`, `my_profile`, `my_billing`, `my_team`) | maps to `app.navigate` with the right `panel` and `section`; a model-friendly alias, so "show me my alert settings" needs no panel ids |
 
@@ -147,9 +147,12 @@ is checked.
    they are judged on correctness and on never acting unconfirmed.
 4. Agent 4 review, then Eric's go to widen the allowlist; `'*'` only after one clean day on the allowlist.
 
-## Open questions
+## Decisions (Agent 4 reviewer defaults, 2026-11-28; Eric can override)
 
-- Should `app.navigate` from the Map open `/app` in the same tab (leaving the Map) or a new one?
-- Profile basics: which fields does Eric want writable by Mindy at all? The proposal keeps it to name, website, city and
-  state.
-- Do coach and client workspaces get Phase B at launch, or own account only first?
+1. **Map → /app** opens in a **new tab**, so the Map session is kept. This matches the existing Map handoffs.
+2. **Writable profile fields:** name, website, city and state only.
+3. **Coach and client workspaces** are excluded from Phase B at launch (own account only). They are added later with the
+   acting-scope checks.
+
+Pending: Eric is deciding whether Phase A (`app.navigate` + `app.show`) is built for Mindy Day. Nothing starts until
+Agent 4 relays his answer.
