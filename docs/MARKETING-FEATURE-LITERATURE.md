@@ -7874,7 +7874,7 @@ the notices. Test: `federal-events-ranking.unit.test.ts`.
 
 **What:** Ask Mindy now answers "how do I sell to Sandia / Los Alamos / Oak Ridge / the national labs" for all 17 DOE national laboratories. For each lab it gives the operator that does the buying, where suppliers register (Ariba, iSupplier, the lab's own portal, SAM.gov), the published small-business goals, the small-business office's mailbox, what the lab buys most from small businesses, and its published buying rules (for example, Sandia posts RFQs under $350K for 3 business days as "Small Business First"). Every fact links to the lab's or DOE's own page, and anything a lab does not publish is labelled not published.
 
-**Why:** National labs buy billions through their operating contractors, and most of that buying never appears in SAM.gov or in federal subaward data. The lab's own supplier portal is the way in, and small businesses rarely know which portal, which rules or which office.
+**Why:** National labs buy through their operating contractors, and much of that buying never appears in SAM.gov or in federal subaward data. The lab's own supplier portal is the way in, and small businesses rarely know which portal, which rules or which office.
 
 **SEO:** how to sell to national labs, Sandia small business, Los Alamos supplier registration Ariba, Oak Ridge National Laboratory small business, DOE national laboratory subcontracting, FFRDC supplier portal.
 
