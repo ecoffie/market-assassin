@@ -59,7 +59,7 @@ export const metadata: Metadata = {
   // "Save on yearly plans" stays true through the Mindy Day week (2 months free) and after (33%).
   description: isTeamSeatPricingEnabled()
     ? `Pro at $149/mo with a 14-day free trial. Team from $${TEAM_FROM_USD}/mo for 2 users. Save on yearly plans. GovWin runs $15K–$50K/yr.`
-    : 'Pro at $149/mo, Team at $499/mo, both with a 14-day free trial. Save up to 33% billed annually. GovWin runs $15K–$50K/yr.',
+    : 'Pro at $149/mo, Team at $499/mo, both with a 14-day free trial. Save on yearly plans. GovWin runs $15K–$50K/yr.',
   alternates: {
     canonical: 'https://getmindy.ai/pricing',
   },

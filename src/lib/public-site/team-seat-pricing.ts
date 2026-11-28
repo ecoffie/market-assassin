@@ -47,7 +47,7 @@ export const TEAM_SEAT_PRICING = {
   status: 'PROPOSED — display only, needs Eric + Stripe prices',
   header: {
     title: 'Pricing',
-    sub: 'Pay monthly, or pay yearly and save up to 33%.',
+    sub: 'Pay monthly, or pay yearly and save.',
     /** Mindy Day week (see MINDY_DAY_WINDOW in src/lib/billing/team-seat-plans.ts). */
     subMindyDay: 'Pay monthly, or pay yearly and get 2 months free.',
   },
