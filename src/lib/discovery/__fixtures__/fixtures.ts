@@ -36,4 +36,5 @@ export const FIXTURES: Array<{ id: string; cls: string; input: DiscoveryInput }>
   { id: 'agency=NOAA', cls: 'forecast coverage: unresolved publisher', input: { query: '', agency: 'NOAA' } },
   { id: 'agency=FAA', cls: 'forecast coverage: known publisher without forecasts', input: { query: '', agency: 'FAA' } },
   { id: 'agency=HUD janitorial', cls: 'forecast coverage: unresolved publisher + concept', input: { query: 'janitorial', agency: 'HUD' } },
+  { id: 'bridge and highway heavy civil construction (VA,MD,DC)', cls: 'compound concepts + road/bridge taxonomy (RBA benchmark)', input: { query: 'bridge and highway heavy civil construction', state: 'VA,MD,DC' } },
 ];

@@ -1,0 +1,214 @@
+/**
+ * Compound concepts + road/bridge taxonomy (Agent 4 decision, 2026-11-23).
+ *
+ * Live defect (production MCP find_opportunities, "bridge and highway heavy civil construction", VA/MD/DC — the RBA
+ * Engineering benchmark, src/lib/chat/__fixtures__/rba-federal-market-profile.ts): eligibility was
+ * ANY(bridge · highway · heavy · civil), so "heavy" alone admitted a DDG-1000 "Heavy Lift" RFI (Open #1) and "civil"
+ * alone admitted USCG "Office of Civil Engineering" support; Coming back used the whole Construction preset
+ * (236/237/238) and every DIRECT row was a building trade, none road/bridge.
+ *
+ * Controls: plans for unrelated queries must be byte-identical to origin/main (DISCOVERY_PLAN_VERSION 4), except the
+ * version stamp. __fixtures__/compound-concept-controls.json was built from origin/main fb4b71f2f.
+ */
+import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { buildDiscoveryPlan, type DiscoveryInput, type PlanContext } from './plan';
+import { MCP_POLICY } from './policy';
+import { buildTextMatcher, matchesText, textPredicate, classifyWord } from './matcher';
+import { interpretCapability, classifyRecord, namesRoadBridgeWork } from '@/lib/opportunities/market-interpretation';
+import { RBA_FEDERAL_MARKET_PROFILE_PROMPT } from '@/lib/chat/__fixtures__/rba-federal-market-profile';
+
+const CTX: PlanContext = { today: '2026-09-22', fiscalYear: 2026 };
+const RBA: DiscoveryInput = { query: 'bridge and highway heavy civil construction', state: 'VA,MD,DC' };
+const plan = (i: DiscoveryInput) => buildDiscoveryPlan(i, MCP_POLICY, CTX);
+const labels = (cs: Array<{ label: string }>) => cs.map((c) => c.label);
+const allExprs = (p: ReturnType<typeof plan>) => [...p.horizons.open.ops, ...p.horizons.recompete.ops, ...p.horizons.forecast.ops]
+  .map((o) => (o.op === 'or' ? o.expr : `${o.col}.${o.op}.${o.val}`)).join('\n');
+
+describe('RBA: "bridge and highway heavy civil construction" (VA, MD, DC)', () => {
+  const p = plan(RBA);
+  const alt = p.matcher.alternatives[0];
+
+  it('is the benchmark customer\'s trade (fixture sanity)', () => {
+    expect(RBA_FEDERAL_MARKET_PROFILE_PROMPT).toMatch(/8\(a\)/);
+  });
+
+  it('recognizes the compounds: "highway and bridge" admits, "heavy civil" + "construction" rank only', () => {
+    expect(p.matcher.alternatives).toHaveLength(1);
+    expect(alt.eligibility).toBe('all');
+    expect(labels(alt.eligible)).toEqual(['highway and bridge']);
+    expect(alt.eligible[0].basis).toBe('recognized_concept');
+    expect(labels(alt.rankOnly).sort()).toEqual(['construction', 'heavy civil']);
+    expect(p.states).toEqual(['VA', 'MD', 'DC']);
+  });
+
+  it('"heavy" and "civil" never satisfy eligibility on their own', () => {
+    const recall = [...labels(alt.eligible)];
+    expect(recall).not.toContain('heavy');
+    expect(recall).not.toContain('civil');
+    // The defect rows, verbatim shapes from the live run: none of them is admitted any more.
+    for (const t of [
+      ['DDG 1000 Heavy Lift Request for Information', 'Heavy lift capability for the ship'],
+      ['Aft Heavy Weapon aircraft lot', null],
+      ['Office of Civil Engineering program support', 'USCG civil engineering program management'],
+      ['Electron microscope service agreement', 'Civil aviation accident laboratory'],
+      ['Research Communications', 'heavy civil program office communications'],
+    ]) expect(matchesText(p.matcher, t), String(t[0])).toBe(false);
+    // The same predicate the database runs carries no heavy/civil clause.
+    const pred = textPredicate(p.matcher, ['title']) || '';
+    expect(pred).not.toMatch(/heavy|civil/);
+  });
+
+  it('admits road work whatever word the agency used (road, roadway, pavement, paving, bridge, highway)', () => {
+    for (const t of [
+      'GWMP Bridge Rehabilitation, Fort Myer',
+      'Highway widening, lane addition',
+      'Road repaving at Joint Base Andrews',
+      'Roadway resurfacing and striping',
+      'Airfield pavement repair',
+      'Asphalt paving of service roads',
+    ]) expect(matchesText(p.matcher, [t]), t).toBe(true);
+  });
+
+  it('a road word alone (place names, passing mentions) never admits — Claude Local live replay 2026-11-24', () => {
+    // The exact Open rows the live replay DIRECT_MATCHed, titles verbatim from production SAM.
+    for (const t of [
+      'Residential Reentry Services and Home Confinement Services located within the Hampton Roads, Virginia Metro Area to include the cities of Virginia Beach, Norfolk, Chesapeake, Newport News, Hampton, Portsmouth, Suffolk, Poquoson, and Williamsburg.',
+      'Norfolk Harbor Inner Channel to Newport News Maintenance Dredging located in Hampton Roads, Virginia',
+      'ZAMBIA- Consultant Services for the Feasibility Study, Concept Designs, Environmental and Social Impact Assessment and Construction Monitoring Services for the Improvement of the T5 and D274/R185a Roads',
+      'Pavement condition sensors',
+    ]) expect(matchesText(p.matcher, [t]), t).toBe(false);
+  });
+
+  it('DESCRIPTIONS: a passing bridge/highway/road mention never admits (Agent 4 trace 2026-11-24, item 2)', () => {
+    // The Open DIRECT check reads [title, description, department, solicitation_number] (find-opportunities.ts).
+    const rows: Array<[string, string]> = [
+      ['Residential Reentry Services and Home Confinement Services located within the Hampton Roads, Virginia Metro Area',
+        'Facility must be within reasonable distance of the Hampton Roads Bridge-Tunnel and Interstate highway access, Norfolk.'],
+      ['Norfolk Harbor Inner Channel to Newport News Maintenance Dredging located in Hampton Roads, Virginia',
+        'Dredged material placed at Craney Island; work near the Hampton Roads Bridge-Tunnel and Monitor-Merrimac bridges.'],
+      ['ZAMBIA- Consultant Services for the Feasibility Study, Concept Designs, Environmental and Social Impact Assessment and Construction Monitoring Services for the Improvement of the T5 and D274/R185a Roads',
+        'MCC consultant study: highway corridor feasibility, bridge crossings and road alignment options in Zambia.'],
+      ['Janitorial services, Building 400', 'Building is located off the highway near the bridge.'],
+      ['Bridge loan servicing support', 'Financial services; bridge financing for program office.'],
+    ];
+    for (const [t, d] of rows) expect(matchesText(p.matcher, [t, d]), t).toBe(false);
+  });
+
+  it('DESCRIPTIONS: real bridge/highway work in a description is still admitted', () => {
+    for (const [t, d] of [
+      ['Z--GWMP project', 'Bridge rehabilitation of the Spout Run structure, George Washington Memorial Parkway.'],
+      ['FHWA EFL solicitation', 'Highway reconstruction and resurfacing, 3.2 miles.'],
+      ['Y1LB project 12', 'Bridge replacement over Difficult Run.'],
+    ]) expect(matchesText(p.matcher, [t, d]), t).toBe(true);
+  });
+
+  it('real road work is still admitted through road-work phrases', () => {
+    for (const t of [
+      'PROJECT VA ST FB KNGMN-WLKR GTS: geometric road improvements, additional left-turn lane',
+      'Z--Access Road Repair National Elk Refuge',
+      'Road maintenance IDIQ, George Washington and Jefferson National Forests',
+      'Pavement rehabilitation from MP 86 to MP 89 on the Blue Ridge Parkway',
+      'Prince William Forest Park failed culvert and road reconstruction',
+      'Bridge deck replacement',
+    ]) expect(matchesText(p.matcher, [t]), t).toBe(true);
+  });
+
+  it('Coming back resolves to the road/bridge market (237310 + Y1LB/Z1LB/Z2LB), not the 236/237/238 Construction preset', () => {
+    expect(p.expansion.capability_kind).toBe('industry_preset');
+    expect(p.expansion.direct.naics).toEqual(['237310']);
+    expect(p.expansion.direct.psc).toEqual(['Y1LB', 'Z1LB', 'Z2LB']);
+    expect(p.expansion.related).toBeNull();
+    expect(p.horizons.recompete.naics).toEqual(['237310']);
+    const exprs = allExprs(p);
+    expect(exprs).toContain('naics_code.eq.237310');
+    expect(exprs).toContain('psc_code.eq.Y1LB');
+    expect(exprs).not.toMatch(/naics_code\.like\.23[678]%/);
+  });
+
+  it('labels a building trade as NOT a direct road/bridge match, and a 237310 / Z2LB row as direct', () => {
+    const cap = interpretCapability(RBA.query);
+    for (const naics of ['236220', '238160', '238210', '237110']) {
+      expect(classifyRecord({ title: 'Repair roof and HVAC, Building 12', naics_code: naics }, cap), naics).toBeNull();
+    }
+    expect(classifyRecord({ title: 'Rehabilitation of GWMP', naics_code: '237310' }, cap)).toBe('DIRECT_MATCH');
+    expect(classifyRecord({ title: 'Repair', psc_code: 'Z2LB' }, cap)).toBe('DIRECT_MATCH');
+  });
+});
+
+describe('the compound rules stay narrow', () => {
+  it('"heavy" and "civil" are qualifiers (required inside a short query, never a list admitter)', () => {
+    expect(classifyWord('heavy').cls).toBe('qualifier');
+    expect(classifyWord('civil').cls).toBe('qualifier');
+    const m = buildTextMatcher('heavy lift');
+    expect(m.alternatives[0].eligibility).toBe('all');
+    expect(labels(m.alternatives[0].eligible).sort()).toEqual(['heavy', 'lift']);
+  });
+
+  it('a bare "bridge" is not the road concept and gets no road taxonomy ("bridge contract")', () => {
+    const p = plan({ query: 'bridge contract' });
+    expect(labels(p.matcher.alternatives[0].eligible)).toEqual(['bridge']);
+    expect(p.expansion.capability_kind).toBe('literal');
+    expect(interpretCapability('IT services bridge contract').direct.source).toBe('IT Services');
+  });
+
+  it('"heavy civil" is one concept (the phrase), not two words', () => {
+    const m = buildTextMatcher('heavy civil construction');
+    expect(labels(m.alternatives[0].eligible)).toEqual(['heavy civil', 'construction']);
+    expect(matchesText(m, ['Heavy civil construction MATOC'])).toBe(true);
+    expect(matchesText(m, ['Heavy lift construction for the Office of Civil Engineering'])).toBe(false);
+  });
+
+  it('plain "construction" keeps the whole Construction preset', () => {
+    expect(plan({ query: 'construction' }).expansion.direct.naics).toEqual(['236', '237', '238']);
+  });
+});
+
+describe('controls: unrelated plans are unchanged from origin/main (version stamp aside)', () => {
+  const frozen = JSON.parse(readFileSync(join(__dirname, '__fixtures__', 'compound-concept-controls.json'), 'utf8')) as {
+    controls: Record<string, { input: DiscoveryInput; plan: Record<string, unknown> }>;
+  };
+  for (const [id, c] of Object.entries(frozen.controls)) {
+    it(id, () => {
+      const { version: _v, ...rest } = plan(c.input);
+      expect(JSON.parse(JSON.stringify(rest))).toEqual(c.plan);
+    });
+  }
+  it('covers the three agreed controls', () => {
+    expect(Object.keys(frozen.controls).sort()).toEqual(['IT services + state=VA', 'cybersecurity + agency=SOCOM', 'janitorial services']);
+  });
+});
+
+describe('road words without civil works do not pin to road construction (Agent 4 review 2026-11-23)', () => {
+  const frozen = JSON.parse(readFileSync(join(__dirname, '__fixtures__', 'compound-concept-controls.json'), 'utf8')) as {
+    road_negatives: Record<string, { input: DiscoveryInput; plan: Record<string, unknown> }>;
+  };
+  const NEGATIVES = [
+    'highway safety data analytics',
+    'highway patrol radios',
+    'Federal Highway Administration IT support',
+    'pavement condition sensors',
+    'highway traffic management software',
+  ];
+  for (const q of NEGATIVES) {
+    it(`"${q}" is not pinned to 237310 / road PSCs`, () => {
+      const c = interpretCapability(q);
+      expect(c.direct?.naics ?? []).not.toContain('237310');
+      expect(c.direct?.psc ?? []).not.toContain('Z2LB');
+    });
+    it(`"${q}" plan is byte-identical to v4 (version stamp aside)`, () => {
+      const { version: _v, ...rest } = plan(frozen.road_negatives[q].input);
+      expect(JSON.parse(JSON.stringify(rest))).toEqual(frozen.road_negatives[q].plan);
+    });
+  }
+  it('the agency name never triggers the pin; real road work with the agency named still does', () => {
+    expect(namesRoadBridgeWork('FHWA program support')).toBe(false);
+    expect(namesRoadBridgeWork('Federal Highway Administration maintenance of IT systems')).toBe(false);
+    expect(namesRoadBridgeWork('Federal Highway Administration bridge repair')).toBe(true);
+    expect(namesRoadBridgeWork('bridge and highway heavy civil construction')).toBe(true);
+    expect(namesRoadBridgeWork('road construction')).toBe(true);
+    expect(namesRoadBridgeWork('highway')).toBe(false);
+    expect(namesRoadBridgeWork('bridge contract')).toBe(false);
+  });
+});
