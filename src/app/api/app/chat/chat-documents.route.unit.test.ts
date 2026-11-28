@@ -142,11 +142,13 @@ describe('Ask Mindy reads the conversation\'s uploaded documents', () => {
     expect(sys).toContain('Never say "none of my tools can"');
   });
 
-  it('Map drawer with Drive/OneDrive enabled: Drive goes to Ask Mindy in the left sidebar, with the link (display hint recognised)', async () => {
+  it('Map drawer with Drive/OneDrive enabled: the in-panel Drive or OneDrive picker, and Ask Mindy (with the link) to connect first (display hint recognised)', async () => {
     vi.stubEnv('CONNECTED_APPS', 'true');
     vi.stubEnv('CONNECTED_APPS_ALLOWLIST', ME);
     await ask({ display: 'narrow_panel' });
-    expect(answerSystem()).toContain('"For Google Drive or OneDrive, open [Ask Mindy](/app?panel=chat) in the left sidebar and use **Use a file from Drive or OneDrive**."');
+    const sys = answerSystem();
+    expect(sys).toContain('Use **Drive or OneDrive** under the message box in this panel to pick a file.');
+    expect(sys).toContain('open [Ask Mindy](/app?panel=chat) in the left sidebar and use **Use a file from Drive or OneDrive** → Connect.');
   });
 
   it('full /app chat: the controls are "under the message box", no sidebar detour', async () => {

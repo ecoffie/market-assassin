@@ -52,7 +52,7 @@ describe('registry metadata for the server tool (Agent 1)', () => {
   it('toolInputSchema offers one branch per registered action for the surface', () => {
     const s = toolInputSchema(['map']) as { oneOf: Array<{ properties: { name: { const: string } } }> };
     expect(s.oneOf.map((b) => b.properties.name.const).sort()).toEqual(Object.keys(ACTIONS).filter((n) => ACTIONS[n].surfaces.includes('map')).sort());
-    expect((toolInputSchema(['app']) as { oneOf: unknown[] }).oneOf).toEqual([]);
+    expect((toolInputSchema(['app']) as { oneOf: Array<{ properties: { name: { const: string } } }> }).oneOf.map((b) => b.properties.name.const)).toEqual(['app.navigate']);
   });
 });
 
@@ -105,5 +105,18 @@ describe('write actions', () => {
     }
     expect(routeActionName('map.save_search')).toBe('save_search');
     expect(routeActionName('app.open_panel')).toBe('open_panel');
+  });
+});
+
+describe('app.navigate registry entry', () => {
+  it('view, no confirm, gate none, app surface only, a closed destination enum with labels', async () => {
+    const { ACTIONS, NAV_DESTINATION_IDS, NAV_DESTINATION_LABELS, validateAction } = await import('./registry');
+    expect(ACTIONS['app.navigate']).toMatchObject({ surfaces: ['app'], kind: 'view', needsConfirm: false, gate: 'none', args: ['destination'] });
+    expect([...NAV_DESTINATION_IDS]).toEqual(['my_documents', 'my_pursuits', 'alert_settings', 'billing']);
+    expect(Object.keys(NAV_DESTINATION_LABELS).sort()).toEqual([...NAV_DESTINATION_IDS].sort());
+    expect((ACTIONS['app.navigate'].argsSchema as { properties: { destination: { enum: string[] } } }).properties.destination.enum).toEqual([...NAV_DESTINATION_IDS]);
+    expect(validateAction({ type: 'action', id: 'a1', name: 'app.navigate', args: { destination: 'my_pursuits' } }, 'app')).toMatchObject({ ok: true, action: { kind: 'view', args: { destination: 'my_pursuits' } } });
+    expect(validateAction({ type: 'action', id: 'a1', name: 'app.navigate', args: { destination: 'my_pursuits' } }, 'map')).toEqual({ ok: false, reason: 'surface' });
+    expect(validateAction({ type: 'action', id: 'a1', name: 'app.navigate', args: { destination: 'team' } }, 'app')).toEqual({ ok: false, reason: 'destination' });
   });
 });

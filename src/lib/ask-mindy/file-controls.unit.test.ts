@@ -2,13 +2,14 @@ import { describe, it, expect } from 'vitest';
 import { fileControlsNote, ASK_MINDY_CHAT_HREF } from './file-controls';
 
 describe('fileControlsNote (production 2026-11-27: say WHERE the control is)', () => {
-  it('Map: Attach is under the message box; Drive/OneDrive sends them to Ask Mindy in the left sidebar, with the link', () => {
+  it('Map: Attach and the in-panel Drive or OneDrive picker are under the message box; connecting goes to Ask Mindy, with the link', () => {
     const n = fileControlsNote({ surface: 'map', uploads: true, connected: true });
     expect(ASK_MINDY_CHAT_HREF).toBe('/app?panel=chat');
     expect(n).toContain('"Use **Attach** under the message box in this panel to add a file from your computer."');
-    expect(n).toContain('"For Google Drive or OneDrive, open [Ask Mindy](/app?panel=chat) in the left sidebar and use **Use a file from Drive or OneDrive**."');
+    expect(n).toContain('Use **Drive or OneDrive** under the message box in this panel to pick a file.');
+    expect(n).toContain('open [Ask Mindy](/app?panel=chat) in the left sidebar and use **Use a file from Drive or OneDrive** → Connect.');
     expect(n).not.toMatch(/can't take files/);
-    expect(n).toContain('this Map panel has no Drive or OneDrive picker');
+    expect(n).not.toContain('has no Drive or OneDrive picker');
   });
   it('Map without Drive/OneDrive enabled: no sidebar detour, Attach only', () => {
     const n = fileControlsNote({ surface: 'map', uploads: true, connected: false });
