@@ -47,6 +47,7 @@ import { connectedAppsEnabledFor, connectedAppsDraftsEnabledFor } from '@/lib/co
 import { loadConnectedFilesContext } from '@/lib/connected-apps/read-file-tool';
 import { makeEmailDraftTool, EMAIL_DRAFT_TOOL_DEF, CREATE_EMAIL_DRAFT, type VerifiedSource } from '@/lib/connected-apps/email-draft';
 import { makeSearchWebTool, SEARCH_WEB_TOOL_DEF, SEARCH_WEB, callerKeyFor } from '@/lib/chat/search-web-tool';
+import { makeLabDirectoryTool, LAB_SUPPLIER_INFO_TOOL_DEF, LAB_SUPPLIER_INFO } from '@/lib/chat/lab-directory-tool';
 import { makeReadWebPageTool, READ_WEB_PAGE_TOOL_DEF, READ_WEB_PAGE, urlsInText } from '@/lib/chat/read-web-page';
 import { makeGenerateDocumentTool, CREATE_DOCUMENT_TOOL_DEF, CREATE_DOCUMENT, isDocumentCreationRequest, parseCreateDocumentDeliverables, type CreateDocumentDeliverable } from '@/lib/chat/generate-document-tool';
 import { vaultDocEnabledFor } from '@/lib/vault/flags';
@@ -1299,8 +1300,8 @@ export async function POST(request: NextRequest) {
             ? createAppActionProposer({ surface: actionSurface, hasPro: chatPro, emit: (evt) => send(evt) })
             : null;
           const actionDefs = actions ? [proposeAppActionToolDef(actions.surface)] : [];
-          const privateDefs = [...TIER0_TOOL_DEFS, ...actionDefs, SEARCH_WEB_TOOL_DEF, ...(readPage ? [READ_WEB_PAGE_TOOL_DEF] : []), ...(myDocs ? [MY_DOCUMENTS_TOOL_DEF] : []), ...(genDoc ? [CREATE_DOCUMENT_TOOL_DEF] : []), ...(emailDraft ? [EMAIL_DRAFT_TOOL_DEF] : [])];
-          const privateNames = new Set([...TIER0_TOOL_NAMES, ...(actions ? [PROPOSE_APP_ACTION] : []), SEARCH_WEB, ...(readPage ? [READ_WEB_PAGE] : []), ...(myDocs ? [FIND_MY_DOCUMENTS] : []), ...(genDoc ? [CREATE_DOCUMENT] : []), ...(emailDraft ? [CREATE_EMAIL_DRAFT] : [])]);
+          const privateDefs = [...TIER0_TOOL_DEFS, ...actionDefs, SEARCH_WEB_TOOL_DEF, LAB_SUPPLIER_INFO_TOOL_DEF, ...(readPage ? [READ_WEB_PAGE_TOOL_DEF] : []), ...(myDocs ? [MY_DOCUMENTS_TOOL_DEF] : []), ...(genDoc ? [CREATE_DOCUMENT_TOOL_DEF] : []), ...(emailDraft ? [EMAIL_DRAFT_TOOL_DEF] : [])];
+          const privateNames = new Set([...TIER0_TOOL_NAMES, ...(actions ? [PROPOSE_APP_ACTION] : []), SEARCH_WEB, LAB_SUPPLIER_INFO, ...(readPage ? [READ_WEB_PAGE] : []), ...(myDocs ? [FIND_MY_DOCUMENTS] : []), ...(genDoc ? [CREATE_DOCUMENT] : []), ...(emailDraft ? [CREATE_EMAIL_DRAFT] : [])]);
           const executor = createChatToolExecutor({
             userEmail: auth.email!,
             ...(actingScope.kind === 'client' ? { vaultEmail: actingScope.vaultEmail } : {}),
@@ -1322,6 +1323,7 @@ export async function POST(request: NextRequest) {
                     return r;
                   });
                 }
+                if (n === LAB_SUPPLIER_INFO) return makeLabDirectoryTool().execute(a);
                 if (readPage && n === READ_WEB_PAGE) return readPage.execute(a);
                 if (emailDraft && n === CREATE_EMAIL_DRAFT) return emailDraft.execute(a);
                 if (myDocs && n === FIND_MY_DOCUMENTS) {
