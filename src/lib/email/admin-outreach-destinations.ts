@@ -19,7 +19,7 @@ import { MINDY_PREFERENCES_URL, mindyDashboardUrlFor } from '@/lib/mindy/email-b
 
 export function feedbackOutreachPreferencesUrl(email: string): string {
   const clean = (email || '').trim().toLowerCase();
-  const base = clean ? `${MINDY_PREFERENCES_URL}?email=${encodeURIComponent(clean)}` : MINDY_PREFERENCES_URL;
+  const base = clean ? `${MINDY_PREFERENCES_URL}${MINDY_PREFERENCES_URL.includes('?') ? '&' : '?'}email=${encodeURIComponent(clean)}` : MINDY_PREFERENCES_URL;
   return appendEmailUtm(base, { campaign: 'feedback_outreach', content: 'update_preferences' });
 }
 

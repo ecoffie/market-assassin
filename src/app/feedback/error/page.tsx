@@ -1,3 +1,5 @@
+import { MINDY_ALERT_SETTINGS_PATH } from '@/lib/mindy/email-branding';
+
 export default function FeedbackErrorPage() {
   return (
     <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
@@ -10,7 +12,7 @@ export default function FeedbackErrorPage() {
 
         <div className="space-y-3">
           <a
-            href="/alerts/preferences"
+            href={MINDY_ALERT_SETTINGS_PATH}
             className="block w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition"
           >
             Update My Preferences

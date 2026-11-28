@@ -65,16 +65,16 @@ function starterHtml(trackedUrl?: (url: string, label: string) => string): strin
 }
 
 describe('Coming Back to Market links (email migration guard)', () => {
-  it('points at the Map recompete horizon and alert preferences, not /app', () => {
+  it('points at the Map recompete horizon and Settings → Alerts (the one allowed /app destination)', () => {
     expect(COMING_BACK_PANEL_PATH).toBe('/opportunity-map?horizon=recompete');
-    expect(COMING_BACK_CONFIRM_PATH).toBe('/alerts/preferences');
+    expect(COMING_BACK_CONFIRM_PATH).toBe('/app?panel=settings&section=alerts');
   });
 
   it('rendered section (both CTAs) passes the legacy-destination guard', () => {
     const html = starterHtml();
     expect(html).toContain('Confirm your market');
     expect(html).toContain(`${SITE}/opportunity-map?horizon=recompete`);
-    expect(html).toContain(`${SITE}/alerts/preferences`);
+    expect(html).toMatch(/\/app\?panel=settings&(amp;)?section=alerts/);
     expect(findLegacyDestinations(html)).toEqual([]);
   });
 

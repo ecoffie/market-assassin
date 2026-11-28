@@ -277,23 +277,23 @@ function addProductEntries() {
     ].join('\n\n'),
   });
 
-  // Unsubscribe means EMAIL, not the paid plan (Agent 4, 2026-11-27). Email preferences = /alerts/preferences
-  // ("Manage Daily Alerts"); every Mindy email also carries an Unsubscribe link at the bottom.
+  // Unsubscribe means EMAIL, not the paid plan (Agent 4, 2026-11-27). Email preferences = Settings → Alerts & matching
+  // (/alerts/preferences rejects a signed-in customer without a token); every Mindy email also carries an Unsubscribe link.
   add({
     id: 'stop_emails',
     kind: 'product',
     triggers: ['unsubscribe me from these emails', 'how do I stop the alerts', 'too many emails'],
-    routes: ['/alerts/preferences'],
-    answer: `To stop or change Mindy emails, open ${link('Email preferences', '/alerts/preferences')}, or click the **Unsubscribe** link at the bottom of any Mindy email. This does not change your paid plan.`,
+    routes: ['/app'],
+    answer: `To stop or change Mindy emails, open ${link('Email preferences', '/app?panel=settings&section=alerts')}, or click the **Unsubscribe** link at the bottom of any Mindy email. This does not change your paid plan.`,
   });
 
   add({
     id: 'unsubscribe_either',
     kind: 'product',
     triggers: ['unsubscribe', 'unsubscribe from Mindy'],
-    routes: ['/alerts/preferences', '/account/cancel'],
+    routes: ['/app', '/account/cancel'],
     answer: [
-      `To stop Mindy emails: open ${link('Email preferences', '/alerts/preferences')}, or click the **Unsubscribe** link at the bottom of any Mindy email.`,
+      `To stop Mindy emails: open ${link('Email preferences', '/app?panel=settings&section=alerts')}, or click the **Unsubscribe** link at the bottom of any Mindy email.`,
       `To cancel your paid plan: open ${link('getmindy.ai/account/cancel', '/account/cancel')} and click **Manage / cancel**.`,
     ].join('\n\n'),
   });

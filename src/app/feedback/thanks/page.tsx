@@ -2,6 +2,7 @@
 
 import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
+import { MINDY_ALERT_SETTINGS_PATH } from '@/lib/mindy/email-branding';
 
 function ThankYouContent() {
   const searchParams = useSearchParams();
@@ -50,7 +51,7 @@ function ThankYouContent() {
 
         <div className="space-y-3">
           <a
-            href="/alerts/preferences"
+            href={MINDY_ALERT_SETTINGS_PATH}
             className="block w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition"
           >
             Update My Preferences

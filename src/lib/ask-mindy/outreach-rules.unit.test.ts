@@ -50,8 +50,10 @@ describe('action plan structure (the Claude + Mindy MCP reference plan)', () => 
   it('no certification in the pitch; contacts are sourced, never inferred; only confirmed events', () => {
     expect(ACTION_PLAN_STRUCTURE).toMatch(/No certification in the pitch/);
     expect(ACTION_PLAN_STRUCTURE).toMatch(/Every named contact carries a citation marker \[n\] pointing to its source \(the notice number or official page\) in Sources/);
-    expect(ACTION_PLAN_STRUCTURE).toMatch(/write no 'from the notice\.\.\.' prose in the table or body/);
-    expect(ACTION_PLAN_STRUCTURE).toMatch(/"confirm this contact before reaching out", with no date shown/);
+    // Eric, 2026-11-27 ("contacts: show notice date"): the record and ITS own date, newest notice first.
+    expect(ACTION_PLAN_STRUCTURE).toMatch(/its "why they matter" cell names that record and the record's own date \(e\.g\. "primary contact on the office's newest notice \(W91ZRS27QA001, Oct 28, 2026\)"\), preferring the newest notice/);
+    expect(ACTION_PLAN_STRUCTURE).toMatch(/A contact found only on a notice older than 180 days is marked "confirm before reaching out"\. Never a data-freshness date\./);
+    expect(ACTION_PLAN_STRUCTURE).toMatch(/Never infer an email from a name pattern/);
     expect(ACTION_PLAN_STRUCTURE).not.toMatch(/says where it came from/);
     expect(ACTION_PLAN_STRUCTURE).toMatch(/Never infer an email from a name pattern/);
     expect(ACTION_PLAN_STRUCTURE).toMatch(/name only events confirmed by a source, and say plainly when none are confirmed/);
@@ -98,12 +100,34 @@ describe('every surface carries the rules', () => {
   });
 });
 
-describe('ATTACHED_FACTS_SOURCED (production retest 2026-11-27)', () => {
-  it('a file\'s figure is sourced and attributed, never "not established"; not established stays for facts found nowhere', () => {
-    expect(ATTACHED_FACTS_SOURCED).toMatch(/sourced to that file/);
-    expect(ATTACHED_FACTS_SOURCED).toMatch(/State it with attribution to the company and the file/);
-    expect(ATTACHED_FACTS_SOURCED).toMatch(/not independently verified/);
-    expect(ATTACHED_FACTS_SOURCED).toMatch(/never "not established"/);
-    expect(ATTACHED_FACTS_SOURCED).toMatch(/"Not established" is only for something that appears in no tool result, web page, customer message or attached file/);
+describe('ATTACHED_FACTS_SOURCED: claims by audience (Eric, 2026-11-27, from the Claude + Mindy MCP baseline)', () => {
+  it('sourced to the file and cited; never "not established"', () => {
+    expect(ATTACHED_FACTS_SOURCED).toMatch(/FACTS FROM AN ATTACHED FILE ARE SOURCED to that file: cite the file/);
+    expect(ATTACHED_FACTS_SOURCED).toMatch(/A file's figure is never "not established"/);
+  });
+  it('a document FOR the company states its claims as written, with no attribution words and no Unverified label', () => {
+    expect(ATTACHED_FACTS_SOURCED).toMatch(/In a document prepared FOR that company \(its report, capability statement, leave-behind\), state its own claims AS WRITTEN: no "<Company> states", no brackets, no "reportedly", and never an "Unverified" label/);
+  });
+  it('third-party content attributes in plain words; the chat says where it comes from', () => {
+    expect(ATTACHED_FACTS_SOURCED).toMatch(/addressed to a third party \(an outreach email, a teaming note\), attribute in plain words: "<Company> has funded/);
+    expect(ATTACHED_FACTS_SOURCED).toMatch(/In the chat answer, say where it comes from \("your capability statement says \.\.\."\)/);
+  });
+  it('word preservation: same word, never rounded, converted or combined with Mindy figures', () => {
+    expect(ATTACHED_FACTS_SOURCED).toMatch(/Never change their word \("funded" is not "awarded" or "revenue"\); never round, convert or combine a file figure with Mindy's figures/);
+  });
+  it('conflicts: SAM beats the file on status; a file-only eligibility claim is never pitched and is flagged in chat', () => {
+    expect(ATTACHED_FACTS_SOURCED).toMatch(/an official record beats the file for status \(the file says "WOSB pending" and SAM shows WOSB certified: the report uses SAM, and the chat says to update the capability statement\)/);
+    expect(ATTACHED_FACTS_SOURCED).toMatch(/An eligibility claim found only in the file \(8\(a\), HUBZone, SDVOSB, WOSB, sole-source eligibility\) is never pitched or used to rank; the chat says "confirm before using"/);
+    expect(ATTACHED_FACTS_SOURCED).toMatch(/Doubts about the file go in the chat answer under "Before you hand it out", never in the client document/);
+  });
+  it('"not established" is only for Mindy\'s inferences or unshown third-party facts, and says what the data does not prove', () => {
+    expect(ATTACHED_FACTS_SOURCED).toMatch(/"not established" is only for Mindy's own inferences or third-party facts the data does not show, and it says what the data does NOT prove \(no prime awards does not mean the firm is small or new\)/);
+  });
+  it('create_document carries the same audience rule and the SAM/eligibility conflict rule', async () => {
+    const { CREATE_DOCUMENT_TOOL_DEF } = await import('@/lib/chat/generate-document-tool');
+    const d = JSON.stringify(CREATE_DOCUMENT_TOOL_DEF);
+    expect(d).toMatch(/written AS THE FILE STATES THEM: no .*<Company> states.*, no brackets, no .*reportedly.*, same word/);
+    expect(d).toMatch(/SAM beats the file on status; an eligibility claim only the file makes \(8\(a\), HUBZone, SDVOSB, WOSB\) is left out of the document and flagged in the chat answer/);
+    expect(d).toMatch(/primary contact on the office's newest notice \(W91ZRS27QA001, Oct 28, 2026\)/);
   });
 });

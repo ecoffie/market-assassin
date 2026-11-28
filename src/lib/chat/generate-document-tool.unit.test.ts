@@ -631,3 +631,22 @@ describe('a market or company report carries a section titled exactly "How They 
     expect(r).not.toHaveProperty('missing_section');
   });
 });
+
+describe("a company's own file-sourced claim in a document FOR that company (Eric, 2026-11-27, claims-by-audience)", () => {
+  beforeEach(() => { vi.stubEnv('VAULT_GENERATED_FILES', 'true'); });
+  afterEach(() => { vi.unstubAllEnvs(); });
+  it('a fact citing the upload is kept verbatim (same word, same figure) with no "Unverified" label', async () => {
+    const { tool, renders } = setup();
+    const CLAIM = 'Northwind Federal Partners has funded $35 billion+ in federal programs.';
+    const r = await tool.execute({ doc_model: model({
+      title: 'Northwind Federal Partners market report',
+      sources: [{ id: 'u1', kind: 'upload', label: 'Northwind Capability Statement.pdf' }],
+      sections: [{ id: 'a', heading: 'Where Northwind stands', blocks: [{ type: 'paragraph', id: 'p1', text: CLAIM, claim: 'fact', cites: ['u1'] }] }],
+    }) });
+    expect(r).toMatchObject({ ok: true, unverified_count: 0, omitted_count: 0 });
+    const saved = JSON.stringify(renders[0].model);
+    expect(saved).toContain(CLAIM);
+    expect(saved).not.toMatch(/Unverified/);
+    expect(String(r.note)).not.toMatch(/NO block cites them/);
+  });
+});

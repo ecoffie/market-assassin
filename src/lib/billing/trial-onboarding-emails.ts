@@ -14,11 +14,12 @@
 import { kv } from '@vercel/kv';
 import { sendEmail } from '@/lib/send-email';
 import { appendEmailUtm } from '@/lib/engagement';
+import { MINDY_ALERT_SETTINGS_PATH } from '@/lib/mindy/email-branding';
 
 const LOGO_URL = 'https://getmindy.ai/brand/mindy-logo-3d.png';
 // Map-era destinations only: /app is a legacy surface (src/lib/email/legacy-destination-guard.ts).
 const SITE = 'https://getmindy.ai';
-const ALERT_SETTINGS = `${SITE}/alerts/preferences`;          // keywords + NAICS for daily alerts
+const ALERT_SETTINGS = `${SITE}${MINDY_ALERT_SETTINGS_PATH}`;          // keywords + NAICS for daily alerts
 const RECOMPETES = `${SITE}/opportunity-map?horizon=recompete`;
 const PURSUITS = `${SITE}/opportunity-map/pursuits`;           // the user's pipeline (user_pipeline)
 const SUPPORT_EMAIL = 'admin@getmindy.ai';

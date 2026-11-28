@@ -36,6 +36,7 @@ export function unsubscribeVerificationSecrets(): string[] {
   return Array.from(new Set(list));
 }
 import { MINDY_SITE_URL } from '@/lib/mindy/email-branding';
+import { MINDY_PREFERENCES_URL } from '@/lib/mindy/email-branding';
 
 /** Footer placeholder; sendEmail() substitutes the recipient's signed URL. Never sent as-is. */
 export const UNSUBSCRIBE_URL_PLACEHOLDER = '%%MINDY_UNSUBSCRIBE_URL%%';
@@ -74,7 +75,7 @@ export function unsubscribeUrl(email: string, emailType?: string | null): string
     return signedUrl(email, emailType);
   } catch (e) {
     console.error('[unsubscribe] cannot sign link; falling back to preferences:', e instanceof Error ? e.message : e);
-    return `${MINDY_SITE_URL}/alerts/preferences`;
+    return MINDY_PREFERENCES_URL;
   }
 }
 
