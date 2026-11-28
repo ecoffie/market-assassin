@@ -61,6 +61,40 @@ export const TEAM_SEAT_ANNUAL_PRICE_IDS: Record<TeamSeatCount, string> = {
   5: 'price_1UgVNuK5zyiZ50PBj3JNMTzh',
 };
 
+/**
+ * MINDY DAY (owner, 2026-11-28): for one week, yearly Team is "2 months free" (10 x monthly)
+ * instead of 33% off. Live Stripe prices, same Mindy app product. Checkout and /pricing use them
+ * ONLY inside MINDY_DAY_WINDOW; outside it everything is the normal 33%-off price above.
+ *
+ * ⚠️ These ids stay RECOGNISED forever (teamSeatPlanForPriceId) — people who subscribe during the
+ * week keep their seats and credits after it ends.
+ */
+const MINDY_DAY_ANNUAL_USD: Record<TeamSeatCount, number> = { 2: 2490, 3: 3660, 4: 4820, 5: 5990 };
+export const MINDY_DAY_ANNUAL_PRICE_IDS: Record<TeamSeatCount, string> = {
+  2: 'price_1UgZgdK5zyiZ50PB5fzGfFhF',
+  3: 'price_1UgZh1K5zyiZ50PBZJQB8tq1',
+  4: 'price_1UgZhTK5zyiZ50PB0j9k6UMY',
+  5: 'price_1UgZhxK5zyiZ50PBjEZTqDgZ',
+};
+/** Inclusive start, exclusive end (UTC instants). 2026-11-28 00:00 ET → 2026-12-06 00:00 ET. */
+export const MINDY_DAY_WINDOW = { startMs: Date.UTC(2026, 10, 28, 5), endMs: Date.UTC(2026, 11, 6, 5) };
+
+export function isMindyDayPricing(nowMs: number = Date.now()): boolean {
+  return nowMs >= MINDY_DAY_WINDOW.startMs && nowMs < MINDY_DAY_WINDOW.endMs;
+}
+
+/** The yearly price checkout charges and /pricing shows for `seats` at `nowMs`. */
+export function teamSeatAnnualOffer(
+  seats: TeamSeatCount,
+  nowMs: number = Date.now(),
+): { priceId: string | null; usd: number; mindyDay: boolean } {
+  if (isMindyDayPricing(nowMs)) {
+    return { priceId: MINDY_DAY_ANNUAL_PRICE_IDS[seats], usd: MINDY_DAY_ANNUAL_USD[seats], mindyDay: true };
+  }
+  const plan = TEAM_SEAT_PLANS.find((p) => p.seats === seats)!;
+  return { priceId: plan.annualPriceId, usd: plan.annualUsd, mindyDay: false };
+}
+
 export const TEAM_SEAT_PLANS: TeamSeatPlan[] = TEAM_SEAT_COUNTS.map((seats) => {
   const monthlyUsd = MONTHLY_USD[seats];
   const annualUsd = ANNUAL_USD[seats];
@@ -89,6 +123,7 @@ export function teamSeatPlanForPriceId(priceId: string | null | undefined): { pl
   for (const plan of TEAM_SEAT_PLANS) {
     if (plan.monthlyPriceId === priceId) return { plan, interval: 'month' };
     if (plan.annualPriceId === priceId) return { plan, interval: 'year' };
+    if (MINDY_DAY_ANNUAL_PRICE_IDS[plan.seats] === priceId) return { plan, interval: 'year' };
   }
   return null;
 }

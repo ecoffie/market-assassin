@@ -15,7 +15,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { getStripe } from '@/lib/stripe';
-import { teamSeatPlan } from '@/lib/billing/team-seat-plans';
+import { teamSeatPlan, teamSeatAnnualOffer } from '@/lib/billing/team-seat-plans';
 import { TEAM_TRIAL_ANNUAL, TEAM_TRIAL_MONTHLY } from '@/components/public-site/pricing/app-plan-links';
 
 export const dynamic = 'force-dynamic';
@@ -27,7 +27,8 @@ export async function GET(req: NextRequest) {
   const annual = req.nextUrl.searchParams.get('billing') === 'annual';
   const fallback = annual ? TEAM_TRIAL_ANNUAL : TEAM_TRIAL_MONTHLY;
   const plan = teamSeatPlan(req.nextUrl.searchParams.get('seats'));
-  const price = plan ? (annual ? plan.annualPriceId : plan.monthlyPriceId) : null;
+  // Yearly: the Mindy Day price during its week, the normal 33%-off price otherwise.
+  const price = plan ? (annual ? teamSeatAnnualOffer(plan.seats).priceId : plan.monthlyPriceId) : null;
   if (!plan || !price) return NextResponse.redirect(fallback, 303);
 
   try {

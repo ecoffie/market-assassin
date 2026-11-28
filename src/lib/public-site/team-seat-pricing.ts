@@ -48,6 +48,8 @@ export const TEAM_SEAT_PRICING = {
   header: {
     title: 'Pricing',
     sub: 'Pay monthly, or pay yearly and save up to 33%.',
+    /** Mindy Day week (see MINDY_DAY_WINDOW in src/lib/billing/team-seat-plans.ts). */
+    subMindyDay: 'Pay monthly, or pay yearly and get 2 months free.',
   },
   /** ⚠️ A claim: Eric must confirm Team really is the most popular plan, or remove it. */
   badge: 'Most popular',

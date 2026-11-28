@@ -21,7 +21,7 @@ import { SALES_URL } from './app-plan-links';
 import {
   TEAM_SEAT_PRICING, isTeamSeatPricingEnabled, teamSeatCtaHref, teamSeatOption, teamSeatTakesPayment,
 } from '@/lib/public-site/team-seat-pricing';
-import { teamSeatPlan } from '@/lib/billing/team-seat-plans';
+import { teamSeatPlan, isMindyDayPricing } from '@/lib/billing/team-seat-plans';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -101,7 +101,10 @@ describe('/pricing with the seat switch ON (server render)', () => {
   it('shows the header, footer and the Monthly/Annual toggle', () => {
     const h = doc.querySelector('[data-testid="seat-pricing-header"]')!;
     expect(h.querySelector('h1')?.textContent).toBe('Pricing');
-    expect(h.textContent).toContain('Pay monthly, or pay yearly and save up to 33%.');
+    // Mindy Day week shows "2 months free"; every other day the normal 33% line.
+    expect(h.textContent).toContain(isMindyDayPricing()
+      ? 'Pay monthly, or pay yearly and get 2 months free.'
+      : 'Pay monthly, or pay yearly and save up to 33%.');
     expect(doc.querySelector('[aria-label="Billing period"]')).not.toBeNull();
     const foot = doc.querySelector('.seat-foot')!;
     expect(foot.textContent).toBe('Questions about a rollout: hello@getmindy.ai');
