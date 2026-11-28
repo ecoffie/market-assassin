@@ -19,6 +19,17 @@ export const QUESTION_OVER_PROFILE =
   + ' profile, past performance) describes a company, research THAT company, not the saved profile, and say whose'
   + ' file it is from its own name.';
 
+/**
+ * Production retest 2026-11-27: figures that ARE in an attached capability statement ("$35 billion+", contract dates
+ * and values) came back as "not established". A fact an attached file states is sourced to that file.
+ */
+export const ATTACHED_FACTS_SOURCED =
+  'FACTS FROM AN ATTACHED FILE ARE SOURCED: a figure, date, award, certification or claim that an attached file states is'
+  + ' sourced to that file. State it with attribution to the company and the file ("<Company> states it has funded $35'
+  + ' billion+, per its capability statement"): it is the company\'s own claim, attributed, not independently verified, and'
+  + ' never "not established", "not verified" or "could not be confirmed". "Not established" is only for something that'
+  + ' appears in no tool result, web page, customer message or attached file.';
+
 /** No data-freshness dates in what the customer reads. */
 export const NO_DATA_DATES =
   'DATES: never print how current Mindy\'s data is or when a record was read ("as of", "data through", "current through",'

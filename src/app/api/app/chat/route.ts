@@ -149,7 +149,7 @@ import { capabilityPlannerNote, interpretCapabilityNaics } from '@/lib/market/ca
 import { guardUnstatedStates, guardUnstatedCities } from '@/lib/chat/stated-filters';
 import { parseDisplayHint, displayHintNote } from '@/lib/chat/display-hint';
 import { appActionsEnabledFor, parseActionSurface, actionNamesFor, createAppActionProposer, proposeAppActionToolDef, PROPOSE_APP_ACTION, APP_ACTIONS_NOTE, type AppActionProposer } from '@/lib/chat/app-actions/propose';
-import { QUESTION_OVER_PROFILE, OUTREACH_AND_PLAN_RULES } from '@/lib/ask-mindy/outreach-rules';
+import { QUESTION_OVER_PROFILE, OUTREACH_AND_PLAN_RULES, ATTACHED_FACTS_SOURCED } from '@/lib/ask-mindy/outreach-rules';
 import { compileIntent, enforceIntent, dedupeToolCalls, isMapScopeNote, splitViewPreamble } from '@/lib/chat/intent-compiler';
 import { sessionTitleFrom } from '@/lib/chat/view-preamble';
 import { prepareChatToolArgs, renderExpiringRecords, renderStatusChecks, renderBuyingOffices, renderPricing, renderKeywords, renderVehicleMix, renderSbloContact, lintAnalysis, deterministicNextSteps, crossCheckOffices, checkSummaryAgainstRecords, EXPIRING_TOOL, PAST_CONTRACTS_TOOL, BUYING_OFFICES_TOOL, PRICING_TOOL, KEYWORDS_TOOL, VEHICLE_MIX_TOOL, SBLO_TOOL, type RenderedRecords } from '@/lib/chat/record-render';
@@ -964,6 +964,7 @@ export async function POST(request: NextRequest) {
           ? await loadConnectedFilesContext(body.connectedFiles, actingScope, customerWords)
           : null;
         if (connectedFiles?.block) messages.push({ role: 'system', content: connectedFiles.block });
+        if (documentContext || connectedFiles?.block) messages.push({ role: 'system', content: ATTACHED_FACTS_SOURCED });
         // Category caveat grounded by the work the customer named in THIS message (janitorial → AbilityOne).
         const categoryNote = abilityOneCaveat(customerWords, interpretCapabilityNaics(customerWords).codes);
         if (categoryNote) messages.push({ role: 'system', content: categoryNote });
@@ -1445,12 +1446,15 @@ export async function POST(request: NextRequest) {
               Object.assign(rmTrace, { stop: loop.stop, steps: loop.steps, call_count: loop.calls, calls: callLog, results_cut: loop.resultsCut, sam_cache_only: true });
               if (!loop.text) { await finish(RESEARCH_NO_ANSWER, {}, rmSources); return; }
               send({ type: 'progress', message: 'Checking every figure against the sources.', phase: 'checking' });
+              // Attached files are evidence: a figure the customer's file states is sourced to it (production retest 2026-11-27),
+              // and the rewrite step sees the same files, so it never calls such a figure "not established".
+              const attachedBlocks = [documentContext?.block, connectedFiles?.block].filter((t): t is string => !!t);
               const grounded = await groundAnswer({
                 text: loop.text,
-                evidence: [...loop.evidence, userProfileBlock],
+                evidence: [...loop.evidence, userProfileBlock, ...attachedBlocks],
                 revise: async (note) => {
                   const r = await client.messages.create({
-                    model, max_tokens: 16_000, system: researchSystemPrompt({ today, profileBlock: userProfileBlock }),
+                    model, max_tokens: 16_000, system: researchSystemPrompt({ today, profileBlock: userProfileBlock, attachments: attachedBlocks }),
                     messages: [{ role: 'user', content: `${note}\n\nANSWER TO REWRITE:\n${loop.text}` }],
                   }, { timeout: 90_000, maxRetries: 0 });
                   return r.content.filter((b) => b.type === 'text').map((b) => (b as Anthropic.TextBlock).text).join('').trim() || null;
