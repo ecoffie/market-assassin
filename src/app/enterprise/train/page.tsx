@@ -1,11 +1,11 @@
 import type { Metadata } from 'next';
 
 /**
- * /enterprise/train — Mindy Enterprise: train Mindy on how a company wins.
+ * /enterprise/train — Mindy Enterprise: we train the customer's OWN AI model, deployed in the
+ * customer's own systems, to get results general AI cannot (Applied Compute model, for GovCon).
  *
- * Positioning page for the Enterprise pilot program (plan: per-company evals, bulk import,
- * a feedback loop, then per-company training). The page states what is live today and what is
- * in pilot; it must not claim per-company training is generally available until it ships.
+ * Positioning page for the Enterprise pilot program. The page states what is live today and what
+ * is in pilot; it must not claim custom-model training is generally available until it ships.
  *
  * Public design system only (src/lib/public-site/tokens.ts): rendered inside PublicShell by
  * src/app/enterprise/layout.tsx. No purple (the logo mark is an image), no dark backgrounds
@@ -13,9 +13,9 @@ import type { Metadata } from 'next';
  */
 export const metadata: Metadata = {
   alternates: { canonical: '/enterprise/train' },
-  title: 'Mindy Enterprise — train Mindy on how your company wins',
+  title: 'Mindy Enterprise — your own AI, trained to win federal work',
   description:
-    'Mindy Enterprise turns your past proposals, debriefs and win history into a version of Mindy built for your company, scored on your own wins. Now onboarding pilot teams.',
+    'We train your own AI model on your proposals, debriefs and win history plus federal market data, and deploy it in your own systems. You own it. Now onboarding pilot teams.',
 };
 
 const CONTACT = '/contact-sales';
@@ -33,24 +33,24 @@ const OK = '#027A48';
 
 const STEPS: { title: string; body: string }[] = [
   { title: 'Define the result.', body: 'We agree what good looks like for your team: full Section L and M compliance, evaluator-ready strengths, your voice, and the win themes that work for you.' },
-  { title: 'Build your evals.', body: 'Your past wins, losses and debriefs become a test set. Every version of Mindy is scored on it before your team sees a draft.' },
-  { title: 'Train on your work.', body: 'Proposals, redlines, CPARS ratings, resumes and capture notes teach Mindy how your company writes, prices and positions.' },
-  { title: 'Deploy where you work.', body: 'Your Mindy runs in the Mindy app and inside Claude, ChatGPT and your own agents.' },
+  { title: 'Build your evals.', body: 'Your past wins, losses and debriefs become a test set. Every version of your model is scored on it before your team relies on it.' },
+  { title: 'We train your model.', body: 'Our team trains an AI model on your proposals, redlines, CPARS ratings, resumes and capture notes, plus Mindy’s federal market data, so it learns how your company writes, prices and positions.' },
+  { title: 'Deploy it in your systems.', body: 'The model runs in your own environment, under your control, and plugs into the tools and agents your team already uses. You own it.' },
   { title: 'Improve with every bid.', body: 'Edits, debriefs and award results feed the next training round, so each proposal starts closer to a win.' },
 ];
 
 const SOURCES: { title: string; body: string }[] = [
   { title: 'Past proposals and win themes', body: 'Your structure, voice and discriminators, learned from the volumes that won and the ones that did not.' },
   { title: 'Debriefs and CPARS', body: 'What evaluators rewarded and penalized, turned into the standard every new draft is scored against.' },
-  { title: 'Redlines and edits', body: 'Every change your capture team makes teaches Mindy what to write the first time.' },
-  { title: 'The federal market', body: 'Mindy already knows awards, recompetes, forecasts and buyers. Training adds your company on top.' },
+  { title: 'Redlines and edits', body: 'Every change your capture team makes teaches your model what to write the first time.' },
+  { title: 'The federal market', body: 'Mindy’s data on awards, recompetes, forecasts and buyers goes into training, so your model knows the market as well as your company.' },
 ];
 
 type Status = 'live' | 'pilot';
 const STATUS: { status: Status; label: string; title: string; body: string }[] = [
-  { status: 'live', label: 'Live', title: 'Grounded in your record', body: 'Drafts cite your saved contracts and people, and leave blanks instead of inventing facts.' },
-  { status: 'pilot', label: 'Pilot', title: 'Your eval set and import', body: 'Bulk import of past proposals and a scorecard built from your wins.' },
-  { status: 'pilot', label: 'Pilot teams', title: 'A Mindy trained for you', body: 'Per-company training for teams with deep proposal history, released only when it beats the grounded version on your scorecard.' },
+  { status: 'live', label: 'Live today', title: 'Mindy, grounded in your record', body: 'Start in the Mindy app and AI connector: drafts cite your saved contracts and people, and leave blanks instead of inventing facts.' },
+  { status: 'pilot', label: 'Pilot', title: 'Your data and eval set', body: 'We import your past proposals and debriefs and build the scorecard your model will be measured on.' },
+  { status: 'pilot', label: 'Pilot teams', title: 'Your own model, in your systems', body: 'Custom training and deployment in your environment for teams with deep proposal history, released only when it beats general AI on your scorecard.' },
 ];
 
 /** Illustrative only — labelled as such on the page. Replace with pilot results when they exist. */
@@ -104,7 +104,7 @@ function IsoLayers() {
   );
   const yB = 390, yM = 260, yT = 130;
   return (
-    <svg viewBox="0 0 640 520" role="img" aria-label="Three layers: your proposal history at the base, training and evals in the middle, your Mindy on top" className="block h-auto w-full max-w-[620px] justify-self-end">
+    <svg viewBox="0 0 640 520" role="img" aria-label="Three layers: your data and federal market data at the base, training and evals in the middle, your own AI in your system on top" className="block h-auto w-full max-w-[620px] justify-self-end">
       {plate(yB, PAPER, MUTED)}
       {grid(yB)}
       <line x1={cx} y1={yM + hh + 10} x2={cx} y2={yB - hh} stroke={NAVY} strokeDasharray="4 4" />
@@ -116,9 +116,9 @@ function IsoLayers() {
       <line x1={cx} y1={yT + hh + 10} x2={cx} y2={yM - hh} stroke={NAVY} strokeDasharray="4 4" />
       {plate(yT, NAVY_WASH, NAVY)}
       <image href={LOGO} x={cx - 28} y={yT - 24} width={56} height={45} />
-      {tag(430, 36, 'YOUR MINDY', NAVY, cx + 120, yT - 30)}
+      {tag(430, 36, 'YOUR AI, YOUR SYSTEM', NAVY, cx + 120, yT - 30)}
       {tag(18, 196, 'TRAINING + EVALS', NAVY, cx - 120, yM - 40)}
-      {tag(446, 440, 'YOUR PROPOSAL HISTORY', MUTED, cx + 150, yB + 20)}
+      {tag(446, 440, 'YOUR DATA + MARKET DATA', MUTED, cx + 150, yB + 20)}
     </svg>
   );
 }
@@ -127,8 +127,8 @@ function IsoLayers() {
 const LOOP_NODES: { name: string; sub: string; color: string }[] = [
   { name: 'Your work', sub: 'proposals, CPARS', color: MUTED },
   { name: 'Evals', sub: 'scored on your wins', color: ACCENT },
-  { name: 'Training', sub: 'on your data only', color: NAVY },
-  { name: 'Your Mindy', sub: 'app + your AI tools', color: NAVY },
+  { name: 'Training', sub: 'by Mindy’s team', color: NAVY },
+  { name: 'Your AI', sub: 'in your environment', color: NAVY },
   { name: 'Bids', sub: 'drafts your team ships', color: OK },
   { name: 'Outcomes', sub: 'edits, debriefs, awards', color: OK },
 ];
@@ -138,7 +138,7 @@ function TrainingLoop() {
   const angle = (i: number) => -Math.PI / 2 + (i * 2 * Math.PI) / n;
   const at = (a: number) => [c + r * Math.cos(a), c + r * Math.sin(a)] as const;
   return (
-    <svg viewBox="0 0 560 560" role="img" aria-label="Training loop: your work, evals, training, your Mindy, bids, outcomes, and back to your work" className="h-auto w-full max-w-[540px]">
+    <svg viewBox="0 0 560 560" role="img" aria-label="Training loop: your work, evals, training, your AI, bids, outcomes, and back to your work" className="h-auto w-full max-w-[540px]">
       <defs>
         <marker id="train-loop-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
           <path d="M0 0L10 5L0 10z" fill={NAVY} />
@@ -193,10 +193,10 @@ export default function EnterpriseTrain() {
             <div className="grid gap-5">
               <p className={kicker}>Mindy Enterprise · Pilot program</p>
               <h1 id="hero-h" className={`${serifH} text-[40px] sm:text-[56px] lg:text-[66px]`}>
-                Train Mindy on <em className="italic text-(--mp-navy)">how your company wins</em>
+                Your own AI, <em className="italic text-(--mp-navy)">trained to win federal work</em>
               </h1>
               <p className="max-w-[31em] text-[19px] leading-relaxed">
-                We turn your past proposals, debriefs and win history into a version of Mindy built for your company. Then we measure it against the results you need: compliant volumes, stronger evaluator scores and more wins.
+                We train an AI model on your proposals, debriefs and win history plus Mindy’s federal market data, and deploy it in your own systems. You own it, and it is measured on the results you need: compliant volumes, stronger evaluator scores and more wins.
               </p>
               <div className="flex flex-wrap gap-3">
                 <a href={CONTACT} className={btnPrimary}>Talk to sales</a>
@@ -214,7 +214,7 @@ export default function EnterpriseTrain() {
           <div className="border-x border-(--mp-line)">
             <div className="grid gap-4 border-b border-(--mp-line) px-6 pb-10 pt-20 lg:px-12">
               <p className={kicker}>| · How training works · |</p>
-              <h2 id="proc-h" className={`${serifH} max-w-[16em] text-[32px] sm:text-[44px]`}>General AI knows contracting. Yours should know your company.</h2>
+              <h2 id="proc-h" className={`${serifH} max-w-[16em] text-[32px] sm:text-[44px]`}>General AI can’t get you these results. A model trained on your work can.</h2>
             </div>
             <div className="grid border-b border-(--mp-line) lg:grid-cols-2">
               <ol className="m-0 list-none p-0 lg:border-r lg:border-(--mp-line)">
@@ -243,10 +243,10 @@ export default function EnterpriseTrain() {
               <div className="grid gap-5">
                 <p className="font-(family-name:--mp-font-mono) text-[12px] font-medium uppercase tracking-[0.12em] text-white/70">Measured on your results</p>
                 <h2 id="eval-h" className="text-balance font-(family-name:--mp-font-serif) text-[32px] font-normal leading-[1.08] tracking-[-0.025em] text-white sm:text-[46px]">Scored on your wins, not a public benchmark</h2>
-                <p className="max-w-[32em] text-[17px] leading-relaxed text-white/80">A model is only better if it is better at your work. Every training round is checked against your own eval set, and you see the scorecard before anything reaches your team.</p>
+                <p className="max-w-[32em] text-[17px] leading-relaxed text-white/80">A model is only better if it is better at your work. Every training round of your model is checked against your own eval set, and you see the scorecard before it reaches your team.</p>
                 <div><a href={CONTACT} className="inline-flex items-center justify-center rounded-none bg-white px-5 py-3 text-[15px] font-semibold text-(--mp-navy) hover:bg-(--mp-wash)">Talk to sales</a></div>
               </div>
-              <figure aria-label="Illustrative eval scorecard comparing a general AI draft with a trained Mindy draft" className="m-0 min-w-0 border border-white/20 bg-white/5">
+              <figure aria-label="Illustrative eval scorecard comparing a general AI draft with your trained model's draft" className="m-0 min-w-0 border border-white/20 bg-white/5">
                 <div className="flex justify-between border-b border-white/20 px-4 py-2.5 font-(family-name:--mp-font-mono) text-[12px] text-white/70">
                   <span>Eval set · past proposals</span>
                   <span>Illustrative</span>
@@ -254,7 +254,7 @@ export default function EnterpriseTrain() {
                 <div className="grid gap-[18px] p-5">
                   <div className="flex flex-wrap gap-5 text-[13px] text-white/75">
                     <span className="inline-flex items-center gap-2"><i className="inline-block size-3 bg-white/35" />General AI draft</span>
-                    <span className="inline-flex items-center gap-2"><i className="inline-block size-3 bg-white" />Your trained Mindy</span>
+                    <span className="inline-flex items-center gap-2"><i className="inline-block size-3 bg-white" />Your trained model</span>
                   </div>
                   {SCORECARD.map((m) => (
                     <div key={m.label} className="grid gap-2 text-[14px] text-white/85">
@@ -270,9 +270,9 @@ export default function EnterpriseTrain() {
             </div>
             <div className="grid border-t border-white/20 md:grid-cols-3">
               {[
-                ['Yours', 'Trained only on your data, used only for your company'],
+                ['Yours', 'You own the model. Trained on your data, for your company only'],
+                ['In your system', 'Deployed in your environment, under your control'],
                 ['Measured', 'Every round scored on your past wins before release'],
-                ['Improving', 'Each bid’s outcome feeds the next training round'],
               ].map(([big, small]) => (
                 <div key={big} className="grid gap-2 border-b border-white/20 px-6 py-8 last:border-b-0 md:border-b-0 md:border-r md:last:border-r-0 lg:px-16 lg:py-10">
                   <strong className="font-(family-name:--mp-font-serif) text-[40px] font-normal leading-none tracking-[-0.03em] text-white">{big}</strong>
@@ -291,7 +291,7 @@ export default function EnterpriseTrain() {
           <div className="grid gap-7 border-x border-(--mp-line) pb-6 pt-22">
             <div className="grid gap-4 px-6 lg:px-12">
               <p className={kicker}>| · What we train on · |</p>
-              <h2 id="sources-h" className={`${serifH} max-w-[15em] text-[32px] sm:text-[44px]`}>The knowledge that wins your bids, captured</h2>
+              <h2 id="sources-h" className={`${serifH} max-w-[15em] text-[32px] sm:text-[44px]`}>What your model learns from</h2>
             </div>
             <div className="mx-4 grid border-l border-t border-(--mp-line) md:grid-cols-2 lg:mx-12">
               {SOURCES.map((s) => (
@@ -311,7 +311,7 @@ export default function EnterpriseTrain() {
           <div className="grid gap-7 border-x border-(--mp-line) pb-4 pt-6">
             <div className="grid gap-4 px-6 lg:px-12">
               <p className={kicker}>| · Where the program is today · |</p>
-              <h2 id="now-h" className={`${serifH} max-w-[16em] text-[32px] sm:text-[44px]`}>Start with what works now. Train as your data grows.</h2>
+              <h2 id="now-h" className={`${serifH} max-w-[16em] text-[32px] sm:text-[44px]`}>Start with Mindy today. Get your own model as your data grows.</h2>
             </div>
             <div className="mx-4 grid border-l border-t border-(--mp-line) lg:mx-12 lg:grid-cols-3">
               {STATUS.map((s) => (
@@ -338,7 +338,7 @@ export default function EnterpriseTrain() {
       <section aria-labelledby="close-h" className="mt-16 border-t border-(--mp-line)">
         <div className="mx-auto max-w-[1200px] px-6">
           <div className="grid justify-items-center gap-5 border-x border-(--mp-line) px-6 py-24 text-center lg:py-28">
-            <h2 id="close-h" className={`${serifH} max-w-[14em] text-[34px] sm:text-[52px]`}>Train a Mindy for your company</h2>
+            <h2 id="close-h" className={`${serifH} max-w-[14em] text-[34px] sm:text-[52px]`}>Get your own AI, trained to win</h2>
             <p className="max-w-[30em] text-[18px] text-(--mp-muted)">Mindy Enterprise is onboarding pilot teams. Tell us your team size and how many proposals you submit a year.</p>
             <a href={CONTACT} className={btnPrimary}>Talk to sales</a>
             <p className="font-(family-name:--mp-font-mono) text-[12px] text-(--mp-muted)">admin@getmindy.ai · typically replies within a business day</p>
