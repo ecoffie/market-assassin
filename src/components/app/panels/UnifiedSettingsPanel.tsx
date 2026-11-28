@@ -40,6 +40,9 @@ interface UnifiedSettingsPanelProps {
   tier: AppTier;
   /** Deep link (/app?panel=settings&section=…) — opens the tab holding that card and scrolls to it. */
   initialSection?: SettingsSection;
+  /** The navigation context that carried initialSection. A NEW object re-applies it, so asking for a section while
+   *  Settings is already open (sidebar, Ask Mindy) jumps there even when the section is the same as last time. */
+  sectionRequest?: unknown;
 }
 
 interface SettingsForm {
@@ -61,16 +64,25 @@ interface SettingsForm {
   alert_mode: AlertMode;
 }
 
-export default function UnifiedSettingsPanel({ email, tier, initialSection }: UnifiedSettingsPanelProps) {
+export default function UnifiedSettingsPanel({ email, tier, initialSection, sectionRequest }: UnifiedSettingsPanelProps) {
   useScrollToAnchor(initialSection ? SETTINGS_SECTION_ANCHORS[initialSection] : null);
   // Which tab is open. A deep link's ?section= picks it; if the panel is re-rendered with a
   // different deep link, follow it (render-time sync, no effect).
   const [tab, setTab] = useState<SettingsTab>(() => tabForSection(initialSection));
-  const [tabFor, setTabFor] = useState(initialSection);
-  if (tabFor !== initialSection) {
-    setTabFor(initialSection);
+  const [tabFor, setTabFor] = useState<{ section: SettingsSection | undefined; request: unknown }>({ section: initialSection, request: sectionRequest });
+  if (tabFor.section !== initialSection || (initialSection && tabFor.request !== sectionRequest)) {
+    setTabFor({ section: initialSection, request: sectionRequest });
     setTab(tabForSection(initialSection));
   }
+  // A repeat request for a section re-scrolls to its card (useScrollToAnchor lands once per mount).
+  const firstRequest = useRef(sectionRequest);
+  useEffect(() => {
+    if (!initialSection || sectionRequest === firstRequest.current || typeof document === 'undefined') return;
+    const anchor = SETTINGS_SECTION_ANCHORS[initialSection];
+    if (!anchor) return;
+    const id = window.setTimeout(() => document.getElementById(anchor)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0);
+    return () => window.clearTimeout(id);
+  }, [initialSection, sectionRequest]);
   // Keep the address bar on the open tab (replaceState — no reload, no history entry).
   const switchTab = useCallback((next: SettingsTab) => {
     setTab(next);

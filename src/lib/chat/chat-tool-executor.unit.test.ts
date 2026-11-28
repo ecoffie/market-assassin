@@ -337,3 +337,23 @@ describe('onResult (Ask Mindy app actions evidence)', () => {
     expect(r3.content).toContain('abc123def');
   });
 });
+
+describe('blockedToolNames: a narrowing deny-list (app actions own saved-search writes, 2026-11-28)', () => {
+  const blockedExec = () => createChatToolExecutor({
+    userEmail: 'u@example.com', chatSessionId: '11111111-2222-3333-4444-555555555555', tier0,
+    deps: { runMcpTool, logCall }, blockedToolNames: new Set(['schedule_market_search', 'update_market_schedule']),
+  });
+  it('deny-listed tools are not offered; everything else is unchanged', () => {
+    const names = blockedExec().offeredToolDefs().map((d) => String(d.function.name));
+    expect(names).not.toContain('schedule_market_search');
+    expect(names).not.toContain('update_market_schedule');
+    expect(names).toContain('get_expiring_contracts');
+    expect(names).toContain('get_my_pipeline');
+  });
+  it('a model that calls one anyway is refused before dispatch, and nothing is written', async () => {
+    const [r] = await blockedExec().executeRound([call('update_market_schedule', { schedule_id: 'ss_1', cadence: 'daily' })], planner);
+    expect(runMcpTool).not.toHaveBeenCalled();
+    expect(r.record.status).toBe('blocked_policy');
+    expect(r.record.error_category).toBe('not_offered_here');
+  });
+});
