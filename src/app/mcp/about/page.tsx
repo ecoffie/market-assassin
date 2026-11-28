@@ -19,7 +19,7 @@ export const metadata: Metadata = {
   alternates: { canonical: '/mcp/about' },
   title: 'What is Mindy MCP? — Federal contracting intelligence for your AI agent',
   description:
-    'Plug real federal-contracting intelligence into Claude, Cursor, ChatGPT, or any agent you build — grounded in SAM.gov, USASpending, SEC EDGAR, GSA CALC, and 8 years of proprietary GovCon data, with a contract that never fabricates.',
+    'Plug real federal-contracting intelligence into Claude, Cursor, ChatGPT, or any agent you build — grounded in SAM.gov, USASpending, SEC EDGAR, GSA CALC, and proprietary GovCon Giants coaching data, with a contract that never fabricates.',
 };
 
 // The four tool layers — the marketing distillation of the 53-tool catalog. Each row's tools are
@@ -62,7 +62,7 @@ const LAYERS: { k: string; title: string; blurb: string; tools: { n: string; d: 
   {
     k: '04',
     title: 'Proprietary & proposal',
-    blurb: 'The moat — 8 years of GovCon coaching no public API holds, plus a full stateless bid loop: bid/no-bid → compliance matrix → draft → independent referee.',
+    blurb: 'The moat — GovCon coaching no public API holds, plus a full stateless bid loop: bid/no-bid → compliance matrix → draft → independent referee.',
     tools: [
       { n: 'evaluate_bid_decision', d: 'The 5-gate / 10-factor bid/no-bid, scored' },
       { n: 'extract_compliance_matrix', d: 'Every shall/must + Section L/M/C requirement' },
@@ -238,7 +238,7 @@ export default function McpAboutPage() {
         </section>
 
         <footer className="mt-20 border-t border-(--mp-line) pt-6 text-center text-[11px] text-(--mp-muted)">
-          Mindy MCP · grounded in SAM.gov, USASpending, SEC EDGAR, GSA CALC, Federal Register + 8 years of GovCon Giants data · GovCon Giants AI
+          Mindy MCP · grounded in SAM.gov, USASpending, SEC EDGAR, GSA CALC, Federal Register + GovCon Giants data · GovCon Giants AI
         </footer>
       </div>
     </main>

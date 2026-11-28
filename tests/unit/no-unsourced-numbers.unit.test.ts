@@ -19,14 +19,11 @@ import { join } from 'node:path';
 const SURFACES: Record<string, Array<[claim: string, reason: string]>> = {
   'src/app/page.tsx': [],
   'src/app/mindy-landing/page.tsx': [
-    ['9,900+', 'claim about Mindy’s own users (GovCon Giants): held for Eric’s decision'],
     ['$1,490', 'price (c): matches src/lib/mcp/packages.ts'],
     ['$1,788', 'price (c): twelve monthly Pro payments, the annual comparison'],
   ],
   'src/app/mindy-day/confirmed/page.tsx': [],
   'src/app/home-redesign/page.tsx': [
-    ['$50M', 'GovCon Giants client award total: held for Eric’s decision'],
-    ['2,000+', 'GovCon Giants students trained: held for Eric’s decision'],
     ['5+', 'product deliverable (matched opportunities in the workshop), not a stat'],
     ['100%', '"100% Free Access": an offer term, not a stat'],
   ],
@@ -78,7 +75,7 @@ const SURFACES: Record<string, Array<[claim: string, reason: string]>> = {
   'src/app/glossary/[slug]/page.tsx': [],
   'src/app/glossary/page.tsx': [],
   'src/app/lifetime/page.tsx': [
-    ['$4,997', 'legacy course price (GovCon Giants offer): held for Eric’s decision'],
+    ['$4,997', 'price (c): the Founders Lifetime offer price itself'],
     ['$1,490', 'price (c): matches src/lib/mcp/packages.ts'],
   ],
   'src/app/mcp/about/page.tsx': [],
@@ -160,6 +157,14 @@ describe('no unsourced numbers on swept customer-facing surfaces', () => {
     const agency = readFileSync(join(process.cwd(), 'src/app/agencies/[slug]/page.tsx'), 'utf8');
     expect(agency).not.toMatch(/\bCVE verified\b/);
     expect(agency).toContain('veterans.certify.sba.gov');
+  });
+
+  it('no claims about GovCon Giants or Eric on these pages (Eric, 2026-11-28: "remove the GovCon Giants claims too")', () => {
+    const read = (f: string) => readFileSync(join(process.cwd(), f), 'utf8');
+    expect(read('src/app/home-redesign/page.tsx')).not.toMatch(/Awards Won|Students Trained/);
+    expect(read('src/app/mindy-landing/page.tsx')).not.toMatch(/contractors using Mindy|9,900/);
+    expect(read('src/app/mcp/about/page.tsx')).not.toMatch(/\b\d+ years of\b/);
+    expect(read('src/app/lifetime/page.tsx')).not.toMatch(/legacy course|paid \$4,997|lifetime course access cost|stay longer/);
   });
 
   it('corpus counts on these pages come from marketing-stats.ts, not hand-typed', () => {

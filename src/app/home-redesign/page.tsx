@@ -65,17 +65,6 @@ export default function HomeRedesign() {
             </a>
           </div>
 
-          {/* Stats */}
-          <div className="flex flex-wrap justify-center gap-8 mt-16">
-            <div className="bg-emerald-900/50 border border-emerald-700/50 text-white px-8 py-4 rounded-2xl">
-              <span className="text-3xl font-bold text-emerald-400">$50M</span>
-              <span className="ml-2 text-emerald-300">in Awards Won</span>
-            </div>
-            <div className="bg-emerald-900/50 border border-emerald-700/50 text-white px-8 py-4 rounded-2xl">
-              <span className="text-3xl font-bold text-emerald-400">2,000+</span>
-              <span className="ml-2 text-emerald-300">Students Trained</span>
-            </div>
-          </div>
         </div>
       </section>
 
