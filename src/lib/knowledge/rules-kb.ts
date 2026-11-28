@@ -26,7 +26,9 @@ export type LegalStatus =
   | 'regulation'
   | 'practice'
   /** A verified fact about the market (a consortium is issuing calls), not a rule. Fix 1C register rows. */
-  | 'operational_fact';
+  | 'operational_fact'
+  /** A figure published by an official statistical/analytical source (e.g. CRS analysis of SAM.gov data). Part E. */
+  | 'official_statistic';
 
 export type SourceKind = 'official' | 'official_mirror' | 'secondary' | 'consortium_primary';
 export type RegisterStatus = 'current' | 'superseded' | 'unverified' | 'pending';
@@ -49,7 +51,8 @@ export interface RuleEntry {
   claim_id: string; // "KB-1" … "KB-16"
   entry_no: number;
   /** A/B/C = the rules file's parts; D = Fix 1C verification rows (consortia, 2808a). */
-  part: 'A' | 'B' | 'C' | 'D';
+  /** E = official statistics (docs/knowledge/official-statistics-*.json). */
+  part: 'A' | 'B' | 'C' | 'D' | 'E';
   /** The entry heading, verbatim (minus the "[Not fully verified]" tag). One sentence a report can carry. */
   claim: string;
   change: string | null;
@@ -91,6 +94,8 @@ export const RECHECK_DAYS: Record<LegalStatus, number> = {
   // reports such a claim as stale (→ "Not currently confirmed.") unless it was re-verified the same day. Intended.
   // Follow-up (not built): a recheck job that re-verifies these rows before a report runs.
   operational_fact: 0,
+  // Annual data (fiscal-year figures, refreshed when the source publishes a new year).
+  official_statistic: 365,
   statute: 365,
   final_rule: 365,
   regulation: 365,
@@ -430,6 +435,57 @@ export function buildVerificationRows(file: VerificationFile): RegisterRow[] {
       notes: v.notes,
       kb_doc: file.doc,
       search_text: [v.claim_id, v.claim, v.name, v.short, v.notes, ...v.sources.map((s) => s.evidence)].filter(Boolean).join('\n'),
+    };
+  });
+}
+
+// ── Official statistics (part E) ────────────────────────────────────────────────────────────────
+
+export interface StatisticFile {
+  doc: string;
+  checked_on: string | null;
+  rows: Array<{
+    claim_id: string; short: string; name: string; claim: string; keywords: string[]; interval?: number;
+    sources: Array<{ url: string; kind: SourceKind; label: string; fetch_status: 'ok' | 'fetch_failed' | null; passage: string | null; fetched_at: string | null; fetch_error: string | null }>;
+    notes: string | null;
+  }>;
+}
+
+/**
+ * Register rows for official statistics. verified ONLY when every official source's passage was fetched (fetch_status
+ * 'ok' with a passage); otherwise the row is unverified and reads "Not currently confirmed" in a report. The claim text
+ * is dateless; the statistic's fiscal year is part of the claim, and the source's period lives in the passage.
+ */
+export function buildStatisticRows(file: StatisticFile): RegisterRow[] {
+  return file.rows.map((v, i) => {
+    const sources = v.sources.map((src) => ({
+      url: src.url, kind: src.kind,
+      fetch_status: (src.fetch_status ?? 'fetch_failed') as 'ok' | 'fetch_failed',
+      passage: src.passage, fetched_from: src.url, fetched_at: src.fetched_at,
+      fetch_error: src.fetch_status ? src.fetch_error : 'not fetched',
+    }));
+    const verified = sources.length > 0 && sources.every((x) => x.kind === 'secondary' || (x.fetch_status === 'ok' && !!x.passage));
+    return {
+      claim_id: v.claim_id,
+      entry_no: 200 + i + 1,
+      part: 'E' as const,
+      claim: v.claim,
+      change: null, source_text: v.sources.map((x) => `${x.label}: ${x.url}`).join(' ; '), status_text: null,
+      affects: null, common_mistake: null, how_to_use: null, practice_text: null,
+      keywords: v.keywords,
+      sources,
+      legal_status: 'official_statistic' as const,
+      effective_date: null,
+      verified,
+      caveats: verified ? [] : ['[Not fully verified: the official passage was not fetched.]'],
+      recheck_interval_days: v.interval ?? RECHECK_DAYS.official_statistic,
+      status: verified ? 'current' as const : 'unverified' as const,
+      verified_on: file.checked_on ?? RULES_KB_CHECKED_ON,
+      supersedes: null,
+      superseded_by: null,
+      notes: v.notes,
+      kb_doc: file.doc,
+      search_text: [v.claim_id, v.claim, v.name, v.short, v.keywords.join('; '), v.notes, ...sources.map((x) => x.passage)].filter(Boolean).join('\n'),
     };
   });
 }

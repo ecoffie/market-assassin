@@ -21,7 +21,7 @@ async function main() {
   const read = await readRuleRegister(db);
   if (!read.ok) throw new Error(`register unreadable: ${read.error}`);
   let fail = 0;
-  console.log(`rows: ${read.rows.length} (expect 40: 16 rules + 24 Fix 1C rows)`); if (read.rows.length !== 40) fail++;
+  console.log(`rows: ${read.rows.length} (expect 41: 16 rules + 24 Fix 1C rows + 1 official statistic)`); if (read.rows.length !== 41) fail++;
   const missing = read.rows.flatMap((r) => r.sources.filter((s) => s.kind !== 'secondary' && !s.passage).map((s) => `${r.claim_id} ${s.url}`));
   console.log(`official sources without a passage: ${missing.length}`); missing.forEach((m) => console.log(`  ${m}`)); if (missing.length) fail++;
   for (const [q, want] of QUERIES) {
