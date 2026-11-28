@@ -18,6 +18,9 @@ export type ChatInlineReport = { html: string; title: string; url?: string | nul
 /** A packaged market report in a REOPENED conversation: History keeps only its id and title, not the html. */
 export type ChatSavedReport = { id: string; title: string };
 
+/** My Documents: the Vault's Documents section, where generated PDF/Word files are listed (under Generated). */
+export const MY_DOCUMENTS_HREF = '/app?panel=vault&section=documents';
+
 /** Same shape as a stored report id (src/app/reports/[id]/pdf/route.ts). */
 const REPORT_ID_RE = /^[A-Za-z0-9_-]{16,64}$/;
 export function validReportId(id: unknown): id is string {
@@ -91,6 +94,7 @@ export function ChatReportPreview({
   inline,
   savedReport,
   pdfNote,
+  onOpenDocuments,
 }: {
   email: string;
   files?: readonly GeneratedDownloadFile[];
@@ -99,6 +103,8 @@ export function ChatReportPreview({
   savedReport?: ChatSavedReport | null;
   /** Shown under Export when PDF could not be produced. */
   pdfNote?: string | null;
+  /** In-app navigation to My Documents (Vault, Documents section). Without it the link loads that page. */
+  onOpenDocuments?: () => void;
 }) {
   const saved = savedReport && validReportId(savedReport.id) ? savedReport : null;
   const [state, setState] = useState<PreviewState>(
@@ -163,6 +169,17 @@ export function ChatReportPreview({
             Open hosted link
           </a>
         ) : null}
+        {!!files?.length && (
+          // A document Mindy saved: always say where it lives, even when the preview cannot load.
+          <a
+            href={MY_DOCUMENTS_HREF}
+            onClick={onOpenDocuments ? (e) => { e.preventDefault(); onOpenDocuments(); } : undefined}
+            className="text-[12px] text-sky-300 hover:underline"
+            data-testid="chat-report-my-documents"
+          >
+            Saved to My Documents
+          </a>
+        )}
         {!!files?.length && (
           <GeneratedDownloadChips email={email} files={[...files]} pdfNote={pdfNote} />
         )}

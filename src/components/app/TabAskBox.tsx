@@ -9,10 +9,14 @@
  * resolves to how many rows came back (`null` = unknown — shown as unavailable, never 0). The box then
  * shows one line saying what Mindy searched, with Clear. A question the tab's filters cannot express is
  * never guessed at: the box shows why and offers "Ask Mindy in chat instead".
+ *
+ * Shown IN PLACE from the floating Ask Mindy button (owner, 2026-11-27): no bar across the top of the
+ * tab. The box stays mounted (so the question and its Clear survive closing it) but is hidden until
+ * the button sends TAB_ASK_TOGGLE_EVENT; then it floats just above the button. Escape or × closes it.
  */
-import { useId, useState, type FormEvent } from 'react';
+import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
 import { Sparkles, X, MessageCircle } from 'lucide-react';
-import { handOffToChat, parseTabAsk, type ParsedTabAsk, type TabAskAdapter, type TabAskCount } from '@/lib/app/tab-ask';
+import { handOffToChat, parseTabAsk, registerTabAskBox, TAB_ASK_TOGGLE_EVENT, type ParsedTabAsk, type TabAskAdapter, type TabAskCount } from '@/lib/app/tab-ask';
 
 export interface TabAskBoxProps<P> {
   adapter: TabAskAdapter<P>;
@@ -34,6 +38,22 @@ export default function TabAskBox<P>({ adapter, onAsk, onClear, onAskInChat = ha
   const inputId = useId();
   const [text, setText] = useState('');
   const [state, setState] = useState<State>({ kind: 'idle' });
+  const [open, setOpen] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => registerTabAskBox(), []);
+  useEffect(() => {
+    const toggle = () => setOpen((o) => !o);
+    window.addEventListener(TAB_ASK_TOGGLE_EVENT, toggle);
+    return () => window.removeEventListener(TAB_ASK_TOGGLE_EVENT, toggle);
+  }, []);
+  useEffect(() => {
+    if (!open) return;
+    inputRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [open]);
 
   async function ask(question: string) {
     const parsed = parseTabAsk(question, adapter.tabWords);
@@ -65,14 +85,29 @@ export default function TabAskBox<P>({ adapter, onAsk, onClear, onAskInChat = ha
       aria-label="Ask Mindy about this list"
       data-testid="tab-ask"
       data-tab={adapter.tab}
-      className="bg-ground border border-surface rounded-xl p-4 space-y-3"
+      data-open={open ? 'true' : 'false'}
+      hidden={!open}
+      className="fixed z-50 left-4 right-4 bottom-20 md:left-auto md:right-5 md:w-[440px] max-h-[70vh] overflow-auto bg-ground border border-surface rounded-xl p-4 space-y-3 shadow-2xl shadow-black/40"
     >
+      <div className="flex items-center justify-between">
+        <p className="text-sm font-semibold text-white">Ask Mindy about this page</p>
+        <button
+          type="button"
+          data-testid="tab-ask-close"
+          onClick={() => setOpen(false)}
+          aria-label="Close Ask Mindy"
+          className="rounded-full p-1 text-muted hover:text-white"
+        >
+          <X className="h-4 w-4" aria-hidden="true" />
+        </button>
+      </div>
       <form role="search" onSubmit={submit} className="flex flex-col sm:flex-row gap-2">
         <label htmlFor={inputId} className="sr-only">Ask Mindy</label>
         <div className="relative flex-1 min-w-0">
           <Sparkles className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-amber-300 pointer-events-none" aria-hidden="true" />
           <input
             id={inputId}
+            ref={inputRef}
             data-testid="tab-ask-input"
             type="text"
             value={text}

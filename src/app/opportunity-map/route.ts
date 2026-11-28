@@ -10990,6 +10990,7 @@ const ASK_MINDY_CSS =
   + '.amk-repbtn{flex:none;border:1px solid #bcd3fb;background:#eaf1fe;color:#1d4ed8;font:600 11.5px Inter,system-ui,sans-serif;border-radius:8px;padding:5px 10px;cursor:pointer;align-self:flex-start}'
   + '.amk-repcard{margin-top:9px;border:1px solid #d3e2fc;background:#f5f9ff;border-radius:10px;padding:10px 12px;display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px}'
   + '.amk-repcard-t{flex:1;min-width:150px;display:flex;flex-direction:column}.amk-repcard-t b{font:700 13px Inter,system-ui,sans-serif;color:#111c26;overflow-wrap:anywhere}.amk-repcard-t span{font:500 11.5px Inter,system-ui,sans-serif;color:#64748b}'
+  + '.amk-repcard-docs{color:#1d4ed8;font-weight:600;text-decoration:none}.amk-repcard-docs:hover{text-decoration:underline}@media(prefers-color-scheme:dark){.amk-repcard-docs{color:#93c5fd}}'
   + '.amk-repcard-open{flex:none;border:0;background:#2563eb;color:#fff;font:700 12px Inter,system-ui,sans-serif;border-radius:8px;padding:7px 12px;cursor:pointer}'
   + '@media(prefers-color-scheme:dark){.amk-repcard{background:#0d141d;border-color:#202b39}.amk-repcard-t b{color:#eaf1f8}}'
   + '.amk-up{text-align:center;padding:30px 20px}.amk-up h4{font:800 16px Inter;margin:0 0 6px;color:#111c26}.amk-up p{font:500 13px Inter;color:#6b7787;margin:0 0 14px}'
@@ -11896,7 +11897,12 @@ const ASK_MINDY_JS = `<script>(function(){
     var w=document.createElement('div'); w.className='amk-repcard'; w.setAttribute('data-testid','amk-report-card');
     w.innerHTML='<div class="amk-repcard-t"><b></b><span></span></div><button type="button" class="amk-repcard-open">Open document</button>';
     w.querySelector('b').textContent=(prim.file_name||'Your report').replace(/[.](pdf|docx|xlsx|csv)$/i,'');
-    w.querySelector('span').textContent='Version '+(ver||1)+' - saved to your Vault';
+    w.querySelector('span').textContent='Version '+(ver||1)+' - ';
+    // Where the file lives, in the full workspace (Eric, 2026-11-27). A new tab, like the Map's other /app
+    // handoffs, so this Map session and its open conversation stay as they are.
+    var docs=document.createElement('a'); docs.className='amk-repcard-docs'; docs.setAttribute('data-testid','amk-report-my-documents');
+    docs.href='/app?panel=vault&section=documents'; docs.target='_blank'; docs.rel='noopener'; docs.textContent='Saved to My Documents';
+    w.querySelector('span').appendChild(docs);
     w.querySelector('.amk-repcard-open').onclick=function(){ repOpen(id); };
     aEl.appendChild(w); body.scrollTop=body.scrollHeight;
     return id;

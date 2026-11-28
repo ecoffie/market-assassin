@@ -17,6 +17,7 @@
  *  - Exit-strategy brand rule: we do NOT expose usage_rights / owner identity
  *    ("eric_owned"); the corpus is presented as "GovCon Giants curriculum".
  */
+import { canBrowseKnowledgeBase } from '@/lib/knowledge-base/access';
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchAllPaged } from '@/lib/supabase/paged-read';
 import { createClient } from '@supabase/supabase-js';
@@ -84,6 +85,13 @@ export async function GET(request: NextRequest) {
   const email = url.searchParams.get('email');
   const auth = requireMIAuthSession(request, email);
   if (!auth.ok) return auth.response;
+  // Staff only (Eric, 2026-11-27): the corpus is internal, not customer-facing. A customer gets the same answer as a
+  // route that does not exist.
+  // Only the email the signed session proves, never the ?email= parameter (Agent 4 review, 2026-11-27). No session
+  // email means no staff identity, so the answer is 404.
+  const sessionEmail = (auth.session as { email?: unknown } | undefined)?.email;
+  const who = typeof sessionEmail === 'string' ? sessionEmail : '';
+  if (!canBrowseKnowledgeBase(who)) return NextResponse.json({ success: false, error: 'not found' }, { status: 404 });
 
   const q = (url.searchParams.get('q') || '').trim();
   const docType = (url.searchParams.get('docType') || '').trim();

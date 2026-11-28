@@ -24,7 +24,10 @@ describe('build: every PDF-rendering route can reach a browser on Vercel', () =>
   const cfg = readFileSync(join(process.cwd(), 'next.config.ts'), 'utf8');
   for (const [route, why] of PDF_ROUTES) {
     it(`${route} (${why})`, () => {
-      expect(cfg).toContain(`'${route}': ${CHROMIUM}`);
+      // Chromium must be in the route's list; other files may follow it (the chat route also carries the pdf.js
+      // worker so it can READ Drive/OneDrive PDFs).
+      const head = `'${route}': ${CHROMIUM.slice(0, -1)}`;
+      expect(cfg.includes(`${head}]`) || cfg.includes(`${head},`), route).toBe(true);
     });
   }
 

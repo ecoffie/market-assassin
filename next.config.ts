@@ -17,6 +17,14 @@ import { authAliasRedirects } from "./src/lib/seo/auth-alias-redirects";
  */
 const PROJECT_ROOT = path.dirname(fileURLToPath(import.meta.url));
 
+/** The pdf.js files pdf-parse 2.x loads at runtime (its worker is a dynamic import the tracer cannot see). */
+const CHAT_PDF_WORKER_FILES = [
+  './node_modules/pdfjs-dist/legacy/build/pdf.mjs',
+  './node_modules/pdfjs-dist/legacy/build/pdf.min.mjs',
+  './node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs',
+  './node_modules/pdfjs-dist/legacy/build/pdf.worker.min.mjs',
+];
+
 /**
  * CONFIGURATION NOTES
  * ===================
@@ -110,7 +118,11 @@ const nextConfig: NextConfig = {
     // Fourth browser route: Ask Mindy chat. Research mode calls create_document INSIDE the chat function, so the
     // document's PDF is rendered there (prod 2026-11-27: Word/Excel/CSV saved, "the PDF could not be produced right
     // now"; last Vault PDF Nov 22). Exact key only: the chat sub-routes (documents, uploads...) do not render PDFs.
-    '/api/app/chat': ['./node_modules/@sparticuz/chromium/bin/**/*'],
+    // Chromium renders research-report PDFs. The pdf.js worker lets Ask Mindy READ a PDF picked from Google Drive /
+    // OneDrive: the chat route itself downloads and parses it (src/lib/connected-apps/files.ts → pdf-parse). Without
+    // the worker pdf-parse throws, and the file was reported as "no readable text" (prod, 2026-11-27). Only the
+    // legacy build pdf-parse 2.x loads (~4.5 MB): this route already carries Chromium, so not the 32 MB glob above.
+    '/api/app/chat': ['./node_modules/@sparticuz/chromium/bin/**/*', ...CHAT_PDF_WORKER_FILES],
     // Fifth: the hosted market report's PDF download (src/app/reports/[id]/pdf/route.ts). '*' stands in for
     // the [id] segment (Next matches these keys with picomatch, where brackets are a character class).
     '/reports/*/pdf': ['./node_modules/@sparticuz/chromium/bin/**/*'],

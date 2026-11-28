@@ -65,11 +65,14 @@ describe('question over profile, and no data dates', () => {
     expect(QUESTION_OVER_PROFILE).toMatch(/override the saved profile/);
     expect(QUESTION_OVER_PROFILE).toMatch(/Use the profile only to fill what the question leaves out/);
     expect(QUESTION_OVER_PROFILE).toMatch(/do not use the profile at all and do not mention it in the answer body/);
+    // 2026-11-27 dry run: an attached capability statement is the customer's words in BOTH engines (standard chat
+    // gets this through userProfileBlock; research through RESEARCH_INSTRUCTIONS and ATTACHED_FILES_RULE).
+    expect(QUESTION_OVER_PROFILE).toMatch(/A FILE THE CUSTOMER ATTACHED counts as their words: .* research THAT company, not the saved profile/);
   });
   it('no freshness dates, but opportunity dates stay', () => {
     expect(NO_DATA_DATES).toMatch(/never print how current Mindy's data is/);
     expect(NO_DATA_DATES).toMatch(/response deadlines, contract end dates, registration expiry/);
-    expect(NO_DATA_DATES).toMatch(/defense awards publish about 90 days late/);
+    expect(NO_DATA_DATES).toMatch(/Defense awards are published on USAspending\.gov with a delay of about 90 days \(DoD reporting policy\)/);
   });
 });
 

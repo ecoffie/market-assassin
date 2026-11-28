@@ -78,6 +78,30 @@ describe('ChatReportPreview', () => {
     expect(el.querySelector('[data-testid="chat-report-frame"]')).toBeNull();
   });
 
+  it('a saved document says where it lives: "Saved to My Documents" links to Vault → Documents, even if the preview fails', async () => {
+    fetchMock.mockResolvedValue(json(500, {}));
+    const el = await mount({ email: 'o@x.com', files: [{ format: 'pdf', document_id: PDF }] });
+    const a = el.querySelector('[data-testid="chat-report-my-documents"]') as HTMLAnchorElement;
+    expect(a.textContent).toBe('Saved to My Documents');
+    expect(a.getAttribute('href')).toBe('/app?panel=vault&section=documents');
+  });
+
+  it('with in-app navigation, the link opens My Documents without a page load', async () => {
+    fetchMock.mockResolvedValueOnce(json(200, { success: true, html: RICH_HTML, title: 'T', version: 1 }));
+    const onOpenDocuments = vi.fn();
+    const el = await mount({ email: 'o@x.com', files: [{ format: 'docx', document_id: DOCX }], onOpenDocuments });
+    const a = el.querySelector('[data-testid="chat-report-my-documents"]') as HTMLAnchorElement;
+    const ev = new MouseEvent('click', { bubbles: true, cancelable: true });
+    await act(async () => { a.dispatchEvent(ev); });
+    expect(onOpenDocuments).toHaveBeenCalledTimes(1);
+    expect(ev.defaultPrevented).toBe(true);
+  });
+
+  it('a packaged market report (not a Vault document) has no My Documents link', async () => {
+    const el = await mount({ email: 'o@x.com', inline: { html: RICH_HTML, title: 'Acme', url: null } });
+    expect(el.querySelector('[data-testid="chat-report-my-documents"]')).toBeNull();
+  });
+
   it('a packaged market report renders its inline HTML with no fetch', async () => {
     const el = await mount({ email: 'o@x.com', inline: { html: RICH_HTML, title: 'Acme market report', url: 'https://getmindy.ai/reports/abc' } });
     expect(fetchMock).not.toHaveBeenCalled();

@@ -148,3 +148,12 @@ export function connectedAppsDraftsEnabledFor(email: string | null | undefined, 
   const list = (env.CONNECTED_APPS_DRAFTS_ALLOWLIST || '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
   return list.includes('*') || list.includes(email.trim().toLowerCase());
 }
+
+/**
+ * True only when the grant is KNOWN to lack a capability: the provider listed its scopes and the capability's
+ * scopes are not among them. An empty list means the provider did not say, which is unknown, not missing, and never
+ * blocks (the provider's own 403 is still caught and explained).
+ */
+export function lacksCapability(provider: Provider, granted: readonly string[] | null | undefined, cap: Exclude<Capability, 'identity'>): boolean {
+  return !!granted && granted.length > 0 && !hasCapability(provider, granted, cap);
+}

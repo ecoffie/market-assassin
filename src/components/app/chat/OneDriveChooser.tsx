@@ -6,7 +6,7 @@
  * can read are listed. Picking a file exchanges it for a signed file handle (POST /selections), exactly like a
  * Google Picker pick. The Microsoft token never reaches the browser.
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, useRef } from 'react';
 import { ChevronRight, FileText, Folder, Loader2, Search, X } from 'lucide-react';
 import { authedFetch } from '../authHeaders';
 import type { ConnectedFile } from './ConnectedFiles';
@@ -18,16 +18,22 @@ const ERR: Record<string, string> = {
   reauth_needed: 'Please reconnect OneDrive, then try again.',
   unsupported_type: 'Mindy can read PDF, Word, Excel and text files.',
   too_large: 'That file is larger than 15 MB.',
-  no_access: 'Mindy no longer has access to that OneDrive. Please reconnect it.',
+  no_access: 'Mindy does not have permission to open files in this OneDrive. Reconnect it to allow file access.',
+  file_permission_needed: 'Mindy does not have permission to open files in this OneDrive. Reconnect it to allow file access.',
 };
 
-export function OneDriveChooser({ email, connectionId, account, onPicked, onClose }: {
+export function OneDriveChooser({ email, connectionId, account, onPicked, onClose, onNoFileAccess }: {
   email: string;
   connectionId: string;
   account: string;
   onPicked: (f: ConnectedFile) => void;
   onClose: () => void;
+  /** The grant cannot read files (403): the parent offers "Reconnect to allow file access" instead of the chooser. */
+  onNoFileAccess?: () => void;
 }) {
+  // A ref, so the parent's inline callback never re-triggers the listing effect.
+  const noAccessRef = useRef(onNoFileAccess);
+  noAccessRef.current = onNoFileAccess;
   const [path, setPath] = useState<Crumb[]>([{ id: null, name: 'My files' }]);
   const [query, setQuery] = useState('');
   const [activeQuery, setActiveQuery] = useState('');
@@ -48,7 +54,12 @@ export function OneDriveChooser({ email, connectionId, account, onPicked, onClos
         const res = await post('/api/app/connected-apps/browse', activeQuery ? { q: activeQuery } : folder.id ? { folder_id: folder.id } : {});
         const j = await res.json().catch(() => ({}));
         if (cancelled) return;
-        if (!res.ok) { setItems([]); setError(ERR[j.error] || 'OneDrive did not respond. Please try again.'); return; }
+        if (!res.ok) {
+          setItems([]);
+          if (j.error === 'file_permission_needed' || j.error === 'no_access') { noAccessRef.current?.(); }
+          setError(ERR[j.error] || 'OneDrive did not respond. Please try again.');
+          return;
+        }
         setItems(j.items || []);
       } finally { if (!cancelled) setLoading(false); }
     })();
@@ -60,7 +71,11 @@ export function OneDriveChooser({ email, connectionId, account, onPicked, onClos
     try {
       const res = await post('/api/app/connected-apps/selections', { file_id: e.id });
       const j = await res.json().catch(() => ({}));
-      if (!res.ok || !j.file_handle) { setError(ERR[j.error] || 'That file could not be used.'); return; }
+      if (!res.ok || !j.file_handle) {
+        if (j.error === 'file_permission_needed' || j.error === 'no_access') { noAccessRef.current?.(); }
+        setError(ERR[j.error] || 'That file could not be used.');
+        return;
+      }
       onPicked({ handle: j.file_handle, name: j.file?.name || e.name, provider: 'microsoft' });
       onClose();
     } finally { setLoading(false); }

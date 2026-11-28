@@ -650,6 +650,7 @@ function AppDashboard() {
     if (panel === 'research' && context?.keyword) {
       params.set('keyword', String(context.keyword));
     }
+    if (panel === 'vault' && typeof context?.section === 'string') params.set('section', context.section);
     const qs = params.toString();
     window.history.replaceState(null, '', qs ? `/app?${qs}` : '/app');
   }, []);

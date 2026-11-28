@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectedAppsGate } from '@/lib/connected-apps/route-gate';
 import { accessTokenFor } from '@/lib/connected-apps/store';
+import { lacksCapability } from '@/lib/connected-apps/config';
 import { assertReadable, fetchFileMeta, FileReadError, FILE_HANDLE_TTL_SEC, signFileHandle } from '@/lib/connected-apps/files';
 
 export async function POST(request: NextRequest) {
@@ -21,6 +22,9 @@ export async function POST(request: NextRequest) {
 
   const tok = await accessTokenFor(g.scopeKey, g.email, connectionId);
   if (!tok.ok) return NextResponse.json({ error: tok.reason }, { status: tok.reason === 'not_found' ? 404 : tok.reason === 'refresh_failed' ? 502 : 409 });
+  // Without the file permission the provider answers 403 (for Google, a raw Google error page inside the picker).
+  // Say what to do instead: reconnect and allow file access.
+  if (lacksCapability(tok.provider, tok.connection.granted_scopes, 'file')) return NextResponse.json({ error: 'file_permission_needed' }, { status: 403 });
   try {
     const meta = await fetchFileMeta(tok.provider, tok.token, fileId);
     assertReadable(meta);
@@ -33,6 +37,6 @@ export async function POST(request: NextRequest) {
   } catch (err) {
     const code = err instanceof FileReadError ? err.code : 'provider_error';
     const status = code === 'not_found' ? 404 : code === 'no_access' ? 403 : code === 'too_large' ? 413 : code === 'unsupported_type' ? 415 : 502;
-    return NextResponse.json({ error: code }, { status });
+    return NextResponse.json({ error: code === 'no_access' ? 'file_permission_needed' : code }, { status });
   }
 }

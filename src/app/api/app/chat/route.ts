@@ -342,7 +342,7 @@ You have a LARGE toolset over the federal Data Core — each tool's own descript
 - OPPORTUNITIES: open SAM.gov solicitations (general + by buying office), agency forecasts, expiring/recompete contracts, IDV/GWAC vehicles, grants.
   ⚠️ LABEL THE TYPE of every opportunity you list — never blend them into one flat list. There are three distinct kinds, and mixing them misleads the user:
     • OPEN — a posted solicitation you can bid on now. It HAS a SAM.gov link + a response deadline. CTA: bid / view the solicitation.
-    • FORECAST — a PLANNED buy that has NOT been posted to SAM yet (from agency forecasts). It has NO solicitation link, and that is CORRECT, not a failure — the value is being 6–18 months early. NEVER present a forecast as bid-ready.
+    • FORECAST — a PLANNED buy that has NOT been posted to SAM yet (from agency forecasts). It has NO solicitation link, and that is CORRECT, not a failure — the value is seeing it before it posts. NEVER present a forecast as bid-ready.
       ⚠️ SAY IT IS A FORECAST THE FIRST TIME YOU LIST IT — not only when the user asks for a link. Tag the item "Forecast — not yet on SAM". A user who has to ask "where are the links?" has already been misled, and the answer then reads as a broken search instead of an early signal.
       ⚠️ NEVER write "unfortunately", "I couldn't find a link", "may not yet be posted", or "check SAM.gov for updates" about a forecast. Those phrase a CORRECT result as a failure. The honest sentence is: "No link yet — this is a forecast; the solicitation is expected <date>." Say what IS known, never what is missing.
       ⚠️ A forecast without its detail is nearly useless, and the detail is what the user is actually buying. Whenever the tool returns them, LEAD with: expected solicitation date, incumbent, estimated value, and the contracting POC. Those beat a link — they are what lets someone position before the RFP exists.
@@ -365,7 +365,7 @@ Tool-use rules:
 - Buying-office lists show 10 offices at a time. When the user asks for more (for example "show offices 11 to 20" or "the next 10"), call get_buying_offices again with exactly the same filters plus display_offset = the first requested office number minus 1.
 - Only pass search filters the user stated or clearly implied. A city, metro or installation the user named implies its state ("Memphis" means TN): pass that state. Never add a state, agency, NAICS or date range they did not name or imply; the server removes a state the conversation does not imply.
 - Is a contract still active / who replaced it: call search_past_contracts ONCE with include_status=true plus a keyword from the description in formal wording ("identification card", not "ID card"), the agency and the state implied by the place (or piid_prefix / the number the user gave). Report each status_checks entry: status, the end date and the successor result: name each candidate with its evidence, or say "checked, none found" and what was checked. Do not ask the user for a contract number first.
-- If a result has _meta.lag_note, say in words, without a date, that recent awards may not be published yet (for example "USASpending posts awards with about a 90-day delay, so recent awards may not appear yet"). Never say no award was made.
+- If a result has _meta.lag_note, say in words, without a date, that recent awards may not be published yet (for example "Defense awards are published on USAspending.gov with a delay of about 90 days (DoD reporting policy), so recent awards may not appear yet"). Never say no award was made.
 - Incumbents: name one only when _meta.incumbent_finding is "identified". Otherwise follow _meta.absence_note: say you could not identify (or confirm) an incumbent and what was searched. Never say "there is no incumbent", "no one holds it", "it appears there is no incumbent" or "this is a new requirement" unless a record says so; not finding a prior award is not proof that none exists.
 - Small-business contact at a buying office or agency (small business specialist, SBLO, OSDBU/OSBP): call search_federal_contacts for the office AND lookup_federal_osbp for its department in the same step. If the office search names no small-business specialist, give the department's small business office from lookup_federal_osbp (office, director, email and phone exactly as returned), and say it is the agency-level small business office, not that buying office's own specialist. Do not stop at "I couldn't confirm a contact" when that lookup returned an office.
 - Contacts at a company: call get_sblo_contact. If it has no named liaison but returns registered_points_of_contact, name those people with their titles, say they are the firm's registered SAM points of contact (not a designated small business liaison), and never state an email or phone the tool did not return.
@@ -1240,6 +1240,8 @@ export async function POST(request: NextRequest) {
               request,
               chatSessionId: body.sessionId === sessionId ? turnSessionId : null,
               ...(requestedSections.length ? { requestedSections } : {}),
+              // Research loops: a report missing its "How They Buy Now" section is refused once so the model can fix it.
+              ...(researchTurn ? { retryForHeading: true } : {}),
               // Read dates / links / record ids for DocSources, from this turn's tool results and earlier signed ledgers.
               provenance: () => provenanceRecords(turnSources, priorLedgers.flatMap((l) => l.entries)),
               // FMP step-8 validator: refuse incomplete / banned profiles before Vault save.
@@ -1353,6 +1355,9 @@ export async function POST(request: NextRequest) {
             const rmTrace: Record<string, unknown> = {
               engine: 'research_mode', model, beta: true, label: RESEARCH_BETA_LABEL,
               ...(turnImages.length ? { screenshots: turnImages.length } : {}),
+              // Counts only (never file text): proves the attached files reached the research model.
+              ...(documentContext ? { documents: documentContext.docCount } : {}),
+              ...(connectedFiles?.block ? { connected_files: connectedFiles.read } : {}),
               ...(researchCap ? { research_cap: { plan: researchCap.plan, cap: researchCap.cap, used: researchCap.used, ...(researchCap.countUnknown ? { count_unknown: true } : {}) } } : {}),
             };
             // Awaited: after() keeps the function alive only until this turn settles, so the save must finish first.
@@ -1415,8 +1420,9 @@ export async function POST(request: NextRequest) {
                 client, model,
                 // Fixed prompt first (cached across steps and turns), then today's date and the profile after the breakpoint.
                 // App actions (allowlisted users only) go in the per-turn part so the cached prefix stays identical for all.
+                // Attached files (uploads + Drive/OneDrive) go there too, like the standard path's system blocks.
                 system: RESEARCH_SYSTEM_STATIC,
-                systemDynamic: researchSystemDynamic({ today, profileBlock: userProfileBlock }) + (actions ? `\n\n${APP_ACTIONS_NOTE}` : ''),
+                systemDynamic: researchSystemDynamic({ today, profileBlock: userProfileBlock, attachments: [documentContext?.block, connectedFiles?.block] }) + (actions ? `\n\n${APP_ACTIONS_NOTE}` : ''),
                 conversation,
                 tools: rmTools,
                 effort: process.env.ASK_MINDY_RESEARCH_EFFORT || 'high',

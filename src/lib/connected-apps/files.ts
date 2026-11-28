@@ -170,7 +170,10 @@ export async function readFileText(provider: Provider, token: string, meta: File
   try {
     const out = await extractByKind(kind, buf);
     return { text: out.text.replace(/\u0000/g, ''), ...(out.pageCount != null ? { pageCount: out.pageCount } : {}) };
-  } catch {
+  } catch (err) {
+    // Logged, never silent: a parser crash (e.g. pdf.js worker missing from the bundle, 2026-11-27) looked exactly like
+    // a scanned file. Kind and size only: never the file name, its text or the token.
+    console.error('[connected-files] extract failed:', JSON.stringify({ kind, bytes: buf.length, error: (err as Error)?.message?.slice(0, 200) }));
     throw new FileReadError('unreadable');
   }
 }

@@ -7,7 +7,9 @@
  * Credits are deliberately not shown anywhere on the gallery.
  *
  * Every preview is a SAMPLE: the companies are made up and the figures are illustrative. The
- * page says so. A real run returns live federal data.
+ * page says so, and every preview carries an "Example output (illustrative)" tag. A real run
+ * returns live federal data. Eric (2026-11-27): no stat-like figure about a REAL agency or
+ * market here unless it is sourced; use generic labels and round example figures instead.
  */
 
 export type GalleryCategory = 'find' | 'compete' | 'buyer' | 'win';
@@ -209,8 +211,8 @@ export const GALLERY_ITEMS: GalleryItem[] = [
     docTitle: 'Competitive landscape · roofing',
     preview: {
       kind: 'landscape',
-      headline: '$1.3B',
-      sub: 'federal roofing awards, last 3 fiscal years',
+      headline: '$500M',
+      sub: 'example roofing market, last 3 fiscal years',
       shares: [
         { label: 'Cardinal Roofing', pct: 22 },
         { label: 'Apex Envelope', pct: 16 },
@@ -360,14 +362,14 @@ export const GALLERY_ITEMS: GalleryItem[] = [
     docTitle: 'Market report · drones',
     preview: {
       kind: 'report',
-      headline: '$243M',
-      sub: 'spent on drones across 42 NAICS codes, FY24',
+      headline: '$200M',
+      sub: 'example drone market, one fiscal year',
       agencies: [
-        { label: 'Army', value: '$71M', pct: 29 },
-        { label: 'Air Force', value: '$52M', pct: 21 },
-        { label: 'Navy', value: '$38M', pct: 16 },
-        { label: 'DHS', value: '$21M', pct: 9 },
-        { label: 'Other', value: '$61M', pct: 25 },
+        { label: 'Agency A', value: '$60M', pct: 30 },
+        { label: 'Agency B', value: '$50M', pct: 25 },
+        { label: 'Agency C', value: '$40M', pct: 20 },
+        { label: 'Agency D', value: '$20M', pct: 10 },
+        { label: 'Other', value: '$30M', pct: 15 },
       ],
       winners: [
         { label: 'Skyline UAS', value: '$31M', pct: 100 },
@@ -403,18 +405,18 @@ export const GALLERY_ITEMS: GalleryItem[] = [
     category: 'find',
     title: 'A go-to-market strategy: where to start',
     result: 'The buyer, contract type and set-aside where a company like yours has the best first shot, and why.',
-    docTitle: 'Go-to-market · janitorial · Florida',
+    docTitle: 'Go-to-market · janitorial · example',
     preview: {
       kind: 'dossier',
       badge: 'Start here',
       fields: [
-        ['First buyer', 'VA Sunshine Healthcare'],
-        ['Why', '14 small buys a year, under $250K'],
+        ['First buyer', 'A regional medical center'],
+        ['Why', 'Repeat small buys of this service'],
         ['Your edge', 'SDVOSB set-aside'],
-        ['Vehicle to get on', 'VA FSS 36 (later)'],
+        ['Vehicle to get on', 'A schedule contract (later)'],
         ['90-day goal', '2 bids, 1 capability brief'],
       ],
-      note: 'Skip DoD for now: most of its spend here is bundled into large base contracts.',
+      note: 'Example reasoning: start where this buyer makes small set-aside buys, not where work is bundled into large base contracts.',
     },
   },
   {
@@ -422,11 +424,11 @@ export const GALLERY_ITEMS: GalleryItem[] = [
     category: 'compete',
     title: "Who's winning around you",
     result: 'The companies winning federal work near you, how much, and from which agencies.',
-    docTitle: 'Situational awareness · 50 mi of Tampa',
+    docTitle: 'Situational awareness · 50 mi radius',
     preview: {
       kind: 'bars',
-      headline: '$412M',
-      sub: 'awarded within 50 miles of Tampa, last 12 months',
+      headline: '$300M',
+      sub: 'example: awarded within 50 miles of one city, last 12 months',
       bars: [
         { label: 'Bay Area Facility Svcs', value: '$38M', pct: 100 },
         { label: 'Gulfline Construction', value: '$27M', pct: 71 },
@@ -447,7 +449,7 @@ export const GALLERY_ITEMS: GalleryItem[] = [
       fields: [
         ['Their gap', 'No 8(a) on the recompete team'],
         ['Your role', 'Sub for custodial + grounds'],
-        ['Ask for', '30% of the work, named in the bid'],
+        ['Ask for', 'A named share of the work in the bid'],
         ['Who to contact', 'Capture manager, Air Force'],
         ['Open with', 'Your Robins AFB past work'],
       ],
@@ -510,18 +512,18 @@ export const GALLERY_ITEMS: GalleryItem[] = [
     category: 'buyer',
     title: 'A one-pager on any agency',
     result: 'What one buyer is buying, what it is struggling with, and who to call, on one page.',
-    docTitle: 'Agency one-pager · VA Sunshine Healthcare',
+    docTitle: 'Agency one-pager · example buyer',
     preview: {
       kind: 'dossier',
       badge: 'Buyer brief',
       fields: [
         ['Buys most', 'Facilities, medical equipment, IT'],
-        ['Struggling with', 'Maintenance backlog (GAO)'],
-        ['Small business share', '41% of spend'],
-        ['Open right now', '22 notices'],
+        ['Struggling with', 'Maintenance backlog (from an oversight report)'],
+        ['Small business share', 'From this buyer\'s award data'],
+        ['Open right now', 'Its notices on SAM.gov'],
         ['Call first', 'Small business specialist'],
       ],
-      note: 'Most buys under $250K go out as small business set-asides.',
+      note: 'Buys under the simplified acquisition threshold are generally reserved for small business (FAR 19.502-2).',
     },
   },
   {
@@ -681,12 +683,12 @@ export const GALLERY_ITEMS: GalleryItem[] = [
     preview: {
       kind: 'bars',
       headline: '5%',
-      sub: 'federal goal for women-owned small businesses, by agency',
+      sub: 'federal goal for women-owned small businesses (15 U.S.C. 644(g)); example agencies',
       bars: [
-        { label: 'Energy', value: '2.1%', pct: 42 },
-        { label: 'NASA', value: '3.0%', pct: 60 },
-        { label: 'Army', value: '3.8%', pct: 76 },
-        { label: 'Interior', value: '5.6%', pct: 100 },
+        { label: 'Agency A', value: '2%', pct: 33 },
+        { label: 'Agency B', value: '3%', pct: 50 },
+        { label: 'Agency C', value: '4%', pct: 67 },
+        { label: 'Agency D', value: '6%', pct: 100 },
       ],
     },
   },
@@ -717,9 +719,9 @@ export const GALLERY_ITEMS: GalleryItem[] = [
     preview: {
       kind: 'list',
       items: [
-        { title: 'Call the small business office before you bid', meta: 'Guest who won a $2M VA contract', tag: 'Lesson' },
-        { title: 'Your first win is usually a sub', meta: 'Guest who grew to $40M', tag: 'Lesson' },
-        { title: 'Pick one agency and go deep', meta: 'Guest who won 12 Army awards', tag: 'Lesson' },
+        { title: 'Call the small business office before you bid', meta: 'Guest, first agency contract', tag: 'Lesson' },
+        { title: 'Consider a sub role for your first win', meta: 'Guest who grew from sub to prime', tag: 'Lesson' },
+        { title: 'Pick one agency and go deep', meta: 'Guest who focused on one agency', tag: 'Lesson' },
       ],
     },
   },
