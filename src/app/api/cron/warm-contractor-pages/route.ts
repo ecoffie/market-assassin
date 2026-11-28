@@ -32,6 +32,8 @@ import { kv } from '@vercel/kv';
 import {
   getTopRecipientsForSitemap,
   getRollupOrSingleBySlug,
+  getRollupBySlug,
+  resolveCanonicalSlug,
   getYearlyTotalsForRecipient,
   getYearlyByAgencyForRecipient,
   getTopAgenciesForRecipient,
@@ -104,6 +106,14 @@ async function warmSlug(slug: string, opts: { skipThin?: boolean } = {}): Promis
   // is what turns a cache miss into a BQ scan + KV write.
   const rollup = await getRollupOrSingleBySlug(slug, true);
   if (!rollup) return 'skipped'; // slug genuinely doesn't resolve
+
+  // A single subsidiary registration with its own SAM parent: warm the alias key and the parent family, so the page
+  // resolver can 308 a CONFIRMED alias cache-only (contractor-resolve.ts confirmedFamilyOf). The slug's own sections
+  // are still warmed below: when identity is not confirmed, the registration keeps serving itself.
+  if (rollup.single?.parent_uei && rollup.single.parent_uei !== rollup.rollup_uei) {
+    const canonical = await resolveCanonicalSlug(slug, true);
+    if (canonical) await getRollupBySlug(canonical, true);
+  }
 
   // Thin contractors render noindex: their sections buy nothing. Identity is cached either way.
   if (opts.skipThin && isThinContractor(rollup.total_obligated, rollup.award_count)) return 'thin';

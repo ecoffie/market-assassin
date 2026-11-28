@@ -13,6 +13,7 @@
  */
 import { dedupeInFlight } from '@/lib/seo/dedupe-in-flight';
 import {
+  getRollupBySlug,
   getRollupOrSingleBySlug,
   resolveCanonicalSlug,
   getPaginatedAwardsForRecipient,
@@ -42,6 +43,7 @@ export const resolveContractorForPage = dedupeInFlight(
       rollupOrSingle: (s, live) => getRollupOrSingleBySlug(s, live),
       canonicalOf: (s, live) => resolveCanonicalSlug(s, live),
       serveable: (c) => serveableCanonical(c),
+      family: (c) => getRollupBySlug(c),
       // A miss on a key that was never read reports 'empty' (no mark). The resolver only
       // reads a key's state right after the call that queried it, so that cannot occur.
       state: (key, s) => bqResultState(KEY_FOR[key](s), 0),

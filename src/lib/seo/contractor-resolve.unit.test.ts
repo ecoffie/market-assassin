@@ -50,6 +50,7 @@ function harness(w: World) {
       read('canonical', live) ? (w.canonicalTarget ?? 'parent-co') : null,
     ),
     serveable: vi.fn(async (c: string | null) => (c && w.targetServeable ? c : null)),
+    family: vi.fn(async () => null),
     state: (key) => states[key],
     takeBudget: vi.fn(async () => w.budget ?? true),
     recordWarmMiss: vi.fn(async () => {}),

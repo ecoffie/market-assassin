@@ -16,6 +16,19 @@
  *        BQ answered empty on every arm → not_found
  *        BQ failed / budget spent        → unavailable (5xx + warm queued)
  *
+ * CONFIRMED ALIAS of a single registration (Eric, 2026-11-25). Steps 1/3 used to answer `found` for a slug that
+ * names ONE subsidiary registration, before the alias resolver was ever asked, so a subsidiary's slug served a
+ * one-UEI page whose contracts were never built (11-23/24 contracts 500s, class c). Now, when the hit is a
+ * synthesized single-registration profile, the slug redirects to the parent family's page ONLY when identity is
+ * confirmed by UEI, never by name:
+ *   - the alias resolver's target family CONTAINS this exact UEI, and
+ *   - that family's key is this registration's own SAM parent UEI (or the UEI itself).
+ * A family that holds the UEI only through the same-NAME merge, or a target that does not hold it at all (two
+ * different companies with one name), is a distinct entity: the page keeps serving the registration itself.
+ * The section is preserved by each route (`/contracts/2` → `/contracts/2`). The request path never spends a
+ * BigQuery unit on this check: it reads the alias cache only (inside an already-paid live pass it reads live),
+ * and a cold alias key queues a warm for the slug.
+ *
  * Pure decision logic over injected readers so every branch is unit-testable without KV/BQ.
  */
 import type { RollupProfile } from '@/lib/bigquery/recipients';
@@ -34,6 +47,8 @@ export interface ContractorResolveDeps {
   canonicalOf(slug: string, liveBq: boolean): Promise<string | null>;
   /** serveableCanonical(): only redirect to a target that itself serves. */
   serveable(canonical: string | null): Promise<string | null>;
+  /** getRollupBySlug(canonical) cache-only: the target family, for the confirmed-alias membership check. */
+  family(canonical: string): Promise<RollupProfile | null>;
   /** bqResultState for the named key of THIS slug, read right after the call that used it. */
   state(key: 'rollup' | 'recipient' | 'canonical', slug: string): BqResultState;
   takeBudget(): Promise<boolean>;
@@ -42,6 +57,34 @@ export interface ContractorResolveDeps {
 
 const answered = (s: BqResultState) => s === 'hit' || s === 'empty';
 
+/**
+ * The family page a single-registration hit is a CONFIRMED alias of, or null. Identity by UEI only:
+ * the family must contain this UEI and be keyed by its own SAM parent (or itself). See the header.
+ */
+export function confirmedFamilyOf(single: RollupProfile, family: RollupProfile | null): string | null {
+  if (!single.single || !family) return null;
+  const uei = single.rollup_uei;
+  const parent = single.single.parent_uei || uei;
+  if (!family.child_ueis.includes(uei)) return null; // the target is not this registration's family
+  if (family.rollup_uei !== parent && family.rollup_uei !== uei) return null; // held only via a name merge
+  if (family.canonical_slug === single.canonical_slug) return null;
+  return family.canonical_slug;
+}
+
+async function singleAliasTarget(
+  slug: string,
+  single: RollupProfile,
+  live: boolean,
+  deps: ContractorResolveDeps,
+): Promise<{ target: string | null; cold: boolean }> {
+  if (!single.single) return { target: null, cold: false };
+  const canonical = await deps.canonicalOf(slug, live);
+  const cold = !answered(deps.state('canonical', slug));
+  if (!canonical) return { target: null, cold };
+  if (!(await deps.serveable(canonical))) return { target: null, cold: false };
+  return { target: confirmedFamilyOf(single, await deps.family(canonical)), cold: false };
+}
+
 export async function resolveContractor(
   slug: string,
   deps: ContractorResolveDeps,
@@ -49,7 +92,15 @@ export async function resolveContractor(
   // ── Cache-only pass (zero BigQuery) ────────────────────────────────────────
   // rollupOrSingle reads the rollup key and, only if that misses, the recipient key.
   let recipient = await deps.rollupOrSingle(slug, false);
-  if (recipient) return { kind: 'found', recipient, liveBq: false };
+  if (recipient) {
+    const { target: cachedTarget, cold } = await singleAliasTarget(slug, recipient, false, deps);
+    if (cachedTarget) return { kind: 'redirect', slug: cachedTarget };
+    // Unknown alias for a registration that HAS a separate parent: serve it now, warm the alias key for next time.
+    if (cold && recipient.single?.parent_uei && recipient.single.parent_uei !== recipient.rollup_uei) {
+      await deps.recordWarmMiss(slug);
+    }
+    return { kind: 'found', recipient, liveBq: false };
+  }
   const rollupState = deps.state('rollup', slug);
   const recipientState = deps.state('recipient', slug);
 
@@ -75,7 +126,12 @@ export async function resolveContractor(
   }
 
   recipient = await deps.rollupOrSingle(slug, true);
-  if (recipient) return { kind: 'found', recipient, liveBq: true };
+  if (recipient) {
+    // Inside the live pass this unit already paid for: ask the alias resolver live too.
+    const { target } = await singleAliasTarget(slug, recipient, true, deps);
+    if (target) return { kind: 'redirect', slug: target };
+    return { kind: 'found', recipient, liveBq: true };
+  }
   const liveRollup = deps.state('rollup', slug);
   const liveRecipient = deps.state('recipient', slug);
 
