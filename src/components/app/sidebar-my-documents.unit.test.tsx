@@ -56,7 +56,7 @@ describe('/app sidebar: My Documents', () => {
   it('the address bar keeps the section, and the Vault follows a repeat request', async () => {
     const { readFileSync } = await import('node:fs');
     const page = readFileSync('src/app/app/page.tsx', 'utf8');
-    expect(page).toContain("if (panel === 'vault' && typeof context?.section === 'string') params.set('section', context.section);");
+    expect(page).toContain("if ((panel === 'vault' || panel === 'settings') && typeof context?.section === 'string') params.set('section', context.section);");
     const vault = readFileSync('src/components/app/panels/VaultPanel.tsx', 'utf8');
     expect(vault).toMatch(/if \(initialSection\) setSection\(initialSection\);\s*\}, \[initialSection, sectionRequest\]\);/);
   });
