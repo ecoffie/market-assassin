@@ -134,22 +134,24 @@ describe('Ask Mindy reads the conversation\'s uploaded documents', () => {
     expect(answerSystem()).not.toContain('FACTS FROM AN ATTACHED FILE ARE SOURCED');
   });
 
-  it('Map drawer turn: asked about files, Mindy points to Ask Mindy in the left sidebar with the link (no "none of my tools can")', async () => {
+  it('Map drawer turn: the file control is named where it is ("Attach" under the message box), never "none of my tools can"', async () => {
     await ask({ surface: 'map' });
     const sys = answerSystem();
-    expect(sys).toContain('Open [Ask Mindy](/app?panel=chat) in the left sidebar, then use **Attach file** under the message box.');
+    expect(sys).toContain('"Use **Attach** under the message box."');
     expect(sys).toContain('Never say "none of my tools can"');
   });
 
-  it('Map drawer recognised by its display hint too', async () => {
+  it('Map drawer with Drive/OneDrive enabled: Drive goes to Ask Mindy in the left sidebar, with the link (display hint recognised)', async () => {
+    vi.stubEnv('CONNECTED_APPS', 'true');
+    vi.stubEnv('CONNECTED_APPS_ALLOWLIST', ME);
     await ask({ display: 'narrow_panel' });
-    expect(answerSystem()).toContain('in the left sidebar');
+    expect(answerSystem()).toContain('"Open [Ask Mindy](/app?panel=chat) in the left sidebar, then use **Use a file from Drive or OneDrive** under the message box."');
   });
 
   it('full /app chat: the controls are "under the message box", no sidebar detour', async () => {
     await ask();
     const sys = answerSystem();
-    expect(sys).toContain('"Use **Attach file** under the message box, then ask your question."');
+    expect(sys).toContain('"Use **Attach file** under the message box."');
     expect(sys).not.toContain('left sidebar');
   });
 

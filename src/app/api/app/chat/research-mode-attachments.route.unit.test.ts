@@ -224,10 +224,14 @@ describe('research mode sees the files the customer attached (P0)', () => {
   it('research turn from the Map drawer: the per-turn part names where the file controls are, with the link', async () => {
     flagOn();
     process.env.VAULT_ASK_MINDY_UPLOADS = 'true';
+    vi.stubEnv('CONNECTED_APPS', 'true');
+    vi.stubEnv('CONNECTED_APPS_ALLOWLIST', EMAIL);
     await ask('Can you connect my Google Drive?', { surface: 'map' });
     const [stat, dyn] = sysParts();
+    expect(dyn.text).toContain('"Use **Attach** under the message box."');
     expect(dyn.text).toContain('Open [Ask Mindy](/app?panel=chat) in the left sidebar');
     expect(stat.text).not.toContain('left sidebar'); // never in the cached prefix
+    vi.unstubAllEnvs();
     delete process.env.VAULT_ASK_MINDY_UPLOADS;
   });
 
