@@ -83,6 +83,24 @@ export async function resolveStripeCustomerByEmail(
 }
 
 /**
+ * Statuses a customer can still manage or cancel in the billing portal. Wider than LIVE_STATUSES
+ * on purpose: a past-due or unpaid plan is still billing them, and they must be able to cancel it.
+ */
+export const MANAGEABLE_SUB_STATUSES: readonly Stripe.Subscription.Status[] = ['active', 'trialing', 'past_due', 'unpaid'];
+
+/**
+ * Does this customer hold a subscription the user can manage or cancel?
+ *
+ * Used to pick WHICH linked email's customer to open. It used to check `status: 'active'` only,
+ * so a plan on a free trial or past due on a linked address lost to an older record on the
+ * signed-in address: the portal opened on a customer with no plan and no cancel option.
+ */
+export async function hasManageableSubscription(stripe: Stripe, customerId: string): Promise<boolean> {
+  const subs = await stripe.subscriptions.list({ customer: customerId, status: 'all', limit: 20 });
+  return subs.data.some((s) => MANAGEABLE_SUB_STATUSES.includes(s.status));
+}
+
+/**
  * Get the Stripe customer for an email, creating one ONLY if none exists.
  *
  * WHY THIS EXISTS — this is the CREATE-side dedup guard. `resolveStripeCustomerByEmail` above

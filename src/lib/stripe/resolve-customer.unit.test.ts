@@ -132,3 +132,28 @@ describe('resolveStripeCustomerByEmail', () => {
     expect(r.all).toHaveLength(3);
   });
 });
+
+describe('hasManageableSubscription (which linked email the billing portal opens)', () => {
+  // REGRESSION (2026-11-20, "cancel button not working"): the portal + billing routes picked the
+  // linked email whose customer had a status:'active' plan. A plan on a free trial or past due
+  // never matched, so the portal opened an older record with no plan and no cancel option.
+  it.each(['active', 'trialing', 'past_due', 'unpaid'])('a %s plan can be managed', async (status) => {
+    const { hasManageableSubscription } = await import('./resolve-customer');
+    expect(await hasManageableSubscription(stubStripe([], { cus_1: [status] }), 'cus_1')).toBe(true);
+  });
+
+  it.each(['canceled', 'incomplete_expired'])('only a %s plan cannot', async (status) => {
+    const { hasManageableSubscription } = await import('./resolve-customer');
+    expect(await hasManageableSubscription(stubStripe([], { cus_1: [status] }), 'cus_1')).toBe(false);
+  });
+
+  it('both billing routes use it (not a status:"active"-only check)', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { join } = await import('node:path');
+    for (const f of ['src/app/api/app/billing/route.ts', 'src/app/api/app/billing/portal/route.ts']) {
+      const src = readFileSync(join(__dirname, '..', '..', '..', f), 'utf8');
+      expect(src, f).toContain('hasManageableSubscription(stripe, r.customer.id)');
+      expect(src, f).not.toMatch(/customer: r\.customer\.id, status: 'active'/);
+    }
+  });
+});
