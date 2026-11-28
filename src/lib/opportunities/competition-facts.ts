@@ -32,7 +32,10 @@ export interface CompetitionFacts {
   offers_received: number | null;
   sole_source_reason: string | null;
   abilityone_holder: boolean | null;
-  source: 'usaspending_award' | 'none';
+  /** The award record's own set-aside value, verbatim, INCLUDING "NO SET ASIDE USED." (set_aside drops that one). */
+  set_aside_reported: string | null;
+  /** usaspending_parent_idv = an order whose own record did not establish it, read from its parent vehicle. */
+  source: 'usaspending_award' | 'usaspending_parent_idv' | 'none';
 }
 
 /** The award fields this reads, as USASpending returns them (latest_transaction_contract_data + recipient). */
@@ -43,6 +46,8 @@ export interface AwardCompetitionFields {
   other_than_full_and_open_description?: string | null;
   number_of_offers_received?: string | number | null;
   business_categories?: string[] | null;
+  /** Orders: FPDS fair-opportunity field ("FAIR OPPORTUNITY GIVEN" or the exception taken). */
+  fair_opportunity_limited_sources_description?: string | null;
 }
 
 // FPDS extent_competed codes. CDO/NDO = competitive / non-competitive delivery order.
@@ -51,7 +56,7 @@ const NOT_COMPETED = new Set(['B', 'C', 'G', 'NDO']);
 
 const UNKNOWN: CompetitionFacts = {
   class: 'unknown', label: 'Not established', detail: 'How the current award was competed could not be established.',
-  extent_competed: null, set_aside: null, offers_received: null, sole_source_reason: null, abilityone_holder: null, source: 'none',
+  extent_competed: null, set_aside: null, offers_received: null, sole_source_reason: null, abilityone_holder: null, set_aside_reported: null, source: 'none',
 };
 
 const clean = (s: unknown): string | null => {
@@ -74,7 +79,16 @@ export function classifyCompetition(f: AwardCompetitionFields | null | undefined
   const abilityone = cats ? cats.some((c) => /abilityone/i.test(String(c))) : null;
   const eightASole = !!setAside && /8\s*\(?a\)?\s*sole source/i.test(setAside);
 
-  const base = { extent_competed: extent, set_aside: setAside, offers_received: offers, sole_source_reason: reason, abilityone_holder: abilityone, source: 'usaspending_award' as const };
+  const base = { extent_competed: extent, set_aside: setAside, offers_received: offers, sole_source_reason: reason, abilityone_holder: abilityone, set_aside_reported: setAsideRaw, source: 'usaspending_award' as const };
+  // Orders often carry no extent_competed code; FPDS records the fair-opportunity decision instead.
+  const fair = clean(f.fair_opportunity_limited_sources_description);
+  if (!code && fair && !eightASole) {
+    if (/fair opportunity given/i.test(fair)) {
+      const offerTxt = offers != null ? ` ${offers} offer${offers === 1 ? ' was' : 's were'} received.` : '';
+      return { class: 'competed', label: setAside ? `Competed (fair opportunity) · ${shortSetAside(setAside)}` : 'Competed (fair opportunity)', detail: `The current order was placed with fair opportunity among the vehicle's holders.${offerTxt}`, ...base };
+    }
+    return { class: 'not_competed', label: 'Not competed (fair-opportunity exception)', detail: `The current order was placed under a fair-opportunity exception: ${sentence(fair)}.`, ...base, sole_source_reason: reason ?? fair };
+  }
 
   if (eightASole || (code && NOT_COMPETED.has(code))) {
     const label = eightASole ? '8(a) sole source' : abilityone ? 'Not competed · AbilityOne' : 'Not competed';
@@ -122,6 +136,7 @@ export async function fetchAwardCompetition(contractId: string, timeoutMs = 4000
       type_set_aside_description: c.type_set_aside_description ?? null,
       other_than_full_and_open_description: c.other_than_full_and_open_description ?? null,
       number_of_offers_received: c.number_of_offers_received ?? null,
+      fair_opportunity_limited_sources_description: c.fair_opportunity_limited_sources_description ?? c.fair_opportunity_limited_sources ?? null,
       business_categories: Array.isArray(d?.recipient?.business_categories) ? d.recipient.business_categories : null,
     };
   } catch {
@@ -135,7 +150,7 @@ export type CompetitionLookup = (contractId: string) => Promise<AwardCompetition
 
 /** Default lookup: USASpending, cached 7 days (an award's competition basis does not change). */
 export const usaspendingCompetitionLookup: CompetitionLookup = async (contractId) => {
-  const { value } = await withCache('usaspending_award_competition', { contract_id: contractId, v: 1 }, 7 * 24 * 3600, async () => {
+  const { value } = await withCache('usaspending_award_competition', { contract_id: contractId, v: 2 }, 7 * 24 * 3600, async () => {
     const v = await fetchAwardCompetition(contractId);
     if (!v) throw new Error('no award record'); // do not cache a miss as a fact
     return v;
