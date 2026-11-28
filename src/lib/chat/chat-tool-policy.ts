@@ -89,6 +89,12 @@ const CHAT_OVERRIDES: Readonly<Record<string, ChatToolPolicy>> = {
     reason: 'Reads one public page (https, SSRF-guarded, pinned, 3/turn) whose URL came from this turn\'s search results or the customer; research mode only (ASK_MINDY_RESEARCH_MODE).',
   },
 
+  // ── Chat-local static directory (not an MCP tool yet; catalog change deferred) ──
+  get_lab_supplier_info: {
+    decision: 'allowed_read',
+    reason: 'National-lab supplier directory: static curated file (src/data/national-lab-suppliers.json), official lab/DOE sources only.',
+  },
+
   // ── Chat-specific exceptions ──
   verify_m_scale: {
     decision: 'blocked_chat_exception',
