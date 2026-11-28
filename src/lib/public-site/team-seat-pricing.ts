@@ -96,7 +96,7 @@ export const TEAM_SEAT_PRICING = {
     ['Shared pipeline', 'Everyone sees the same pursuits and deadlines.'],
     ['Team dashboard and roles', 'See who is working what.'],
   ] as Array<[title: string, detail: string]>,
-  contactEmail: 'hello@getmindy.ai',
+  contactEmail: 'admin@getmindy.ai',
   footer: 'Questions about a rollout:',
 } as const;
 
