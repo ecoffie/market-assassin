@@ -43,6 +43,25 @@ export interface CompetitionFacts {
   offers_source?: 'usaspending_award' | 'usaspending_parent_idv' | null;
   /** The award's OWN record facts beyond competition (never the parent's). null when no record was read. */
   award_record?: AwardRecordFacts | null;
+  /**
+   * Orders only: the FPDS fair-opportunity value on THIS order, verbatim (e.g. "FAIR OPPORTUNITY GIVEN",
+   * "FAR 16.505(B)(2)(I)(G) SINGLE SOURCE"). null = the record carries none (not an order, or not reported).
+   */
+  order_fair_opportunity?: string | null;
+  /**
+   * Orders only: true = the order was competed among the vehicle's holders (fair opportunity given / competitive
+   * set-aside); false = issued under a fair-opportunity EXCEPTION; null = not reported. This is independent of
+   * `class`: an order can carry extent "competed" (the VEHICLE was competed) and still be issued without fair
+   * opportunity.
+   */
+  order_competed_among_holders?: boolean | null;
+}
+
+/** Pure. Order-level fair opportunity from the FPDS value. */
+export function orderFairOpportunity(raw: string | null | undefined): { order_fair_opportunity: string | null; order_competed_among_holders: boolean | null } {
+  const v = clean(raw);
+  if (!v) return { order_fair_opportunity: null, order_competed_among_holders: null };
+  return { order_fair_opportunity: v, order_competed_among_holders: /fair opportunity given|competitive set.?aside/i.test(v) };
 }
 
 /** Place and period facts from the same award record (USASpending /awards/{id}). Each null = not reported. */
@@ -95,7 +114,7 @@ const NOT_COMPETED = new Set(['B', 'C', 'G', 'NDO']);
 const UNKNOWN: CompetitionFacts = {
   class: 'unknown', label: 'Not established', detail: 'How the current award was competed could not be established.',
   extent_competed: null, set_aside: null, offers_received: null, sole_source_reason: null, abilityone_holder: null, set_aside_reported: null, source: 'none',
-  offers_source: null, award_record: null,
+  offers_source: null, award_record: null, order_fair_opportunity: null, order_competed_among_holders: null,
 };
 
 const clean = (s: unknown): string | null => {
@@ -122,6 +141,7 @@ export function classifyCompetition(f: AwardCompetitionFields | null | undefined
     extent_competed: extent, set_aside: setAside, offers_received: offers, sole_source_reason: reason, abilityone_holder: abilityone,
     set_aside_reported: setAsideRaw, source: 'usaspending_award' as const,
     offers_source: offers != null ? 'usaspending_award' as const : null, award_record: awardRecordFacts(f),
+    ...orderFairOpportunity(f.fair_opportunity_limited_sources_description),
   };
   // Orders often carry no extent_competed code; FPDS records the fair-opportunity decision instead.
   const fair = clean(f.fair_opportunity_limited_sources_description);
