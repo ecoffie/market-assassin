@@ -11,7 +11,7 @@ describe('least-competition / where-to-start method (Claude + MCP, as written)',
     expect(COMPETITION_AND_START_PLAYBOOK).toMatch(/capable_depth, eligible_population and tiers/);
     expect(COMPETITION_AND_START_PLAYBOOK).toMatch(/a smaller order is an easier first win/);
     expect(COMPETITION_AND_START_PLAYBOOK).not.toMatch(/\$\d/); // Eric 2026-11-27: no unsourced numbers
-    expect(COMPETITION_AND_START_PLAYBOOK).toMatch(/Bidder counts come only from get_expiring_contracts' competition object .* never imply bidders were counted/);
+    expect(COMPETITION_AND_START_PLAYBOOK).toMatch(/a row's number_of_offers \/ competition_type count only when competition_fields_source is set .* never imply bidders were counted/);
     expect(COMPETITION_AND_START_PLAYBOOK).toMatch(/Never call it "no competition" because a search came back empty or a contract is still within its term/);
     expect(COMPETITION_AND_START_PLAYBOOK).toMatch(/only holds a registration is not a competitor/);
   });
@@ -35,10 +35,13 @@ describe('least-competition / where-to-start method (Claude + MCP, as written)',
 
 describe('competition answer rules (production test 2026-11-28: SDVOSB IT, WOSB Virginia, SDVOSB 1-2 bidders)', () => {
   it('1. coverage: every ranking states "offers reported on X of Y candidates" from the tool counts', () => {
-    expect(COMPETITION_ANSWER_RULES).toMatch(/states "offers reported on X of Y candidates"\. Use the tool's own coverage counts when it returns them \(get_expiring_contracts competition\.offers_reported of competition\.checked/);
-    expect(COMPETITION_ANSWER_RULES).toMatch(/otherwise count the rows yourself: X = rows whose offers are reported, Y = all candidate rows you ranked from/);
-    expect(COMPETITION_ANSWER_RULES).toMatch(/Ranking a few contracts without that line is wrong/);
-    expect(COMPETITION_ANSWER_RULES).toMatch(/null means NOT REPORTED, never one bidder and never zero/);
+    // #2583 shape (Agent 3): _meta.competition.coverage_line, row competition_status, competition_fields_source.
+    expect(COMPETITION_ANSWER_RULES).toMatch(/When get_expiring_contracts returns _meta\.competition\.coverage_line \("Competition checked on X of Y contracts; offers reported on N, set-aside reported on M; K not checked"\), quote it VERBATIM/);
+    expect(COMPETITION_ANSWER_RULES).toMatch(/Otherwise count the rows yourself and say "offers reported on X of Y candidates" \(X = rows whose offers are reported, Y = all candidate rows you ranked from\)/);
+    expect(COMPETITION_ANSWER_RULES).toMatch(/Ranking a few contracts without a coverage line is wrong/);
+    expect(COMPETITION_ANSWER_RULES).toMatch(/number_of_offers null means NOT REPORTED, never one bidder and never zero/);
+    expect(COMPETITION_ANSWER_RULES).toMatch(/competition_status "not_checked" means the row was NOT CHECKED \(past the lookup cap\): say "not checked", never "not reported"/);
+    expect(COMPETITION_ANSWER_RULES).toMatch(/usable when competition_fields_source is set \("usaspending_award" = that award's own record; "usaspending_parent_idv" = the parent vehicle's record, so say the count is for the vehicle, not this order\)/);
   });
   it('2. set-aside fit: each pick shows its real set-aside; outside the named group is labelled; empty is "not on record", never "full and open"', () => {
     expect(COMPETITION_ANSWER_RULES).toMatch(/when the question names a set-aside group \(SDVOSB, VOSB, WOSB, EDWOSB, 8\(a\), HUBZone\), every recommended item shows its actual set-aside/);
