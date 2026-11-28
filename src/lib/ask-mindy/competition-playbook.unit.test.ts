@@ -35,7 +35,8 @@ describe('least-competition / where-to-start method (Claude + MCP, as written)',
 
 describe('competition answer rules (production test 2026-11-28: SDVOSB IT, WOSB Virginia, SDVOSB 1-2 bidders)', () => {
   it('1. coverage: every ranking states "offers reported on X of Y candidates" from the tool counts', () => {
-    expect(COMPETITION_ANSWER_RULES).toMatch(/states, from the tool's own counts, "offers reported on X of Y candidates" \(get_expiring_contracts competition\.offers_reported of competition\.checked/);
+    expect(COMPETITION_ANSWER_RULES).toMatch(/states "offers reported on X of Y candidates"\. Use the tool's own coverage counts when it returns them \(get_expiring_contracts competition\.offers_reported of competition\.checked/);
+    expect(COMPETITION_ANSWER_RULES).toMatch(/otherwise count the rows yourself: X = rows whose offers are reported, Y = all candidate rows you ranked from/);
     expect(COMPETITION_ANSWER_RULES).toMatch(/Ranking a few contracts without that line is wrong/);
     expect(COMPETITION_ANSWER_RULES).toMatch(/null means NOT REPORTED, never one bidder and never zero/);
   });
