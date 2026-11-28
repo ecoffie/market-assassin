@@ -18,6 +18,8 @@
  * penalty risk and we don't have real ones yet.
  */
 import type { Metadata } from 'next';
+import { isTeamSeatPricingEnabled } from '@/lib/public-site/team-seat-pricing';
+import { teamSeatPlan } from '@/lib/billing/team-seat-plans';
 import { siteShareImages } from '@/lib/seo/share-image';
 import SimplePricing from '@/components/public-site/pricing/SimplePricing';
 import { appPricingFaqs } from '@/components/public-site/pricing/faqs';
@@ -46,10 +48,18 @@ const creditPlans = SUBSCRIPTION_PLANS.filter((p) => p.id !== 'agency').map((p) 
   annualPerMonthUsd: p.annual?.usdPerMonth ?? null, annualHref: p.annual?.checkoutUrl ?? null,
 }));
 
+// Team's entry price: the 2-user seat plan when the seat picker is on, else the old $499 Team.
+const TEAM_FROM_USD = teamSeatPlan(2)?.monthlyUsd ?? 249;
+const TEAM_LD_USD = isTeamSeatPricingEnabled() ? TEAM_FROM_USD : 499;
+
 export const metadata: Metadata = {
   title: 'Pricing — Pro, Team and Enterprise | Mindy',
-  description:
-    'Pro at $149/mo, Team at $499/mo, both with a 14-day free trial. Save up to 33% billed annually. GovWin runs $15K–$50K/yr.',
+  // Search snippet follows what /pricing actually shows: with the Team seat picker on, Team starts
+  // at $249/mo for 2 users and yearly is paid up front (no trial), so only Pro claims the trial.
+  // "Save on yearly plans" stays true through the Mindy Day week (2 months free) and after (33%).
+  description: isTeamSeatPricingEnabled()
+    ? `Pro at $149/mo with a 14-day free trial. Team from $${TEAM_FROM_USD}/mo for 2 users. Save on yearly plans. GovWin runs $15K–$50K/yr.`
+    : 'Pro at $149/mo, Team at $499/mo, both with a 14-day free trial. Save up to 33% billed annually. GovWin runs $15K–$50K/yr.',
   alternates: {
     canonical: 'https://getmindy.ai/pricing',
   },
@@ -114,11 +124,11 @@ export default function PricingPage() {
           {
             '@type': 'Offer',
             name: 'Team',
-            price: '499',
+            price: String(TEAM_LD_USD),
             priceCurrency: 'USD',
             priceSpecification: {
               '@type': 'UnitPriceSpecification',
-              price: '499',
+              price: String(TEAM_LD_USD),
               priceCurrency: 'USD',
               unitCode: 'MON',
             },
