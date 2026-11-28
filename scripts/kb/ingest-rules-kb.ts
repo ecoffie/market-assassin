@@ -10,10 +10,11 @@
  */
 import { readFileSync } from 'node:fs';
 import { createClient } from '@supabase/supabase-js';
-import { buildRegisterRows, buildVerificationRows, parseRulesKb, RULES_KB_DOC, type SourcesSnapshot, type VerificationFile } from '../../src/lib/knowledge/rules-kb';
+import { buildRegisterRows, buildStatisticRows, buildVerificationRows, parseRulesKb, RULES_KB_DOC, type SourcesSnapshot, type StatisticFile, type VerificationFile } from '../../src/lib/knowledge/rules-kb';
 
 const SNAPSHOT = 'docs/knowledge/how-government-buys-now-2026-11-27.sources.json';
 const VERIFICATION = 'docs/knowledge/consortia-status-2026-11-27.json';
+const STATISTICS = 'docs/knowledge/official-statistics-2026-11-28.json';
 
 async function main() {
   const go = process.argv.includes('--go');
@@ -22,6 +23,7 @@ async function main() {
   const rows = [
     ...buildRegisterRows(entries, snapshot),
     ...buildVerificationRows(JSON.parse(readFileSync(VERIFICATION, 'utf8')) as VerificationFile),
+    ...buildStatisticRows(JSON.parse(readFileSync(STATISTICS, 'utf8')) as StatisticFile),
   ];
 
   const srcs = rows.flatMap((r) => r.sources);
@@ -52,9 +54,9 @@ async function main() {
   const { error } = await db.from('kb_rule_claims').upsert(payload, { onConflict: 'claim_id' });
   if (error) throw new Error(`upsert failed: ${error.message}`);
   // Verify against the table, not the client's "ok".
-  const { count: n, error: cErr } = await db.from('kb_rule_claims').select('claim_id', { count: 'exact', head: true }).in('kb_doc', [RULES_KB_DOC, VERIFICATION]);
+  const { count: n, error: cErr } = await db.from('kb_rule_claims').select('claim_id', { count: 'exact', head: true }).in('kb_doc', [RULES_KB_DOC, VERIFICATION, STATISTICS]);
   if (cErr) throw new Error(`verify read failed: ${cErr.message}`);
-  console.log(`\nupserted ${payload.length}; table now holds ${n} rows for ${RULES_KB_DOC} + ${VERIFICATION}`);
+  console.log(`\nupserted ${payload.length}; table now holds ${n} rows for ${RULES_KB_DOC} + ${VERIFICATION} + ${STATISTICS}`);
   if (n !== rows.length) process.exitCode = 1;
 }
 

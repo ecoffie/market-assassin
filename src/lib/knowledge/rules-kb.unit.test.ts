@@ -231,3 +231,44 @@ describe('Fix 1C verification rows (consortia, 2808a)', async () => {
     expect(rankRuleClaims('2808a construction OTA guidance', [...rows, ...v])[0].claim_id).toBe('KB-X1');
   });
 });
+
+describe('official statistics (part E): CRS IF12558 IDV share', async () => {
+  const { buildStatisticRows, FRESHNESS_PHRASE: FP } = await import('./rules-kb');
+  const file = JSON.parse(readFileSync(join(process.cwd(), 'docs/knowledge/official-statistics-2026-11-28.json'), 'utf8'));
+  const [s1] = buildStatisticRows(file);
+  it('verified only because the official passage was fetched, and the passage carries the figures verbatim', () => {
+    expect(s1).toMatchObject({ claim_id: 'KB-S1', part: 'E', legal_status: 'official_statistic', verified: true, status: 'current', recheck_interval_days: 365 });
+    const src = s1.sources[0];
+    expect(src).toMatchObject({ kind: 'official', fetch_status: 'ok' });
+    expect(src.url).toMatch(/^https:\/\/www\.congress\.gov\/crs_external_products\/IF\/PDF\/IF12558\//);
+    expect(src.passage).toContain('In FY2024, approximately 56% of Department of Defense (DOD) contract award dollars and 63% of non-DOD contract award dollars were obligated on IDVs');
+    expect(src.passage).toContain('Buying Through Government Acquisition Vehicles');
+  });
+  it('claim text is dateless (FY2024 is part of the claim, no freshness phrase or calendar date)', () => {
+    expect(FP.test(s1.claim)).toBe(false);
+    expect(s1.claim).toMatch(/FY2024/);
+    expect(s1.claim).toMatch(/56%.*63%/);
+    expect(s1.claim).not.toMatch(/\b20\d\d-\d\d-\d\d\b|(January|February|March|April|May|June|July|August|September|October|November|December) \d{1,2}, 20\d\d/);
+  });
+  it('an unfetched passage makes the row unverified (never trusted on the summary alone)', () => {
+    const blank = JSON.parse(JSON.stringify(file));
+    Object.assign(blank.rows[0].sources[0], { fetch_status: null, passage: null });
+    const [r] = buildStatisticRows(blank);
+    expect(r).toMatchObject({ verified: false, status: 'unverified' });
+    expect(checkClaims(['KB-S1'], [r], '2026-11-28')[0].state).toBe('unverified');
+  });
+  it('retrieval finds it; ids stay unique across the register', () => {
+    const all = [...rows, s1];
+    expect(rankRuleClaims('what share of contract dollars go through IDIQ vehicles', all)[0].claim_id).toBe('KB-S1');
+    expect(rankRuleClaims('indefinite delivery vehicle share DoD', all)[0].claim_id).toBe('KB-S1');
+    expect(new Set(all.map((r) => r.claim_id)).size).toBe(all.length);
+  });
+  it('the migration widens the CHECKs idempotently and is a no-op without the table', () => {
+    const sql = readFileSync(join(process.cwd(), 'supabase/migrations/20261128_kb_rule_claims_official_statistic.sql'), 'utf8');
+    expect(sql).toMatch(/to_regclass\('public\.kb_rule_claims'\) IS NULL/);
+    for (const c of ['claim_id', 'part', 'legal_status']) expect(sql).toMatch(new RegExp(`DROP CONSTRAINT IF EXISTS kb_rule_claims_${c}_check`));
+    expect(sql).toMatch(/\^KB-\(\[CXS\]\)\?\[0-9\]\+\$/);
+    expect(sql).toMatch(/'official_statistic'/);
+    expect(sql).not.toMatch(/\b(DROP TABLE|DELETE|TRUNCATE|UPDATE)\b/i);
+  });
+});

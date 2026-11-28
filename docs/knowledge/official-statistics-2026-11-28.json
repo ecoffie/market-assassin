@@ -1,0 +1,44 @@
+{
+  "doc": "docs/knowledge/official-statistics-2026-11-28.json",
+  "_doc": "Official statistics for the rules register (kb_rule_claims, part E). Each row's passage is the source's own words, fetched read-only by scripts/kb/fetch-statistic-sources.ts. verified only when the passage was fetched. Quotable claim text carries no freshness date; the fiscal year of the statistic is part of the claim.",
+  "checked_on": "2026-11-28",
+  "rows": [
+    {
+      "claim_id": "KB-S1",
+      "short": "IDV share of contract dollars",
+      "name": "Share of contract award dollars obligated on indefinite delivery vehicles (CRS In Focus IF12558)",
+      "claim": "In FY2024, about 56% of Department of Defense contract award dollars and 63% of non-DoD contract award dollars were obligated on indefinite delivery vehicles (IDVs), which include IDIQ contracts.",
+      "keywords": [
+        "IDIQ",
+        "indefinite delivery vehicle",
+        "IDV",
+        "contract vehicles",
+        "share of contract dollars",
+        "task orders",
+        "CRS IF12558",
+        "Buying Through Government Acquisition Vehicles"
+      ],
+      "interval": 365,
+      "sources": [
+        {
+          "url": "https://www.congress.gov/crs_external_products/IF/PDF/IF12558/IF12558.4.pdf",
+          "kind": "official",
+          "label": "Congressional Research Service, In Focus IF12558, Indefinite Delivery, Indefinite Quantity Contracts (updated November 12, 2024)",
+          "anchors": [
+            "In FY2024, approximately 56% of Department of Defense"
+          ],
+          "must_contain": [
+            "56%",
+            "63%",
+            "Buying Through Government Acquisition Vehicles"
+          ],
+          "fetch_status": "ok",
+          "passage": "In FY2024, approximately 56% of Department of Defense (DOD) contract award dollars and 63% of non-DOD contract award dollars were obligated on IDVs, which include IDIQ contracts (see Figure 1). Figure 1. DOD and Non-DOD Contract Award Dollars FY2024 (Billions of Dollars) Source: CRS analysis of data from the System for Award Management website (SAM.gov), “Buying Through Government Acquisition Vehicles” report for 10/1/2023 through 9/30/2024. Note: IDVs include IDCs (of which IDIQ contracts are a subset) in addition to BOAs and BPAs. The SAM “Buying Through Government Acquisition Vehicles” report does not provide the capability to disaggregate IDVs by type to include only IDIQ contracts. Single and Multiple Award IDIQ Contracts A contracting officer may award IDIQ contracts to multiple vendors under a single solicitation. This is called a multiple award IDIQ contract. This allows two or more prequalified vendors to compete for orders from agencies under streamlined procedures. The FAR states that multiple award IDIQ contracts are the federal government’s preferred contracting method. By contrast, a single award IDIQ contract is awarded to a single contractor under a single solicitation. An agency may award these contracts competitively or noncompetitively. The FAR requires agency heads to provide written approval for single award IDIQ contracts that exceed $100 million. Orders Once an IDIQ contract has been established, an agency may place orders to fulfill a need. Agencies place task orders for services and delivery orders for supplies. These orders obligate funds and authorize work. Under a single award IDIQ contract, a contracting officer may place an order with the vendor following the processes outlined in the contract. Under a multiple award IDIQ, the FAR requires that an agency give all the IDIQ contract holders “fair opportunity” to compete for an order. Unlike other government contracting methods, IDIQ contracts establish prices during the individual ordering process. The FAR states that individual orders “shall clearly -- 1 of 3 -- Indefinite Delivery, Indefinite Quantity Contracts https://crsreports.congress.gov describe all services to be performed or supplies to be delivered so the full cost or price … can be established when the order is placed.” According to GSA, IDIQ contracts “streamline the contract process and speed service delivery.” A con",
+          "fetched_at": "2026-11-28T09:12:39.248Z",
+          "fetch_error": null
+        }
+      ],
+      "notes": "CRS analysis of SAM.gov's \"Buying Through Government Acquisition Vehicles\" report for 10/1/2023 through 9/30/2024. IDVs include IDCs (of which IDIQ contracts are a subset) plus BOAs and BPAs; the SAM report cannot isolate IDIQ contracts alone."
+    }
+  ]
+}
