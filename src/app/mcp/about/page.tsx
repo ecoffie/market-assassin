@@ -112,6 +112,9 @@ export default function McpAboutPage() {
             <Link href="/mcp/pricing" className="rounded-none border border-(--mp-line) bg-(--mp-surface) px-5 py-2.5 text-sm font-medium text-(--mp-ink) transition hover:bg-(--mp-wash)">
               See pricing
             </Link>
+            <Link href="/mcp/setup" className="rounded-none border border-(--mp-line) bg-(--mp-surface) px-5 py-2.5 text-sm font-medium text-(--mp-ink) transition hover:bg-(--mp-wash)">
+              Step-by-step setup guide
+            </Link>
           </div>
           <p className="mx-auto mt-3 text-[12px] text-(--mp-muted)">No API key — you sign in through your browser. 14-day free trial.</p>
         </section>
