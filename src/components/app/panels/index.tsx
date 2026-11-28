@@ -168,6 +168,7 @@ export default function PanelContainer({ activePanel, email, tier, onPanelChange
             email={email}
             tier={tier}
             initialSection={parseVaultSection(typeof panelContext?.section === 'string' ? panelContext.section : null)}
+            sectionRequest={panelContext}
           />
         );
       case 'library':

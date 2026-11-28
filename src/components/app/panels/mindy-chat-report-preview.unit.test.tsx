@@ -34,11 +34,11 @@ import MindyChatPanel from './MindyChatPanel';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-async function ask(): Promise<HTMLElement> {
+async function ask(onPanelChange?: (panel: string, ctx?: Record<string, unknown>) => void): Promise<HTMLElement> {
   const el = document.createElement('div');
   document.body.appendChild(el);
   const root = createRoot(el);
-  await act(async () => { root.render(<MindyChatPanel email="pro@example.com" tier="pro" />); });
+  await act(async () => { root.render(<MindyChatPanel email="pro@example.com" tier="pro" onPanelChange={onPanelChange as never} />); });
   await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
   const ta = el.querySelector('textarea')!;
   const setVal = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!;
@@ -71,6 +71,21 @@ describe('MindyChatPanel report preview', () => {
     expect(exportToggle.textContent).toMatch(/Export/);
     expect(answer.contains(exportToggle)).toBe(false);
     expect(el.querySelectorAll('[data-testid="generated-downloads"]').length).toBe(1);
+  });
+
+  it('create_document turn: the answer says "Saved to My Documents", which opens Vault → Documents in the app', async () => {
+    sse = [
+      JSON.stringify({ type: 'token', content: 'Here is your capability statement.' }),
+      JSON.stringify({ type: 'deliverables', files: [{ format: 'docx', document_id: DOCX }, { format: 'pdf', document_id: PDF }] }),
+      JSON.stringify({ type: 'done' }),
+    ];
+    const nav = vi.fn();
+    const el = await ask(nav);
+    const a = el.querySelector('[data-testid="chat-report-my-documents"]') as HTMLAnchorElement;
+    expect(a.textContent).toBe('Saved to My Documents');
+    expect(a.getAttribute('href')).toBe('/app?panel=vault&section=documents');
+    await act(async () => { a.click(); });
+    expect(nav).toHaveBeenCalledWith('vault', { section: 'documents' });
   });
 
   it('market_report turn: the packaged report renders inline with no Vault fetch', async () => {

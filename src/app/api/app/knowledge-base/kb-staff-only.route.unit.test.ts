@@ -64,6 +64,17 @@ describe('Knowledge Base corpus routes are staff only', () => {
     expect(doc.status).toBe(200);
   });
 
+  it('staff identity comes from the signed session only: a customer session with ?email=<staff> gets 404', async () => {
+    const tfs = await import('@/lib/two-factor-session');
+    const spy = vi.spyOn(tfs, 'requireMIAuthSession').mockReturnValue({ ok: true, session: { valid: true, email: 'customer@example.com' } } as never);
+    const r = await (await import('./route')).GET(kbReq('staff@govcongiants.com'));
+    expect(r.status).toBe(404);
+    expect(h.calls.length).toBe(0);
+    spy.mockReturnValue({ ok: true, session: { valid: true } } as never);
+    expect((await (await import('./route')).GET(kbReq('staff@govcongiants.com'))).status).toBe(404);
+    spy.mockRestore();
+  });
+
   it('a has_pii document is never served, even to staff', async () => {
     h.doc = { ...DOC, has_pii: true };
     const r = await (await import('../rag-doc/route')).GET(docReq('staff@govcongiants.com'));

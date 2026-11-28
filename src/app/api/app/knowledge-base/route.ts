@@ -87,7 +87,10 @@ export async function GET(request: NextRequest) {
   if (!auth.ok) return auth.response;
   // Staff only (Eric, 2026-11-27): the corpus is internal, not customer-facing. A customer gets the same answer as a
   // route that does not exist.
-  const who = String((auth.session as { email?: string | null }).email || email || '');
+  // Only the email the signed session proves, never the ?email= parameter (Agent 4 review, 2026-11-27). No session
+  // email means no staff identity, so the answer is 404.
+  const sessionEmail = (auth.session as { email?: unknown } | undefined)?.email;
+  const who = typeof sessionEmail === 'string' ? sessionEmail : '';
   if (!canBrowseKnowledgeBase(who)) return NextResponse.json({ success: false, error: 'not found' }, { status: 404 });
 
   const q = (url.searchParams.get('q') || '').trim();

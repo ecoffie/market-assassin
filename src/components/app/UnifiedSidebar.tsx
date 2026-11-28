@@ -11,6 +11,7 @@ import {
   Bell,
   Heart,
   Sun,
+  FileText,
 } from 'lucide-react';
 import { MindyLogo } from '@/components/mindy/MindyLogo';
 import WorkspaceSwitcher from './WorkspaceSwitcher';
@@ -74,7 +75,7 @@ export type AppTier = 'free' | 'pro' | 'team' | 'enterprise';
 // switches to the `map` panel, which shows the map route in the app shell (MapShellPanel, ?shell=app).
 // Free for everyone. Watchlist and Saved — the map's own rail items — sit under a "Saved" heading.
 // The standalone /opportunity-map is unchanged for signed-out visitors, SEO and existing links.
-type ShellItem = { id: 'today' | 'map' | 'watchlist' | 'saved'; label: string; icon: typeof MapPin; description: string };
+type ShellItem = { id: 'today' | 'map' | 'watchlist' | 'saved' | 'documents'; label: string; icon: typeof MapPin; description: string };
 // Today sits above Map only while the switch is on (default OFF — the sidebar is unchanged).
 const TODAY_HOME = isTodayHomeEnabled();
 const TODAY_ITEM: ShellItem = { id: 'today', label: 'Today', icon: Sun, description: 'Your saved searches, three matches and the Map' };
@@ -82,7 +83,13 @@ const MAP_ITEM: ShellItem = { id: 'map', label: 'Map', icon: MapPin, description
 const SAVED_ITEMS: ShellItem[] = [
   { id: 'watchlist', label: 'Watchlist', icon: Bell, description: 'Saved searches and new matches' },
   { id: 'saved', label: 'Saved opportunities', icon: Heart, description: 'Opportunities you hearted' },
+  // Files Mindy made (PDF/Word) and your uploads: My Vault, Documents section (Eric, 2026-11-27). Vault itself is
+  // otherwise reached only from the account menu, so documents had no way in from the sidebar.
+  { id: 'documents', label: 'My Documents', icon: FileText, description: 'Files Mindy made for you and your uploads' },
 ];
+
+/** Where the My Documents row goes: the Vault panel, opened on its Documents section. */
+export const MY_DOCUMENTS_TARGET = { panel: 'vault' as const, context: { section: 'documents' } };
 
 // Sidebar = one row per NAV GROUP (src/components/app/nav-groups.ts). Each group's old pages
 // render as tabs across the top of the main area (AppNavTabs). History of the per-panel order
@@ -90,7 +97,7 @@ const SAVED_ITEMS: ShellItem[] = [
 
 interface UnifiedSidebarProps {
   activePanel: AppPanel;
-  onPanelChange: (panel: AppPanel) => void;
+  onPanelChange: (panel: AppPanel, context?: Record<string, unknown>) => void;
   userTier: AppTier;
   /** Staff / grandfathered org members on Pro can use My Clients. */
   coachModeAllowed?: boolean;
@@ -194,7 +201,7 @@ export default function UnifiedSidebar({
 
   const renderShellItem = (item: ShellItem, count: number | null = null) => {
     const Icon = item.icon;
-    const isActive = activePanel === item.id;
+    const isActive = item.id === 'documents' ? activePanel === 'vault' : activePanel === item.id;
     const isHovered = hoveredItem === item.id;
     const countLabel = count ? (count > 99 ? '99+' : String(count)) : null;
     return (
@@ -205,7 +212,8 @@ export default function UnifiedSidebar({
         aria-current={isActive ? 'page' : undefined}
         onClick={() => {
           track('link_click', 'sidebar', { action: item.id === 'map' ? 'open_map' : 'open_panel', feature: item.id, tier: userTier });
-          onPanelChange(item.id);
+          if (item.id === 'documents') onPanelChange(MY_DOCUMENTS_TARGET.panel, { ...MY_DOCUMENTS_TARGET.context });
+          else onPanelChange(item.id);
           onMobileClose?.();
         }}
         onMouseEnter={(e) => { setHoveredItem(item.id); showTooltip(e, item.label, countLabel ?? undefined, false); }}

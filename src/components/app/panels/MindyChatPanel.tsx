@@ -154,6 +154,8 @@ const MD_CLASSES = [
 ].join(' ');
 
 export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChatPanelProps) {
+  // "Saved to My Documents" under a document Mindy made: in-app jump to Vault → Documents.
+  const openMyDocuments = onPanelChange ? () => onPanelChange('vault', { section: 'documents' }) : undefined;
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
@@ -838,13 +840,13 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
                     <ResearchProgressView progress={msg.progress} running={!!msg.isStreaming && !msg.content && !msg.errored} finishedAt={msg.progressDoneAt} tag={msg.modeLabel} />
                   )}
                   {msg.role === 'assistant' && !msg.isStreaming && !msg.errored && email && msg.report && (
-                    <ChatReportPreview email={email} inline={msg.report} files={msg.deliverables} pdfNote={msg.deliverablePdfNote} />
+                    <ChatReportPreview email={email} inline={msg.report} files={msg.deliverables} pdfNote={msg.deliverablePdfNote} onOpenDocuments={openMyDocuments} />
                   )}
                   {msg.role === 'assistant' && !msg.isStreaming && !msg.errored && email && !msg.report && msg.savedReport && (
-                    <ChatReportPreview email={email} savedReport={msg.savedReport} files={msg.deliverables} pdfNote={msg.deliverablePdfNote} />
+                    <ChatReportPreview email={email} savedReport={msg.savedReport} files={msg.deliverables} pdfNote={msg.deliverablePdfNote} onOpenDocuments={openMyDocuments} />
                   )}
                   {msg.role === 'assistant' && !msg.isStreaming && !msg.errored && email && !msg.report && !msg.savedReport && !!msg.deliverables?.length && (
-                    <ChatReportPreview email={email} files={msg.deliverables} pdfNote={msg.deliverablePdfNote} />
+                    <ChatReportPreview email={email} files={msg.deliverables} pdfNote={msg.deliverablePdfNote} onOpenDocuments={openMyDocuments} />
                   )}
                   <div className={`text-[14.5px] leading-relaxed ${msg.errored ? 'text-red-300' : msg.role === 'user' ? 'text-slate-100' : 'text-slate-200'}`}>
                     {msg.content
