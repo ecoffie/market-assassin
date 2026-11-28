@@ -2,6 +2,7 @@
 
 import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
+import { MINDY_ALERT_SETTINGS_PATH } from '@/lib/mindy/email-branding';
 
 const errorMessages: Record<string, { title: string; message: string }> = {
   missing_params: {
@@ -52,7 +53,7 @@ function ErrorContent() {
 
         {reason === 'user_not_found' && (
           <a
-            href={`/alerts/preferences${email ? `?email=${encodeURIComponent(email)}` : ''}`}
+            href={MINDY_ALERT_SETTINGS_PATH}
             className="inline-block bg-gradient-to-r from-purple-600 to-violet-600 text-white font-semibold px-6 py-3 rounded-lg hover:from-purple-700 hover:to-violet-700 transition-all mb-4"
           >
             Set Up Alert Preferences
@@ -61,7 +62,7 @@ function ErrorContent() {
 
         <div className="mt-6 pt-6 border-t border-gray-200 space-y-3">
           <a
-            href="/alerts/preferences"
+            href={MINDY_ALERT_SETTINGS_PATH}
             className="block text-purple-600 hover:text-purple-800 text-sm font-medium"
           >
             Manage Preferences

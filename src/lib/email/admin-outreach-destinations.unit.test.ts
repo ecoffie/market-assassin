@@ -32,7 +32,9 @@ vi.mock('@supabase/supabase-js', () => ({
 describe('feedbackOutreachPreferencesUrl', () => {
   it('lands on the preferences page for this reader, with UTM tags', () => {
     const u = new URL(feedbackOutreachPreferencesUrl(' Pat@Example.com '));
-    expect(u.origin + u.pathname).toBe('https://getmindy.ai/alerts/preferences');
+    expect(u.origin + u.pathname).toBe('https://getmindy.ai/app');
+    expect(u.searchParams.get('panel')).toBe('settings');
+    expect(u.searchParams.get('section')).toBe('alerts');
     expect(u.searchParams.get('email')).toBe('pat@example.com');
     expect(u.searchParams.get('utm_source')).toBe('resend');
     expect(u.searchParams.get('utm_medium')).toBe('email');

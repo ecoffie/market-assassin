@@ -33,7 +33,14 @@ export const MINDY_APP_URL = resolveEmailDashboardUrl();
  * "show me opportunities", the other is "change my settings", and collapsing them is how
  * both ended up on /briefings.
  */
-export const MINDY_PREFERENCES_URL = `${MINDY_SITE_URL}/alerts/preferences`;
+/**
+ * Alert & email preferences for a customer WITHOUT a signed preferences token: in-app Settings → Alerts & matching.
+ * The old /alerts/preferences page answers "Unauthorized - please sign in" to a signed-in customer unless the link
+ * carries ?email=&token= (Agent 4, production finding 2026-11-28); /app signs them in first when needed.
+ * Token-carrying links (daily alerts' preferencesUrl, access links) keep /alerts/preferences: those work.
+ */
+export const MINDY_ALERT_SETTINGS_PATH = '/app?panel=settings&section=alerts';
+export const MINDY_PREFERENCES_URL = `${MINDY_SITE_URL}${MINDY_ALERT_SETTINGS_PATH}`;
 
 /**
  * The dashboard URL for an EMAIL CTA — always carrying the recipient's identity.

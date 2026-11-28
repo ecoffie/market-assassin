@@ -27,8 +27,12 @@ describe('trial onboarding CTA destinations', () => {
   });
 
   it('each step goes to the Map-era page that matches its copy', () => {
-    expect(ctaHref(renderTrialStep('day0', ctx).html).pathname).toBe('/alerts/preferences');
-    expect(ctaHref(renderTrialStep('day1', ctx).html).pathname).toBe('/alerts/preferences');
+    for (const step of ['day0', 'day1'] as const) {
+      const u = ctaHref(renderTrialStep(step, ctx).html);
+      expect(u.pathname).toBe('/app');
+      expect(u.searchParams.get('panel')).toBe('settings');
+      expect(u.searchParams.get('section')).toBe('alerts');
+    }
     const d3 = ctaHref(renderTrialStep('day3', ctx).html);
     expect(d3.pathname).toBe('/opportunity-map');
     expect(d3.searchParams.get('horizon')).toBe('recompete');

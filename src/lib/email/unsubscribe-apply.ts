@@ -6,6 +6,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { MINDY_SITE_URL } from '@/lib/mindy/email-branding';
 import { UNSUBSCRIBE_PATH, unsubscribeUrl } from './unsubscribe';
 import { sendEmail } from '@/lib/send-email';
+import { MINDY_PREFERENCES_URL } from '@/lib/mindy/email-branding';
 
 type Db = Pick<SupabaseClient, 'from'>;
 
@@ -77,7 +78,7 @@ export type UnsubscribePageState =
   | { state: 'error' }
   | { state: 'legacy_sent' };
 
-const PREFS = `${MINDY_SITE_URL}/alerts/preferences`;
+const PREFS = MINDY_PREFERENCES_URL;
 
 export function unsubscribePage(p: UnsubscribePageState): string {
   const body = (() => {

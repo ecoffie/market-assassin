@@ -35,6 +35,12 @@ const ALLOWED: Array<{ match: RegExp; query?: (q: URLSearchParams) => boolean; r
     query: (q) => q.get('panel') === 'settings' && q.get('section') === 'billing',
     reason: 'billing / cancel subscription — the Subscriptions card (Manage / cancel) lives only in Settings → Billing & credits; no Map-native equivalent yet',
   },
+  {
+    // Exactly /app?panel=settings&section=alerts — "Manage preferences" for a reader without a signed token.
+    match: /^\/app$/,
+    query: (q) => q.get('panel') === 'settings' && q.get('section') === 'alerts',
+    reason: 'alert & email preferences — /alerts/preferences rejects a signed-in customer without a signed token (2026-11-28); Settings → Alerts & matching is the working preferences surface; no Map-native equivalent yet',
+  },
 ];
 
 export interface LegacyLinkFinding {
