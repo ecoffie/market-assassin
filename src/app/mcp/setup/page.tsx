@@ -15,6 +15,7 @@
  */
 import Link from 'next/link';
 import FirstQuestions from './FirstQuestions';
+import CopyAddressButton from './CopyAddressButton';
 import {
   ANY_ASSISTANT_LINE,
   OTHER_ASSISTANTS,
@@ -129,9 +130,12 @@ export default function McpSetupPage() {
         </div>
 
         {/* The address, once, up top */}
-        <div className="mt-6 rounded-none border border-(--mp-line) bg-(--mp-surface) px-4 py-3">
-          <p className="text-[11px] uppercase tracking-wide text-(--mp-muted)">The address you&rsquo;ll paste</p>
-          <code className="mt-1 block truncate font-(family-name:--mp-font-mono) text-[14px] text-(--mp-navy)">{MCP_URL}</code>
+        <div data-testid="setup-address-box" className="mt-6 flex flex-col items-start gap-2 rounded-none border border-(--mp-line) bg-(--mp-surface) px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+          <div className="min-w-0 max-w-full">
+            <p className="text-[11px] uppercase tracking-wide text-(--mp-muted)">The address you&rsquo;ll paste</p>
+            <code className="mt-1 block truncate font-(family-name:--mp-font-mono) text-[14px] text-(--mp-navy)">{MCP_URL}</code>
+          </div>
+          <CopyAddressButton text={MCP_URL} />
         </div>
 
         {/* Which AI do you use? Each option jumps to its section and AI_CHOOSER_CSS hides the
