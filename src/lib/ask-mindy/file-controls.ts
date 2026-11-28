@@ -1,8 +1,9 @@
 /**
  * Where the customer attaches a file. Production finding 2026-11-27 (Map drawer): asked to connect Drive, Mindy said
  * "None of my tools can link outside accounts... do it yourself in the Mindy app" without saying where.
- * The Map drawer HAS an Attach row (opportunity-map/route.ts buildAttach, label "Attach", shown when uploads are enabled
- * for the caller) but no Drive/OneDrive picker, which lives only in Ask Mindy in the app (/app?panel=chat).
+ * The Map drawer has an Attach row (opportunity-map/route.ts buildAttach, label "Attach", shown when uploads are enabled
+ * for the caller) and, since 2026-11-28, a "Drive or OneDrive" button (buildDrive) shown when connected apps are on AND
+ * an account is already connected. Connecting an account happens in Ask Mindy in the app (/app?panel=chat).
  */
 export type FileSurface = 'map' | 'app';
 
@@ -20,7 +21,9 @@ export function fileControlsNote(a: { surface: FileSurface; uploads: boolean; co
     lines.push(a.uploads
       ? 'For a file from their computer: "Use **Attach** under the message box in this panel to add a file from your computer."'
       : 'For a file from their computer: attaching files is not turned on for their account yet.');
-    if (a.connected) lines.push(`For Google Drive or OneDrive: "For Google Drive or OneDrive, open [Ask Mindy](${ASK_MINDY_CHAT_HREF}) in the left sidebar and use **Use a file from Drive or OneDrive**." Include that link exactly; this Map panel has no Drive or OneDrive picker.`);
+    // The server cannot tell here whether an account is connected (the flag only says the feature is on), so the
+    // answer covers both: the in-panel picker when connected, Ask Mindy in the app to connect one first.
+    if (a.connected) lines.push(`For Google Drive or OneDrive: "Use **Drive or OneDrive** under the message box in this panel to pick a file. If that button is not there, connect your account first: open [Ask Mindy](${ASK_MINDY_CHAT_HREF}) in the left sidebar and use **Use a file from Drive or OneDrive** → Connect." Include that link exactly.`);
   } else {
     lines.push(a.uploads
       ? 'For a file from their computer: "Use **Attach file** under the message box."'
